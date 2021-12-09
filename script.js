@@ -10,10 +10,6 @@ const BoxEdge = {
    */
   New: 0,
   /**
-   * You can place the cursor here, but other shared edges will get "collapsed" into it. Or skipped.
-   */
-  Shared: 1,
-  /**
    * You cannot place the cursor here, however you might be able to place it inside one of the deeper children.
    */
   Skip: 2,
@@ -24,55 +20,88 @@ const BoxEdge = {
 };
 
 const tagBoxHandling = new Map([
-  ["math", [BoxEdge.New, BoxEdge.New]],
-  ["semantics", [BoxEdge.Skip, BoxEdge.Skip]],
-  ["annotation", [BoxEdge.Ignore, BoxEdge.Ignore]],
-  ["annotation-xml", [BoxEdge.Ignore, BoxEdge.Ignore]],
-  ["mtext", [BoxEdge.Shared, BoxEdge.Shared]], // Maybe mtext deserves BoxHandling.New
-  ["mi", [BoxEdge.Shared, BoxEdge.Shared]],
-  ["mn", [BoxEdge.Shared, BoxEdge.Shared]],
-  ["mo", [BoxEdge.Shared, BoxEdge.Shared]],
-  ["mspace", [BoxEdge.Shared, BoxEdge.Shared]],
-  ["ms", [BoxEdge.Shared, BoxEdge.Shared]],
-  ["mrow", [BoxEdge.Shared, BoxEdge.Shared]],
-  ["mfrac", [BoxEdge.New, BoxEdge.New], [BoxEdge.New, BoxEdge.New]],
-  ["msqrt", [BoxEdge.New, BoxEdge.New]],
-  ["mroot", [BoxEdge.Shared, BoxEdge.Shared], [BoxEdge.New, BoxEdge.New]],
-  ["mstyle", [BoxEdge.Skip, BoxEdge.Skip]],
-  ["merror", [BoxEdge.Skip, BoxEdge.Skip]], // Maybe merror deserves BoxHandling.New
-  ["maction", [BoxEdge.Skip, BoxEdge.Skip]],
-  ["mpadded", [BoxEdge.New, BoxEdge.New]],
-  ["mphantom", [BoxEdge.Ignore, BoxEdge.Ignore]],
-  ["msub", [BoxEdge.Shared, BoxEdge.New], [BoxEdge.New, BoxEdge.New]],
-  ["msup", [BoxEdge.Shared, BoxEdge.New], [BoxEdge.New, BoxEdge.New]],
+  ["math", (element, index) => BoxEdge.New],
+  ["semantics", (element, index) => BoxEdge.Skip], // Semantics annotates exactly one child
+  ["annotation", (element, index) => BoxEdge.Ignore],
+  ["annotation-xml", (element, index) => BoxEdge.Ignore],
   [
-    "msubsup",
-    [BoxEdge.Shared, BoxEdge.New],
-    [BoxEdge.New, BoxEdge.New],
-    [BoxEdge.New, BoxEdge.New],
-  ],
-  ["munder", [BoxEdge.Shared, BoxEdge.Shared], [BoxEdge.New, BoxEdge.New]],
-  ["mover", [BoxEdge.Shared, BoxEdge.Shared], [BoxEdge.New, BoxEdge.New]],
+    "mtext",
+    (element, index) => {
+      if (index == 0) return BoxEdge.Skip;
+      if (index == getChildrenLength(element)) return BoxEdge.Skip;
+      return BoxEdge.New;
+    },
+  ], // Maybe mtext deserves BoxEdge.New
   [
-    "munderover",
-    [BoxEdge.Shared, BoxEdge.Shared],
-    [BoxEdge.New, BoxEdge.New],
-    [BoxEdge.New, BoxEdge.New],
+    "mi",
+    (element, index) => {
+      if (index == 0) return BoxEdge.Skip;
+      if (index == getChildrenLength(element)) return BoxEdge.Skip;
+      return BoxEdge.New;
+    },
   ],
+  [
+    "mn",
+    (element, index) => {
+      if (index == 0) return BoxEdge.Skip;
+      if (index == getChildrenLength(element)) return BoxEdge.Skip;
+      return BoxEdge.New;
+    },
+  ],
+  [
+    "mo",
+    (element, index) => {
+      if (index == 0) return BoxEdge.Skip;
+      if (index == getChildrenLength(element)) return BoxEdge.Skip;
+      return BoxEdge.New;
+    },
+  ],
+  [
+    "mspace",
+    (element, index) => {
+      if (index == 0) return BoxEdge.Skip;
+      if (index == getChildrenLength(element)) return BoxEdge.Skip;
+      return BoxEdge.New;
+    },
+  ],
+  [
+    "ms",
+    (element, index) => {
+      if (index == 0) return BoxEdge.Skip;
+      if (index == getChildrenLength(element)) return BoxEdge.Skip;
+      return BoxEdge.New;
+    },
+  ],
+  [
+    "mrow",
+    (element, index) => {
+      if (index == 0) return BoxEdge.Skip;
+      if (index == getChildrenLength(element)) return BoxEdge.Skip;
+      return BoxEdge.New;
+    },
+  ], // Skip, new, new, new, ....., skip
+  ["mfrac", (element, index) => BoxEdge.New],
+  ["msqrt", (element, index) => BoxEdge.New],
+  ["mroot", (element, index) => (index <= 1 ? BoxEdge.Skip : BoxEdge.New)], // skip edges for the first child element
+  ["mstyle", (element, index) => BoxEdge.Skip],
+  ["merror", (element, index) => BoxEdge.Skip], // Maybe merror deserves BoxHandling.New. or mtext?
+  ["maction", (element, index) => BoxEdge.Skip],
+  ["mpadded", (element, index) => BoxEdge.New],
+  ["mphantom", (element, index) => BoxEdge.Ignore],
+  ["msub", (element, index) => (index <= 0 ? BoxEdge.Skip : BoxEdge.New)],
+  ["msup", (element, index) => (index <= 0 ? BoxEdge.Skip : BoxEdge.New)],
+  ["msubsup", (element, index) => (index <= 0 ? BoxEdge.Skip : BoxEdge.New)],
+  ["munder", (element, index) => BoxEdge.New],
+  ["mover", (element, index) => BoxEdge.New],
+  ["munderover", (element, index) => BoxEdge.New], // because it matters which elements are sandwiched between the under-over
   // see https://www.w3.org/TR/mathml-core/#prescripts-and-tensor-indices-mmultiscripts
-  [
-    "mmultiscripts",
-    [BoxEdge.Shared, BoxEdge.Shared],
-    [BoxEdge.New, BoxEdge.New],
-  ], // TODO: Here the boxes sorta depend on whether the postscripts and prescripts exist or not
-  ["none", [BoxEdge.Ignore, BoxEdge.Ignore]], // Or we could make all "none"s navigateable. Hm
-  ["mprescripts", [BoxEdge.Ignore, BoxEdge.Ignore]],
-  ["mtable", [BoxEdge.Shared, BoxEdge.Shared]], // Not sure
-  ["mtr", [BoxEdge.Shared, BoxEdge.Shared]], // Not sure
-  ["mtd", [BoxEdge.New, BoxEdge.New]],
+  ["mmultiscripts", (element, index) => BoxEdge.New],
+  ["none", (element, index) => BoxEdge.Ignore], // Or we could make all "none"s navigateable. Hm
+  ["mprescripts", (element, index) => BoxEdge.Ignore],
+  ["mtable", (element, index) => BoxEdge.Skip],
+  ["mtr", (element, index) => BoxEdge.Skip],
+  ["mtd", (element, index) => BoxEdge.New],
 ]);
-
-// TODO: moveRight and moveLeft functions, using the info above
 
 /**
  * MathML can be separated into text-containing nodes and other nodes.
@@ -88,23 +117,122 @@ function isTextTagElement(t) {
 }
 
 /**
- * Creates a caret that can be positioned anywhere on the screen
+ * Gets the text length for text-children and the number of elements otherwise
+ * @param {HTMLElement} t
  */
-function createCaretElement() {
-  let cursorElement = document.createElement("span");
-  cursorElement.style.userSelect = "none";
-  cursorElement.style.position = "absolute";
-  cursorElement.style.height = "10px";
-  cursorElement.style.width = "0px";
-  cursorElement.style.margin = "0px";
-  cursorElement.style.borderRightWidth = "0px";
-  cursorElement.style.boxShadow = "0px 0px 0px 1px black";
-  cursorElement.style.top = "0px";
+function getChildrenLength(t) {
+  if (isTextTagElement(t)) {
+    return getTextLength(t);
+  } else {
+    if (t.childElementCount == 0) {
+      return 0; // TODO: Or return 1? Hmm
+    } else {
+      return t.childElementCount;
+    }
+  }
+}
 
-  cursorElement.className = "math-cursor";
-  document.body.appendChild(cursorElement);
+function classifyEdge(target, index) {
+  let tagName = target.tagName.toLowerCase();
+  let handling = tagBoxHandling.get(tagName);
+  if (!handling) {
+    console.warn("Unknown target", target);
+    handling = (element, index) => BoxEdge.New;
+  }
 
-  return cursorElement;
+  return handling(target, index);
+}
+
+// TODO: moveRight and moveLeft functions, using the info above
+// And the also moveUp and moveDown
+
+function getPrevious(target, index) {
+  // If we can move inside the text, we do that
+  if (isTextTagElement(target) && index - 1 >= 0) {
+    return {
+      target,
+      index: index - 1,
+      type: classifyEdge(target, index - 1),
+    };
+  }
+
+  if (index <= 0) {
+    // We're at the end (it's important to first check this, otherwise empty text nodes might cause issues)
+    // So we step out of this element, into the parent
+    let parentIndex = indexInParent(target);
+    return {
+      target: target.parentElement,
+      index: parentIndex,
+      type: classifyEdge(target, parentIndex),
+    };
+  } else {
+    // The cursor is in a non-text node. So we check out the next interesting child and step into it
+    let nextChildElement = target.children[index - 1];
+    let childIndex = getChildrenLength(nextChildElement);
+    return {
+      target: nextChildElement,
+      index: childIndex,
+      type: classifyEdge(nextChildElement, childIndex),
+    };
+  }
+}
+
+function getNext(target, index) {
+  // If we can move inside the text, we do that
+  if (isTextTagElement(target) && index + 1 <= getChildrenLength(target)) {
+    return {
+      target,
+      index: index + 1,
+      type: classifyEdge(target, index + 1),
+    };
+  }
+
+  if (index >= getChildrenLength(target)) {
+    // We're at the end (it's important to first check this, otherwise empty text nodes might cause issues)
+    // So we step out of this element, into the parent
+    let parentIndex = indexInParent(target) + 1;
+    return {
+      target: target.parentElement,
+      index: parentIndex,
+      type: classifyEdge(target, parentIndex),
+    };
+  } else {
+    // The cursor is in a non-text node. So we check out the next interesting child and step into it
+    let nextChildElement = target.children[index];
+    return {
+      target: nextChildElement,
+      index: 0,
+      type: classifyEdge(nextChildElement, 0),
+    };
+  }
+}
+
+/**
+ *
+ * @param {HTMLElement} target
+ * @param {number} index
+ * @param {(target: HTMLElement, index: number) => {target: any, index: any, type: number}} getInDirection
+ * @returns
+ */
+function move(target, index, getInDirection, silent = true) {
+  let current = { target, index };
+
+  // TODO: Handle the case where we navigate outside of the math element!
+
+  while (true) {
+    let potentialNext = getInDirection(current.target, current.index);
+    if (!silent) console.log(current, "lead to", potentialNext);
+    if (potentialNext.type == BoxEdge.New) {
+      // Also includes the "next character in text"
+      return potentialNext;
+    } else if (potentialNext.type == BoxEdge.Skip) {
+      current.target = potentialNext.target;
+      current.index = potentialNext.index;
+    } else if (potentialNext.type == BoxEdge.Ignore) {
+      current.target = potentialNext.target;
+      current.index = getChildrenLength(potentialNext.index); // skip over the children
+    }
+  }
 }
 
 /**
@@ -117,148 +245,71 @@ function makeEditable(mathElement) {
 
   makeHoverable(mathElement);
 
-  // Some hack to overlay a caret
-  let cursorElement = createCaretElement();
+  let cursorElement = createCursor();
 
-  // A cursor here consists of a text-containing node and an index
-  let cursorTarget = null;
-  let cursorIndex = 0;
+  // A cursor here consists of a node and an index
+  // The index can be the index in the text, or it can be 0 (start) or 1 (end)
+  let cursor = {
+    cursorElement,
+    target: null,
+    index: 0,
+  };
+
   function setCursorTarget(t) {
-    if (cursorTarget) {
-    }
-    cursorTarget = t;
+    cursor.target = t;
     setCursorIndex(0);
-    if (cursorTarget) {
-    }
-  }
-
-  /**
-   * Returns the number of characters in a text-containing node.
-   * Could be cached
-   */
-  function getTextLength(t) {
-    // TODO: A better implementation would use ranges: https://javascript.info/selection-range
-    return t.innerText?.length ?? t.textContent.length;
-  }
-
-  /**
-   * Returns the screen position of a letter in a text-containing node
-   */
-  function getLetterPosition(t, index) {
-    // https://stackoverflow.com/a/51618540/3492994
-
-    // A better implementation would deal with the fact that a node can contain multiple text childs
-    let range = document.createRange();
-    range.setStart(t.firstChild, index);
-
-    return range.getBoundingClientRect();
   }
 
   /**
    * Sets the letter-index of the cursor. Also moves the caret there.
    */
   function setCursorIndex(index) {
-    cursorIndex = index;
-    if (cursorTarget) {
-      let letterBoundingBox = getLetterPosition(cursorTarget, cursorIndex);
-      let containerBoundingBox = cursorTarget.getBoundingClientRect();
-      cursorElement.style.top = `${letterBoundingBox.top + window.scrollY}px`;
-      cursorElement.style.left = `${letterBoundingBox.left + window.scrollX}px`;
-      cursorElement.style.height = `${containerBoundingBox.height}px`;
+    cursor.index = index;
+    if (cursor.target) {
+      let targetBounds = getElementBounds(cursor.target);
+
+      if (isTextTagElement(cursor.target)) {
+        // Position it where the letter is
+        let letterPosition = getLetterPosition(cursor.target, cursor.index);
+        cursor.cursorElement.setPosition(letterPosition.x, letterPosition.y);
+        cursor.cursorElement.setHeight(targetBounds.height);
+      } else {
+        let prevElement = move(cursor.target, cursor.index, getPrevious);
+        let nextElement = move(cursor.target, cursor.index, getNext);
+
+        let prevBounds = getElementBounds(prevElement.target);
+        let nextBounds = getElementBounds(nextElement.target);
+
+        // Use the average bounds
+        cursor.cursorElement.setPosition(
+          (prevBounds.x + prevBounds.width + nextBounds.x) / 2, // use the rightmost edge of the previous bounds
+          (prevBounds.y + nextBounds.y) / 2
+        );
+        cursor.cursorElement.setHeight(
+          (prevBounds.height + nextBounds.height) / 2
+        );
+      }
     } else {
-      cursorElement.style.top = "0px";
-      cursorElement.style.left = "0px";
+      cursor.cursorElement.setPosition(0, 0);
+      cursor.cursorElement.setHeight(0);
     }
-  }
-
-  function getAdjacent(t, direction) {
-    if (direction == "Up" || direction == "Down") {
-      // TODO: Special rules depending on t.parentNode
-      return null;
-    } else if (direction == "Left") {
-      return getTextElement(t.previousElementSibling, "End");
-    } else if (direction == "Right") {
-      return getTextElement(t.nextElementSibling, "Start");
-    }
-  }
-
-  /**
-   * Gets a text element inside this node
-   * @param {HTMLElement} t
-   * @param {"Start"|"End"} startOrEnd the caller should decide which side to come from
-   * @returns
-   */
-  function getTextElement(t, startOrEnd) {
-    if (!t) return null;
-
-    if (isTextTagElement(t)) {
-      return t;
-    }
-
-    if (startOrEnd == "Start") {
-      // Notice how we're using firstElementChild to skip #text nodes
-      return getTextElement(t.firstElementChild, startOrEnd);
-    } else if (startOrEnd == "End") {
-      return getTextElement(t.lastElementChild, startOrEnd);
-    }
-  }
-
-  function navigate(direction) {
-    let currentElement = cursorTarget;
-    let adjacentElement = null;
-    while (currentElement && currentElement != mathElement) {
-      adjacentElement = getAdjacent(currentElement, direction);
-      if (adjacentElement) break;
-
-      currentElement = currentElement.parentNode;
-    }
-
-    if (!currentElement || currentElement == mathElement) {
-      console.log("no!");
-      return;
-    }
-
-    if (adjacentElement == null) {
-      console.log("absolutely not!");
-      return;
-    }
-
-    setCursorTarget(adjacentElement);
-
-    // TODO: This is still a bit of a hack
-    if (direction == "Left") {
-      setCursorIndex(getTextLength(adjacentElement));
-    }
-  }
-
-  function skipFinalSpot(t) {
-    // If placing the caret at the end of a text-element doesn't make sense, we skip it
-    // So, we have the current element (t), an adjacent element (use the navigate algorithm) and a shared parent (...)
-
-    // So we start from the current element and travel upwards. Certain elements, like msqrt mean that we automatiall "return false"
-    // Otherwise, we end up at the shared parent. Now we *have* to decide
-    // Whitelist or blacklist? Or depending on the style/relative positions?
-
-    return false;
   }
 
   // If we click, we gotta do something
   mathElement.addEventListener("pointerdown", (ev) => {
-    if (!isTextTagElement(ev.target)) {
+    /*if (!isTextTagElement(ev.target)) {
       // TODO: Maybe select the nearest such element?
       return;
-    }
+    }*/
 
+    // TODO: This is a bit wrong. We need to find the closest element where stuff can actually be placed.
     setCursorTarget(ev.target);
 
-    let boundingBox = ev.target.getBoundingClientRect();
+    let boundingBox = getElementBounds(ev.target);
 
     // setCursorIndex according to the relative position in this element
-    if (
-      ev.pageX >=
-      (boundingBox.left + boundingBox.right + +window.scrollX) / 2
-    ) {
-      setCursorIndex(getTextLength(ev.target));
+    if (ev.pageX >= (boundingBox.left + boundingBox.right) / 2) {
+      setCursorIndex(getChildrenLength(ev.target));
     } else {
       setCursorIndex(0);
     }
@@ -266,35 +317,20 @@ function makeEditable(mathElement) {
 
   // If we use the arrow keys, we gotta do something
   mathElement.addEventListener("keydown", (ev) => {
-    if (!cursorTarget) return;
+    if (!cursor.target) return;
 
     if (ev.key == "ArrowUp") {
-      navigate("Up");
+      //navigate("Up");
     } else if (ev.key == "ArrowDown") {
-      navigate("Down");
+      //navigate("Down");
     } else if (ev.key == "ArrowLeft") {
-      if (cursorIndex - 1 < 0) {
-        navigate("Left");
-      } else {
-        setCursorIndex(cursorIndex - 1);
-      }
+      let moveResult = move(cursor.target, cursor.index, getPrevious, false);
+      setCursorTarget(moveResult.target);
+      setCursorIndex(moveResult.index);
     } else if (ev.key == "ArrowRight") {
-      let maxLength = getTextLength(cursorTarget);
-      if (cursorIndex + 1 > maxLength) {
-        navigate("Right");
-      } else if (cursorIndex + 1 == maxLength && skipFinalSpot(cursorTarget)) {
-        // TODO: Don't make this a special case that's just here. Instead unconditionally check this after every move
-        // Otherwise we could accidentally click on a "skip" final spot or something
-
-        // Special case where we skip to the next node
-        // For example, if we have <mn>2</mn><mo>=</mo>,
-        //   we don't need to be able to put the cursor
-        //       <mn>2HERE</mn><mo>=</mo>
-        //   and <mn>2</mn><mo>HERE=</mo>
-        navigate("Right");
-      } else {
-        setCursorIndex(cursorIndex + 1);
-      }
+      let moveResult = move(cursor.target, cursor.index, getNext, false);
+      setCursorTarget(moveResult.target);
+      setCursorIndex(moveResult.index);
     }
   });
 }
@@ -319,10 +355,10 @@ function makeHoverable(mathElement) {
   }
 
   mathElement.addEventListener("pointerover", (ev) => {
-    if (!isTextTagElement(ev.target)) {
+    /*if (!isTextTagElement(ev.target)) {
       // TODO: Maybe select the nearest such element?
       return;
-    }
+    }*/
     setHoverTarget(ev.target);
   });
 
