@@ -2,7 +2,7 @@
  * Creates a caret that can be positioned anywhere in the document.
  * The (x,y) refers to the top left corner of the caret.
  */
-function createCursor() {
+export function createCursor() {
   let cursorElement = document.createElement("span");
   cursorElement.style.userSelect = "none";
   cursorElement.style.position = "absolute";
@@ -10,7 +10,7 @@ function createCursor() {
   cursorElement.style.width = "0px";
   cursorElement.style.margin = "0px";
   cursorElement.style.borderRightWidth = "0px";
-  cursorElement.style.boxShadow = "0px 0px 0px 1px black";
+  cursorElement.style.boxShadow = "0px 0px 0px 0.6px rgba(50, 50, 230, 50%)";
   cursorElement.style.top = "0px";
   // Maybe add some cute blinking
   cursorElement.className = "math-cursor";
@@ -39,7 +39,7 @@ function createCursor() {
 /**
  * Returns the number of characters in a text-containing node.
  */
-function getTextLength(t) {
+export function getTextLength(t) {
   // TODO: A bit of a shoddy implementation
   return t.textContent.trim().length;
 }
@@ -47,7 +47,7 @@ function getTextLength(t) {
 /**
  * Returns the document position of a letter in a text-containing node
  */
-function getLetterPosition(t, index) {
+export function getLetterPosition(t, index) {
   // https://stackoverflow.com/a/51618540/3492994
 
   // A better implementation would deal with the fact that a node can contain multiple text childs
@@ -67,7 +67,7 @@ function getLetterPosition(t, index) {
  * @param {HTMLElement} t
  * @returns DOMRect
  */
-function getElementBounds(t) {
+export function getElementBounds(t) {
   let boundingBox = t.getBoundingClientRect();
 
   return new DOMRect(
@@ -83,7 +83,7 @@ function getElementBounds(t) {
  * @param {HTMLElement} t
  * @returns number
  */
-function indexInParent(t) {
+export function indexInParent(t) {
   // https://stackoverflow.com/a/23528539/3492994
   return Array.prototype.indexOf.call(t.parentElement.children, t);
 }

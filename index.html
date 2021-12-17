@@ -2,7 +2,16 @@
 <head>
   <meta charset="utf-8" />
   <title>Mathml Editor</title>
-  <style></style>
+  <style>
+    /* so that the carets are spaced out nicely */
+    msqrt::after {
+      content: " ";
+      width: 10px;
+      min-width: 10px;
+      margin: 1px;
+      padding: 1px;
+    }
+  </style>
 </head>
 <body>
   <div style="width: 15em">
@@ -43,11 +52,8 @@
       </munderover>
     </math>
 
-    An annotated test case.
-    <br />
-    One approach is to only place the caret at new-edges. All other edges get
-    skipped. (And certain elements get ignored.) Alrighty, this works. Now we
-    just need to fix the caret (position and size). ^ was trash
+    An annotated test case. <br />
+    The shiny new approach is to generate a list of valid caret positions.
 
     <math>
       <!--|-->
@@ -71,7 +77,9 @@
       <msqrt>
         <!--|-->
         <msqrt>
-          <mn> <!--|-->5<!--|--> </mn>
+          <mstyle>
+            <mn> <!--|-->5<!--|--> </mn>
+          </mstyle>
         </msqrt>
         <!--|-->
       </msqrt>
@@ -87,52 +95,6 @@
       </munderover>
       <!--|-->
     </math>
-    <br />
-    Another approach is to start with the simplest elements, define rules for
-    them and then carefully add in more complicated ones.
-    <h4>mi</h4>
-    Cursor can be placed at the beginning and end. Cursor can also be placed in
-    the text.
-    <h4>multiple mi</h4>
-    Cursor can be placed between them. If this happens, the cursor will skip
-    edges that are touching each other. (if at edge and we're moving, skip over
-    all touching edges)
-    <h4>mn,mo,ms</h4>
-    same as mi
-    <h4>mfrac</h4>
-    Cursor can be placed at the beginning and end. Same rules as mi, including
-    the multiple mi rule. The inside of a fraction has strict delimiters. Across
-    those, the "edge touching" rule will be disabled. Like this:
-    frac|top|bottom|frac
-    <h4>mtext</h4>
-    Cursor can be placed at the beginning and end. Same rules as mi, including
-    the multiple mi rule. The inside of mtext has strict delimiters. They block
-    the "mi-edge touching"
-    <h4>math</h4>
-    like mtext, except with the special case that we cannot navigate out of it.
-    ever.
-    <h4>msqrt</h4>
-    like mtext
-    <h4>mroot</h4>
-    Cursor can be placed at the beginning and end. Same rules as mi, including
-    the multiple mi rule. The inside of it has strict delimiters for only the
-    second element! Like this: mroot msqrt msqrt | nthroot | mroot
-    <h4>mpadded</h4>
-    like mtext, I guess? unless I find out that people use mpadded for fun
-    <h4>msub</h4>
-    like mroot. strict delimiters only around the second element
-    <h4>msub, msup, msubsup</h4>
-    like mroot. strict delimiters only around the second element
-    <h4>munder, mover, munderover</h4>
-    like mfrac, strict delimiters everywhere inside it
-    <h4>mtd</h4>
-    like mtext
-    <h4>mtr</h4>
-    skippy skip
-    <br />
-    However, all those rules are doomed to fail.
-    <code>\frac{\sqrt{}}{}</code> says henlo
   </div>
-  <script src="./helpers.js"></script>
-  <script src="./script.js"></script>
+  <script type="module" src="./script.js"></script>
 </body>

@@ -1,4 +1,19 @@
+import {
+  createCursor,
+  getTextLength,
+  getLetterPosition,
+  getElementBounds,
+  indexInParent,
+} from "./helpers.js";
+
 [...document.querySelectorAll("math")].forEach(makeEditable);
+
+function CaretLocation(x, y, height) {
+  this.x = x;
+  this.y = y;
+  this.height = height;
+  return this;
+}
 
 // TODO: Write documentation about the algorithm
 /**
@@ -235,6 +250,160 @@ function move(target, index, getInDirection, silent = true) {
   }
 }
 
+// TODO: A render-caret locations method
+function addCaretLocations(caretLocations, mathElement) {
+  function tagIs(element, ...tagNames) {
+    return tagNames.includes(element.tagName.toLowerCase());
+  }
+
+  // Quick n cheap way of saying "skip the next opening thingy"
+  let skipNext = false;
+
+  /**
+   *
+   * @param {HTMLElement} element
+   */
+  function addCaretLocation(element) {
+    if (!element) return;
+
+    let children = [...element.children];
+
+    if (tagIs(element, "math")) {
+      skipNext = false;
+      children.forEach((v) => addCaretLocation(v));
+      skipNext = false;
+    } else if (tagIs(element, "semantics")) {
+      // Semantics annotates exactly one child
+      addCaretLocation(children[0]);
+    } else if (
+      tagIs(
+        element,
+        "annotation",
+        "annotation-xml",
+        "mphantom",
+        "none",
+        "mprescripts"
+      )
+    ) {
+      // Ignore
+    } else if (tagIs(element, "mtext", "mpadded")) {
+      // Add a start and end caret
+      let bounds = getElementBounds(element);
+      caretLocations.push(new CaretLocation(bounds.x, bounds.y, bounds.height));
+      skipNext = false;
+      children.forEach((v) => addCaretLocation(v));
+      caretLocations.push(
+        new CaretLocation(bounds.x + bounds.width, bounds.y, bounds.height)
+      );
+      skipNext = false;
+    } else if (tagIs(element, "mi", "mn", "mo", "mspace", "ms")) {
+      // Hmm, only some of them produce a valid caret location
+      // We could theoretically take a look at the stack. Or do this:
+
+      // The "Check if no right sibling" rule has the problem that it needs to apply
+      // to more elements, like fraction fraction or sqrt sqrt
+
+      let bounds = getElementBounds(element);
+      if (!skipNext) {
+        caretLocations.push(
+          new CaretLocation(bounds.x, bounds.y, bounds.height)
+        );
+        // skipNext = true; // TODO: ?
+      }
+      children.forEach((v) => addCaretLocation(v));
+
+      caretLocations.push(
+        new CaretLocation(bounds.x + bounds.width, bounds.y, bounds.height)
+      );
+      skipNext = true;
+    } else if (tagIs(element, "mrow")) {
+      // TODO: What if we have an empty mrow? Should we add a caret to every empty element?
+      children.forEach((v) => addCaretLocation(v));
+    } else if (tagIs(element, "mfrac")) {
+      let bounds = getElementBounds(element);
+      if (!skipNext) {
+        caretLocations.push(
+          new CaretLocation(bounds.x, bounds.y, bounds.height)
+        );
+      }
+
+      children.forEach((v) => {
+        skipNext = false;
+        addCaretLocation(v);
+      });
+
+      caretLocations.push(
+        new CaretLocation(bounds.x + bounds.width, bounds.y, bounds.height)
+      );
+      skipNext = true;
+    } else if (tagIs(element, "msqrt")) {
+      // The msqrt caret is a funky one. We place it *outside* of the element
+
+      let bounds = getElementBounds(element);
+      if (!skipNext) {
+        caretLocations.push(
+          new CaretLocation(bounds.x, bounds.y, bounds.height)
+        );
+      }
+      skipNext = false;
+      // TODO: A msqrt without any children has the same problem as an empty mrow...
+      children.forEach((v) => addCaretLocation(v));
+
+      caretLocations.push(
+        new CaretLocation(bounds.x + bounds.width, bounds.y, bounds.height)
+      );
+      skipNext = true;
+    } else if (tagIs(element, "mroot")) {
+      // mroot has one msqrt and a "nth root" symbol
+      children.forEach((v) => {
+        addCaretLocation(v);
+        skipNext = false;
+      });
+      skipNext = false;
+    } else if (tagIs(element, "mstyle", "merror", "maction")) {
+      children.forEach((v) => addCaretLocation(v));
+    } else if (tagIs(element, "msub", "msup", "msubsup")) {
+      let bounds = getElementBounds(element);
+
+      children.forEach((v) => {
+        addCaretLocation(v);
+        skipNext = false;
+      });
+
+      caretLocations.push(
+        new CaretLocation(bounds.x + bounds.width, bounds.y, bounds.height)
+      );
+      skipNext = true;
+    } else if (
+      tagIs(element, "munder", "mover", "munderover", "mmultiscripts")
+    ) {
+      // it matters which elements are sandwiched between the under-over
+      // see also https://www.w3.org/TR/mathml-core/#prescripts-and-tensor-indices-mmultiscripts
+      let bounds = getElementBounds(element);
+
+      if (!skipNext) {
+        caretLocations.push(
+          new CaretLocation(bounds.x, bounds.y, bounds.height)
+        );
+      }
+      // Normal carets outside, and every child gets its own caret positions
+      children.forEach((v) => {
+        skipNext = false;
+        addCaretLocation(v);
+      });
+
+      caretLocations.push(
+        new CaretLocation(bounds.x + bounds.width, bounds.y, bounds.height)
+      );
+      skipNext = true;
+    } else if (tagIs(element, "mtable")) {
+      // TODO: Finish it up, mtr and mtd also exist
+    }
+  }
+
+  addCaretLocation(mathElement);
+}
+
 /**
  * Takes a <math> element and makes it editable
  * @param {HTMLElement} mathElement
@@ -246,12 +415,19 @@ function makeEditable(mathElement) {
   makeHoverable(mathElement);
 
   let cursorElement = createCursor();
+  let caretLocations = [];
+  addCaretLocations(caretLocations, mathElement);
 
-  // A cursor here consists of a node and an index
+  caretLocations.forEach((loc) => {
+    let c = createCursor();
+    c.setPosition(loc.x, loc.y);
+    c.setHeight(loc.height);
+  });
+
+  // A cursor here consists of an index in the caretLocations array
   // The index can be the index in the text, or it can be 0 (start) or 1 (end)
   let cursor = {
     cursorElement,
-    target: null,
     index: 0,
   };
 
