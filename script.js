@@ -15,109 +15,8 @@ function CaretLocation(x, y, height) {
   return this;
 }
 
+// TODO: Caret height is trickier
 // TODO: Write documentation about the algorithm
-/**
- * A parent defines where you can place the cursor for its direct children.
- */
-const BoxEdge = {
-  /**
-   * You can definitely place the cursor at this edge.
-   */
-  New: 0,
-  /**
-   * You cannot place the cursor here, however you might be able to place it inside one of the deeper children.
-   */
-  Skip: 2,
-  /**
-   * You cannot place the cursor here or anywhere deeper in this tree.
-   */
-  Ignore: 3,
-};
-
-const tagBoxHandling = new Map([
-  ["math", (element, index) => BoxEdge.New],
-  ["semantics", (element, index) => BoxEdge.Skip], // Semantics annotates exactly one child
-  ["annotation", (element, index) => BoxEdge.Ignore],
-  ["annotation-xml", (element, index) => BoxEdge.Ignore],
-  [
-    "mtext",
-    (element, index) => {
-      if (index == 0) return BoxEdge.Skip;
-      if (index == getChildrenLength(element)) return BoxEdge.Skip;
-      return BoxEdge.New;
-    },
-  ], // Maybe mtext deserves BoxEdge.New
-  [
-    "mi",
-    (element, index) => {
-      if (index == 0) return BoxEdge.Skip;
-      if (index == getChildrenLength(element)) return BoxEdge.Skip;
-      return BoxEdge.New;
-    },
-  ],
-  [
-    "mn",
-    (element, index) => {
-      if (index == 0) return BoxEdge.Skip;
-      if (index == getChildrenLength(element)) return BoxEdge.Skip;
-      return BoxEdge.New;
-    },
-  ],
-  [
-    "mo",
-    (element, index) => {
-      if (index == 0) return BoxEdge.Skip;
-      if (index == getChildrenLength(element)) return BoxEdge.Skip;
-      return BoxEdge.New;
-    },
-  ],
-  [
-    "mspace",
-    (element, index) => {
-      if (index == 0) return BoxEdge.Skip;
-      if (index == getChildrenLength(element)) return BoxEdge.Skip;
-      return BoxEdge.New;
-    },
-  ],
-  [
-    "ms",
-    (element, index) => {
-      if (index == 0) return BoxEdge.Skip;
-      if (index == getChildrenLength(element)) return BoxEdge.Skip;
-      return BoxEdge.New;
-    },
-  ],
-  [
-    "mrow",
-    (element, index) => {
-      if (index == 0) return BoxEdge.Skip;
-      if (index == getChildrenLength(element)) return BoxEdge.Skip;
-      return BoxEdge.New;
-    },
-  ], // Skip, new, new, new, ....., skip
-  ["mfrac", (element, index) => BoxEdge.New],
-  ["msqrt", (element, index) => BoxEdge.New],
-  ["mroot", (element, index) => (index <= 1 ? BoxEdge.Skip : BoxEdge.New)], // skip edges for the first child element
-  ["mstyle", (element, index) => BoxEdge.Skip],
-  ["merror", (element, index) => BoxEdge.Skip], // Maybe merror deserves BoxHandling.New. or mtext?
-  ["maction", (element, index) => BoxEdge.Skip],
-  ["mpadded", (element, index) => BoxEdge.New],
-  ["mphantom", (element, index) => BoxEdge.Ignore],
-  ["msub", (element, index) => (index <= 0 ? BoxEdge.Skip : BoxEdge.New)],
-  ["msup", (element, index) => (index <= 0 ? BoxEdge.Skip : BoxEdge.New)],
-  ["msubsup", (element, index) => (index <= 0 ? BoxEdge.Skip : BoxEdge.New)],
-  ["munder", (element, index) => BoxEdge.New],
-  ["mover", (element, index) => BoxEdge.New],
-  ["munderover", (element, index) => BoxEdge.New], // because it matters which elements are sandwiched between the under-over
-  // see https://www.w3.org/TR/mathml-core/#prescripts-and-tensor-indices-mmultiscripts
-  ["mmultiscripts", (element, index) => BoxEdge.New],
-  ["none", (element, index) => BoxEdge.Ignore], // Or we could make all "none"s navigateable. Hm
-  ["mprescripts", (element, index) => BoxEdge.Ignore],
-  ["mtable", (element, index) => BoxEdge.Skip],
-  ["mtr", (element, index) => BoxEdge.Skip],
-  ["mtd", (element, index) => BoxEdge.New],
-]);
-
 /**
  * MathML can be separated into text-containing nodes and other nodes.
  * When editing the mathematical part, we almost exclusively care about the text containing nodes
@@ -125,6 +24,10 @@ const tagBoxHandling = new Map([
  */
 const textTagNames = ["mtext", "mi", "mn", "mo", "mspace", "ms"];
 
+/**
+ * Checks if this element is one of the text containing MathML elements
+ * @param {HTMLElement} t
+ */
 function isTextTagElement(t) {
   if (!t) return;
 
@@ -145,17 +48,6 @@ function getChildrenLength(t) {
       return t.childElementCount;
     }
   }
-}
-
-function classifyEdge(target, index) {
-  let tagName = target.tagName.toLowerCase();
-  let handling = tagBoxHandling.get(tagName);
-  if (!handling) {
-    console.warn("Unknown target", target);
-    handling = (element, index) => BoxEdge.New;
-  }
-
-  return handling(target, index);
 }
 
 // TODO: moveRight and moveLeft functions, using the info above
@@ -308,7 +200,7 @@ function addCaretLocations(caretLocations, mathElement) {
         caretLocations.push(
           new CaretLocation(bounds.x, bounds.y, bounds.height)
         );
-        // skipNext = true; // TODO: ?
+        skipNext = true;
       }
       children.forEach((v) => addCaretLocation(v));
 
@@ -396,8 +288,16 @@ function addCaretLocations(caretLocations, mathElement) {
         new CaretLocation(bounds.x + bounds.width, bounds.y, bounds.height)
       );
       skipNext = true;
-    } else if (tagIs(element, "mtable")) {
-      // TODO: Finish it up, mtr and mtd also exist
+    } else if (tagIs(element, "mtable", "mtr")) {
+      children.forEach((v) => addCaretLocation(v));
+    } else if (tagIs(element, "mtd")) {
+      skipNext = false;
+      children.forEach((v) => {
+        addCaretLocation(v);
+        skipNext = false;
+      });
+    } else {
+      console.warn("Unknown element", element);
     }
   }
 
