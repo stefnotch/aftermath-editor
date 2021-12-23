@@ -188,13 +188,13 @@ function addCaretLocations(caretLocations, mathElement) {
    */
   function shouldHaveStartingCaret(element) {
     let parent = element.parentElement;
+    // TODO: Apparently also include "msqrt" into this list. Make sure to treat it like the "math" element, because we don't want to go up the tree
     if (tagIs(parent, "math")) {
       if (previousVisibleSibling(element) != null) {
         return false;
       } else {
         return true;
       }
-      // TODO: Apparently also include "msqrt" into this list
     } else if (tagIs(parent, "mrow", "msup", "msub", "msubsup")) {
       if (previousVisibleSibling(element) != null) {
         return false;
