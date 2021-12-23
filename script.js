@@ -142,12 +142,6 @@ function move(target, index, getInDirection, silent = true) {
   }
 }
 
-// NOTE: The "if the parent is an mrow and we have a previous sibling, don't render the caret" rule works wonders
-// Except for the <mrow> <mo>-</mo> <msup><mi>n</mi><mn>2</mn></msup> </mrow> case
-// Because that one                           ^ should not have a starting caret!
-// Technically, we could fix it by changing the rule to "if the parent is an mrow and we have a NEXT sibling, don't render the caret".
-// But that'd be a bit of a specific hack?
-
 function addCaretLocations(caretLocations, mathElement) {
   /**
    *
