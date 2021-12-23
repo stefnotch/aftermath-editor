@@ -95,6 +95,70 @@
       </munderover>
       <!--|-->
     </math>
+
+    And a quick msup torture test <br />
+
+    <math>
+      <mo>-</mo>
+      <msup><mn>2</mn><mn>3</mn></msup>
+      <mo>+</mo>
+      <msup>
+        <mn>2</mn>
+        <msup><mn>4</mn><mn>8</mn></msup>
+      </msup>
+      <mo>*</mo>
+      <msup>
+        <msup><mn>2</mn><mn>3</mn></msup>
+        <mn>3</mn>
+      </msup>
+    </math>
+
+    <br />
+    And nested mrows are also fun
+    <br />
+
+    <math>
+      <mrow>
+        <mo>-</mo>
+        <mrow>
+          <mrow><mn>2</mn></mrow>
+        </mrow>
+      </mrow>
+    </math>
+
+    <br />
+    The simple rules
+    <ol>
+      <li>Always generate carets outside of the elements</li>
+      <li>Don't generate carets for ...</li>
+      <li>Completely ignore ... and their children</li>
+      <li>
+        To merge carets, we pick the starting caret locations (without loss of
+        generality, you could also pick the ending caret locations). Then, when
+        gerating a starting caret
+        <pre>
+          <code>
+            generateCaret(element): boolean {
+              if(element.parent is an mrow or math or msup or msub or msubsup) { 
+                if(previousSibling(element) is not null) {
+                  return false
+                } else {
+                  return generateCaret(element)
+                }
+              } else {
+                return true
+              }
+            }
+          </code>
+        </pre>
+        Basically, the idea is to check if we have a previous sibling (that
+        already has a caret generated). And since we can nest mrows, we have to
+        do that check recursively. TODO: Wait, it's not simply "previous
+        sibling". It's a bit more involved, for example if the previous sibling
+        is an (nested) mrow. Or if the previous sibling is an element that we
+        entirely skip
+      </li>
+    </ol>
   </div>
   <script type="module" src="./script.js"></script>
 </body>

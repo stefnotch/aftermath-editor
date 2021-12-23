@@ -15,7 +15,7 @@ function CaretLocation(x, y, height) {
   return this;
 }
 
-// TODO: Caret height is trickier
+// TODO: Caret height is a function of scriptlevel(current node). In the case of the browser, we can use the computed font-size
 // TODO: Write documentation about the algorithm
 /**
  * MathML can be separated into text-containing nodes and other nodes.
@@ -142,6 +142,12 @@ function move(target, index, getInDirection, silent = true) {
   }
 }
 
+// NOTE: The "if the parent is an mrow and we have a previous sibling, don't render the caret" rule works wonders
+// Except for the <mrow> <mo>-</mo> <msup><mi>n</mi><mn>2</mn></msup> </mrow> case
+// Because that one                           ^ should not have a starting caret!
+// Technically, we could fix it by changing the rule to "if the parent is an mrow and we have a NEXT sibling, don't render the caret".
+// But that'd be a bit of a specific hack?
+
 // TODO: A render-caret locations method
 function addCaretLocations(caretLocations, mathElement) {
   function tagIs(element, ...tagNames) {
@@ -257,11 +263,14 @@ function addCaretLocations(caretLocations, mathElement) {
     } else if (tagIs(element, "msub", "msup", "msubsup")) {
       let bounds = getElementBounds(element);
 
+      // No starting caret, child takes care of it
+      // However, this is the one special case so far: SEE NOTE ABOVE
       children.forEach((v) => {
         addCaretLocation(v);
         skipNext = false;
       });
 
+      // Ending caret is needed
       caretLocations.push(
         new CaretLocation(bounds.x + bounds.width, bounds.y, bounds.height)
       );
