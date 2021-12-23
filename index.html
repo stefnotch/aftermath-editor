@@ -15,7 +15,7 @@
 </head>
 <body>
   <div style="width: 15em">
-    This mathematical formula with a big summation and the number pi
+    This is a formula with a big summation and the number pi
     <math display="block" style="font-family: STIX Two" tabindex="0">
       <mrow>
         <munderover>
@@ -34,7 +34,7 @@
         <mn>6</mn>
       </mfrac>
     </math>
-    is easy to prove. This is a test
+    This is a test
     <math display="block" style="font-family: STIX Two" tabindex="0">
       <munderover>
         <mo>cat</mo>
@@ -125,40 +125,23 @@
         </mrow>
       </mrow>
     </math>
-
     <br />
-    The simple rules
-    <ol>
-      <li>Always generate carets outside of the elements</li>
-      <li>Don't generate carets for ...</li>
-      <li>Completely ignore ... and their children</li>
-      <li>
-        To merge carets, we pick the starting caret locations (without loss of
-        generality, you could also pick the ending caret locations). Then, when
-        gerating a starting caret
-        <pre>
-          <code>
-            generateCaret(element): boolean {
-              if(element.parent is an mrow or math or msup or msub or msubsup) { 
-                if(previousSibling(element) is not null) {
-                  return false
-                } else {
-                  return generateCaret(element)
-                }
-              } else {
-                return true
-              }
-            }
-          </code>
-        </pre>
-        Basically, the idea is to check if we have a previous sibling (that
-        already has a caret generated). And since we can nest mrows, we have to
-        do that check recursively. TODO: Wait, it's not simply "previous
-        sibling". It's a bit more involved, for example if the previous sibling
-        is an (nested) mrow. Or if the previous sibling is an element that we
-        entirely skip
-      </li>
-    </ol>
+    Mroot
+    <math>
+      <mroot>
+        <msqrt>
+          <mfrac>
+            <mn>1</mn>
+            <mn>2</mn>
+          </mfrac>
+          <mo>+</mo>
+          <mn>4</mn>
+        </msqrt>
+        <mn>3</mn>
+      </mroot>
+      <mo>+</mo>
+      <mn>0</mn>
+    </math>
   </div>
   <script type="module" src="./script.js"></script>
 </body>

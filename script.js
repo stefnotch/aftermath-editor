@@ -148,14 +148,72 @@ function move(target, index, getInDirection, silent = true) {
 // Technically, we could fix it by changing the rule to "if the parent is an mrow and we have a NEXT sibling, don't render the caret".
 // But that'd be a bit of a specific hack?
 
-// TODO: A render-caret locations method
 function addCaretLocations(caretLocations, mathElement) {
+  /**
+   *
+   * @param {HTMLElement} element
+   * @param  {...String} tagNames
+   */
   function tagIs(element, ...tagNames) {
     return tagNames.includes(element.tagName.toLowerCase());
   }
 
-  // Quick n cheap way of saying "skip the next opening thingy"
-  let skipNext = false;
+  // TODO: What if we have an empty element? Should we add a caret to every empty element?
+  // TODO: How should mtext be handled?
+  // TODO: How should mpadded be handled?
+  // TODO: https://github.com/w3c/mathml-core/issues/111
+  // TODO: Move around in text
+
+  /**
+   * Finds the previous actually visible sibling, so it skips over mphantoms
+   * @param {HTMLElement} element
+   */
+  function previousVisibleSibling(element) {
+    let sibling = element.previousElementSibling;
+    while (
+      sibling &&
+      tagIs(
+        sibling,
+        "annotation",
+        "annotation-xml",
+        "mphantom",
+        "none",
+        "mprescripts"
+      )
+    ) {
+      sibling = element.previousElementSibling;
+    }
+    return sibling;
+  }
+
+  /**
+   * Decides whether an element should get a starting caret or not.
+   * For example, if we have two elements next to each other in an mrow,
+   * then we can safely skip the starting caret for the second one.
+   * @param {HTMLElement} element
+   */
+  function shouldHaveStartingCaret(element) {
+    let parent = element.parentElement;
+    if (tagIs(parent, "math")) {
+      if (previousVisibleSibling(element) != null) {
+        return false;
+      } else {
+        return true;
+      }
+      // TODO: Apparently also include "msqrt" into this list
+    } else if (tagIs(parent, "mrow", "msup", "msub", "msubsup")) {
+      if (previousVisibleSibling(element) != null) {
+        return false;
+      } else {
+        // We aren't sure if there is a sibling to our right
+        // For example, we could be in a nested mrow
+        // So we ask the parent
+        return shouldHaveStartingCaret(parent);
+      }
+    } else {
+      return true;
+    }
+  }
 
   /**
    *
@@ -165,14 +223,45 @@ function addCaretLocations(caretLocations, mathElement) {
     if (!element) return;
 
     let children = [...element.children];
-
-    if (tagIs(element, "math")) {
-      skipNext = false;
+    if (tagIs(element, "mi", "mn", "mo", "mspace", "ms")) {
+      let { x, y, width, height } = getElementBounds(element);
+      if (shouldHaveStartingCaret(element)) {
+        caretLocations.push(new CaretLocation(x, y, height));
+      }
+      children.forEach((v) => addCaretLocation(v)); // TODO: Maybe not needed for those elements?
+      caretLocations.push(new CaretLocation(x + width, y, height));
+    } else if (
+      tagIs(
+        element,
+        "mfrac",
+        "msqrt",
+        "munder",
+        "mover",
+        "munderover",
+        "mmultiscripts"
+      )
+    ) {
+      let { x, y, width, height } = getElementBounds(element);
+      if (shouldHaveStartingCaret(element)) {
+        caretLocations.push(new CaretLocation(x, y, height));
+      }
       children.forEach((v) => addCaretLocation(v));
-      skipNext = false;
-    } else if (tagIs(element, "semantics")) {
-      // Semantics annotates exactly one child
-      addCaretLocation(children[0]);
+      caretLocations.push(new CaretLocation(x + width, y, height));
+    } else if (
+      tagIs(
+        element,
+        "math",
+        "mrow",
+        "mroot",
+        "mstyle",
+        "merror",
+        "maction",
+        "mtable",
+        "mtr",
+        "mtd"
+      )
+    ) {
+      children.forEach((v) => addCaretLocation(v));
     } else if (
       tagIs(
         element,
@@ -184,127 +273,19 @@ function addCaretLocations(caretLocations, mathElement) {
       )
     ) {
       // Ignore
+    } else if (tagIs(element, "semantics")) {
+      // Semantics annotates exactly one child
+      addCaretLocation(children[0]);
     } else if (tagIs(element, "mtext", "mpadded")) {
-      // Add a start and end caret
-      let bounds = getElementBounds(element);
-      caretLocations.push(new CaretLocation(bounds.x, bounds.y, bounds.height));
-      skipNext = false;
+      throw new Error("TODO: Not implemented");
+    }
+    // TODO:
+    else if (tagIs(element, "msub", "msup", "msubsup")) {
+      let { x, y, width, height } = getElementBounds(element);
+      // No starting caret, instead the first child will have one
+
       children.forEach((v) => addCaretLocation(v));
-      caretLocations.push(
-        new CaretLocation(bounds.x + bounds.width, bounds.y, bounds.height)
-      );
-      skipNext = false;
-    } else if (tagIs(element, "mi", "mn", "mo", "mspace", "ms")) {
-      // Hmm, only some of them produce a valid caret location
-      // We could theoretically take a look at the stack. Or do this:
-
-      // The "Check if no right sibling" rule has the problem that it needs to apply
-      // to more elements, like fraction fraction or sqrt sqrt
-
-      let bounds = getElementBounds(element);
-      if (!skipNext) {
-        caretLocations.push(
-          new CaretLocation(bounds.x, bounds.y, bounds.height)
-        );
-        skipNext = true;
-      }
-      children.forEach((v) => addCaretLocation(v));
-
-      caretLocations.push(
-        new CaretLocation(bounds.x + bounds.width, bounds.y, bounds.height)
-      );
-      skipNext = true;
-    } else if (tagIs(element, "mrow")) {
-      // TODO: What if we have an empty mrow? Should we add a caret to every empty element?
-      children.forEach((v) => addCaretLocation(v));
-    } else if (tagIs(element, "mfrac")) {
-      let bounds = getElementBounds(element);
-      if (!skipNext) {
-        caretLocations.push(
-          new CaretLocation(bounds.x, bounds.y, bounds.height)
-        );
-      }
-
-      children.forEach((v) => {
-        skipNext = false;
-        addCaretLocation(v);
-      });
-
-      caretLocations.push(
-        new CaretLocation(bounds.x + bounds.width, bounds.y, bounds.height)
-      );
-      skipNext = true;
-    } else if (tagIs(element, "msqrt")) {
-      // The msqrt caret is a funky one. We place it *outside* of the element
-
-      let bounds = getElementBounds(element);
-      if (!skipNext) {
-        caretLocations.push(
-          new CaretLocation(bounds.x, bounds.y, bounds.height)
-        );
-      }
-      skipNext = false;
-      // TODO: A msqrt without any children has the same problem as an empty mrow...
-      children.forEach((v) => addCaretLocation(v));
-
-      caretLocations.push(
-        new CaretLocation(bounds.x + bounds.width, bounds.y, bounds.height)
-      );
-      skipNext = true;
-    } else if (tagIs(element, "mroot")) {
-      // mroot has one msqrt and a "nth root" symbol
-      children.forEach((v) => {
-        addCaretLocation(v);
-        skipNext = false;
-      });
-      skipNext = false;
-    } else if (tagIs(element, "mstyle", "merror", "maction")) {
-      children.forEach((v) => addCaretLocation(v));
-    } else if (tagIs(element, "msub", "msup", "msubsup")) {
-      let bounds = getElementBounds(element);
-
-      // No starting caret, child takes care of it
-      // However, this is the one special case so far: SEE NOTE ABOVE
-      children.forEach((v) => {
-        addCaretLocation(v);
-        skipNext = false;
-      });
-
-      // Ending caret is needed
-      caretLocations.push(
-        new CaretLocation(bounds.x + bounds.width, bounds.y, bounds.height)
-      );
-      skipNext = true;
-    } else if (
-      tagIs(element, "munder", "mover", "munderover", "mmultiscripts")
-    ) {
-      // it matters which elements are sandwiched between the under-over
-      // see also https://www.w3.org/TR/mathml-core/#prescripts-and-tensor-indices-mmultiscripts
-      let bounds = getElementBounds(element);
-
-      if (!skipNext) {
-        caretLocations.push(
-          new CaretLocation(bounds.x, bounds.y, bounds.height)
-        );
-      }
-      // Normal carets outside, and every child gets its own caret positions
-      children.forEach((v) => {
-        skipNext = false;
-        addCaretLocation(v);
-      });
-
-      caretLocations.push(
-        new CaretLocation(bounds.x + bounds.width, bounds.y, bounds.height)
-      );
-      skipNext = true;
-    } else if (tagIs(element, "mtable", "mtr")) {
-      children.forEach((v) => addCaretLocation(v));
-    } else if (tagIs(element, "mtd")) {
-      skipNext = false;
-      children.forEach((v) => {
-        addCaretLocation(v);
-        skipNext = false;
-      });
+      caretLocations.push(new CaretLocation(x + width, y, height));
     } else {
       console.warn("Unknown element", element);
     }
