@@ -50,98 +50,6 @@ function getChildrenLength(t) {
   }
 }
 
-// TODO: moveRight and moveLeft functions, using the info above
-// And the also moveUp and moveDown
-
-function getPrevious(target, index) {
-  // If we can move inside the text, we do that
-  if (isTextTagElement(target) && index - 1 >= 0) {
-    return {
-      target,
-      index: index - 1,
-      type: classifyEdge(target, index - 1),
-    };
-  }
-
-  if (index <= 0) {
-    // We're at the end (it's important to first check this, otherwise empty text nodes might cause issues)
-    // So we step out of this element, into the parent
-    let parentIndex = indexInParent(target);
-    return {
-      target: target.parentElement,
-      index: parentIndex,
-      type: classifyEdge(target, parentIndex),
-    };
-  } else {
-    // The cursor is in a non-text node. So we check out the next interesting child and step into it
-    let nextChildElement = target.children[index - 1];
-    let childIndex = getChildrenLength(nextChildElement);
-    return {
-      target: nextChildElement,
-      index: childIndex,
-      type: classifyEdge(nextChildElement, childIndex),
-    };
-  }
-}
-
-function getNext(target, index) {
-  // If we can move inside the text, we do that
-  if (isTextTagElement(target) && index + 1 <= getChildrenLength(target)) {
-    return {
-      target,
-      index: index + 1,
-      type: classifyEdge(target, index + 1),
-    };
-  }
-
-  if (index >= getChildrenLength(target)) {
-    // We're at the end (it's important to first check this, otherwise empty text nodes might cause issues)
-    // So we step out of this element, into the parent
-    let parentIndex = indexInParent(target) + 1;
-    return {
-      target: target.parentElement,
-      index: parentIndex,
-      type: classifyEdge(target, parentIndex),
-    };
-  } else {
-    // The cursor is in a non-text node. So we check out the next interesting child and step into it
-    let nextChildElement = target.children[index];
-    return {
-      target: nextChildElement,
-      index: 0,
-      type: classifyEdge(nextChildElement, 0),
-    };
-  }
-}
-
-/**
- *
- * @param {HTMLElement} target
- * @param {number} index
- * @param {(target: HTMLElement, index: number) => {target: any, index: any, type: number}} getInDirection
- * @returns
- */
-function move(target, index, getInDirection, silent = true) {
-  let current = { target, index };
-
-  // TODO: Handle the case where we navigate outside of the math element!
-
-  while (true) {
-    let potentialNext = getInDirection(current.target, current.index);
-    if (!silent) console.log(current, "lead to", potentialNext);
-    if (potentialNext.type == BoxEdge.New) {
-      // Also includes the "next character in text"
-      return potentialNext;
-    } else if (potentialNext.type == BoxEdge.Skip) {
-      current.target = potentialNext.target;
-      current.index = potentialNext.index;
-    } else if (potentialNext.type == BoxEdge.Ignore) {
-      current.target = potentialNext.target;
-      current.index = getChildrenLength(potentialNext.index); // skip over the children
-    }
-  }
-}
-
 function addCaretLocations(caretLocations, mathElement) {
   /**
    *
@@ -217,6 +125,7 @@ function addCaretLocations(caretLocations, mathElement) {
     if (!element) return;
 
     let children = [...element.children];
+    // TODO: How to treat mspace?
     if (tagIs(element, "mi", "mn", "mo", "mspace", "ms")) {
       let { x, y, width, height } = getElementBounds(element);
       if (shouldHaveStartingCaret(element)) {
@@ -308,10 +217,10 @@ function makeEditable(mathElement) {
     c.setHeight(loc.height);
   });
 
-  // A cursor here consists of an index in the caretLocations array
   // The index can be the index in the text, or it can be 0 (start) or 1 (end)
   let cursor = {
     cursorElement,
+    caretLocation: caretLocations[0],
     index: 0,
   };
 
