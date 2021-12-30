@@ -1,12 +1,30 @@
 <script setup lang="ts">
-// This starter template is using Vue 3 <script setup> SFCs
-// Check out https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup
-import HelloWorld from './components/HelloWorld.vue'
+import MathEditor from "./components/MathEditor.vue";
 </script>
 
 <template>
-  <img alt="Vue logo" src="./assets/logo.png" />
-  <HelloWorld msg="Hello Vue 3 + TypeScript + Vite" />
+  <MathEditor
+    mathml="<math
+        v-pre
+        display='block'
+        style='font-family: STIX Two'
+        tabindex='0'
+      >
+        <msqrt>
+          <msqrt>
+            <mi>x</mi>
+            <mi>x</mi>
+            <mi>x</mi>
+          </msqrt>
+          <mi>x</mi>
+        </msqrt>
+        <mfrac>
+          <mi>x</mi>
+          <mi>x</mi>
+        </mfrac>
+      </math>"
+  >
+  </MathEditor>
 </template>
 
 <style>

@@ -51,42 +51,9 @@ function getChildrenLength(t) {
 }
 
 function addCaretLocations(caretLocations, mathElement) {
-  /**
-   *
-   * @param {HTMLElement} element
-   * @param  {...String} tagNames
-   */
-  function tagIs(element, ...tagNames) {
-    return tagNames.includes(element.tagName.toLowerCase());
-  }
-
-  // TODO: What if we have an empty element? Should we add a caret to every empty element?
-  // TODO: How should mtext be handled?
-  // TODO: How should mpadded be handled?
+  // TODO: How should mtext be handled?: A proper text element with always a starting caret. Same goes for merror
   // TODO: https://github.com/w3c/mathml-core/issues/111
   // TODO: Move around in text
-
-  /**
-   * Finds the previous actually visible sibling, so it skips over mphantoms
-   * @param {HTMLElement} element
-   */
-  function previousVisibleSibling(element) {
-    let sibling = element.previousElementSibling;
-    while (
-      sibling &&
-      tagIs(
-        sibling,
-        "annotation",
-        "annotation-xml",
-        "mphantom",
-        "none",
-        "mprescripts"
-      )
-    ) {
-      sibling = element.previousElementSibling;
-    }
-    return sibling;
-  }
 
   /**
    * Decides whether an element should get a starting caret or not.
@@ -125,7 +92,9 @@ function addCaretLocations(caretLocations, mathElement) {
     if (!element) return;
 
     let children = [...element.children];
-    // TODO: How to treat mspace?
+    // TODO: Document the difference between mtext, merror and ms
+    // mtext and merror are proper containers. They are defined by the user and will really contain stuff
+    // ms is more of a stylistic thingy, like if I type "aaa" in quotes or something, I guess. Or that's how I wanna treat it for now.
     if (tagIs(element, "mi", "mn", "mo", "mspace", "ms")) {
       let { x, y, width, height } = getElementBounds(element);
       if (shouldHaveStartingCaret(element)) {
@@ -334,4 +303,120 @@ function makeHoverable(mathElement) {
   mathElement.addEventListener("pointerout", (ev) => {
     setHoverTarget(null);
   });
+}
+
+export type CaretDocumentLocation = { x: number; y: number; height: number };
+
+// TODO: How should mpadded be handled?
+// TODO: How should mspace be handled?
+// TODO: What if we have an empty element? This breaks a lot of implicit assumptions, such as the usage of "previousVisibleSibling" (could return an mrow with zero children).
+
+export const CaretLocation = {
+  Start: 0,
+  End: 1,
+  Text: 2,
+};
+
+export class MathmlCaret {
+  readonly element: HTMLElement;
+  readonly location: keyof typeof CaretLocation;
+  readonly textIndex?: number;
+  constructor(
+    element: HTMLElement,
+    location: keyof typeof CaretLocation,
+    textIndex?: number
+  ) {
+    assert(typeof textIndex === "number");
+    this.element = element;
+    this.location = location;
+    this.textIndex = textIndex;
+  }
+
+  get documentLocation(): CaretDocumentLocation {
+    // TODO:
+    return {
+      x: 0,
+      y: 0,
+      height: 0,
+    };
+  }
+}
+
+
+
+
+
+/**
+ * Elements that are invisible
+ */
+const invisibleElements = [
+  "annotation",
+  "annotation-xml",
+  "mphantom",
+  "none",
+  "mprescripts",
+];
+
+/**
+ * Finds the previous actually visible sibling, so it skips over mphantoms
+ */
+function previousVisibleSibling(element: HTMLElement) {
+  let sibling = element.previousElementSibling;
+  while (
+    sibling &&
+    (!(sibling instanceof HTMLElement) || tagIs(sibling, ...invisibleElements))
+  ) {
+    sibling = element.previousElementSibling;
+  }
+  return sibling;
+}
+
+/**
+ * Decides whether an element should get a starting caret or not.
+ * For example, if we have two elements next to each other in an mrow,
+ * then we can safely skip the starting caret for the second one.
+ */
+function shouldHaveStartingCaret(element: HTMLElement): boolean {
+  let parent = element.parentElement;
+  if (!parent) return true;
+
+  // Elements where we don't want to go up the tree
+  if (tagIs(parent, "math", "msqrt", "mtext", "merror")) {
+    if (previousVisibleSibling(element) != null) {
+      return false;
+    } else {
+      return true;
+    }
+  } else if (
+    tagIs(
+      parent,
+      "mrow",
+      "semantics",
+      "mstyle",
+      "maction",
+      "mi",
+      "mn",
+      "mo",
+      "ms"
+    )
+  ) {
+    if (previousVisibleSibling(element) != null) {
+      return false;
+    } else {
+      // We aren't sure if there is a sibling to our right
+      // For example, we could be in a nested mrow
+      // So we ask the parent
+      return shouldHaveStartingCaret(parent);
+    }
+  } else if (tagIs(parent, "msup", "msub", "msubsup")) {
+    if (previousVisibleSibling(element) == null) {
+      // First child of an msup is a bit special
+      return shouldHaveStartingCaret(parent);
+    } else {
+      return true;
+    }
+  }
+
+  // The parent is something like mfrac or something unknown
+  return true;
 }

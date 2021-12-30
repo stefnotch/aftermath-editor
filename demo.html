@@ -142,8 +142,25 @@
       <mo>+</mo>
       <mn>0</mn>
     </math>
+
+    Sqrt test. See HTML comments for preferred order
+    <math>
+      <!--1-->
+      <mroot>
+        <msqrt>
+          <!--4-->
+          <mn>b</mn>
+          <!--5-->
+        </msqrt>
+        <!--6-->
+        <mn>
+          <!--2 (should be outside of mn)-->
+          a
+          <!--3 (should be outside of mn)-->
+        </mn>
+      </mroot>
+    </math>
   </div>
 
   <div style="width: 15em">Cute goal: TIL homework</div>
-  <script type="module" src="./script.js"></script>
 </body>
