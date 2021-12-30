@@ -5,7 +5,6 @@ import MathEditor from "./components/MathEditor.vue";
 <template>
   <MathEditor
     mathml="<math
-        v-pre
         display='block'
         style='font-family: STIX Two'
         tabindex='0'

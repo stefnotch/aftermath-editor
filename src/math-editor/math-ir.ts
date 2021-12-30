@@ -9,6 +9,7 @@
 
 export type MathIR =
   | {
+      // the only thing that has an arbitrary number of children
       type: "row";
       values: MathIR[];
     }
@@ -41,6 +42,7 @@ export type MathIR =
       value: MathIR;
     }
   | {
+      // a single symbol
       type: "symbol";
       value: string;
     }

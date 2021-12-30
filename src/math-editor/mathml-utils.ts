@@ -7,6 +7,63 @@ export function fromElement(element: HTMLElement) {
   return flattenMathIR(toMathIR(element));
 }
 
+type MathMLTags =
+  | "math"
+  | "semantics"
+  | "annotation"
+  | "annotation-xml"
+  | "mtext"
+  | "mi"
+  | "mn"
+  | "mo"
+  | "mspace"
+  | "ms"
+  | "mrow"
+  | "mfrac"
+  | "msqrt"
+  | "mroot"
+  | "mstyle"
+  | "merror"
+  | "maction"
+  | "mpadded"
+  | "mphantom"
+  | "msub"
+  | "msup"
+  | "msubsup"
+  | "munder"
+  | "mover"
+  | "munderover"
+  | "mmultiscripts"
+  | "none"
+  | "mprescripts"
+  | "mtable"
+  | "mtr"
+  | "mtd";
+
+const mathNamespace = "http://www.w3.org/1998/Math/MathML";
+function createMathElement(tagName: MathMLTags, children: Node[]) {
+  let element = document.createElementNS(mathNamespace, "math");
+  children.forEach((c) => {
+    element.appendChild(c);
+  });
+  return element;
+}
+
+export function toElement(mathIR: MathIR): Element {
+  let element = createMathElement("math", []);
+  element.setAttributeNS(mathNamespace, "display", "block");
+  element.setAttribute("style", "font-family: STIX Two");
+  element.setAttribute("tabindex", "font-0");
+
+  if (mathIR.type == "row") {
+    element.append(...mathIR.values.map((v) => fromMathIR(v)));
+  } else {
+    element.append(fromMathIR(mathIR));
+  }
+
+  return element;
+}
+
 function flattenMathIR(mathIR: MathIR | MathIR[]): MathIR {
   if (Array.isArray(mathIR)) {
     return {
@@ -45,14 +102,17 @@ function toMathIR(element: Element): MathIR | MathIR[] {
     return {
       type: "text",
       // TODO: Correctly get the text (this includes worthless spaces and such)
-      value: element.textContent + "",
+      value: (element.textContent + "").trim(),
     };
   } else if (tagIs(element, "mi", "mn", "mo")) {
-    return {
-      type: "symbol",
-      // TODO: Correctly get the text (this includes worthless spaces and such)
-      value: element.textContent + "",
-    };
+    // TODO: Correctly get the text (this includes worthless spaces and such)
+    let text = (element.textContent + "").trim();
+    return text.split("").map((v) => {
+      return {
+        type: "symbol",
+        value: v,
+      };
+    });
   } else if (tagIs(element, "mfrac")) {
     return (
       expectNChildren(element, 2) ?? {
@@ -208,4 +268,50 @@ function toMathIR(element: Element): MathIR | MathIR[] {
  */
 function tagIs(element: Element, ...tagNames: string[]): boolean {
   return tagNames.includes(element.tagName.toLowerCase());
+}
+
+function fromMathIR(mathIR: MathIR): Element {
+  if (mathIR.type == "error") {
+    return createMathElement("merror", [
+      createMathElement("mtext", [document.createTextNode(mathIR.value)]),
+    ]);
+  } else if (mathIR.type == "frac") {
+    return createMathElement("mfrac", [
+      fromMathIR(mathIR.values[0]),
+      fromMathIR(mathIR.values[1]),
+    ]);
+
+    // Maybe detect under-over?
+  } else if (mathIR.type == "over") {
+    return createMathElement("mover", [
+      fromMathIR(mathIR.values[0]),
+      fromMathIR(mathIR.values[1]),
+    ]);
+  } else if (mathIR.type == "under") {
+    return createMathElement("munder", [
+      fromMathIR(mathIR.values[0]),
+      fromMathIR(mathIR.values[1]),
+    ]);
+  } else if (mathIR.type == "root") {
+    return createMathElement("mroot", [
+      createMathElement("msqrt", [fromMathIR(mathIR.values[1])]),
+      fromMathIR(mathIR.values[0]),
+    ]);
+  } else if (mathIR.type == "row") {
+    // This one is too simplistic. Instead we need to go over the elements and do fansy parsing stuff
+    return createMathElement(
+      "mrow",
+      mathIR.values.map((v) => fromMathIR(v))
+    );
+  } else if (mathIR.type == "sub") {
+    // TODO:
+  } else if (mathIR.type == "sup") {
+    // TODO:
+  } else if (mathIR.type == "symbol") {
+    // TODO:
+  } else if (mathIR.type == "text") {
+    return createMathElement("mtext", [document.createTextNode(mathIR.value)]);
+  } else {
+    assertUnreachable(mathIR.type);
+  }
 }
