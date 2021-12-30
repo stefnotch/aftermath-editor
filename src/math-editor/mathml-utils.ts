@@ -42,7 +42,7 @@ type MathMLTags =
 
 const mathNamespace = "http://www.w3.org/1998/Math/MathML";
 function createMathElement(tagName: MathMLTags, children: Node[]) {
-  let element = document.createElementNS(mathNamespace, "math");
+  let element = document.createElementNS(mathNamespace, tagName);
   children.forEach((c) => {
     element.appendChild(c);
   });
@@ -122,12 +122,6 @@ function toMathIR(element: Element): MathIR | MathIR[] {
       }
     );
   } else if (tagIs(element, "msqrt")) {
-    if (element.parentElement && tagIs(element.parentElement, "mroot")) {
-      return {
-        type: "error",
-        value: "Should have parsed mroot instead",
-      };
-    }
     return {
       type: "root",
       values: [
@@ -146,17 +140,11 @@ function toMathIR(element: Element): MathIR | MathIR[] {
     if (children.length != 2) {
       return { type: "error", value: "Not 2 children in root" };
     }
-    if (!tagIs(children[0], "msqrt")) {
-      return { type: "error", value: "Expected msqrt in mroot" };
-    }
     return {
       type: "root",
       values: [
         flattenMathIR(toMathIR(children[1])),
-        {
-          type: "row",
-          values: [...children[0].children].flatMap((c) => toMathIR(c)),
-        },
+        flattenMathIR(toMathIR(children[0])),
       ],
       count: 2,
     };
@@ -293,25 +281,97 @@ function fromMathIR(mathIR: MathIR): Element {
       fromMathIR(mathIR.values[1]),
     ]);
   } else if (mathIR.type == "root") {
+    // TODO: Sometimes create a msqrt
     return createMathElement("mroot", [
-      createMathElement("msqrt", [fromMathIR(mathIR.values[1])]),
+      fromMathIR(mathIR.values[1]),
       fromMathIR(mathIR.values[0]),
     ]);
   } else if (mathIR.type == "row") {
-    // This one is too simplistic. Instead we need to go over the elements and do fansy parsing stuff
-    return createMathElement(
-      "mrow",
-      mathIR.values.map((v) => fromMathIR(v))
-    );
-  } else if (mathIR.type == "sub") {
-    // TODO:
-  } else if (mathIR.type == "sup") {
-    // TODO:
-  } else if (mathIR.type == "symbol") {
-    // TODO:
+    // This one is too simplistic. Instead we need to go over the elements and do somewhat fansy parsing stuff
+    // Hm, where do we get an operator dictionary from?
+    // That parsing needs to
+    // - Parse numbers <mn> numbers go brr
+    // - Parse variables <mi> everything else I guess
+    // - Parse operators <mo> https://w3c.github.io/mathml-core/#operator-tables
+    // - Put the sub and sup where they belong
+    // - Does not really need to parse bracket pairs, integral-dx and other fancy stuff for now.
+    //   Instead we'll expose some "parser" API to the user and let him deal with fun like "wait, what e is that"
+
+    const isDigit = /^\p{Nd}+$/gu;
+
+    let elements: Element[] = [];
+
+    mathIR.values.forEach((v) => {
+      if (v.type == "symbol") {
+        // TODO: Don't create a new node for each digit
+        if (isDigit.test(v.value)) {
+          elements.push(
+            createMathElement("mn", [document.createTextNode(v.value)])
+          );
+        } else if (
+          elements.length > 0 &&
+          elements[elements.length - 1].tagName.toLowerCase() == "mn"
+        ) {
+          // Quick hack for parsing dots
+          elements.push(
+            createMathElement("mn", [document.createTextNode(v.value)])
+          );
+        } else {
+          // TODO: Might be an operator
+
+          elements.push(
+            createMathElement("mi", [document.createTextNode(v.value)])
+          );
+        }
+      } else if (v.type == "sub" || v.type == "sup") {
+        let lastElement = elements.pop();
+        if (lastElement) {
+          elements.push(
+            createMathElement(v.type == "sub" ? "msub" : "msup", [
+              lastElement,
+              fromMathIR(v.value),
+            ])
+          );
+        } else {
+          // A lonely sub or sup is an error, we let this function deal with it
+          elements.push(fromMathIR(v));
+        }
+      } else {
+        // It's some other element
+        elements.push(fromMathIR(v));
+      }
+    });
+    return createMathElement("mrow", elements);
+  } else if (
+    mathIR.type == "sub" ||
+    mathIR.type == "sup" ||
+    mathIR.type == "symbol"
+  ) {
+    return createMathElement("merror", [
+      createMathElement("mtext", [
+        document.createTextNode("Unexpected " + mathIR.type),
+      ]),
+    ]);
   } else if (mathIR.type == "text") {
     return createMathElement("mtext", [document.createTextNode(mathIR.value)]);
+  } else if (mathIR.type == "table") {
+    return createMathElement(
+      "mtable",
+      mathIR.values.map((v) =>
+        createMathElement(
+          "mtr",
+          v.map((cell) => {
+            if (cell.type == "row") {
+              // TODO: Remove extraneous row (but remember, we need the row parsing logic from above)
+              return createMathElement("mtd", [fromMathIR(cell)]);
+            } else {
+              return createMathElement("mtd", [fromMathIR(cell)]);
+            }
+          })
+        )
+      )
+    );
   } else {
-    assertUnreachable(mathIR.type);
+    assertUnreachable(mathIR);
   }
 }

@@ -55,6 +55,7 @@ export type MathIR =
       value: string;
     }
   | {
+      // rows and cells
       // Not sure about this one yet
       type: "table";
       values: MathIR[][];
