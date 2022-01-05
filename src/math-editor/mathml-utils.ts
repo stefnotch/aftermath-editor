@@ -1,6 +1,11 @@
 import { assert, assertUnreachable } from ".././assert";
 import { MathIR } from "./math-ir";
-import { expectNChildren, optionalWrapInRow } from "./math-ir-utils";
+import {
+  expectNChildren,
+  findEitherEndingBracket,
+  findEndingBracket,
+  optionalWrapInRow,
+} from "./math-ir-utils";
 import {
   startingBrackets,
   endingBrackets,
@@ -58,7 +63,7 @@ function createMathElement(tagName: MathMLTags, children: Node[]) {
 
 export function toElement(mathIR: MathIR): Element {
   let element = createMathElement("math", []);
-  element.setAttributeNS(mathNamespace, "display", "block");
+  element.setAttribute("display", "block");
   element.setAttribute("style", "font-family: STIX Two");
   element.setAttribute("tabindex", "font-0");
 
@@ -301,15 +306,16 @@ function fromMathIR(mathIR: MathIR): Element {
     ]);
   } else if (mathIR.type == "symbol") {
     // TODO: stretchy=false
-    // TODO: Remove extraneous row (but remember, we need the row parsing logic from above)
-    let elements = fromMathIRRow([mathIR]);
+    const elements = fromMathIRRow([mathIR]);
     return elements.length == 1
       ? elements[0]
       : createMathElement("mrow", elements);
   } else if (mathIR.type == "bracket") {
-    // TODO: Find the associated closing bracket
-    // And then output <mrow>starting bracket <mrow></mrow> closing bracket</mrow>
-    return createMathElement("mo", [document.createTextNode(mathIR.value)]);
+    const element = createMathElement("mo", [
+      document.createTextNode(mathIR.value),
+    ]);
+    element.setAttribute("stretchy", "false");
+    return element;
   } else if (mathIR.type == "text") {
     return createMathElement("mtext", [document.createTextNode(mathIR.value)]);
   } else if (mathIR.type == "table") {
@@ -334,6 +340,8 @@ function fromMathIR(mathIR: MathIR): Element {
   }
 }
 
+const isDigit = /^\p{Nd}+$/gu;
+
 /**
  * Parse all the children of a row, has some special logic
  */
@@ -343,52 +351,103 @@ function fromMathIRRow(mathIR: MathIR[]): Element[] {
   // - Parse variables <mi> everything else I guess
   // - Parse operators <mo> https://w3c.github.io/mathml-core/#operator-tables
   // - Put the sub and sup where they belong
+  // - Match brackets (opening - closing bracket pairs)
   // - Does not really need to parse e, integral-dx and other stuff for now.
   //   Instead we'll expose some "parser" API to the user and let them deal with fun like "wait, what e is that"
 
-  const isDigit = /^\p{Nd}+$/gu;
+  const output: Element[] = [];
 
-  let elements: Element[] = [];
-
-  mathIR.values.forEach((v) => {
-    if (v.type == "symbol") {
-      // TODO: Don't create a new node for each digit
-      if (isDigit.test(v.value)) {
-        elements.push(
-          createMathElement("mn", [document.createTextNode(v.value)])
-        );
-      } else if (
-        elements.length > 0 &&
-        elements[elements.length - 1].tagName.toLowerCase() == "mn"
-      ) {
-        // Quick hack for parsing dots
-        elements.push(
-          createMathElement("mn", [document.createTextNode(v.value)])
-        );
+  for (let i = 0; i < mathIR.length; i++) {
+    const element = mathIR[i];
+    if (element.type == "symbol") {
+      if (isDigit.test(element.value)) {
+        const parsed = fromMathIRNumber(mathIR, i);
+        output.push(parsed.element);
+        i = parsed.lastDigitIndex;
       } else {
         // TODO: Might be an operator
 
-        elements.push(
-          createMathElement("mi", [document.createTextNode(v.value)])
+        output.push(
+          createMathElement("mi", [document.createTextNode(element.value)])
         );
       }
-    } else if (v.type == "sub" || v.type == "sup") {
-      let lastElement = elements.pop();
+    } else if (element.type == "bracket") {
+      if (endingBrackets.has(element.value)) {
+        output.push(fromMathIR(element)); // No opening bracket
+      } else {
+        // A starting bracket or an either bracket (funnily enough, the logic is almost the same for both)
+        const endingBracketIndex = startingBrackets.has(element.value)
+          ? findEndingBracket(mathIR, i)
+          : findEitherEndingBracket(mathIR, i);
+        // TODO: maybe check if the ending bracket is actually the right type of bracket?
+        if (endingBracketIndex == null) {
+          output.push(fromMathIR(element)); // No closing bracket
+        } else {
+          const children = fromMathIRRow(
+            mathIR.slice(i + 1, endingBracketIndex)
+          );
+          const endingBracket = mathIR[endingBracketIndex];
+          assert(endingBracket.type == "bracket");
+          output.push(
+            createMathElement("mrow", [
+              createMathElement("mo", [document.createTextNode(element.value)]),
+              children.length == 1
+                ? children[0]
+                : createMathElement("mrow", children),
+              createMathElement("mo", [
+                document.createTextNode(endingBracket.value),
+              ]),
+            ])
+          );
+        }
+      }
+    } else if (element.type == "sub" || element.type == "sup") {
+      let lastElement = output.pop();
       if (lastElement) {
-        elements.push(
-          createMathElement(v.type == "sub" ? "msub" : "msup", [
+        output.push(
+          createMathElement(element.type == "sub" ? "msub" : "msup", [
             lastElement,
-            fromMathIR(v.value),
+            fromMathIR(element.value),
           ])
         );
       } else {
         // A lonely sub or sup is an error, we let this function deal with it
-        elements.push(fromMathIR(v));
+        output.push(fromMathIR(element));
       }
     } else {
-      // It's some other element
-      elements.push(fromMathIR(v));
+      output.push(fromMathIR(element));
     }
-  });
-  return [];
+  }
+
+  return output;
+}
+
+function fromMathIRNumber(
+  mathIR: MathIR[],
+  firstDigitIndex: number
+): {
+  element: Element;
+  lastDigitIndex: number;
+} {
+  // TODO: Parse dots and other stuff (Maybe even hexadecimal numbers?)
+
+  const firstDigit = mathIR[firstDigitIndex];
+  assert(firstDigit.type == "symbol");
+
+  let digits = firstDigit.value;
+  let i = firstDigitIndex + 1;
+  while (i < mathIR.length) {
+    let element = mathIR[i];
+    if (element.type == "symbol" && isDigit.test(element.value)) {
+      digits += element.value;
+      i += 1;
+    } else {
+      break;
+    }
+  }
+
+  return {
+    element: createMathElement("mn", [document.createTextNode(digits)]),
+    lastDigitIndex: i - 1,
+  };
 }
