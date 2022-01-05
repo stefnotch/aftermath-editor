@@ -1,6 +1,11 @@
 import { assert, assertUnreachable } from ".././assert";
 import { MathIR } from "./math-ir";
 import {
+  expectNChildren,
+  optionalWrapInRow,
+  parseBrackets,
+} from "./math-ir-utils";
+import {
   startingBrackets,
   endingBrackets,
   allBrackets,
@@ -43,7 +48,7 @@ type MathMLTags =
 export function fromElement(element: HTMLElement) {
   assert(tagIs(element, "math"));
 
-  return flattenMathIR(toMathIR(element));
+  return parseBrackets(optionalWrapInRow(toMathIR(element)));
 }
 
 const mathNamespace = "http://www.w3.org/1998/Math/MathML";
@@ -68,27 +73,6 @@ export function toElement(mathIR: MathIR): Element {
   }
 
   return element;
-}
-
-function flattenMathIR(mathIR: MathIR | MathIR[]): MathIR {
-  if (Array.isArray(mathIR)) {
-    return {
-      type: "row",
-      values: mathIR,
-    };
-  } else {
-    return mathIR;
-  }
-}
-
-function expectNChildren(element: Element, n: number): MathIR | null {
-  if (element.children.length != n) {
-    return {
-      type: "error",
-      value: `Expected ${n} children in ${element.tagName.toLowerCase()}`,
-    };
-  }
-  return null;
 }
 
 // Time to iterate over the MathML and create a cute little tree
@@ -140,7 +124,9 @@ function toMathIR(element: Element): MathIR | MathIR[] {
               type: "brackets",
               values: [
                 startingBracketSymbol,
-                children.length == 1 ? children[0] : flattenMathIR(children),
+                children.length == 1
+                  ? children[0]
+                  : optionalWrapInRow(children),
                 endingBracketSymbol,
               ],
               count: 3,
@@ -207,7 +193,7 @@ function toMathIR(element: Element): MathIR | MathIR[] {
             opening.reference.values.push(
               insideBracket.length == 1
                 ? insideBracket[0]
-                : flattenMathIR(insideBracket)
+                : optionalWrapInRow(insideBracket)
             );
             opening.reference.values.push(bracketSymbol);
             i = opening.index;
@@ -230,7 +216,7 @@ function toMathIR(element: Element): MathIR | MathIR[] {
           opening.reference.values.push(
             insideBracket.length == 1
               ? insideBracket[0]
-              : flattenMathIR(insideBracket)
+              : optionalWrapInRow(insideBracket)
           );
           opening.reference.values.push(bracketSymbol);
           i = opening.index;
@@ -260,7 +246,10 @@ function toMathIR(element: Element): MathIR | MathIR[] {
 
   if (tagIs(element, "math", "mrow", "mtd")) {
     // Uses flatMap so that msub can return two elements...
-    return makeMathIRRow(children.flatMap((c) => toMathIR(c)));
+    return {
+      type: "row",
+      values: children.flatMap((c) => toMathIR(c)),
+    };
   } else if (tagIs(element, "semantics") && children.length > 0) {
     return toMathIR(children[0]);
   } else if (tagIs(element, "mtext", "ms")) {
@@ -287,14 +276,8 @@ function toMathIR(element: Element): MathIR | MathIR[] {
         allBrackets.has(text)
       ) {
         return {
-          type: "brackets",
-          values: [
-            {
-              type: "symbol",
-              value: v,
-            },
-          ],
-          count: 3,
+          type: "bracket",
+          value: v,
         };
       } else {
         return {
@@ -319,7 +302,10 @@ function toMathIR(element: Element): MathIR | MathIR[] {
           type: "symbol",
           value: "2",
         },
-        makeMathIRRow(children.flatMap((c) => toMathIR(c))),
+        {
+          type: "row",
+          values: children.flatMap((c) => toMathIR(c)),
+        },
       ],
       count: 2,
     };
@@ -330,42 +316,42 @@ function toMathIR(element: Element): MathIR | MathIR[] {
     return {
       type: "root",
       values: [
-        flattenMathIR(toMathIR(children[1])),
-        flattenMathIR(toMathIR(children[0])),
+        optionalWrapInRow(toMathIR(children[1])),
+        optionalWrapInRow(toMathIR(children[0])),
       ],
       count: 2,
     };
   } else if (tagIs(element, "msub")) {
     return (
       expectNChildren(element, 2) ?? [
-        flattenMathIR(toMathIR(children[0])),
+        optionalWrapInRow(toMathIR(children[0])),
         {
           type: "sub",
-          value: flattenMathIR(toMathIR(children[1])),
+          value: optionalWrapInRow(toMathIR(children[1])),
         },
       ]
     );
   } else if (tagIs(element, "msup")) {
     return (
       expectNChildren(element, 2) ?? [
-        flattenMathIR(toMathIR(children[0])),
+        optionalWrapInRow(toMathIR(children[0])),
         {
           type: "sup",
-          value: flattenMathIR(toMathIR(children[1])),
+          value: optionalWrapInRow(toMathIR(children[1])),
         },
       ]
     );
   } else if (tagIs(element, "msubsup")) {
     return (
       expectNChildren(element, 3) ?? [
-        flattenMathIR(toMathIR(children[0])),
+        optionalWrapInRow(toMathIR(children[0])),
         {
           type: "sub",
-          value: flattenMathIR(toMathIR(children[1])),
+          value: optionalWrapInRow(toMathIR(children[1])),
         },
         {
           type: "sup",
-          value: flattenMathIR(toMathIR(children[2])),
+          value: optionalWrapInRow(toMathIR(children[2])),
         },
       ]
     );
@@ -374,8 +360,8 @@ function toMathIR(element: Element): MathIR | MathIR[] {
       expectNChildren(element, 2) ?? {
         type: "under",
         values: [
-          flattenMathIR(toMathIR(children[0])),
-          flattenMathIR(toMathIR(children[1])),
+          optionalWrapInRow(toMathIR(children[0])),
+          optionalWrapInRow(toMathIR(children[1])),
         ],
         count: 2,
       }
@@ -385,8 +371,8 @@ function toMathIR(element: Element): MathIR | MathIR[] {
       expectNChildren(element, 2) ?? {
         type: "over",
         values: [
-          flattenMathIR(toMathIR(children[0])),
-          flattenMathIR(toMathIR(children[1])),
+          optionalWrapInRow(toMathIR(children[0])),
+          optionalWrapInRow(toMathIR(children[1])),
         ],
         count: 2,
       }
@@ -399,12 +385,12 @@ function toMathIR(element: Element): MathIR | MathIR[] {
           {
             type: "under",
             values: [
-              flattenMathIR(toMathIR(children[0])),
-              flattenMathIR(toMathIR(children[1])),
+              optionalWrapInRow(toMathIR(children[0])),
+              optionalWrapInRow(toMathIR(children[1])),
             ],
             count: 2,
           },
-          flattenMathIR(toMathIR(children[2])),
+          optionalWrapInRow(toMathIR(children[2])),
         ],
         count: 2,
       }
@@ -427,7 +413,7 @@ function toMathIR(element: Element): MathIR | MathIR[] {
     return {
       type: "table",
       values: children.map((c) =>
-        [...c.children].map((cc) => flattenMathIR(toMathIR(cc)))
+        [...c.children].map((cc) => optionalWrapInRow(toMathIR(cc)))
       ),
     };
   } else {
@@ -482,6 +468,7 @@ function fromMathIR(mathIR: MathIR): Element {
       ]),
     ]);
   } else if (mathIR.type == "symbol") {
+    // TODO: stretchy=false
     // TODO: Remove extraneous row (but remember, we need the row parsing logic from above)
     let elements = fromMathIRRow([mathIR]);
     return elements.length == 1
@@ -493,6 +480,8 @@ function fromMathIR(mathIR: MathIR): Element {
       fromMathIR(mathIR.values[1]),
       fromMathIR(mathIR.values[2]),
     ]);
+  } else if (mathIR.type == "bracket") {
+    return createMathElement("mo", [document.createTextNode(mathIR.value)]);
   } else if (mathIR.type == "text") {
     return createMathElement("mtext", [document.createTextNode(mathIR.value)]);
   } else if (mathIR.type == "table") {
