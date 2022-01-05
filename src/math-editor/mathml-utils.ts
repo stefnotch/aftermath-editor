@@ -1,10 +1,6 @@
 import { assert, assertUnreachable } from ".././assert";
 import { MathIR } from "./math-ir";
-import {
-  expectNChildren,
-  optionalWrapInRow,
-  parseBrackets,
-} from "./math-ir-utils";
+import { expectNChildren, optionalWrapInRow } from "./math-ir-utils";
 import {
   startingBrackets,
   endingBrackets,
@@ -48,7 +44,7 @@ type MathMLTags =
 export function fromElement(element: HTMLElement) {
   assert(tagIs(element, "math"));
 
-  return parseBrackets(optionalWrapInRow(toMathIR(element)));
+  return optionalWrapInRow(toMathIR(element));
 }
 
 const mathNamespace = "http://www.w3.org/1998/Math/MathML";
@@ -78,170 +74,6 @@ export function toElement(mathIR: MathIR): Element {
 // Time to iterate over the MathML and create a cute little tree
 // Doesn't deal with horrible MathML yet (so stuff like unnecessary nested mrows is bad, maybe that should be a post-processing step?)
 function toMathIR(element: Element): MathIR | MathIR[] {
-  // Internal contract: Whenever we encounter a potential bracket, we emit a new type: bracket element
-
-  type MathIRBrackets = MathIR & { type: "brackets" };
-
-  function parseBrackets(
-    elements: MathIR[],
-    startingBracketIndex: number
-  ): { endingBracketIndex: number; mathIR: MathIRBrackets } {
-    const children = [] as MathIR[];
-
-    const startingBracket = elements[startingBracketIndex];
-    assert(startingBracket.type == "brackets");
-    const startingBracketSymbol = startingBracket.values[0];
-    assert(startingBracketSymbol.type == "symbol");
-
-    for (let i = startingBracketIndex + 1; i < elements.length; i++) {
-      const element = elements[i];
-      if (element.type != "brackets") {
-        children.push(element);
-      } else {
-        const bracketSymbol = element.values[0];
-        assert(bracketSymbol.type == "symbol");
-
-        if (startingBrackets.has(bracketSymbol.value)) {
-          const parsed = parseBrackets(elements, i);
-          i = parsed.endingBracketIndex + 1;
-          children.push(parsed.mathIR);
-        } else if (endingBrackets.has(bracketSymbol.value)) {
-          const endingBracketSymbol = element.values[0];
-          assert(endingBracketSymbol.type == "symbol");
-          if (
-            startingBrackets.get(startingBracketSymbol.value) !=
-            endingBracketSymbol.value
-          ) {
-            children.push({
-              type: "error",
-              value: "Expected a different ending bracket",
-            });
-          }
-
-          return {
-            endingBracketIndex: i,
-            mathIR: {
-              type: "brackets",
-              values: [
-                startingBracketSymbol,
-                children.length == 1
-                  ? children[0]
-                  : optionalWrapInRow(children),
-                endingBracketSymbol,
-              ],
-              count: 3,
-            },
-          };
-        }
-      }
-    }
-    // Apparently we didn't have a proper starting bracket
-    return;
-  }
-
-  function makeMathIRRow(children: MathIR[]): MathIR {
-    type BracketReference = {
-      index: number;
-      reference: MathIRBrackets;
-      bracketType: "starting" | "either";
-      value: string;
-    };
-    let bracketStack = [] as BracketReference[];
-    for (let i = 0; i < children.length; i++) {
-      const child = children[i];
-      if (child.type != "brackets") continue;
-      let bracketSymbol = child.values[0];
-      assert(bracketSymbol.type == "symbol");
-
-      if (startingBrackets.has(bracketSymbol.value)) {
-        bracketStack.push({
-          index: i,
-          reference: child,
-          bracketType: "starting",
-          value: bracketSymbol.value,
-        });
-      } else if (endingBrackets.has(bracketSymbol.value)) {
-        // Clear out the "either" brackets, they're just symbols
-        while (true) {
-          if (bracketStack.length <= 0) break;
-          let top = bracketStack[bracketStack.length - 1];
-          if (top.bracketType != "either") break;
-          children[top.index] = top.reference.values[0];
-        }
-        // Take care of the starting bracket
-        if (bracketStack.length <= 0) {
-          children[i] = {
-            type: "error",
-            value: "Unexpected closing bracket",
-          };
-        } else {
-          // Please get rid of the code duplication around here
-          let opening = bracketStack.pop();
-          assert(opening != undefined);
-          assert(opening.reference.values.length == 1);
-          assert(opening.bracketType == "starting");
-          if (opening.value != endingBrackets.get(bracketSymbol.value)) {
-            children[i] = {
-              type: "error",
-              value: "Expected a matching opening bracket",
-            };
-          } else {
-            let insideBracket = children.splice(
-              opening.index + 1,
-              i - opening.index
-            );
-            opening.reference.values.push(
-              insideBracket.length == 1
-                ? insideBracket[0]
-                : optionalWrapInRow(insideBracket)
-            );
-            opening.reference.values.push(bracketSymbol);
-            i = opening.index;
-          }
-        }
-      } else if (eitherBrackets.has(bracketSymbol.value)) {
-        // Things like the absolute value bars
-        if (
-          bracketStack.length > 0 &&
-          bracketStack[bracketStack.length - 1].bracketType == "either" &&
-          bracketStack[bracketStack.length - 1].value == bracketSymbol.value
-        ) {
-          let opening = bracketStack.pop();
-          assert(opening != undefined);
-          assert(opening.reference.values.length == 1);
-          let insideBracket = children.splice(
-            opening.index + 1,
-            i - opening.index
-          );
-          opening.reference.values.push(
-            insideBracket.length == 1
-              ? insideBracket[0]
-              : optionalWrapInRow(insideBracket)
-          );
-          opening.reference.values.push(bracketSymbol);
-          i = opening.index;
-        } else {
-          bracketStack.push({
-            index: i,
-            reference: child,
-            bracketType: "either",
-            value: bracketSymbol.value,
-          });
-        }
-      } else {
-        children[i] = {
-          type: "error",
-          value: "Illegal bracket, function did not honor internal contract",
-        };
-      }
-    }
-
-    return {
-      type: "row",
-      values: children,
-    };
-  }
-
   let children = [...element.children];
 
   if (tagIs(element, "math", "mrow", "mtd")) {
@@ -474,13 +306,9 @@ function fromMathIR(mathIR: MathIR): Element {
     return elements.length == 1
       ? elements[0]
       : createMathElement("mrow", elements);
-  } else if (mathIR.type == "brackets") {
-    return createMathElement("mrow", [
-      fromMathIR(mathIR.values[0]),
-      fromMathIR(mathIR.values[1]),
-      fromMathIR(mathIR.values[2]),
-    ]);
   } else if (mathIR.type == "bracket") {
+    // TODO: Find the associated closing bracket
+    // And then output <mrow>starting bracket <mrow></mrow> closing bracket</mrow>
     return createMathElement("mo", [document.createTextNode(mathIR.value)]);
   } else if (mathIR.type == "text") {
     return createMathElement("mtext", [document.createTextNode(mathIR.value)]);

@@ -49,14 +49,8 @@ export type MathIR =
       value: MathIR;
     }
   | {
-      // TODO: Implement
-      // starting bracket, inside stuff, ending bracket
-      type: "brackets";
-      values: MathIR[];
-      count: 3;
-    }
-  | {
       // A bracket symbol
+      // Brackets are not containers, cause that makes things like adding a closing bracket somewhere in a formula really awkward
       type: "bracket";
       value: string;
     }
