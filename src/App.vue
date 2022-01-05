@@ -24,6 +24,15 @@ import MathEditor from "./components/MathEditor.vue";
       </math>"
   >
   </MathEditor>
+
+  <math>
+    <mn>-1.3</mn>
+    <mn>-1</mn>
+    <mn>.3</mn>
+
+    <mo>-</mo>
+    <mn>1.3</mn>
+  </math>
 </template>
 
 <style>
