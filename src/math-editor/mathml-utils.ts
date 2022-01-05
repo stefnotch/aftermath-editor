@@ -68,7 +68,7 @@ export function toElement(mathIR: MathIR): Element {
   element.setAttribute("tabindex", "font-0");
 
   if (mathIR.type == "row") {
-    element.append(...mathIR.values.map((v) => fromMathIR(v)));
+    element.append(...fromMathIRRow(mathIR.values));
   } else {
     element.append(fromMathIR(mathIR));
   }
@@ -340,7 +340,10 @@ function fromMathIR(mathIR: MathIR): Element {
   }
 }
 
+// For starting a number
 const isDigit = /^\p{Nd}+$/gu;
+// For parsing a whole number
+const isNumber = /^\p{Nd}+(\.\p{Nd}*)?$/gu;
 
 /**
  * Parse all the children of a row, has some special logic
@@ -360,7 +363,7 @@ function fromMathIRRow(mathIR: MathIR[]): Element[] {
   for (let i = 0; i < mathIR.length; i++) {
     const element = mathIR[i];
     if (element.type == "symbol") {
-      if (isDigit.test(element.value)) {
+      if (element.value.search(isDigit) != -1) {
         const parsed = fromMathIRNumber(mathIR, i);
         output.push(parsed.element);
         i = parsed.lastDigitIndex;
@@ -430,15 +433,17 @@ function fromMathIRNumber(
   lastDigitIndex: number;
 } {
   // TODO: Parse dots and other stuff (Maybe even hexadecimal numbers?)
-
   const firstDigit = mathIR[firstDigitIndex];
   assert(firstDigit.type == "symbol");
 
   let digits = firstDigit.value;
   let i = firstDigitIndex + 1;
   while (i < mathIR.length) {
-    let element = mathIR[i];
-    if (element.type == "symbol" && isDigit.test(element.value)) {
+    const element = mathIR[i];
+    if (
+      element.type == "symbol" &&
+      (digits + element.value).search(isNumber) != -1
+    ) {
       digits += element.value;
       i += 1;
     } else {
