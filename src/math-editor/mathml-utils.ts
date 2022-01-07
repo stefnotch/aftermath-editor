@@ -52,15 +52,6 @@ export function fromElement(element: HTMLElement) {
   return optionalWrapInRow(toMathIR(element));
 }
 
-const mathNamespace = "http://www.w3.org/1998/Math/MathML";
-function createMathElement(tagName: MathMLTags, children: Node[]) {
-  let element = document.createElementNS(mathNamespace, tagName);
-  children.forEach((c) => {
-    element.appendChild(c);
-  });
-  return element;
-}
-
 export function toElement(mathIR: MathIR): Element {
   let element = createMathElement("math", []);
   element.setAttribute("display", "block");
@@ -74,6 +65,20 @@ export function toElement(mathIR: MathIR): Element {
   }
 
   return element;
+}
+
+const mathNamespace = "http://www.w3.org/1998/Math/MathML";
+function createMathElement(tagName: MathMLTags, children: Node[]) {
+  let element = document.createElementNS(mathNamespace, tagName);
+  children.forEach((c) => {
+    element.appendChild(c);
+  });
+  return element;
+}
+
+function getText(element: Element) {
+  // Good enough for now
+  return (element.textContent + "").trim();
 }
 
 // Time to iterate over the MathML and create a cute little tree
@@ -92,37 +97,33 @@ function toMathIR(element: Element): MathIR | MathIR[] {
   } else if (tagIs(element, "mtext", "ms")) {
     return {
       type: "text",
-      // TODO: Correctly get the text (this includes worthless spaces and such)
-      value: (element.textContent + "").trim(),
+      value: getText(element),
     };
   } else if (tagIs(element, "mi", "mn")) {
-    // TODO: Correctly get the text (this includes worthless spaces and such)
-    let text = (element.textContent + "").trim();
-    return text.split("").map((v) => {
-      return {
-        type: "symbol",
-        value: v,
-      };
-    });
-  } else if (tagIs(element, "mo")) {
-    // TODO: Correctly get the text (this includes worthless spaces and such)
-    let text = (element.textContent + "").trim();
-    return text.split("").map((v) => {
-      if (
-        element.getAttribute("stretchy") != "false" &&
-        allBrackets.has(text)
-      ) {
-        return {
-          type: "bracket",
-          value: v,
-        };
-      } else {
+    return getText(element)
+      .split("")
+      .map((v) => {
         return {
           type: "symbol",
           value: v,
         };
-      }
-    });
+      });
+  } else if (tagIs(element, "mo")) {
+    return getText(element)
+      .split("")
+      .map((v) => {
+        if (element.getAttribute("stretchy") != "false" && allBrackets.has(v)) {
+          return {
+            type: "bracket",
+            value: v,
+          };
+        } else {
+          return {
+            type: "symbol",
+            value: v,
+          };
+        }
+      });
   } else if (tagIs(element, "mfrac")) {
     return (
       expectNChildren(element, 2) ?? {
@@ -147,17 +148,16 @@ function toMathIR(element: Element): MathIR | MathIR[] {
       count: 2,
     };
   } else if (tagIs(element, "mroot")) {
-    if (children.length != 2) {
-      return { type: "error", value: "Not 2 children in root" };
-    }
-    return {
-      type: "root",
-      values: [
-        optionalWrapInRow(toMathIR(children[1])),
-        optionalWrapInRow(toMathIR(children[0])),
-      ],
-      count: 2,
-    };
+    return (
+      expectNChildren(element, 2) ?? {
+        type: "root",
+        values: [
+          optionalWrapInRow(toMathIR(children[1])),
+          optionalWrapInRow(toMathIR(children[0])),
+        ],
+        count: 2,
+      }
+    );
   } else if (tagIs(element, "msub")) {
     return (
       expectNChildren(element, 2) ?? [
@@ -245,8 +245,6 @@ function toMathIR(element: Element): MathIR | MathIR[] {
       };
     }
 
-    // Can add some useless rows for each table cell
-    // Maybe we should only generate a row if it's actually needed
     return {
       type: "table",
       values: children.map((c) =>
@@ -305,7 +303,6 @@ function fromMathIR(mathIR: MathIR): Element {
       ]),
     ]);
   } else if (mathIR.type == "symbol") {
-    // TODO: stretchy=false
     const elements = fromMathIRRow([mathIR]);
     return elements.length == 1
       ? elements[0]
@@ -326,7 +323,7 @@ function fromMathIR(mathIR: MathIR): Element {
           "mtr",
           v.map((cell) => {
             if (cell.type == "row") {
-              // TODO: Remove extraneous row (but remember, we need the row parsing logic from above)
+              // TODO: Does this introduce useless rows? (also remember, we need the row parsing logic from above)
               return createMathElement("mtd", [fromMathIR(cell)]);
             } else {
               return createMathElement("mtd", [fromMathIR(cell)]);
@@ -367,6 +364,12 @@ function fromMathIRRow(mathIR: MathIR[]): Element[] {
         const parsed = fromMathIRNumber(mathIR, i);
         output.push(parsed.element);
         i = parsed.lastDigitIndex;
+      } else if (allBrackets.has(element.value)) {
+        const pseudoBracket = createMathElement("mo", [
+          document.createTextNode(element.value),
+        ]);
+        pseudoBracket.setAttribute("stretchy", "false");
+        output.push(pseudoBracket);
       } else {
         // TODO: Might be an operator
 
@@ -432,7 +435,6 @@ function fromMathIRNumber(
   element: Element;
   lastDigitIndex: number;
 } {
-  // TODO: Parse dots and other stuff (Maybe even hexadecimal numbers?)
   const firstDigit = mathIR[firstDigitIndex];
   assert(firstDigit.type == "symbol");
 

@@ -3,12 +3,15 @@ import { MathIR } from "./math-ir";
 import { endingBrackets, startingBrackets } from "./mathml-spec";
 
 export function optionalWrapInRow(mathIR: MathIR | MathIR[]): MathIR {
-  // TODO: What if I get an array with the length 1?
   if (Array.isArray(mathIR)) {
-    return {
-      type: "row",
-      values: mathIR,
-    };
+    if (mathIR.length == 1) {
+      return mathIR[0];
+    } else {
+      return {
+        type: "row",
+        values: mathIR,
+      };
+    }
   } else {
     return mathIR;
   }

@@ -14,8 +14,12 @@ export class MathEditor {
     console.log(this.mathIR);
 
     this.render = () => {
-      // TODO: Copy over the attributes
-      element.replaceChildren(...toMathMLElement(this.mathIR).children);
+      const newMathElement = toMathMLElement(this.mathIR);
+      element.replaceChildren(...newMathElement.children);
+      [...element.attributes].forEach((v) => element.removeAttribute(v.name));
+      [...newMathElement.attributes].forEach((v) =>
+        element.setAttribute(v.name, v.value)
+      );
     };
 
     setTimeout(() => this.render(), 1000);
