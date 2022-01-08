@@ -14,6 +14,12 @@
 // if subtree: brackets stop being symbols, instead you can place the caret outside of the brackets and then there is another expression (usually row) inside them
 // if not subtree: we need to find the ending bracket. which means that in the case of |abs|, we need to wrap it in its own row. and when |abs| gets deleted or edited, we gotta get rid of the useless row
 
+/**
+ * A simple, JSON-compatible representation of a math formula.
+ * Optimized for editing, purposefully does not assign meaning to most characters.
+ * For instance, if the formula contains "0xe", we just say it has the characters 0, x, e.
+ * We don't parse it as a hexadecimal or 0*x*e or anything. That part is done later.
+ */
 export type MathIR =
   | {
       // the only thing that has an arbitrary number of children
