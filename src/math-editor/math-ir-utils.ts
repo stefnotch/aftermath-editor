@@ -1,20 +1,26 @@
 import { assert } from "../assert";
-import { MathIR } from "./math-ir";
+import { MathIR, MathIRRow } from "./math-ir";
 import { endingBrackets, startingBrackets } from "./mathml-spec";
 
-export function optionalWrapInRow(mathIR: MathIR | MathIR[]): MathIR {
-  if (Array.isArray(mathIR)) {
-    if (mathIR.length == 1) {
-      return mathIR[0];
-    } else {
-      return {
-        type: "row",
-        values: mathIR,
-      };
+/**
+ * Guarantees that something is wrapped in a row
+ */
+export function wrapInRow(mathIR: MathIR | MathIR[]): MathIRRow {
+  if (!Array.isArray(mathIR)) {
+    if (mathIR.type == "row") {
+      return mathIR;
     }
-  } else {
-    return mathIR;
+    mathIR = [mathIR];
   }
+
+  return {
+    type: "row",
+    values: mathIR.map((v) => {
+      // Maybe we should actually try to handle this
+      assert(v.type != "row");
+      return v;
+    }),
+  };
 }
 
 /**

@@ -1,21 +1,32 @@
 import { assert, assertUnreachable } from "../assert";
-import type { MathIR } from "./math-ir";
+import type {
+  MathIR,
+  MathIRContainer,
+  MathIRTextLeaf,
+  MathIRRow,
+  MathIRSymbolLeaf,
+} from "./math-ir";
 
 /*
  * MathIR with parent pointers
  */
 export interface MathAst {
-  mathIR: MathIR;
-  parents: Map<MathIR, MathIR>;
+  mathIR: MathIRRow;
+  parents: Map<MathIR, MathIR | null>;
   setChild(
-    mathIR: MathIR & { type: "row" | "frac" | "root" | "under" | "over" },
-    value: MathIR,
+    mathIR: MathIRRow,
+    value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf,
+    index: number
+  ): void;
+  setChild(
+    mathIR: MathIR & { type: "frac" | "root" | "under" | "over" },
+    value: MathIRRow,
     index: number
   ): void;
   setChild(mathIR: MathIR & { type: "sup" | "sub" }, value: MathIR): void;
   setChild(
     mathIR: MathIR & { type: "table" },
-    value: MathIR,
+    value: MathIRRow,
     indexA: number,
     indexB: number
   ): void;
@@ -24,7 +35,7 @@ export interface MathAst {
 /**
  * Math-ir with parent pointers. Super convenient for traversing the data structure
  */
-export function MathAst(mathIR: MathIR): MathAst {
+export function MathAst(mathIR: MathIRRow): MathAst {
   const ast: MathAst = { mathIR, parents: new Map(), setChild };
 
   function setChild(
@@ -35,6 +46,7 @@ export function MathAst(mathIR: MathIR): MathAst {
   ): void {
     if (mathIR.type == "row") {
       assert(indexA !== undefined);
+      assert(value.type != "row");
       mathIR.values[indexA] = value;
     } else if (
       mathIR.type == "frac" ||
@@ -43,8 +55,10 @@ export function MathAst(mathIR: MathIR): MathAst {
       mathIR.type == "over"
     ) {
       assert(indexA !== undefined);
+      assert(value.type == "row");
       mathIR.values[indexA] = value;
     } else if (mathIR.type == "sup" || mathIR.type == "sub") {
+      assert(value.type == "row");
       mathIR.value = value;
     } else if (
       mathIR.type == "bracket" ||
@@ -56,11 +70,39 @@ export function MathAst(mathIR: MathIR): MathAst {
     } else if (mathIR.type == "table") {
       assert(indexA !== undefined);
       assert(indexB !== undefined);
+      assert(value.type == "row");
       mathIR.values[indexA][indexB] = value;
     } else {
       assertUnreachable(mathIR);
     }
   }
+
+  function setParents(parent: MathIR | null, children: MathIR[]) {
+    for (let i = 0; i < children.length; i++) {
+      ast.parents.set(children[i], parent);
+      setParents(children[i], getChildren(children[i]));
+    }
+  }
+
+  function getChildren(mathIR: MathIR) {
+    if (
+      mathIR.type == "row" ||
+      mathIR.type == "frac" ||
+      mathIR.type == "root" ||
+      mathIR.type == "under" ||
+      mathIR.type == "over"
+    ) {
+      return mathIR.values;
+    } else if (mathIR.type == "sup" || mathIR.type == "sub") {
+      return [mathIR.value];
+    } else if (mathIR.type == "table") {
+      return mathIR.values.flatMap((v) => v);
+    } else {
+      return [];
+    }
+  }
+
+  setParents(null, [mathIR]);
 
   return ast;
 }

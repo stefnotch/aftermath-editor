@@ -21,39 +21,54 @@
  * We don't parse it as a hexadecimal or 0*x*e or anything. That part is done later.
  */
 export type MathIR =
-  | {
-      // the only thing that has an arbitrary number of children
-      type: "row";
-      values: MathIR[];
-    }
+  | MathIRRow
+  | MathIRContainer
+  | MathIRSymbolLeaf
+  | MathIRTextLeaf;
+
+export type MathIRContainer =
   | {
       type: "frac";
-      values: MathIR[];
+      values: MathIRRow[];
       count: 2;
     }
   | {
       type: "root";
-      values: MathIR[];
+      values: MathIRRow[];
       count: 2;
     }
   | {
       type: "under";
-      values: MathIR[];
+      values: MathIRRow[];
       count: 2;
     }
   | {
       type: "over";
-      values: MathIR[];
+      values: MathIRRow[];
       count: 2;
     }
   | {
       type: "sup";
-      value: MathIR;
+      value: MathIRRow;
     }
   | {
       type: "sub";
-      value: MathIR;
+      value: MathIRRow;
     }
+  | {
+      // rows and cells
+      // Not sure about this one yet
+      type: "table";
+      values: MathIRRow[][];
+    };
+
+export type MathIRRow = {
+  // the only thing that has an arbitrary number of children
+  type: "row";
+  values: (MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf)[];
+};
+
+export type MathIRSymbolLeaf =
   | {
       // A bracket symbol
       // Brackets are not containers, cause that makes things like adding a closing bracket somewhere in a formula really awkward
@@ -67,7 +82,9 @@ export type MathIR =
       name?: string;
       wikidata?: string;
       value: string;
-    }
+    };
+
+export type MathIRTextLeaf =
   | {
       type: "text";
       value: string;
@@ -75,15 +92,7 @@ export type MathIR =
   | {
       type: "error";
       value: string;
-    }
-  | {
-      // rows and cells
-      // Not sure about this one yet
-      type: "table";
-      values: MathIR[][];
     };
-
-export type MathIRRange = {}; // TODO:
 
 // Minus sign can mean multiple things (infix and prefix)
 // Multi character stuff (like ==)
@@ -107,4 +116,3 @@ export type MathIRRange = {}; // TODO:
 // Annotated symbols support? (unmatched bracket, colors, ...)
 
 // TODO: bracket pairs are to be resolved during inputting (pairs, ghost close bracket, esc and space, set builder |, |abs|, ||norm||, {x| |x| < 3})
-export type MathRowIR = {};
