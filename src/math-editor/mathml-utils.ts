@@ -290,16 +290,15 @@ function tagIs(element: Element, ...tagNames: string[]): boolean {
   return tagNames.includes(element.tagName.toLowerCase());
 }
 
-function getLetterLayout(t: Text, index: number) {
-  // https://stackoverflow.com/a/51618540/3492994
+function getTextBoundingBox(t: Text, index: number) {
   const range = document.createRange();
-  const child = t.firstChild; // TODO: This might be wrong
-  if (child) {
-    range.setStart(t, index);
-  } else {
-    range.selectNode(t);
-  }
-  const boundingBox = range.getBoundingClientRect();
+  range.setStart(t, index);
+  range.setEnd(t, index + 1);
+  return range.getBoundingClientRect();
+}
+
+function getTextLayout(t: Text, index: number) {
+  const boundingBox = getTextBoundingBox(t, index);
 
   return {
     x: boundingBox.x + window.scrollX,
@@ -308,12 +307,13 @@ function getLetterLayout(t: Text, index: number) {
   };
 }
 
-function getRowLayout(elements: Element[], index: number) {
-  assert(index <= elements.length);
-  const isLast = index == elements.length;
+function getRowLayout(mathLayout: (() => DOMRect)[], index: number) {
+  console.log("getRowLayout", index);
+  assert(index <= mathLayout.length);
+  const isLast = index == mathLayout.length;
   const boundingBox = isLast
-    ? elements[elements.length - 1].getBoundingClientRect()
-    : elements[index].getBoundingClientRect();
+    ? mathLayout[mathLayout.length - 1]()
+    : mathLayout[index]();
 
   return {
     x: boundingBox.x + (isLast ? boundingBox.width : 0) + window.scrollX,
@@ -324,13 +324,12 @@ function getRowLayout(elements: Element[], index: number) {
 
 function fromMathIR(mathIR: MathIR, mathIRLayout: MathIRLayout): Element {
   function setTextLayout(mathIR: MathIRTextLeaf, textNode: Text): Text {
-    mathIRLayout?.set(mathIR, (index) => getLetterLayout(textNode, index));
+    mathIRLayout?.set(mathIR, (index) => getTextLayout(textNode, index));
     return textNode;
   }
 
-  function setRowLayout(mathIR: MathIRRow, elements: Element[]): Element[] {
-    mathIRLayout?.set(mathIR, (index) => getRowLayout(elements, index));
-    return elements;
+  function setRowLayout(mathIR: MathIRRow, mathLayout: (() => DOMRect)[]) {
+    mathIRLayout?.set(mathIR, (index) => getRowLayout(mathLayout, index));
   }
 
   if (mathIR.type == "error") {
@@ -365,7 +364,7 @@ function fromMathIR(mathIR: MathIR, mathIRLayout: MathIRLayout): Element {
   } else if (mathIR.type == "row") {
     // TODO: Maybe don't emit every useless row
     const parsedChildren = fromMathIRRow(mathIR.values, mathIRLayout);
-    setRowLayout(mathIR, parsedChildren.flatElements);
+    setRowLayout(mathIR, parsedChildren.mathLayout);
     return createMathElement("mrow", parsedChildren.elements);
   } else if (mathIR.type == "sub" || mathIR.type == "sup") {
     return createMathElement("merror", [
@@ -423,7 +422,7 @@ function fromMathIRRow(
   mathIRLayout: MathIRLayout
 ): {
   elements: Element[];
-  flatElements: Element[];
+  mathLayout: (() => DOMRect)[];
 } {
   // That parsing needs to
   // - Parse numbers <mn> numbers go brr
@@ -435,11 +434,11 @@ function fromMathIRRow(
   //   Instead we'll expose some "parser" API to the user and let them deal with fun like "wait, what e is that"
 
   const output: Element[] = [];
-  const flatOutput: Element[] = [];
+  const mathLayout: (() => DOMRect)[] = [];
 
   function pushOutput(element: Element) {
     output.push(element);
-    flatOutput.push(element);
+    mathLayout.push(() => element.getBoundingClientRect());
   }
 
   for (let i = 0; i < mathIR.length; i++) {
@@ -448,7 +447,7 @@ function fromMathIRRow(
       if (element.value.search(isDigit) != -1) {
         const parsed = fromMathIRNumber(mathIR, i);
         output.push(parsed.element);
-        flatOutput.push(...); // TODO: Numbers get squished into one element 
+        mathLayout.push(...parsed.mathLayout); // TODO: Numbers get squished into one element
         i = parsed.lastDigitIndex;
       } else if (allBrackets.has(element.value)) {
         const pseudoBracket = createMathElement("mo", [
@@ -496,16 +495,16 @@ function fromMathIRRow(
               endingBracketElement,
             ])
           );
-          flatOutput.push(startingBracketElement);
-          flatOutput.push(...parsedChildren.flatElements);
-          flatOutput.push(endingBracketElement);
+          mathLayout.push(() => startingBracketElement.getBoundingClientRect());
+          mathLayout.push(...parsedChildren.mathLayout);
+          mathLayout.push(() => endingBracketElement.getBoundingClientRect());
         }
       }
     } else if (element.type == "sub" || element.type == "sup") {
       const lastElement = output.pop();
       if (lastElement) {
         const subSupElement = fromMathIR(element.value, mathIRLayout);
-        flatOutput.push(subSupElement);
+        mathLayout.push(() => subSupElement.getBoundingClientRect());
         output.push(
           createMathElement(element.type == "sub" ? "msub" : "msup", [
             lastElement,
@@ -521,7 +520,7 @@ function fromMathIRRow(
     }
   }
 
-  return { elements: output, flatElements: flatOutput };
+  return { elements: output, mathLayout: mathLayout };
 }
 
 function fromMathIRNumber(
@@ -529,13 +528,16 @@ function fromMathIRNumber(
   firstDigitIndex: number
 ): {
   element: Element;
+  mathLayout: (() => DOMRect)[];
   lastDigitIndex: number;
 } {
+  const mathLayout: (() => DOMRect)[] = [];
   const firstDigit = mathIR[firstDigitIndex];
   assert(firstDigit.type == "symbol");
 
   let digits = firstDigit.value;
-  let i = firstDigitIndex + 1;
+  let i = firstDigitIndex + 1; // Invariant: Always points at the next digit
+  let count = 1;
   while (i < mathIR.length) {
     const element = mathIR[i];
     if (
@@ -544,13 +546,20 @@ function fromMathIRNumber(
     ) {
       digits += element.value;
       i += 1;
+      count += 1;
     } else {
       break;
     }
   }
 
+  const textNode = document.createTextNode(digits);
+  for (let j = 0; j < count; j++) {
+    mathLayout.push(() => getTextBoundingBox(textNode, j));
+  }
+
   return {
-    element: createMathElement("mn", [document.createTextNode(digits)]),
+    element: createMathElement("mn", [textNode]),
+    mathLayout: mathLayout,
     lastDigitIndex: i - 1,
   };
 }
