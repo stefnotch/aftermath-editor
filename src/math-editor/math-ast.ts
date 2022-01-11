@@ -12,7 +12,7 @@ import type {
  */
 export interface MathAst {
   mathIR: MathIRRow;
-  parents: Map<MathIR, MathIR | null>;
+  parents: Map<MathIR, MathIRRow | MathIRContainer | null>;
   setChild(
     mathIR: MathIRRow,
     value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf,
@@ -77,10 +77,37 @@ export function MathAst(mathIR: MathIRRow): MathAst {
     }
   }
 
-  function setParents(parent: MathIR | null, children: MathIR[]) {
+  function setParents(
+    parent: MathIRRow | MathIRContainer | null,
+    children: MathIR[]
+  ) {
     for (let i = 0; i < children.length; i++) {
       ast.parents.set(children[i], parent);
-      setParents(children[i], getChildren(children[i]));
+
+      const validParent = asRowOrContainer(children[i]);
+      if (validParent != null) {
+        setParents(validParent, getChildren(children[i]));
+      }
+    }
+  }
+
+  function asRowOrContainer(
+    mathIR: MathIR
+  ): MathIRRow | MathIRContainer | null {
+    if (mathIR.type == "row") {
+      return mathIR;
+    } else if (
+      mathIR.type == "frac" ||
+      mathIR.type == "root" ||
+      mathIR.type == "under" ||
+      mathIR.type == "over" ||
+      mathIR.type == "sup" ||
+      mathIR.type == "sub" ||
+      mathIR.type == "table"
+    ) {
+      return mathIR;
+    } else {
+      return null;
     }
   }
 

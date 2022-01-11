@@ -7,7 +7,6 @@ import MathEditor from "./components/MathEditor.vue";
     mathml="<math
         display='block'
         style='font-family: STIX Two'
-        tabindex='0'
       >
         <msqrt>
           <msqrt>

@@ -46,28 +46,18 @@ function createCaret(documentBody: HTMLElement): MathmlCaret {
   };
 }
 
-export class MathCaret {
-  #row: MathIRRow | MathIRTextLeaf;
-  #offset: number;
-  #caretElement: MathmlCaret;
-
-  constructor(row: MathIRRow, offset: number, caretElement: MathmlCaret) {
-    this.#row = row;
-    this.#offset = offset;
-    this.#caretElement = caretElement;
+function atEnd(row: MathIRRow | MathIRTextLeaf, offset: number) {
+  if (row.type == "row") {
+    return offset >= row.values.length;
+  } else {
+    return offset >= row.value.length;
   }
+}
 
-  render(mathIRLayout: MathIRLayout) {
-    const layoutGetter = mathIRLayout.get(this.#row);
-    assert(layoutGetter !== undefined);
-    const layout = layoutGetter(this.#offset);
-    this.#caretElement.setPosition(layout.x, layout.y);
-    this.#caretElement.setHeight(layout.height);
-  }
-
-  destroy() {
-    this.#caretElement.destroy();
-  }
+export interface MathCaret {
+  row: MathIRRow | MathIRTextLeaf;
+  offset: number;
+  caretElement: MathmlCaret;
 }
 
 export class MathEditor {
@@ -77,12 +67,25 @@ export class MathEditor {
   lastLayout: MathIRLayout | null = null;
 
   constructor(element: HTMLElement) {
+    element.style.userSelect = "none";
+    element.tabIndex = 0; // Should this be here or in mathml-utils.ts?
+
     this.mathAst = MathAst(fromMathMLElement(element));
     console.log(this.mathAst);
 
-    this.carets.add(
-      new MathCaret(this.mathAst.mathIR, 0, createCaret(document.body))
-    );
+    this.carets.add({
+      row: this.mathAst.mathIR,
+      offset: 0,
+      caretElement: createCaret(document.body),
+    });
+
+    // https://d-toybox.com/studio/lib/input_event_viewer.html
+    // https://w3c.github.io/uievents/tools/key-event-viewer.html
+    // https://tkainrad.dev/posts/why-keyboard-shortcuts-dont-work-on-non-us-keyboard-layouts-and-how-to-fix-it/
+
+    // For now, I'll just use the following for text input
+    // - Sneaky textarea or input field
+    // - beforeInput event
 
     // Register keyboard handlers
     // TODO:
@@ -100,11 +103,27 @@ export class MathEditor {
     // - Click (put cursor)
     // - Drag (selection)
 
+    element.addEventListener("keydown", (ev) => {
+      console.log(ev);
+      if (ev.key == "ArrowUp") {
+        this.carets.forEach((caret) => this.moveCaret(caret, "up"));
+        this.renderCarets();
+      } else if (ev.key == "ArrowDown") {
+        this.carets.forEach((caret) => this.moveCaret(caret, "down"));
+        this.renderCarets();
+      } else if (ev.key == "ArrowLeft") {
+        this.carets.forEach((caret) => this.moveCaret(caret, "left"));
+        this.renderCarets();
+      } else if (ev.key == "ArrowRight") {
+        this.carets.forEach((caret) => this.moveCaret(caret, "right"));
+        this.renderCarets();
+      }
+    });
+
     window.addEventListener("resize", () => this.renderCarets());
 
     this.render = () => {
       // TODO: Render caret
-      // - Caret
       // - Highlight current element
       // - Highlight brackets
 
@@ -123,15 +142,58 @@ export class MathEditor {
   }
 
   renderCarets() {
+    this.carets.forEach((v) => this.renderCaret(v));
+  }
+
+  renderCaret(caret: MathCaret) {
     const lastLayout = this.lastLayout;
-    if (lastLayout) {
-      this.carets.forEach((v) => v.render(lastLayout));
+    if (!lastLayout) return;
+
+    const layoutGetter = lastLayout.get(caret.row);
+    assert(layoutGetter !== undefined);
+    const layout = layoutGetter(caret.offset);
+    caret.caretElement.setPosition(layout.x, layout.y);
+    caret.caretElement.setHeight(layout.height);
+  }
+
+  removeCaret(caret: MathCaret) {
+    caret.caretElement.destroy();
+    this.carets.delete(caret);
+  }
+
+  /**
+   * Note: Make sure to re-render the caret after moving it
+   */
+  moveCaret(caret: MathCaret, direction: "up" | "down" | "left" | "right") {
+    if (direction == "right") {
+      if (atEnd(caret.row, caret.offset)) {
+        // TODO:
+        const parent = this.mathAst.parents.get(caret.row);
+      } else {
+        if (caret.row.type == "row") {
+          // TODO:
+          caret.offset += 1;
+        } else {
+          caret.offset += 1;
+        }
+      }
+    } else if (direction == "left") {
+      if (caret.offset <= 0) {
+        const parent = this.mathAst.parents.get(caret.row);
+        // TODO:
+      } else {
+        if (caret.row.type == "row") {
+          // TODO:
+          caret.offset -= 1;
+        } else {
+          caret.offset -= 1;
+        }
+      }
     }
   }
 
   destroy() {
-    this.carets.forEach((v) => v.destroy());
-    this.carets.clear();
+    [...this.carets].forEach((v) => this.removeCaret(v));
     this.render = () => {};
     this.lastLayout = null;
   }

@@ -69,7 +69,7 @@ export function toElement(mathIR: MathIR): {
   const element = createMathElement("math", []);
   element.setAttribute("display", "block");
   element.setAttribute("style", "font-family: STIX Two");
-  element.setAttribute("tabindex", "font-0");
+  element.setAttribute("tabindex", "0");
 
   const emittedMathML = fromMathIR(mathIR, mathIRLayout);
   if (tagIs(emittedMathML, "mrow")) {
@@ -447,7 +447,8 @@ function fromMathIRRow(
     if (element.type == "symbol") {
       if (element.value.search(isDigit) != -1) {
         const parsed = fromMathIRNumber(mathIR, i);
-        pushOutput(parsed.element);
+        output.push(parsed.element);
+        flatOutput.push(...); // TODO: Numbers get squished into one element 
         i = parsed.lastDigitIndex;
       } else if (allBrackets.has(element.value)) {
         const pseudoBracket = createMathElement("mo", [
