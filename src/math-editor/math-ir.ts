@@ -116,3 +116,9 @@ export type MathIRTextLeaf =
 // Annotated symbols support? (unmatched bracket, colors, ...)
 
 // TODO: bracket pairs are to be resolved during inputting (pairs, ghost close bracket, esc and space, set builder |, |abs|, ||norm||, {x| |x| < 3})
+
+// The index has a different meaning depending on the element (child index, ignored, text index, 2D index)
+export type MathIRLayout = Map<
+  MathIRRow | MathIRTextLeaf, // row-container
+  (index: number) => { x: number; y: number; height: number }
+>;

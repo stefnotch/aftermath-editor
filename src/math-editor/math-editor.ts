@@ -1,6 +1,6 @@
 import { assert } from "../assert";
 import { MathAst } from "./math-ast";
-import { MathIR, MathIRRow, MathIRTextLeaf } from "./math-ir";
+import { MathIR, MathIRLayout, MathIRRow, MathIRTextLeaf } from "./math-ir";
 import {
   fromElement as fromMathMLElement,
   toElement as toMathMLElement,
@@ -9,7 +9,7 @@ import {
 interface MathmlCaret {
   setPosition(x: number, y: number): void;
   setHeight(v: number): void;
-  remove(): void;
+  destroy(): void;
 }
 
 function createCaret(documentBody: HTMLElement): MathmlCaret {
@@ -35,14 +35,14 @@ function createCaret(documentBody: HTMLElement): MathmlCaret {
     caretElement.style.height = `${v}px`;
   }
 
-  function remove() {
+  function destroy() {
     documentBody.removeChild(caretElement);
   }
 
   return {
     setPosition,
     setHeight,
-    remove,
+    destroy,
   };
 }
 
@@ -57,22 +57,30 @@ export class MathCaret {
     this.#caretElement = caretElement;
   }
 
-  render() {}
+  render(mathIRLayout: MathIRLayout) {
+    const layoutGetter = mathIRLayout.get(this.#row);
+    assert(layoutGetter !== undefined);
+    const layout = layoutGetter(this.#offset);
+    this.#caretElement.setPosition(layout.x, layout.y);
+    this.#caretElement.setHeight(layout.height);
+  }
 
-  remove() {
-    this.#caretElement.remove();
+  destroy() {
+    this.#caretElement.destroy();
   }
 }
 
 export class MathEditor {
-  carets: MathCaret[] = [];
+  carets: Set<MathCaret> = new Set<MathCaret>();
   mathAst: MathAst;
   render: () => void;
+  lastLayout: MathIRLayout | null = null;
+
   constructor(element: HTMLElement) {
     this.mathAst = MathAst(fromMathMLElement(element));
     console.log(this.mathAst);
 
-    this.carets.push(
+    this.carets.add(
       new MathCaret(this.mathAst.mathIR, 0, createCaret(document.body))
     );
 
@@ -92,9 +100,7 @@ export class MathEditor {
     // - Click (put cursor)
     // - Drag (selection)
 
-    document.addEventListener("resize", () => {
-      this.carets.forEach((v) => v.render());
-    });
+    window.addEventListener("resize", () => this.renderCarets());
 
     this.render = () => {
       // TODO: Render caret
@@ -103,13 +109,30 @@ export class MathEditor {
       // - Highlight brackets
 
       const newMathElement = toMathMLElement(this.mathAst.mathIR);
+      this.lastLayout = newMathElement.mathIRLayout;
       element.replaceChildren(...newMathElement.element.children);
       [...element.attributes].forEach((v) => element.removeAttribute(v.name));
       [...newMathElement.element.attributes].forEach((v) =>
         element.setAttribute(v.name, v.value)
       );
+
+      this.renderCarets();
     };
 
     setTimeout(() => this.render(), 1000);
+  }
+
+  renderCarets() {
+    const lastLayout = this.lastLayout;
+    if (lastLayout) {
+      this.carets.forEach((v) => v.render(lastLayout));
+    }
+  }
+
+  destroy() {
+    this.carets.forEach((v) => v.destroy());
+    this.carets.clear();
+    this.render = () => {};
+    this.lastLayout = null;
   }
 }
