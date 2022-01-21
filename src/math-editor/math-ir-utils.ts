@@ -1,5 +1,5 @@
 import { assert } from "../assert";
-import { MathIR, MathIRContainer, MathIRRow } from "./math-ir";
+import { MathIR, MathIRRow } from "./math-ir";
 import { endingBrackets, startingBrackets } from "./mathml-spec";
 
 /**
@@ -93,16 +93,4 @@ export function expectNChildren(element: Element, n: number): MathIR | null {
     };
   }
   return null;
-}
-
-export function isMathIRContainer(mathIR: MathIR): mathIR is MathIRContainer {
-  return (
-    mathIR.type == "frac" ||
-    mathIR.type == "root" ||
-    mathIR.type == "under" ||
-    mathIR.type == "over" ||
-    mathIR.type == "sup" ||
-    mathIR.type == "sub" ||
-    mathIR.type == "table"
-  );
 }
