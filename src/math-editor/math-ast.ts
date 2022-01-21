@@ -18,12 +18,7 @@ export interface MathAst {
     value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf,
     index: number
   ): void;
-  setChild(
-    mathIR: MathIR & { type: "frac" | "root" | "under" | "over" },
-    value: MathIRRow,
-    index: number
-  ): void;
-  setChild(mathIR: MathIR & { type: "sup" | "sub" }, value: MathIR): void;
+  setChild(mathIR: MathIRContainer, value: MathIRRow, index: number): void;
   setChild(
     mathIR: MathIR & { type: "table" },
     value: MathIRRow,
@@ -52,14 +47,13 @@ export function MathAst(mathIR: MathIRRow): MathAst {
       mathIR.type == "frac" ||
       mathIR.type == "root" ||
       mathIR.type == "under" ||
-      mathIR.type == "over"
+      mathIR.type == "over" ||
+      mathIR.type == "sup" ||
+      mathIR.type == "sub"
     ) {
       assert(indexA !== undefined);
       assert(value.type == "row");
       mathIR.values[indexA] = value;
-    } else if (mathIR.type == "sup" || mathIR.type == "sub") {
-      assert(value.type == "row");
-      mathIR.value = value;
     } else if (
       mathIR.type == "bracket" ||
       mathIR.type == "symbol" ||
@@ -117,11 +111,11 @@ export function MathAst(mathIR: MathIRRow): MathAst {
       mathIR.type == "frac" ||
       mathIR.type == "root" ||
       mathIR.type == "under" ||
-      mathIR.type == "over"
+      mathIR.type == "over" ||
+      mathIR.type == "sup" ||
+      mathIR.type == "sub"
     ) {
       return mathIR.values;
-    } else if (mathIR.type == "sup" || mathIR.type == "sub") {
-      return [mathIR.value];
     } else if (mathIR.type == "table") {
       return mathIR.values.flatMap((v) => v);
     } else {

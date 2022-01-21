@@ -86,8 +86,6 @@ function getAdjacentChild(
     } else {
       return null;
     }
-  } else if (parent.type == "sub" || parent.type == "sup") {
-    return null;
   } else if (parent.type == "table") {
     // TODO: Do something
     return null;
@@ -230,8 +228,6 @@ export class MathEditor {
         caret.row = parent;
         caret.offset = offset + (isLeft ? 0 : 1);
         return true;
-      } else if (parent.type == "sub" || parent.type == "sup") {
-        return moveCaretInDirection(parent, direction);
       } else if (parent.type == "table") {
         // TODO: Do something
         throw new Error("Not implemented");
@@ -265,10 +261,6 @@ export class MathEditor {
         adjacentChild.type == "symbol"
       ) {
         return false;
-      } else if (adjacentChild.type == "sup" || adjacentChild.type == "sub") {
-        caret.row = adjacentChild.value;
-        caret.offset = 0;
-        return true;
       } else if (adjacentChild.type == "table") {
         // TODO: Do something
         throw new Error("Not implemented");
@@ -292,10 +284,6 @@ export class MathEditor {
         adjacentChild.type == "symbol"
       ) {
         return false;
-      } else if (adjacentChild.type == "sup" || adjacentChild.type == "sub") {
-        caret.row = adjacentChild.value;
-        caret.offset = 1;
-        return true;
       } else if (adjacentChild.type == "table") {
         // TODO: Do something
         throw new Error("Not implemented");

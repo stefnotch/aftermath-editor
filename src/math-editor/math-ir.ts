@@ -49,11 +49,13 @@ export type MathIRContainer =
     }
   | {
       type: "sup";
-      value: MathIRRow;
+      values: MathIRRow[];
+      count: 1;
     }
   | {
       type: "sub";
-      value: MathIRRow;
+      values: MathIRRow[];
+      count: 1;
     }
   | {
       // rows and cells

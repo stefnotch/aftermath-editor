@@ -180,7 +180,8 @@ function toMathIR(element: Element): MathIR | MathIR[] {
         ...base,
         {
           type: "sub",
-          value: wrapInRow(toMathIR(children[1])),
+          values: [wrapInRow(toMathIR(children[1]))],
+          count: 1,
         },
       ]
     );
@@ -194,7 +195,8 @@ function toMathIR(element: Element): MathIR | MathIR[] {
         ...base,
         {
           type: "sup",
-          value: wrapInRow(toMathIR(children[1])),
+          values: [wrapInRow(toMathIR(children[1]))],
+          count: 1,
         },
       ]
     );
@@ -208,11 +210,13 @@ function toMathIR(element: Element): MathIR | MathIR[] {
         ...base,
         {
           type: "sub",
-          value: wrapInRow(toMathIR(children[1])),
+          values: [wrapInRow(toMathIR(children[1]))],
+          count: 1,
         },
         {
           type: "sup",
-          value: wrapInRow(toMathIR(children[2])),
+          values: [wrapInRow(toMathIR(children[2]))],
+          count: 1,
         },
       ]
     );
@@ -503,7 +507,7 @@ function fromMathIRRow(
     } else if (element.type == "sub" || element.type == "sup") {
       const lastElement = output.pop();
       if (lastElement) {
-        const subSupElement = fromMathIR(element.value, mathIRLayout);
+        const subSupElement = fromMathIR(element.values[0], mathIRLayout);
         mathLayout.push(() => subSupElement.getBoundingClientRect());
         output.push(
           createMathElement(element.type == "sub" ? "msub" : "msup", [
