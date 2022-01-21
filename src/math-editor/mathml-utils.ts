@@ -143,8 +143,10 @@ function toMathIR(element: Element): MathIR | MathIR[] {
     return (
       expectNChildren(element, 2) ?? {
         type: "frac",
-        values: children.map((c) => wrapInRow(toMathIR(c))),
-        count: 2,
+        values: children.map((c) => wrapInRow(toMathIR(c))) as [
+          MathIRRow,
+          MathIRRow
+        ],
       }
     );
   } else if (tagIs(element, "msqrt")) {
@@ -157,7 +159,6 @@ function toMathIR(element: Element): MathIR | MathIR[] {
         }),
         wrapInRow(children.flatMap((c) => toMathIR(c))),
       ],
-      count: 2,
     };
   } else if (tagIs(element, "mroot")) {
     return (
@@ -167,7 +168,6 @@ function toMathIR(element: Element): MathIR | MathIR[] {
           wrapInRow(toMathIR(children[1])),
           wrapInRow(toMathIR(children[0])),
         ],
-        count: 2,
       }
     );
   } else if (tagIs(element, "msub")) {
@@ -181,7 +181,6 @@ function toMathIR(element: Element): MathIR | MathIR[] {
         {
           type: "sub",
           values: [wrapInRow(toMathIR(children[1]))],
-          count: 1,
         },
       ]
     );
@@ -196,7 +195,6 @@ function toMathIR(element: Element): MathIR | MathIR[] {
         {
           type: "sup",
           values: [wrapInRow(toMathIR(children[1]))],
-          count: 1,
         },
       ]
     );
@@ -211,12 +209,10 @@ function toMathIR(element: Element): MathIR | MathIR[] {
         {
           type: "sub",
           values: [wrapInRow(toMathIR(children[1]))],
-          count: 1,
         },
         {
           type: "sup",
           values: [wrapInRow(toMathIR(children[2]))],
-          count: 1,
         },
       ]
     );
@@ -228,7 +224,6 @@ function toMathIR(element: Element): MathIR | MathIR[] {
           wrapInRow(toMathIR(children[0])),
           wrapInRow(toMathIR(children[1])),
         ],
-        count: 2,
       }
     );
   } else if (tagIs(element, "mover")) {
@@ -239,7 +234,6 @@ function toMathIR(element: Element): MathIR | MathIR[] {
           wrapInRow(toMathIR(children[0])),
           wrapInRow(toMathIR(children[1])),
         ],
-        count: 2,
       }
     );
   } else if (tagIs(element, "munderover")) {
@@ -253,11 +247,9 @@ function toMathIR(element: Element): MathIR | MathIR[] {
               wrapInRow(toMathIR(children[0])),
               wrapInRow(toMathIR(children[1])),
             ],
-            count: 2,
           }),
           wrapInRow(toMathIR(children[2])),
         ],
-        count: 2,
       }
     );
   } else if (tagIs(element, "mtable")) {

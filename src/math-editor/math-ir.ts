@@ -29,33 +29,27 @@ export type MathIR =
 export type MathIRContainer =
   | {
       type: "frac";
-      values: MathIRRow[]; // TODO: Should probably be [MathIRRow, MathIRRow]
-      count: 2;
+      values: [MathIRRow, MathIRRow];
     }
   | {
       type: "root";
-      values: MathIRRow[];
-      count: 2;
+      values: [MathIRRow, MathIRRow];
     }
   | {
       type: "under";
-      values: MathIRRow[];
-      count: 2;
+      values: [MathIRRow, MathIRRow];
     }
   | {
       type: "over";
-      values: MathIRRow[];
-      count: 2;
+      values: [MathIRRow, MathIRRow];
     }
   | {
       type: "sup";
-      values: MathIRRow[];
-      count: 1;
+      values: [MathIRRow];
     }
   | {
       type: "sub";
-      values: MathIRRow[];
-      count: 1;
+      values: [MathIRRow];
     }
   | {
       // rows and cells
