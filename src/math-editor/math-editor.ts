@@ -1,6 +1,13 @@
 import { assert } from "../assert";
 import { MathAst } from "./math-ast";
-import { MathIR, MathIRLayout, MathIRRow, MathIRTextLeaf } from "./math-ir";
+import {
+  MathIR,
+  MathIRContainer,
+  MathIRLayout,
+  MathIRRow,
+  MathIRSymbolLeaf,
+  MathIRTextLeaf,
+} from "./math-ir";
 import {
   fromElement as fromMathMLElement,
   toElement as toMathMLElement,
@@ -53,6 +60,49 @@ function atEnd(row: MathIRRow | MathIRTextLeaf, offset: number) {
     return offset >= row.value.length;
   }
 }
+function getAdjacentChild(
+  parent: MathIRRow,
+  element: MathIR,
+  direction: number
+): (MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf) | null;
+function getAdjacentChild(
+  parent: MathIRContainer,
+  element: MathIR,
+  direction: number
+): MathIRRow | null;
+function getAdjacentChild(
+  parent: MathIRRow | MathIRContainer,
+  element: MathIR,
+  direction: number
+): MathIR | null {
+  assert(direction != 0);
+  if (parent.type == "row") {
+    if (element.type != "row") {
+      const indexInParent = parent.values.indexOf(element);
+      assert(indexInParent != -1);
+      return indexInParent + direction >= parent.values.length
+        ? null
+        : parent.values[indexInParent + direction];
+    } else {
+      return null;
+    }
+  } else if (parent.type == "sub" || parent.type == "sup") {
+    return null;
+  } else if (parent.type == "table") {
+    // TODO: Do something
+    return null;
+  } else {
+    if (element.type == "row") {
+      const indexInParent = parent.values.indexOf(element);
+      assert(indexInParent != -1);
+      return indexInParent + direction >= parent.values.length
+        ? null
+        : parent.values[indexInParent + direction];
+    } else {
+      return null;
+    }
+  }
+}
 
 export interface MathCaret {
   row: MathIRRow | MathIRTextLeaf;
@@ -89,7 +139,6 @@ export class MathEditor {
 
     // Register keyboard handlers
     // TODO:
-    // - Arrow keys (left right)
     // - up and down
     // - Backspace
     // - Delete
@@ -165,26 +214,125 @@ export class MathEditor {
    * Note: Make sure to re-render the caret after moving it
    */
   moveCaret(caret: MathCaret, direction: "up" | "down" | "left" | "right") {
+    const mathAst = this.mathAst;
+
+    function moveCaretInDirection(
+      caretElement: MathIR,
+      direction: "left" | "right"
+    ): boolean {
+      const isLeft = direction == "left";
+      const parent = mathAst.parents.get(caretElement);
+      if (!parent) return false;
+
+      if (parent.type == "row") {
+        const offset = (parent.values as MathIR[]).indexOf(caretElement);
+        assert(offset != -1);
+        caret.row = parent;
+        caret.offset = offset + (isLeft ? 0 : 1);
+        return true;
+      } else if (parent.type == "sub" || parent.type == "sup") {
+        return moveCaretInDirection(parent, direction);
+      } else if (parent.type == "table") {
+        // TODO: Do something
+        throw new Error("Not implemented");
+      } else {
+        const adjacentChild = getAdjacentChild(
+          parent,
+          caretElement,
+          isLeft ? -1 : 1
+        );
+        if (adjacentChild != null) {
+          caret.row = adjacentChild;
+          caret.offset = isLeft ? adjacentChild.values.length : 0;
+          return true;
+        } else {
+          // We're at the end, move up
+          return moveCaretInDirection(parent, direction);
+        }
+      }
+    }
+
+    function moveCaretRightDown(
+      adjacentChild: MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf
+    ): boolean {
+      // TODO: Maybe create a few type guards?
+      if (adjacentChild.type == "text" || adjacentChild.type == "error") {
+        caret.row = adjacentChild;
+        caret.offset = 0;
+        return true;
+      } else if (
+        adjacentChild.type == "bracket" ||
+        adjacentChild.type == "symbol"
+      ) {
+        return false;
+      } else if (adjacentChild.type == "sup" || adjacentChild.type == "sub") {
+        caret.row = adjacentChild.value;
+        caret.offset = 0;
+        return true;
+      } else if (adjacentChild.type == "table") {
+        // TODO: Do something
+        throw new Error("Not implemented");
+      } else {
+        caret.row = adjacentChild.values[0];
+        caret.offset = 0;
+        return true;
+      }
+    }
+
+    function moveCaretLeftDown(
+      adjacentChild: MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf
+    ): boolean {
+      // TODO: Maybe create a few type guards?
+      if (adjacentChild.type == "text" || adjacentChild.type == "error") {
+        caret.row = adjacentChild;
+        caret.offset = adjacentChild.value.length;
+        return true;
+      } else if (
+        adjacentChild.type == "bracket" ||
+        adjacentChild.type == "symbol"
+      ) {
+        return false;
+      } else if (adjacentChild.type == "sup" || adjacentChild.type == "sub") {
+        caret.row = adjacentChild.value;
+        caret.offset = 1;
+        return true;
+      } else if (adjacentChild.type == "table") {
+        // TODO: Do something
+        throw new Error("Not implemented");
+      } else {
+        const row = adjacentChild.values[adjacentChild.values.length - 1];
+        caret.row = row;
+        caret.offset = row.values.length;
+        return true;
+      }
+    }
+
     if (direction == "right") {
       if (atEnd(caret.row, caret.offset)) {
-        // TODO:
-        const parent = this.mathAst.parents.get(caret.row);
+        moveCaretInDirection(caret.row, "right");
       } else {
         if (caret.row.type == "row") {
-          // TODO:
-          caret.offset += 1;
+          const movedIntoTree = moveCaretRightDown(
+            caret.row.values[caret.offset]
+          );
+          if (!movedIntoTree) {
+            caret.offset += 1;
+          }
         } else {
           caret.offset += 1;
         }
       }
     } else if (direction == "left") {
       if (caret.offset <= 0) {
-        const parent = this.mathAst.parents.get(caret.row);
-        // TODO:
+        moveCaretInDirection(caret.row, "left");
       } else {
         if (caret.row.type == "row") {
-          // TODO:
-          caret.offset -= 1;
+          const movedIntoTree = moveCaretLeftDown(
+            caret.row.values[caret.offset - 1]
+          );
+          if (!movedIntoTree) {
+            caret.offset -= 1;
+          }
         } else {
           caret.offset -= 1;
         }

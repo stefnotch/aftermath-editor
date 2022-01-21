@@ -29,7 +29,7 @@ export type MathIR =
 export type MathIRContainer =
   | {
       type: "frac";
-      values: MathIRRow[];
+      values: MathIRRow[]; // TODO: Should probably be [MathIRRow, MathIRRow]
       count: 2;
     }
   | {

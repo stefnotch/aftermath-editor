@@ -293,7 +293,7 @@ function tagIs(element: Element, ...tagNames: string[]): boolean {
 function getTextBoundingBox(t: Text, index: number) {
   const range = document.createRange();
   range.setStart(t, index);
-  range.setEnd(t, index + 1);
+  range.setEnd(t, index + 1); // Select the entire character
   return range.getBoundingClientRect();
 }
 
@@ -312,7 +312,7 @@ function getRowLayout(mathLayout: (() => DOMRect)[], index: number) {
   assert(index <= mathLayout.length);
   const isLast = index == mathLayout.length;
   const boundingBox = isLast
-    ? mathLayout[mathLayout.length - 1]()
+    ? mathLayout[mathLayout.length - 1]() // Hacks in the final symbol/character
     : mathLayout[index]();
 
   return {
