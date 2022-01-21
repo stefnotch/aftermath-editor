@@ -6,6 +6,7 @@ import type {
   MathIRRow,
   MathIRSymbolLeaf,
 } from "./math-ir";
+import { isMathIRContainer } from "./math-ir-utils";
 
 /*
  * MathIR with parent pointers
@@ -43,14 +44,12 @@ export function MathAst(mathIR: MathIRRow): MathAst {
       assert(indexA !== undefined);
       assert(value.type != "row");
       mathIR.values[indexA] = value;
-    } else if (
-      mathIR.type == "frac" ||
-      mathIR.type == "root" ||
-      mathIR.type == "under" ||
-      mathIR.type == "over" ||
-      mathIR.type == "sup" ||
-      mathIR.type == "sub"
-    ) {
+    } else if (mathIR.type == "table") {
+      assert(indexA !== undefined);
+      assert(indexB !== undefined);
+      assert(value.type == "row");
+      mathIR.values[indexA][indexB] = value;
+    } else if (isMathIRContainer(mathIR)) {
       assert(indexA !== undefined);
       assert(value.type == "row");
       mathIR.values[indexA] = value;
@@ -61,11 +60,6 @@ export function MathAst(mathIR: MathIRRow): MathAst {
       mathIR.type == "error"
     ) {
       throw new Error("Illegal call to setChild");
-    } else if (mathIR.type == "table") {
-      assert(indexA !== undefined);
-      assert(indexB !== undefined);
-      assert(value.type == "row");
-      mathIR.values[indexA][indexB] = value;
     } else {
       assertUnreachable(mathIR);
     }
@@ -106,18 +100,10 @@ export function MathAst(mathIR: MathIRRow): MathAst {
   }
 
   function getChildren(mathIR: MathIR) {
-    if (
-      mathIR.type == "row" ||
-      mathIR.type == "frac" ||
-      mathIR.type == "root" ||
-      mathIR.type == "under" ||
-      mathIR.type == "over" ||
-      mathIR.type == "sup" ||
-      mathIR.type == "sub"
-    ) {
-      return mathIR.values;
-    } else if (mathIR.type == "table") {
+    if (mathIR.type == "table") {
       return mathIR.values.flatMap((v) => v);
+    } else if (isMathIRContainer(mathIR)) {
+      return mathIR.values;
     } else {
       return [];
     }
