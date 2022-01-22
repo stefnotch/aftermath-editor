@@ -35,6 +35,16 @@ import MathEditor from "./components/MathEditor.vue";
   </math>"
   >
   </MathEditor>
+
+  <MathEditor
+    mathml="<math>
+    <mfrac>
+          <mn>1.22</mn>
+          <mtext>henlo</mtext>
+        </mfrac>
+  </math>"
+  >
+  </MathEditor>
 </template>
 
 <style>

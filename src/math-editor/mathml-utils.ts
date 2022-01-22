@@ -67,9 +67,6 @@ export function toElement(mathIR: MathIR): {
 } {
   const mathIRLayout: MathIRLayout = new Map();
   const element = createMathElement("math", []);
-  element.setAttribute("display", "block");
-  element.setAttribute("style", "font-family: STIX Two");
-  element.setAttribute("tabindex", "0");
 
   const emittedMathML = fromMathIR(mathIR, mathIRLayout);
   if (tagIs(emittedMathML, "mrow")) {
@@ -289,15 +286,20 @@ function tagIs(element: Element, ...tagNames: string[]): boolean {
 function getTextBoundingBox(t: Text, index: number) {
   const range = document.createRange();
   range.setStart(t, index);
-  range.setEnd(t, index + 1); // Select the entire character
+  if (t.length > 0) {
+    range.setEnd(t, index + 1); // Select the entire character
+  }
   return range.getBoundingClientRect();
 }
 
 function getTextLayout(t: Text, index: number) {
-  const boundingBox = getTextBoundingBox(t, index);
+  const atEnd = index >= t.length;
+  const boundingBox = !atEnd
+    ? getTextBoundingBox(t, index)
+    : getTextBoundingBox(t, Math.max(0, t.length - 1));
 
   return {
-    x: boundingBox.x + window.scrollX,
+    x: boundingBox.x + (atEnd ? boundingBox.width : 0) + window.scrollX,
     y: boundingBox.y + window.scrollY,
     height: boundingBox.height,
   };
@@ -314,7 +316,7 @@ function getRowLayout(mathLayout: (() => DOMRect)[], index: number) {
   return {
     x: boundingBox.x + (isLast ? boundingBox.width : 0) + window.scrollX,
     y: boundingBox.y + window.scrollY,
-    height: boundingBox.height, // TODO: Use the script level or font size instead
+    height: boundingBox.height, // TODO: Use the script level or font size instead or the new "math-depth" CSS property
   };
 }
 

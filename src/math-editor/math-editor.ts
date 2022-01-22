@@ -12,10 +12,16 @@ import {
   fromElement as fromMathMLElement,
   toElement as toMathMLElement,
 } from "./mathml-utils";
+import arrayUtils from "./array-utils";
 
 interface MathmlCaret {
   setPosition(x: number, y: number): void;
   setHeight(v: number): void;
+  destroy(): void;
+}
+
+interface MathmlInputHandler {
+  inputElement: HTMLElement;
   destroy(): void;
 }
 
@@ -49,6 +55,32 @@ function createCaret(documentBody: HTMLElement): MathmlCaret {
   return {
     setPosition,
     setHeight,
+    destroy,
+  };
+}
+
+function createInputHandler(documentBody: HTMLElement): MathmlInputHandler {
+  // See also https://github.com/stefnotch/quantum-sheet/blob/6b445476559ab5354b8a1c68c24a4ceb24e050e9/src/ui/QuantumDocument.vue#L23
+  const inputElement = document.createElement("textarea");
+  inputElement.autocomplete = "off";
+  inputElement.spellcheck = false;
+  inputElement.setAttribute("autocorrect", "off");
+  inputElement.style.transform = "scale(0)";
+  inputElement.style.resize = "none";
+  inputElement.style.position = "absolute";
+  inputElement.style.clipPath = "polygon(0 0)";
+  inputElement.style.width = "0px";
+  inputElement.style.height = "0px";
+
+  inputElement.className = "math-input-area";
+  documentBody.appendChild(inputElement);
+
+  function destroy() {
+    documentBody.removeChild(inputElement);
+  }
+
+  return {
+    inputElement,
     destroy,
   };
 }
@@ -132,10 +164,13 @@ export class MathEditor {
   mathAst: MathAst;
   render: () => void;
   lastLayout: MathIRLayout | null = null;
+  inputHandler: MathmlInputHandler;
 
   constructor(element: HTMLElement) {
     element.style.userSelect = "none";
-    element.tabIndex = 0; // Should this be here or in mathml-utils.ts?
+    element.style.display = "block";
+    element.style.fontFamily = "STIX Two";
+    element.tabIndex = 0;
 
     this.mathAst = MathAst(fromMathMLElement(element));
     console.log(this.mathAst);
@@ -146,6 +181,8 @@ export class MathEditor {
       caretElement: createCaret(document.body),
     });
 
+    this.inputHandler = createInputHandler(document.body);
+
     // https://d-toybox.com/studio/lib/input_event_viewer.html
     // https://w3c.github.io/uievents/tools/key-event-viewer.html
     // https://tkainrad.dev/posts/why-keyboard-shortcuts-dont-work-on-non-us-keyboard-layouts-and-how-to-fix-it/
@@ -153,6 +190,7 @@ export class MathEditor {
     // For now, I'll just use the following for text input
     // - Sneaky textarea or input field
     // - beforeInput event
+    //   - https://rawgit.com/w3c/input-events/v1/index.html#interface-InputEvent-Attributes
 
     // Register keyboard handlers
     // TODO:
@@ -169,8 +207,16 @@ export class MathEditor {
     // - Click (put cursor)
     // - Drag (selection)
 
-    element.addEventListener("keydown", (ev) => {
-      console.log(ev);
+    // Multi-caret support
+    // TODO:
+    // - move carets to the same spot (merge)
+    // - select and delete region that contains a caret
+    element.addEventListener("focus", (ev) => {
+      this.inputHandler.inputElement.focus();
+    });
+
+    this.inputHandler.inputElement.addEventListener("keydown", (ev) => {
+      console.info(ev);
       if (ev.key == "ArrowUp") {
         this.carets.forEach((caret) => this.moveCaret(caret, "up"));
         this.renderCarets();
@@ -186,6 +232,23 @@ export class MathEditor {
       }
     });
 
+    this.inputHandler.inputElement.addEventListener("beforeinput", (ev) => {
+      console.info(ev);
+      if (
+        ev.inputType == "deleteContentBackward" ||
+        ev.inputType == "deleteWordBackward"
+      ) {
+        this.carets.forEach((caret) => this.deleteAtCaret(caret, "left"));
+        this.render();
+      } else if (
+        ev.inputType == "deleteContentForward" ||
+        ev.inputType == "deleteWordForward"
+      ) {
+        this.carets.forEach((caret) => this.deleteAtCaret(caret, "right"));
+        this.render();
+      }
+    });
+
     window.addEventListener("resize", () => this.renderCarets());
 
     this.render = () => {
@@ -196,15 +259,12 @@ export class MathEditor {
       const newMathElement = toMathMLElement(this.mathAst.mathIR);
       this.lastLayout = newMathElement.mathIRLayout;
       element.replaceChildren(...newMathElement.element.children);
-      [...element.attributes].forEach((v) => element.removeAttribute(v.name));
-      [...newMathElement.element.attributes].forEach((v) =>
-        element.setAttribute(v.name, v.value)
-      );
+      // Don't copy the attributes
 
       this.renderCarets();
     };
 
-    setTimeout(() => this.render(), 1000);
+    this.render();
   }
 
   renderCarets() {
@@ -401,9 +461,59 @@ export class MathEditor {
     }
   }
 
+  getElementAtCaret(
+    caret: MathCaret,
+    direction: "left" | "right"
+  ): MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf | null {
+    if (caret.row.type == "row") {
+      const elementIndex = caret.offset + (direction == "left" ? -1 : 0);
+      return arrayUtils.get(caret.row.values, elementIndex) ?? null;
+    } else {
+      return null;
+    }
+  }
+
+  /**
+   * Note: Make sure to re-render after deleting
+   */
+  deleteAtCaret(caret: MathCaret, direction: "left" | "right") {
+    if (caret.row.type == "row") {
+      // TODO: This one is spicier
+      const element = this.getElementAtCaret(caret, direction);
+      if (element == null) {
+        // TODO: We might be inside a container, like a sqrt. Might want to start deleting it.
+        // this.moveCaret(caret, direction);
+      } else if (element.type == "symbol" || element.type == "bracket") {
+        // TODO: Delete the symbol and update the AST
+      } else {
+        //this.moveCaret(caret, direction);
+      }
+    } else {
+      // Text deletion
+      if (
+        (direction == "left" && caret.offset <= 0) ||
+        (direction == "right" && caret.offset >= caret.row.value.length)
+      ) {
+        this.moveCaret(caret, direction);
+      } else {
+        if (direction == "left") {
+          caret.row.value =
+            caret.row.value.slice(0, caret.offset - 1) +
+            caret.row.value.slice(caret.offset);
+          caret.offset -= 1;
+        } else {
+          caret.row.value =
+            caret.row.value.slice(0, caret.offset) +
+            caret.row.value.slice(caret.offset + 1);
+        }
+      }
+    }
+  }
+
   destroy() {
     [...this.carets].forEach((v) => this.removeCaret(v));
     this.render = () => {};
     this.lastLayout = null;
+    this.inputHandler.destroy();
   }
 }
