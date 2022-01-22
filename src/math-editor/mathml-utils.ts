@@ -443,7 +443,7 @@ function fromMathIRRow(
       if (element.value.search(isDigit) != -1) {
         const parsed = fromMathIRNumber(mathIR, i);
         output.push(parsed.element);
-        mathLayout.push(...parsed.mathLayout); // TODO: Numbers get squished into one element
+        mathLayout.push(...parsed.mathLayout);
         i = parsed.lastDigitIndex;
       } else if (allBrackets.has(element.value)) {
         const pseudoBracket = createMathElement("mo", [

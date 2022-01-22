@@ -80,20 +80,39 @@ function getAdjacentChild(
     if (element.type != "row") {
       const indexInParent = parent.values.indexOf(element);
       assert(indexInParent != -1);
-      return indexInParent + direction >= parent.values.length
+      return indexInParent + direction >= parent.values.length ||
+        indexInParent + direction < 0
         ? null
         : parent.values[indexInParent + direction];
     } else {
       return null;
     }
   } else if (parent.type == "table") {
-    // TODO: Do something
-    return null;
+    if (element.type == "row") {
+      // We assume that tables are always rectangular
+      const length = parent.values.length;
+      const width = parent.values[0].length;
+      for (let i = 0; i < length; i++) {
+        const indexInParent = parent.values[i].indexOf(element);
+        const oneDimensionalIndex = i * width + indexInParent;
+        const adjacentIndex = oneDimensionalIndex + direction;
+        return adjacentIndex >= length * width || adjacentIndex < 0
+          ? null
+          : parent.values[Math.trunc(adjacentIndex / width)][
+              adjacentIndex % width
+            ];
+      }
+      // Unreachable
+      throw new Error("Element not found in table");
+    } else {
+      return null;
+    }
   } else {
     if (element.type == "row") {
       const indexInParent = parent.values.indexOf(element);
       assert(indexInParent != -1);
-      return indexInParent + direction >= parent.values.length
+      return indexInParent + direction >= parent.values.length ||
+        indexInParent + direction < 0
         ? null
         : parent.values[indexInParent + direction];
     } else {
@@ -228,9 +247,6 @@ export class MathEditor {
         caret.row = parent;
         caret.offset = offset + (isLeft ? 0 : 1);
         return true;
-      } else if (parent.type == "table") {
-        // TODO: Do something
-        throw new Error("Not implemented");
       } else {
         const adjacentChild = getAdjacentChild(
           parent,
@@ -251,7 +267,6 @@ export class MathEditor {
     function moveCaretRightDown(
       adjacentChild: MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf
     ): boolean {
-      // TODO: Maybe create a few type guards?
       if (adjacentChild.type == "text" || adjacentChild.type == "error") {
         caret.row = adjacentChild;
         caret.offset = 0;
@@ -262,8 +277,9 @@ export class MathEditor {
       ) {
         return false;
       } else if (adjacentChild.type == "table") {
-        // TODO: Do something
-        throw new Error("Not implemented");
+        caret.row = adjacentChild.values[0][0];
+        caret.offset = 0;
+        return true;
       } else {
         caret.row = adjacentChild.values[0];
         caret.offset = 0;
@@ -274,7 +290,6 @@ export class MathEditor {
     function moveCaretLeftDown(
       adjacentChild: MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf
     ): boolean {
-      // TODO: Maybe create a few type guards?
       if (adjacentChild.type == "text" || adjacentChild.type == "error") {
         caret.row = adjacentChild;
         caret.offset = adjacentChild.value.length;
@@ -285,8 +300,11 @@ export class MathEditor {
       ) {
         return false;
       } else if (adjacentChild.type == "table") {
-        // TODO: Do something
-        throw new Error("Not implemented");
+        const lastTableRow =
+          adjacentChild.values[adjacentChild.values.length - 1];
+        caret.row = lastTableRow[lastTableRow.length - 1];
+        caret.offset = 0;
+        return true;
       } else {
         const row = adjacentChild.values[adjacentChild.values.length - 1];
         caret.row = row;
