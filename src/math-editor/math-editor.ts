@@ -1,4 +1,4 @@
-import { assert } from "../assert";
+import { assert, assertUnreachable } from "../assert";
 import { MathAst } from "./math-ast";
 import {
   MathIR,
@@ -313,6 +313,55 @@ export class MathEditor {
       }
     }
 
+    function moveCaretInVerticalDirection(
+      caretElement: MathIRRow | MathIRTextLeaf,
+      direction: "up" | "down"
+    ): boolean {
+      // TODO: Potentially tweak this so that it attempts to keep the x-coordinate
+      const parent = mathAst.getParent(caretElement);
+      if (!parent) return false;
+
+      if (parent.type == "table") {
+        // TODO:
+        return false;
+      } else if (
+        parent.type == "frac" ||
+        parent.type == "root" ||
+        parent.type == "under" ||
+        parent.type == "over"
+      ) {
+        if (caretElement.type == "row") {
+          const indexInParent = parent.values.indexOf(caretElement);
+          assert(indexInParent != -1);
+          const newIndexInParent = indexInParent + (direction == "up" ? -1 : 1);
+
+          if (
+            newIndexInParent < 0 ||
+            newIndexInParent >= parent.values.length
+          ) {
+            // Reached the top/bottom
+            const parentParent = mathAst.getParent(parent);
+            return parentParent == null
+              ? false
+              : moveCaretInVerticalDirection(parentParent, direction);
+          } else {
+            // Can move up or down
+            const row = parent.values[newIndexInParent];
+            caret.row = parent.values[newIndexInParent];
+            caret.offset = direction == "up" ? row.values.length : 0;
+            return true;
+          }
+        } else {
+          return false;
+        }
+      } else if (parent.type == "sup" || parent.type == "sub") {
+        // TODO:
+        return false;
+      } else {
+        return moveCaretInVerticalDirection(parent, direction);
+      }
+    }
+
     if (direction == "right") {
       if (atEnd(caret.row, caret.offset)) {
         moveCaretInDirection(caret.row, "right");
@@ -343,6 +392,12 @@ export class MathEditor {
           caret.offset -= 1;
         }
       }
+    } else if (direction == "up") {
+      moveCaretInVerticalDirection(caret.row, direction);
+    } else if (direction == "down") {
+      moveCaretInVerticalDirection(caret.row, direction);
+    } else {
+      assertUnreachable(direction);
     }
   }
 

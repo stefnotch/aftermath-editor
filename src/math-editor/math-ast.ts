@@ -13,6 +13,12 @@ import type {
 export interface MathAst {
   mathIR: MathIRRow;
   parents: Map<MathIR, MathIRRow | MathIRContainer | null>;
+
+  getParent(mathIR: MathIRRow): MathIRContainer | null;
+  getParent(
+    mathIR: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf
+  ): MathIRRow | null;
+  getParent(mathIR: MathIR): MathIRRow | MathIRContainer | null;
   setChild(
     mathIR: MathIRRow,
     value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf,
@@ -31,7 +37,25 @@ export interface MathAst {
  * Math-ir with parent pointers. Super convenient for traversing the data structure
  */
 export function MathAst(mathIR: MathIRRow): MathAst {
-  const ast: MathAst = { mathIR, parents: new Map(), setChild };
+  const ast: MathAst = {
+    mathIR,
+    parents: new Map(),
+    getParent: getParent,
+    setChild,
+  };
+
+  function getParent(mathIR: MathIRRow): MathIRContainer | null;
+  function getParent(
+    mathIR: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf
+  ): MathIRRow | null;
+  function getParent(mathIR: MathIR): MathIRRow | MathIRContainer | null {
+    const parent = ast.parents.get(mathIR);
+    if (parent) {
+      return parent;
+    } else {
+      return null;
+    }
+  }
 
   function setChild(
     mathIR: MathIR,
