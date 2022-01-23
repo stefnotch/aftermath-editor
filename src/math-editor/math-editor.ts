@@ -75,13 +75,6 @@ function createInputHandler(documentBody: HTMLElement): MathmlInputHandler {
   };
 }
 
-function atEnd(row: MathIRRow | MathIRTextLeaf, offset: number) {
-  if (row.type == "row") {
-    return offset >= row.values.length;
-  } else {
-    return offset >= row.value.length;
-  }
-}
 function getAdjacentChild(parent: MathIRRow, element: MathIR, direction: number): (MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf) | null;
 function getAdjacentChild(parent: MathIRContainer, element: MathIR, direction: number): MathIRRow | null;
 function getAdjacentChild(parent: MathIRRow | MathIRContainer, element: MathIR, direction: number): MathIR | null {
@@ -354,8 +347,8 @@ export class MathEditor {
     }
 
     if (direction == "right") {
-      if (atEnd(caret.row, caret.offset)) {
-        moveCaretInDirection(caret.row, "right");
+      if (this.isCaretAtEdge(caret, direction)) {
+        moveCaretInDirection(caret.row, direction);
       } else {
         if (caret.row.type == "row") {
           const movedIntoTree = moveCaretRightDown(caret.row.values[caret.offset]);
@@ -367,8 +360,8 @@ export class MathEditor {
         }
       }
     } else if (direction == "left") {
-      if (caret.offset <= 0) {
-        moveCaretInDirection(caret.row, "left");
+      if (this.isCaretAtEdge(caret, direction)) {
+        moveCaretInDirection(caret.row, direction);
       } else {
         if (caret.row.type == "row") {
           const movedIntoTree = moveCaretLeftDown(caret.row.values[caret.offset - 1]);
@@ -389,6 +382,21 @@ export class MathEditor {
   }
 
   /**
+   * Checks if the caret is moving at the very edge of its container
+   */
+  isCaretAtEdge(caret: MathCaret, direction: "left" | "right"): boolean {
+    if (direction == "right") {
+      if (caret.row.type == "row") {
+        return caret.offset >= caret.row.values.length;
+      } else {
+        return caret.offset >= caret.row.value.length;
+      }
+    } else {
+      return caret.offset <= 0;
+    }
+  }
+
+  /**
    * Gets the element that the caret is "touching"
    */
   getElementAtCaret(caret: MathCaret, direction: "left" | "right"): MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf | null {
@@ -404,6 +412,20 @@ export class MathEditor {
    * Note: Make sure to re-render after deleting
    */
   deleteAtCaret(caret: MathCaret, direction: "left" | "right") {
+    function removeButKeepChildren(
+      mathAst: MathAst,
+      toRemove: MathIRContainer,
+      children: (MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf)[]
+    ): { parent: MathIRRow; indexInParent: number } {
+      const { parent, indexInParent } = mathAst.getParentAndIndex(toRemove);
+      assert(parent != null);
+      for (let i = 0; i < children.length; i++) {
+        mathAst.insertChild(parent, children[i], indexInParent + i);
+      }
+      mathAst.removeChild(parent, toRemove);
+      return { parent, indexInParent };
+    }
+
     if (caret.row.type == "row") {
       // Row deletion
       const elementAtCaret = this.getElementAtCaret(caret, direction);
@@ -416,42 +438,24 @@ export class MathEditor {
             this.moveCaret(caret, direction);
           } else {
             // Delete the fraction but keep its contents
-            const { parent: parentParent, indexInParent: indexInParentParent } = this.mathAst.getParentAndIndex(parent);
-            assert(parentParent != null);
-
             const parentContents = parent.values.flatMap((v) => v.values);
-            for (let i = 0; i < parentContents.length; i++) {
-              this.mathAst.insertChild(parentParent, parentContents[i], indexInParentParent + i);
-            }
-            this.mathAst.removeChild(parentParent, parent);
+            const { parent: parentParent, indexInParent: indexInParentParent } = removeButKeepChildren(this.mathAst, parent, parentContents);
 
             caret.row = parentParent;
             caret.offset = indexInParentParent + parent.values[0].values.length;
           }
         } else if ((parent.type == "sup" || parent.type == "sub") && direction == "left") {
           // Delete the superscript/subscript but keep its contents
-          const { parent: parentParent, indexInParent: indexInParentParent } = this.mathAst.getParentAndIndex(parent);
-          assert(parentParent != null);
-
           const parentContents = parent.values.flatMap((v) => v.values);
-          for (let i = 0; i < parentContents.length; i++) {
-            this.mathAst.insertChild(parentParent, parentContents[i], indexInParentParent + i);
-          }
-          this.mathAst.removeChild(parentParent, parent);
+          const { parent: parentParent, indexInParent: indexInParentParent } = removeButKeepChildren(this.mathAst, parent, parentContents);
 
           caret.row = parentParent;
           caret.offset = indexInParentParent;
         } else if (parent.type == "root") {
           if ((indexInParent == 0 && direction == "right") || (indexInParent == 1 && direction == "left")) {
-            // Delete sqrt but keep its contents
-            const { parent: parentParent, indexInParent: indexInParentParent } = this.mathAst.getParentAndIndex(parent);
-            assert(parentParent != null);
-
+            // Delete root but keep its contents
             const parentContents = parent.values[1].values;
-            for (let i = 0; i < parentContents.length; i++) {
-              this.mathAst.insertChild(parentParent, parentContents[i], indexInParentParent + i);
-            }
-            this.mathAst.removeChild(parentParent, parent);
+            const { parent: parentParent, indexInParent: indexInParentParent } = removeButKeepChildren(this.mathAst, parent, parentContents);
 
             caret.row = parentParent;
             caret.offset = indexInParentParent;
@@ -467,7 +471,12 @@ export class MathEditor {
           caret.offset -= 1;
         }
       } else if ((elementAtCaret.type == "sup" || elementAtCaret.type == "sub") && direction == "right") {
-        // TODO: Anti-super/subscript
+        // Delete the superscript/subscript but keep its contents
+        const parentContents = elementAtCaret.values.flatMap((v) => v.values);
+        const { parent: parentParent, indexInParent: indexInParentParent } = removeButKeepChildren(this.mathAst, elementAtCaret, parentContents);
+
+        caret.row = parentParent;
+        caret.offset = indexInParentParent;
       } else {
         this.moveCaret(caret, direction);
       }
