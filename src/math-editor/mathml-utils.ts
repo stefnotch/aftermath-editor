@@ -306,17 +306,12 @@ function getTextLayout(t: Text, index: number) {
 }
 
 function getRowLayout(mathLayout: (() => DOMRect)[], index: number) {
-  // TODO: Handle an empty row
-
   console.log("getRowLayout", index);
   assert(index <= mathLayout.length);
-  const isLast = index == mathLayout.length;
-  const boundingBox = isLast
-    ? mathLayout[mathLayout.length - 1]() // Hacks in the final symbol/character
-    : mathLayout[index]();
+  const boundingBox = mathLayout[index]();
 
   return {
-    x: boundingBox.x + (isLast ? boundingBox.width : 0) + window.scrollX,
+    x: boundingBox.x + window.scrollX,
     y: boundingBox.y + window.scrollY,
     height: boundingBox.height, // TODO: Use the script level or font size instead or the new "math-depth" CSS property
   };
@@ -520,6 +515,29 @@ function fromMathIRRow(
     } else {
       pushOutput(fromMathIR(element, mathIRLayout));
     }
+  }
+
+  // And push another last entry, since we can place a caret after the last one
+  if (mathLayout.length > 0) {
+    const lastEntry = mathLayout[mathLayout.length - 1];
+    mathLayout.push(() => {
+      const boundingBox = lastEntry();
+      boundingBox.x += boundingBox.width;
+      boundingBox.width = 0;
+      return boundingBox;
+    });
+  } else {
+    // Placeholder element, so that the row doesn't collapse to a zero-width
+    const placeholder = createMathElement("mtext", [
+      document.createTextNode("⬚"),
+    ]);
+    output.push(placeholder);
+    mathLayout.push(() => {
+      const boundingBox = placeholder.getBoundingClientRect();
+      boundingBox.x += boundingBox.width / 2;
+      boundingBox.width = 0;
+      return boundingBox;
+    });
   }
 
   return { elements: output, mathLayout: mathLayout };
