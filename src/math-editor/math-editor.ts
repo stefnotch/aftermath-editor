@@ -1,17 +1,7 @@
 import { assert, assertUnreachable } from "../assert";
 import { MathAst } from "./math-ast";
-import {
-  MathIR,
-  MathIRContainer,
-  MathIRLayout,
-  MathIRRow,
-  MathIRSymbolLeaf,
-  MathIRTextLeaf,
-} from "./math-ir";
-import {
-  fromElement as fromMathMLElement,
-  toElement as toMathMLElement,
-} from "./mathml-utils";
+import { MathIR, MathIRContainer, MathIRLayout, MathIRRow, MathIRSymbolLeaf, MathIRTextLeaf } from "./math-ir";
+import { fromElement as fromMathMLElement, toElement as toMathMLElement } from "./mathml-utils";
 import arrayUtils from "./array-utils";
 
 interface MathmlCaret {
@@ -92,30 +82,15 @@ function atEnd(row: MathIRRow | MathIRTextLeaf, offset: number) {
     return offset >= row.value.length;
   }
 }
-function getAdjacentChild(
-  parent: MathIRRow,
-  element: MathIR,
-  direction: number
-): (MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf) | null;
-function getAdjacentChild(
-  parent: MathIRContainer,
-  element: MathIR,
-  direction: number
-): MathIRRow | null;
-function getAdjacentChild(
-  parent: MathIRRow | MathIRContainer,
-  element: MathIR,
-  direction: number
-): MathIR | null {
+function getAdjacentChild(parent: MathIRRow, element: MathIR, direction: number): (MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf) | null;
+function getAdjacentChild(parent: MathIRContainer, element: MathIR, direction: number): MathIRRow | null;
+function getAdjacentChild(parent: MathIRRow | MathIRContainer, element: MathIR, direction: number): MathIR | null {
   assert(direction != 0);
   if (parent.type == "row") {
     if (element.type != "row") {
       const indexInParent = parent.values.indexOf(element);
       assert(indexInParent != -1);
-      return indexInParent + direction >= parent.values.length ||
-        indexInParent + direction < 0
-        ? null
-        : parent.values[indexInParent + direction];
+      return indexInParent + direction >= parent.values.length || indexInParent + direction < 0 ? null : parent.values[indexInParent + direction];
     } else {
       return null;
     }
@@ -126,13 +101,11 @@ function getAdjacentChild(
       const width = parent.values[0].length;
       for (let i = 0; i < length; i++) {
         const indexInParent = parent.values[i].indexOf(element);
+        if (indexInParent == -1) continue;
+
         const oneDimensionalIndex = i * width + indexInParent;
         const adjacentIndex = oneDimensionalIndex + direction;
-        return adjacentIndex >= length * width || adjacentIndex < 0
-          ? null
-          : parent.values[Math.trunc(adjacentIndex / width)][
-              adjacentIndex % width
-            ];
+        return adjacentIndex >= length * width || adjacentIndex < 0 ? null : parent.values[Math.trunc(adjacentIndex / width)][adjacentIndex % width];
       }
       // Unreachable
       throw new Error("Element not found in table");
@@ -143,10 +116,7 @@ function getAdjacentChild(
     if (element.type == "row") {
       const indexInParent = parent.values.indexOf(element);
       assert(indexInParent != -1);
-      return indexInParent + direction >= parent.values.length ||
-        indexInParent + direction < 0
-        ? null
-        : parent.values[indexInParent + direction];
+      return indexInParent + direction >= parent.values.length || indexInParent + direction < 0 ? null : parent.values[indexInParent + direction];
     } else {
       return null;
     }
@@ -234,16 +204,10 @@ export class MathEditor {
 
     this.inputHandler.inputElement.addEventListener("beforeinput", (ev) => {
       console.info(ev);
-      if (
-        ev.inputType == "deleteContentBackward" ||
-        ev.inputType == "deleteWordBackward"
-      ) {
+      if (ev.inputType == "deleteContentBackward" || ev.inputType == "deleteWordBackward") {
         this.carets.forEach((caret) => this.deleteAtCaret(caret, "left"));
         this.render();
-      } else if (
-        ev.inputType == "deleteContentForward" ||
-        ev.inputType == "deleteWordForward"
-      ) {
+      } else if (ev.inputType == "deleteContentForward" || ev.inputType == "deleteWordForward") {
         this.carets.forEach((caret) => this.deleteAtCaret(caret, "right"));
         this.render();
       }
@@ -293,10 +257,7 @@ export class MathEditor {
   moveCaret(caret: MathCaret, direction: "up" | "down" | "left" | "right") {
     const mathAst = this.mathAst;
 
-    function moveCaretInDirection(
-      caretElement: MathIR,
-      direction: "left" | "right"
-    ): boolean {
+    function moveCaretInDirection(caretElement: MathIR, direction: "left" | "right"): boolean {
       const isLeft = direction == "left";
       const parent = mathAst.parents.get(caretElement);
       if (!parent) return false;
@@ -308,11 +269,7 @@ export class MathEditor {
         caret.offset = offset + (isLeft ? 0 : 1);
         return true;
       } else {
-        const adjacentChild = getAdjacentChild(
-          parent,
-          caretElement,
-          isLeft ? -1 : 1
-        );
+        const adjacentChild = getAdjacentChild(parent, caretElement, isLeft ? -1 : 1);
         if (adjacentChild != null) {
           caret.row = adjacentChild;
           caret.offset = isLeft ? adjacentChild.values.length : 0;
@@ -324,17 +281,12 @@ export class MathEditor {
       }
     }
 
-    function moveCaretRightDown(
-      adjacentChild: MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf
-    ): boolean {
+    function moveCaretRightDown(adjacentChild: MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf): boolean {
       if (adjacentChild.type == "text" || adjacentChild.type == "error") {
         caret.row = adjacentChild;
         caret.offset = 0;
         return true;
-      } else if (
-        adjacentChild.type == "bracket" ||
-        adjacentChild.type == "symbol"
-      ) {
+      } else if (adjacentChild.type == "bracket" || adjacentChild.type == "symbol") {
         return false;
       } else if (adjacentChild.type == "table") {
         caret.row = adjacentChild.values[0][0];
@@ -347,21 +299,15 @@ export class MathEditor {
       }
     }
 
-    function moveCaretLeftDown(
-      adjacentChild: MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf
-    ): boolean {
+    function moveCaretLeftDown(adjacentChild: MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf): boolean {
       if (adjacentChild.type == "text" || adjacentChild.type == "error") {
         caret.row = adjacentChild;
         caret.offset = adjacentChild.value.length;
         return true;
-      } else if (
-        adjacentChild.type == "bracket" ||
-        adjacentChild.type == "symbol"
-      ) {
+      } else if (adjacentChild.type == "bracket" || adjacentChild.type == "symbol") {
         return false;
       } else if (adjacentChild.type == "table") {
-        const lastTableRow =
-          adjacentChild.values[adjacentChild.values.length - 1];
+        const lastTableRow = adjacentChild.values[adjacentChild.values.length - 1];
         caret.row = lastTableRow[lastTableRow.length - 1];
         caret.offset = 0;
         return true;
@@ -373,37 +319,22 @@ export class MathEditor {
       }
     }
 
-    function moveCaretInVerticalDirection(
-      caretElement: MathIRRow | MathIRTextLeaf,
-      direction: "up" | "down"
-    ): boolean {
+    function moveCaretInVerticalDirection(caretElement: MathIRRow | MathIRTextLeaf, direction: "up" | "down"): boolean {
       // TODO: Potentially tweak this so that it attempts to keep the x-coordinate
-      const parent = mathAst.getParent(caretElement);
+      const { parent, indexInParent } = mathAst.getParentAndIndex(caretElement);
       if (!parent) return false;
 
       if (parent.type == "table") {
         // TODO:
         return false;
-      } else if (
-        parent.type == "frac" ||
-        parent.type == "root" ||
-        parent.type == "under" ||
-        parent.type == "over"
-      ) {
+      } else if (parent.type == "frac" || parent.type == "root" || parent.type == "under" || parent.type == "over") {
         if (caretElement.type == "row") {
-          const indexInParent = parent.values.indexOf(caretElement);
-          assert(indexInParent != -1);
           const newIndexInParent = indexInParent + (direction == "up" ? -1 : 1);
 
-          if (
-            newIndexInParent < 0 ||
-            newIndexInParent >= parent.values.length
-          ) {
+          if (newIndexInParent < 0 || newIndexInParent >= parent.values.length) {
             // Reached the top/bottom
             const parentParent = mathAst.getParent(parent);
-            return parentParent == null
-              ? false
-              : moveCaretInVerticalDirection(parentParent, direction);
+            return parentParent == null ? false : moveCaretInVerticalDirection(parentParent, direction);
           } else {
             // Can move up or down
             const row = parent.values[newIndexInParent];
@@ -427,9 +358,7 @@ export class MathEditor {
         moveCaretInDirection(caret.row, "right");
       } else {
         if (caret.row.type == "row") {
-          const movedIntoTree = moveCaretRightDown(
-            caret.row.values[caret.offset]
-          );
+          const movedIntoTree = moveCaretRightDown(caret.row.values[caret.offset]);
           if (!movedIntoTree) {
             caret.offset += 1;
           }
@@ -442,9 +371,7 @@ export class MathEditor {
         moveCaretInDirection(caret.row, "left");
       } else {
         if (caret.row.type == "row") {
-          const movedIntoTree = moveCaretLeftDown(
-            caret.row.values[caret.offset - 1]
-          );
+          const movedIntoTree = moveCaretLeftDown(caret.row.values[caret.offset - 1]);
           if (!movedIntoTree) {
             caret.offset -= 1;
           }
@@ -464,10 +391,7 @@ export class MathEditor {
   /**
    * Gets the element that the caret is "touching"
    */
-  getElementAtCaret(
-    caret: MathCaret,
-    direction: "left" | "right"
-  ): MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf | null {
+  getElementAtCaret(caret: MathCaret, direction: "left" | "right"): MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf | null {
     if (caret.row.type == "row") {
       const elementIndex = caret.offset + (direction == "left" ? -1 : 0);
       return arrayUtils.get(caret.row.values, elementIndex) ?? null;
@@ -482,68 +406,81 @@ export class MathEditor {
   deleteAtCaret(caret: MathCaret, direction: "left" | "right") {
     if (caret.row.type == "row") {
       // Row deletion
-      const element = this.getElementAtCaret(caret, direction);
-      if (element == null) {
+      const elementAtCaret = this.getElementAtCaret(caret, direction);
+      if (elementAtCaret == null) {
         // At the start or end of a row
-        const parent = this.mathAst.getParent(caret.row);
+        const { parent, indexInParent } = this.mathAst.getParentAndIndex(caret.row);
         if (parent == null) return;
         if (parent.type == "frac") {
-          const indexInParent = parent.values.indexOf(caret.row);
-          assert(indexInParent != -1);
-          if (
-            (indexInParent == 0 && direction == "left") ||
-            (indexInParent == 1 && direction == "right")
-          ) {
+          if ((indexInParent == 0 && direction == "left") || (indexInParent == 1 && direction == "right")) {
             this.moveCaret(caret, direction);
           } else {
             // Delete the fraction but keep its contents
-            const parentParent = this.mathAst.getParent(parent);
+            const { parent: parentParent, indexInParent: indexInParentParent } = this.mathAst.getParentAndIndex(parent);
             assert(parentParent != null);
-            const indexInParentParent = parentParent.values.indexOf(parent);
-            assert(indexInParentParent != -1);
 
-            const fractionContents = parent.values.flatMap((v) => v.values);
-            for (let i = 0; i < fractionContents.length; i++) {
-              this.mathAst.insertChild(
-                parentParent,
-                fractionContents[i],
-                indexInParentParent + i
-              );
+            const parentContents = parent.values.flatMap((v) => v.values);
+            for (let i = 0; i < parentContents.length; i++) {
+              this.mathAst.insertChild(parentParent, parentContents[i], indexInParentParent + i);
             }
             this.mathAst.removeChild(parentParent, parent);
 
             caret.row = parentParent;
-            caret.offset = parent.values[0].values.length + 1;
+            caret.offset = indexInParentParent + parent.values[0].values.length;
+          }
+        } else if ((parent.type == "sup" || parent.type == "sub") && direction == "left") {
+          // Delete the superscript/subscript but keep its contents
+          const { parent: parentParent, indexInParent: indexInParentParent } = this.mathAst.getParentAndIndex(parent);
+          assert(parentParent != null);
+
+          const parentContents = parent.values.flatMap((v) => v.values);
+          for (let i = 0; i < parentContents.length; i++) {
+            this.mathAst.insertChild(parentParent, parentContents[i], indexInParentParent + i);
+          }
+          this.mathAst.removeChild(parentParent, parent);
+
+          caret.row = parentParent;
+          caret.offset = indexInParentParent;
+        } else if (parent.type == "root") {
+          if ((indexInParent == 0 && direction == "right") || (indexInParent == 1 && direction == "left")) {
+            // Delete sqrt but keep its contents
+            const { parent: parentParent, indexInParent: indexInParentParent } = this.mathAst.getParentAndIndex(parent);
+            assert(parentParent != null);
+
+            const parentContents = parent.values[1].values;
+            for (let i = 0; i < parentContents.length; i++) {
+              this.mathAst.insertChild(parentParent, parentContents[i], indexInParentParent + i);
+            }
+            this.mathAst.removeChild(parentParent, parent);
+
+            caret.row = parentParent;
+            caret.offset = indexInParentParent;
+          } else {
+            this.moveCaret(caret, direction);
           }
         } else {
-          // TODO:
+          this.moveCaret(caret, direction);
         }
-      } else if (element.type == "symbol" || element.type == "bracket") {
-        this.mathAst.removeChild(caret.row, element);
+      } else if (elementAtCaret.type == "symbol" || elementAtCaret.type == "bracket") {
+        this.mathAst.removeChild(caret.row, elementAtCaret);
         if (direction == "left") {
           caret.offset -= 1;
         }
+      } else if ((elementAtCaret.type == "sup" || elementAtCaret.type == "sub") && direction == "right") {
+        // TODO: Anti-super/subscript
       } else {
-        // TODO: This one is spicier
-        //this.moveCaret(caret, direction);
+        this.moveCaret(caret, direction);
       }
     } else {
       // Text deletion
-      if (
-        (direction == "left" && caret.offset <= 0) ||
-        (direction == "right" && caret.offset >= caret.row.value.length)
-      ) {
+      if ((direction == "left" && caret.offset <= 0) || (direction == "right" && caret.offset >= caret.row.value.length)) {
         this.moveCaret(caret, direction);
       } else {
         if (direction == "left") {
-          caret.row.value =
-            caret.row.value.slice(0, caret.offset - 1) +
-            caret.row.value.slice(caret.offset);
+          caret.row.value = caret.row.value.slice(0, caret.offset - 1) + caret.row.value.slice(caret.offset);
           caret.offset -= 1;
         } else {
-          caret.row.value =
-            caret.row.value.slice(0, caret.offset) +
-            caret.row.value.slice(caret.offset + 1);
+          caret.row.value = caret.row.value.slice(0, caret.offset) + caret.row.value.slice(caret.offset + 1);
         }
       }
     }

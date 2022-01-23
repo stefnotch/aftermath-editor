@@ -358,7 +358,6 @@ function fromMathIR(mathIR: MathIR, mathIRLayout: MathIRLayout): Element {
     ]);
   } else if (mathIR.type == "row") {
     // TODO: Maybe don't emit every useless row
-    // TODO: Special styling for empty rows
     const parsedChildren = fromMathIRRow(mathIR.values, mathIRLayout);
     setRowLayout(mathIR, parsedChildren.mathLayout);
     return createMathElement("mrow", parsedChildren.elements);

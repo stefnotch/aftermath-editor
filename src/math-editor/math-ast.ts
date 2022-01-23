@@ -1,45 +1,34 @@
 import { assert, assertUnreachable } from "../assert";
 import arrayUtils from "./array-utils";
-import type {
-  MathIR,
-  MathIRContainer,
-  MathIRTextLeaf,
-  MathIRRow,
-  MathIRSymbolLeaf,
-} from "./math-ir";
+import type { MathIR, MathIRContainer, MathIRTextLeaf, MathIRRow, MathIRSymbolLeaf } from "./math-ir";
 
 /*
- * MathIR with parent pointers
+ * MathIR with parent pointers. Currently not super safe, as it's possible to construct a cyclic tree (node.parent = node)
  */
 export interface MathAst {
   mathIR: MathIRRow;
   parents: Map<MathIR, MathIRRow | MathIRContainer | null>;
 
   getParent(mathIR: MathIRRow): MathIRContainer | null;
-  getParent(
-    mathIR: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf
-  ): MathIRRow | null;
+  getParent(mathIR: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf): MathIRRow | null;
   getParent(mathIR: MathIR): MathIRRow | MathIRContainer | null;
 
-  setChild(
-    mathIR: MathIRRow,
-    value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf,
-    index: number
-  ): void;
+  getParentAndIndex(mathIR: MathIRRow): {
+    parent: MathIRContainer | null;
+    indexInParent: number;
+  };
+  getParentAndIndex(mathIR: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf): { parent: MathIRRow | null; indexInParent: number };
+  getParentAndIndex(mathIR: MathIR): {
+    parent: MathIRRow | MathIRContainer | null;
+    indexInParent: number;
+  };
+
+  setChild(mathIR: MathIRRow, value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf, index: number): void;
   setChild(mathIR: MathIRContainer, value: MathIRRow, index: number): void;
-  setChild(
-    mathIR: MathIR & { type: "table" },
-    value: MathIRRow,
-    indexA: number,
-    indexB: number
-  ): void;
+  setChild(mathIR: MathIR & { type: "table" }, value: MathIRRow, indexA: number, indexB: number): void;
 
   removeChild(mathIR: MathIRRow, value: MathIR): void;
-  insertChild(
-    mathIR: MathIRRow,
-    value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf,
-    index: number
-  ): void;
+  insertChild(mathIR: MathIRRow, value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf, index: number): void;
 }
 
 /**
@@ -49,16 +38,15 @@ export function MathAst(mathIR: MathIRRow): MathAst {
   const ast: MathAst = {
     mathIR,
     parents: new Map(),
-    getParent: getParent,
+    getParent,
+    getParentAndIndex,
     setChild,
     removeChild,
     insertChild,
   };
 
   function getParent(mathIR: MathIRRow): MathIRContainer | null;
-  function getParent(
-    mathIR: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf
-  ): MathIRRow | null;
+  function getParent(mathIR: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf): MathIRRow | null;
   function getParent(mathIR: MathIR): MathIRRow | MathIRContainer | null {
     const parent = ast.parents.get(mathIR);
     if (parent) {
@@ -68,32 +56,58 @@ export function MathAst(mathIR: MathIRRow): MathAst {
     }
   }
 
-  function removeChild(
-    mathIR: MathIRRow,
-    value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf
-  ): void {
+  function getParentAndIndex(mathIR: MathIRRow): {
+    parent: MathIRContainer | null;
+    indexInParent: number;
+  };
+  function getParentAndIndex(mathIR: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf): { parent: MathIRRow | null; indexInParent: number };
+  function getParentAndIndex(mathIR: MathIR): {
+    parent: MathIRRow | MathIRContainer | null;
+    indexInParent: number;
+  } {
+    const parent = ast.parents.get(mathIR);
+    if (!parent) return { parent: null, indexInParent: -1 };
+
+    if (parent.type == "row") {
+      assert(mathIR.type != "row");
+      const indexInParent = parent.values.indexOf(mathIR);
+      assert(indexInParent >= 0);
+      return { parent, indexInParent };
+    } else if (parent.type == "table") {
+      assert(mathIR.type == "row");
+      // We assume that tables are always rectangular
+      const length = parent.values.length;
+      const width = parent.values[0].length;
+      for (let i = 0; i < length; i++) {
+        const indexInParent = parent.values[i].indexOf(mathIR);
+        if (indexInParent == -1) continue;
+        const oneDimensionalIndex = i * width + indexInParent;
+        return { parent, indexInParent: oneDimensionalIndex };
+      }
+      // Unreachable
+      throw new Error("Element not found in table");
+    } else {
+      assert(mathIR.type == "row");
+      const indexInParent = parent.values.indexOf(mathIR);
+      assert(indexInParent >= 0);
+      return { parent, indexInParent };
+    }
+  }
+
+  function removeChild(mathIR: MathIRRow, value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf): void {
     assert(mathIR.type == "row");
     // Maybe check if it actually returned true
     arrayUtils.remove(mathIR.values, value);
     ast.parents.delete(value);
   }
 
-  function insertChild(
-    mathIR: MathIRRow,
-    value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf,
-    index: number
-  ): void {
+  function insertChild(mathIR: MathIRRow, value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf, index: number): void {
     assert(mathIR.type == "row");
     mathIR.values.splice(index, 0, value);
     ast.parents.set(value, mathIR);
   }
 
-  function setChild(
-    mathIR: MathIR,
-    value: MathIR,
-    indexA: number,
-    indexB?: number
-  ): void {
+  function setChild(mathIR: MathIR, value: MathIR, indexA: number, indexB?: number): void {
     if (mathIR.type == "row") {
       assert(indexA !== undefined);
       assert(value.type != "row");
@@ -111,12 +125,7 @@ export function MathAst(mathIR: MathIRRow): MathAst {
       assert(value.type == "row");
       mathIR.values[indexA] = value;
       ast.parents.set(value, mathIR);
-    } else if (
-      mathIR.type == "bracket" ||
-      mathIR.type == "symbol" ||
-      mathIR.type == "text" ||
-      mathIR.type == "error"
-    ) {
+    } else if (mathIR.type == "bracket" || mathIR.type == "symbol" || mathIR.type == "text" || mathIR.type == "error") {
       throw new Error("Illegal call to setChild");
     } else if (mathIR.type == "table") {
       assert(indexA !== undefined);
@@ -129,10 +138,7 @@ export function MathAst(mathIR: MathIRRow): MathAst {
     }
   }
 
-  function setParents(
-    parent: MathIRRow | MathIRContainer | null,
-    children: MathIR[]
-  ) {
+  function setParents(parent: MathIRRow | MathIRContainer | null, children: MathIR[]) {
     for (let i = 0; i < children.length; i++) {
       ast.parents.set(children[i], parent);
 
@@ -143,9 +149,7 @@ export function MathAst(mathIR: MathIRRow): MathAst {
     }
   }
 
-  function asRowOrContainer(
-    mathIR: MathIR
-  ): MathIRRow | MathIRContainer | null {
+  function asRowOrContainer(mathIR: MathIR): MathIRRow | MathIRContainer | null {
     if (mathIR.type == "row") {
       return mathIR;
     } else if (
