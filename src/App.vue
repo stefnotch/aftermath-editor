@@ -45,6 +45,13 @@ import MathEditor from "./components/MathEditor.vue";
   </math>"
   >
   </MathEditor>
+
+  <MathEditor
+    mathml="<math>
+    <mrow><mo>-</mo><msub><mi>x</mi><mn>2</mn></msub><mo>+</mo><msup><mi>y</mi><mfrac><mn>2</mn><mrow><mi>k</mi><mo>+</mo><mn>1</mn></mrow></mfrac></msup></mrow>
+  </math>"
+  >
+  </MathEditor>
 </template>
 
 <style>

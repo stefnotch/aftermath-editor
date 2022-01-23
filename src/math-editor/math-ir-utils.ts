@@ -15,10 +15,12 @@ export function wrapInRow(mathIR: MathIR | MathIR[]): MathIRRow {
 
   return {
     type: "row",
-    values: mathIR.map((v) => {
-      // Maybe we should actually try to handle this
-      assert(v.type != "row");
-      return v;
+    values: mathIR.flatMap((v) => {
+      if (v.type == "row") {
+        return v.values;
+      } else {
+        return v;
+      }
     }),
   };
 }

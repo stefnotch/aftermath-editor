@@ -155,16 +155,15 @@ export class MathEditor {
     // - beforeInput event
     //   - https://rawgit.com/w3c/input-events/v1/index.html#interface-InputEvent-Attributes
 
+    // TODO: Fix the superscript/subscript caret rendering
+
     // Register keyboard handlers
     // TODO:
     // - up and down
-    // - Backspace
-    // - Delete
-    // - Caret (superscript)
-    // - Underscore (subscript)
     // - Letters and numbers
     // - Shift+arrow keys to select
     // - Shortcuts system (import a lib)
+    // - undo and redo
 
     // Register mouse handlers
     // - Click (put cursor)
@@ -202,6 +201,12 @@ export class MathEditor {
         this.render();
       } else if (ev.inputType == "deleteContentForward" || ev.inputType == "deleteWordForward") {
         this.carets.forEach((caret) => this.deleteAtCaret(caret, "right"));
+        this.render();
+      } else if (ev.inputType == "insertText") {
+        const data = ev.data;
+        if (data != null) {
+          this.carets.forEach((caret) => this.insertAtCaret(caret, data));
+        }
         this.render();
       }
     });
@@ -492,6 +497,42 @@ export class MathEditor {
           caret.row.value = caret.row.value.slice(0, caret.offset) + caret.row.value.slice(caret.offset + 1);
         }
       }
+    }
+  }
+
+  /**
+   * User typed some text
+   */
+  insertAtCaret(caret: MathCaret, text: string) {
+    if (caret.row.type == "row") {
+      if (text == "^") {
+        const mathIR: MathIR = {
+          type: "sup",
+          values: [
+            {
+              type: "row",
+              values: [],
+            },
+          ],
+        };
+        this.mathAst.setParents(null, [mathIR]);
+        this.mathAst.insertChild(caret.row, mathIR, caret.offset);
+      } else if (text == "_") {
+        const mathIR: MathIR = {
+          type: "sub",
+          values: [
+            {
+              type: "row",
+              values: [],
+            },
+          ],
+        };
+        this.mathAst.setParents(null, [mathIR]);
+        this.mathAst.insertChild(caret.row, mathIR, caret.offset);
+      }
+    } else {
+      caret.row.value = caret.row.value.slice(0, caret.offset) + text + caret.row.value.slice(caret.offset);
+      caret.offset += text.length;
     }
   }
 

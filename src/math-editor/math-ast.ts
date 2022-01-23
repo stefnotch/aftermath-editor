@@ -4,6 +4,7 @@ import type { MathIR, MathIRContainer, MathIRTextLeaf, MathIRRow, MathIRSymbolLe
 
 /*
  * MathIR with parent pointers. Currently not super safe, as it's possible to construct a cyclic tree (node.parent = node)
+ * Or calling insertChild with a subtree that doesn't have any valid parents
  */
 export interface MathAst {
   mathIR: MathIRRow;
@@ -29,6 +30,12 @@ export interface MathAst {
 
   removeChild(mathIR: MathIRRow, value: MathIR): void;
   insertChild(mathIR: MathIRRow, value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf, index: number): void;
+
+  /**
+   * Recursively sets the parents, used to set all the parent links for a newly created subtree.
+   * Example: `setParents(null, [mathIR]);`
+   */
+  setParents(parent: MathIRRow | MathIRContainer | null, children: MathIR[]): void;
 }
 
 /**
@@ -43,6 +50,7 @@ export function MathAst(mathIR: MathIRRow): MathAst {
     setChild,
     removeChild,
     insertChild,
+    setParents,
   };
 
   function getParent(mathIR: MathIRRow): MathIRContainer | null;
