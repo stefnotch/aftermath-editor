@@ -26,10 +26,7 @@ export function wrapInRow(mathIR: MathIR | MathIR[]): MathIRRow {
 /**
  * Finds the ending bracket for a given starting bracket
  */
-export function findEndingBracket(
-  mathIR: MathIR[],
-  startingBracketIndex: number
-): number | null {
+export function findEndingBracket(mathIR: MathIR[], startingBracketIndex: number): number | null {
   const startingBracket = mathIR[startingBracketIndex];
   assert(startingBracket.type == "bracket");
 
@@ -56,10 +53,7 @@ export function findEndingBracket(
 /**
  * Finds the next best bracket that is the same
  */
-export function findEitherEndingBracket(
-  mathIR: MathIR[],
-  startingBracketIndex: number
-): number | null {
+export function findEitherEndingBracket(mathIR: MathIR[], startingBracketIndex: number): number | null {
   const startingBracket = mathIR[startingBracketIndex];
   assert(startingBracket.type == "bracket");
 

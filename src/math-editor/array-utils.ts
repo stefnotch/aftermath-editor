@@ -6,10 +6,7 @@ export default {
    * @param array Target array
    * @param compareFunction Comparison function, should compare arrayElement to the new value
    */
-  getBinaryInsertIndex: function <T>(
-    array: T[],
-    compareFunction: (arrayElement: T) => number
-  ): { index: number; itemExists: boolean } {
+  getBinaryInsertIndex: function <T>(array: T[], compareFunction: (arrayElement: T) => number): { index: number; itemExists: boolean } {
     // https://stackoverflow.com/a/29018745
     let low = 0;
     let high = array.length - 1;

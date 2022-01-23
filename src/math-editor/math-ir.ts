@@ -20,11 +20,7 @@
  * For instance, if the formula contains "0xe", we just say it has the characters 0, x, e.
  * We don't parse it as a hexadecimal or 0*x*e or anything. That part is done later.
  */
-export type MathIR =
-  | MathIRRow
-  | MathIRContainer
-  | MathIRSymbolLeaf
-  | MathIRTextLeaf;
+export type MathIR = MathIRRow | MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf;
 
 export type MathIRContainer =
   | {

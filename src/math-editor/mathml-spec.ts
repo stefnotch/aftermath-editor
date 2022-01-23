@@ -37,26 +37,15 @@ const ambigousBracketsList: [string, string][] = [
 
 // Source: https://stackoverflow.com/a/22015930/3492994
 function zipWith<T>(a: T[], b: T[]) {
-  return Array.from(Array(Math.max(a.length, b.length)), (v, i) => [
-    a[i],
-    b[i],
-  ]);
+  return Array.from(Array(Math.max(a.length, b.length)), (v, i) => [a[i], b[i]]);
 }
 
-const parseUnicode = (v: string) =>
-  String.fromCodePoint(
-    parseInt(v.trim().replace(/U\+([a-zA-Z0-9]+)/, "$1"), 16)
-  );
+const parseUnicode = (v: string) => String.fromCodePoint(parseInt(v.trim().replace(/U\+([a-zA-Z0-9]+)/, "$1"), 16));
 
 export const startingBrackets = new Map<string, string>(bracketsList);
 
 export const ambigousBrackets = new Map<string, string>(ambigousBracketsList);
 
-export const endingBrackets = new Map<string, string>(
-  bracketsList.map(([key, value]) => [value, key])
-);
+export const endingBrackets = new Map<string, string>(bracketsList.map(([key, value]) => [value, key]));
 
-export const allBrackets = new Set<string>([
-  ...bracketsList.flat(),
-  ...ambigousBracketsList.flat(),
-]);
+export const allBrackets = new Set<string>([...bracketsList.flat(), ...ambigousBracketsList.flat()]);
