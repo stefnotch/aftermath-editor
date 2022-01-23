@@ -14,11 +14,11 @@ import MathEditor from "./components/MathEditor.vue";
             <mi>x</mi>
             <mi>x</mi>
           </msqrt>
-          <mi>x</mi>
+          <mi>a</mi>
         </msqrt>
         <mfrac>
-          <mi>x</mi>
-          <mi>x</mi>
+          <mi>b</mi>
+          <mi>c</mi>
         </mfrac>
       </math>"
   >

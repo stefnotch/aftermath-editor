@@ -461,6 +461,9 @@ export class MathEditor {
     }
   }
 
+  /**
+   * Gets the element that the caret is "touching"
+   */
   getElementAtCaret(
     caret: MathCaret,
     direction: "left" | "right"
@@ -478,14 +481,50 @@ export class MathEditor {
    */
   deleteAtCaret(caret: MathCaret, direction: "left" | "right") {
     if (caret.row.type == "row") {
-      // TODO: This one is spicier
+      // Row deletion
       const element = this.getElementAtCaret(caret, direction);
       if (element == null) {
-        // TODO: We might be inside a container, like a sqrt. Might want to start deleting it.
-        // this.moveCaret(caret, direction);
+        // At the start or end of a row
+        const parent = this.mathAst.getParent(caret.row);
+        if (parent == null) return;
+        if (parent.type == "frac") {
+          const indexInParent = parent.values.indexOf(caret.row);
+          assert(indexInParent != -1);
+          if (
+            (indexInParent == 0 && direction == "left") ||
+            (indexInParent == 1 && direction == "right")
+          ) {
+            this.moveCaret(caret, direction);
+          } else {
+            // Delete the fraction but keep its contents
+            const parentParent = this.mathAst.getParent(parent);
+            assert(parentParent != null);
+            const indexInParentParent = parentParent.values.indexOf(parent);
+            assert(indexInParentParent != -1);
+
+            const fractionContents = parent.values.flatMap((v) => v.values);
+            for (let i = 0; i < fractionContents.length; i++) {
+              this.mathAst.insertChild(
+                parentParent,
+                fractionContents[i],
+                indexInParentParent + i
+              );
+            }
+            this.mathAst.removeChild(parentParent, parent);
+
+            caret.row = parentParent;
+            caret.offset = parent.values[0].values.length + 1;
+          }
+        } else {
+          // TODO:
+        }
       } else if (element.type == "symbol" || element.type == "bracket") {
-        // TODO: Delete the symbol and update the AST
+        this.mathAst.removeChild(caret.row, element);
+        if (direction == "left") {
+          caret.offset -= 1;
+        }
       } else {
+        // TODO: This one is spicier
         //this.moveCaret(caret, direction);
       }
     } else {

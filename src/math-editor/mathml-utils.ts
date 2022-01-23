@@ -306,6 +306,8 @@ function getTextLayout(t: Text, index: number) {
 }
 
 function getRowLayout(mathLayout: (() => DOMRect)[], index: number) {
+  // TODO: Handle an empty row
+
   console.log("getRowLayout", index);
   assert(index <= mathLayout.length);
   const isLast = index == mathLayout.length;
@@ -361,6 +363,7 @@ function fromMathIR(mathIR: MathIR, mathIRLayout: MathIRLayout): Element {
     ]);
   } else if (mathIR.type == "row") {
     // TODO: Maybe don't emit every useless row
+    // TODO: Special styling for empty rows
     const parsedChildren = fromMathIRRow(mathIR.values, mathIRLayout);
     setRowLayout(mathIR, parsedChildren.mathLayout);
     return createMathElement("mrow", parsedChildren.elements);
@@ -382,6 +385,7 @@ function fromMathIR(mathIR: MathIR, mathIRLayout: MathIRLayout): Element {
     element.setAttribute("stretchy", "false");
     return element;
   } else if (mathIR.type == "text") {
+    // TODO: Special styling for empty text
     return createMathElement("mtext", [
       setTextLayout(mathIR, document.createTextNode(mathIR.value)),
     ]);

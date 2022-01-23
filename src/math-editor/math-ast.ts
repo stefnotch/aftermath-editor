@@ -1,4 +1,5 @@
 import { assert, assertUnreachable } from "../assert";
+import arrayUtils from "./array-utils";
 import type {
   MathIR,
   MathIRContainer,
@@ -19,6 +20,7 @@ export interface MathAst {
     mathIR: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf
   ): MathIRRow | null;
   getParent(mathIR: MathIR): MathIRRow | MathIRContainer | null;
+
   setChild(
     mathIR: MathIRRow,
     value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf,
@@ -31,6 +33,13 @@ export interface MathAst {
     indexA: number,
     indexB: number
   ): void;
+
+  removeChild(mathIR: MathIRRow, value: MathIR): void;
+  insertChild(
+    mathIR: MathIRRow,
+    value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf,
+    index: number
+  ): void;
 }
 
 /**
@@ -42,6 +51,8 @@ export function MathAst(mathIR: MathIRRow): MathAst {
     parents: new Map(),
     getParent: getParent,
     setChild,
+    removeChild,
+    insertChild,
   };
 
   function getParent(mathIR: MathIRRow): MathIRContainer | null;
@@ -57,16 +68,37 @@ export function MathAst(mathIR: MathIRRow): MathAst {
     }
   }
 
+  function removeChild(
+    mathIR: MathIRRow,
+    value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf
+  ): void {
+    assert(mathIR.type == "row");
+    // Maybe check if it actually returned true
+    arrayUtils.remove(mathIR.values, value);
+    ast.parents.delete(value);
+  }
+
+  function insertChild(
+    mathIR: MathIRRow,
+    value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf,
+    index: number
+  ): void {
+    assert(mathIR.type == "row");
+    mathIR.values.splice(index, 0, value);
+    ast.parents.set(value, mathIR);
+  }
+
   function setChild(
     mathIR: MathIR,
     value: MathIR,
-    indexA?: number,
+    indexA: number,
     indexB?: number
   ): void {
     if (mathIR.type == "row") {
       assert(indexA !== undefined);
       assert(value.type != "row");
       mathIR.values[indexA] = value;
+      ast.parents.set(value, mathIR);
     } else if (
       mathIR.type == "frac" ||
       mathIR.type == "root" ||
@@ -78,6 +110,7 @@ export function MathAst(mathIR: MathIRRow): MathAst {
       assert(indexA !== undefined);
       assert(value.type == "row");
       mathIR.values[indexA] = value;
+      ast.parents.set(value, mathIR);
     } else if (
       mathIR.type == "bracket" ||
       mathIR.type == "symbol" ||
@@ -90,6 +123,7 @@ export function MathAst(mathIR: MathIRRow): MathAst {
       assert(indexB !== undefined);
       assert(value.type == "row");
       mathIR.values[indexA][indexB] = value;
+      ast.parents.set(value, mathIR);
     } else {
       assertUnreachable(mathIR);
     }
