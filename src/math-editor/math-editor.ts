@@ -160,6 +160,8 @@ export class MathEditor {
     // Register keyboard handlers
     // TODO:
     // - up and down
+    // - fractions by typing /
+    // - space to move to the right (but only in some cases)
     // - Letters and numbers
     // - Shift+arrow keys to select
     // - Shortcuts system (import a lib)

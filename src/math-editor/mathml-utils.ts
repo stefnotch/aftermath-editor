@@ -365,6 +365,13 @@ function fromMathIRRow(
 
   const output: Element[] = [];
   const mathLayout: (() => DOMRect)[] = [];
+  // TODO: Figure out where the baseline is (line-descent, line-ascent and that stuff)
+  // Because you can't really rely on "look at where the next element is"
+  // One silly hack for getting the baseline is:
+  // - get the bounding box of the parent
+  // - insert a 0px element
+  // - get its bounding box
+  // - figure out where it is relative to the parent
 
   function pushOutput(element: Element) {
     output.push(element);
@@ -419,7 +426,12 @@ function fromMathIRRow(
       const lastElement = output.pop();
       if (lastElement) {
         const subSupElement = fromMathIR(element.values[0], mathIRLayout);
-        mathLayout.push(() => subSupElement.getBoundingClientRect());
+        mathLayout.push(() => {
+          const boundingBox = lastElement.getBoundingClientRect();
+          boundingBox.x += boundingBox.width;
+          boundingBox.width = subSupElement.getBoundingClientRect().width;
+          return boundingBox;
+        });
         output.push(createMathElement(element.type == "sub" ? "msub" : "msup", [lastElement, subSupElement]));
       } else {
         // A lonely sub or sup is an error, we let this function deal with it

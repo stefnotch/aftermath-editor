@@ -33,4 +33,11 @@ watch(
   <span ref="mathElement"> </span>
 </template>
 
-<style scoped></style>
+<style>
+mroot > :first-child::after {
+  content: "";
+  width: 2px;
+  height: 10px;
+  position: absolute;
+}
+</style>
