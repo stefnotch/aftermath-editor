@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "vite --open",
     "build": "vue-tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "vite build --base=/mathml-editor/ && node utils/publish.js"
   },
   "dependencies": {
     "vue": "^3.2.25"

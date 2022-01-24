@@ -1,9 +1,10 @@
 # mathml-editor
 
-A prototype of a MathML editor
+A prototype of a MathML editor. See it in action at https://stefnotch.github.io/mathml-editor
 
 ## Developer info
 
-- `index.html` contains a few equations and loads the scripts
-- `helpers.js` has helper functions, mostly to deal with web-browsers being fun
-- `script.js` has the actual editing algorithm, distilled down to the essence
+- `src/MathEditor.vue` contains a Vue wrapper for the mathematical editor
+- `src/math-editor` contains all the code for the mathematical editor
+- `src/math-editor/math-ir.ts` is the "intermediate representation" of a formula
+- `src/math-editor/math-ast.ts` is the same representation plus links to parents
