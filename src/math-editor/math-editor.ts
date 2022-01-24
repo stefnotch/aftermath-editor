@@ -150,19 +150,14 @@ export class MathEditor {
     // https://w3c.github.io/uievents/tools/key-event-viewer.html
     // https://tkainrad.dev/posts/why-keyboard-shortcuts-dont-work-on-non-us-keyboard-layouts-and-how-to-fix-it/
 
-    // For now, I'll just use the following for text input
-    // - Sneaky textarea or input field
-    // - beforeInput event
-    //   - https://rawgit.com/w3c/input-events/v1/index.html#interface-InputEvent-Attributes
-
-    // TODO: Fix the superscript/subscript caret rendering
-
     // Register keyboard handlers
     // TODO:
     // - up and down
     // - fractions by typing /
+    // - sup and sub with placeholders, basically (placeholderBefore) ^(placeholderAfter) and then the existing content gets put there (order of operations is important in that case)
     // - space to move to the right (but only in some cases)
     // - Letters and numbers
+    // - quotes to type "strings"?
     // - Shift+arrow keys to select
     // - Shortcuts system (import a lib)
     // - undo and redo
@@ -216,10 +211,6 @@ export class MathEditor {
     window.addEventListener("resize", () => this.renderCarets());
 
     this.render = () => {
-      // TODO: Render caret
-      // - Highlight current element
-      // - Highlight brackets
-
       const newMathElement = toMathMLElement(this.mathAst.mathIR);
       this.lastLayout = newMathElement.mathIRLayout;
       element.replaceChildren(...newMathElement.element.children);
@@ -244,6 +235,12 @@ export class MathEditor {
     const layout = layoutGetter(caret.offset);
     caret.caretElement.setPosition(layout.x, layout.y);
     caret.caretElement.setHeight(layout.height);
+
+    // TODO: Highlight current element
+    // - if inside sqrt, highlight that
+    // - if inside text, highlight that
+    // - if next to variable, highlight it and all occurrences
+    // - if next to bracket, highlight it and its pair
   }
 
   removeCaret(caret: MathCaret) {
@@ -519,6 +516,8 @@ export class MathEditor {
         };
         this.mathAst.setParents(null, [mathIR]);
         this.mathAst.insertChild(caret.row, mathIR, caret.offset);
+        caret.row = mathIR.values[0];
+        caret.offset = 0;
       } else if (text == "_") {
         const mathIR: MathIR = {
           type: "sub",
@@ -531,6 +530,23 @@ export class MathEditor {
         };
         this.mathAst.setParents(null, [mathIR]);
         this.mathAst.insertChild(caret.row, mathIR, caret.offset);
+        caret.row = mathIR.values[0];
+        caret.offset = 0;
+      } else if (text == "/") {
+        // TODO: Fractions
+      } else if (text.length == 1) {
+        // Broken unicode support ^
+        this.mathAst.insertChild(
+          caret.row,
+          {
+            type: "symbol",
+            value: text,
+          },
+          caret.offset
+        );
+        caret.offset += 1;
+      } else {
+        // Attempted to insert multiple things
       }
     } else {
       caret.row.value = caret.row.value.slice(0, caret.offset) + text + caret.row.value.slice(caret.offset);
