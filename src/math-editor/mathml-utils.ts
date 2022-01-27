@@ -1,6 +1,6 @@
 import { assert, assertUnreachable } from ".././assert";
 import { MathIR, MathIRTextLeaf, MathIRRow, MathIRContainer, MathIRLayout } from "./math-ir";
-import { expectNChildren, findEitherEndingBracket, findEndingBracket, wrapInRow } from "./math-ir-utils";
+import { expectNChildren, findEitherEndingBracket, findOtherBracket, wrapInRow } from "./math-ir-utils";
 import { startingBrackets, endingBrackets, allBrackets, ambigousBrackets as eitherBrackets } from "./mathml-spec";
 
 type MathMLTags =
@@ -392,6 +392,7 @@ function fromMathIRRow(
         pushOutput(pseudoBracket);
       } else {
         // TODO: Might be an operator
+        // ⊥  is both a symbol (false) and an operator (A perpendicular B)
 
         pushOutput(createMathElement("mi", [document.createTextNode(element.value)]));
       }
@@ -400,7 +401,7 @@ function fromMathIRRow(
         pushOutput(fromMathIR(element, mathIRLayout)); // No opening bracket
       } else {
         // A starting bracket or an either bracket (funnily enough, the logic is almost the same for both)
-        const endingBracketIndex = startingBrackets.has(element.value) ? findEndingBracket(mathIR, i) : findEitherEndingBracket(mathIR, i);
+        const endingBracketIndex = startingBrackets.has(element.value) ? findOtherBracket(mathIR, i, "right") : findEitherEndingBracket(mathIR, i);
         // TODO: maybe check if the ending bracket is actually the right type of bracket?
         if (endingBracketIndex == null) {
           pushOutput(fromMathIR(element, mathIRLayout)); // No closing bracket

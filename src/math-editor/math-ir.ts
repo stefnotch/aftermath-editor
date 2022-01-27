@@ -87,9 +87,7 @@ export type MathIRTextLeaf =
     };
 
 // Minus sign can mean multiple things (infix and prefix)
-// Multi character stuff (like ==)
-// Supporting bracket pairs is important so that we know which things get stretched
-// We probably have to generate extra mrows to support the above ^
+// Multi character stuff (like == or lim)
 // Implicit multiply vs variable name
 // dx at the end of an integral
 // This stuff happens at the parsing step and doesn't get stored. So, it's possible to first write myF(x) and afterwards define myF

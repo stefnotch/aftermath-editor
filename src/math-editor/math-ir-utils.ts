@@ -5,7 +5,11 @@ import { endingBrackets, startingBrackets } from "./mathml-spec";
 /**
  * Guarantees that something is wrapped in a row
  */
-export function wrapInRow(mathIR: MathIR | MathIR[]): MathIRRow {
+export function wrapInRow(mathIR: MathIR | MathIR[] | null): MathIRRow {
+  if (mathIR == null) {
+    return { type: "row", values: [] };
+  }
+
   if (!Array.isArray(mathIR)) {
     if (mathIR.type == "row") {
       return mathIR;
@@ -26,27 +30,36 @@ export function wrapInRow(mathIR: MathIR | MathIR[]): MathIRRow {
 }
 
 /**
- * Finds the ending bracket for a given starting bracket
+ * Finds the starting/ending bracket for a given ending/starting bracket
+ * @param direction the search direction, use "right" to find an ending bracket
  */
-export function findEndingBracket(mathIR: MathIR[], startingBracketIndex: number): number | null {
-  const startingBracket = mathIR[startingBracketIndex];
-  assert(startingBracket.type == "bracket");
+export function findOtherBracket(mathIR: MathIR[], bracketIndex: number, direction: "left" | "right"): number | null {
+  const isLeft = direction == "left";
+  const bracket = mathIR[bracketIndex];
+  assert(bracket.type == "bracket");
 
   let bracketCounter = 0;
-  for (let i = startingBracketIndex + 1; i < mathIR.length; i++) {
+  let i = bracketIndex + (isLeft ? -1 : +1);
+
+  const sameBracketType = isLeft ? endingBrackets : startingBrackets;
+  const otherBracketType = isLeft ? startingBrackets : endingBrackets;
+
+  while (i >= 0 && i < mathIR.length) {
     const element = mathIR[i];
     if (element.type != "bracket") continue;
 
-    if (startingBrackets.has(element.value)) {
+    if (sameBracketType.has(element.value)) {
       bracketCounter += 1;
-    } else if (endingBrackets.has(element.value)) {
-      if (bracketCounter > 0) {
-        bracketCounter -= 1;
-      } else {
-        // Doesn't bother finding the correct bracket type
+    } else if (otherBracketType.has(element.value)) {
+      if (bracketCounter <= 0) {
+        // Doesn't bother finding the absolutely correct bracket type
         return i;
+      } else {
+        bracketCounter -= 1;
       }
     }
+
+    i += isLeft ? -1 : +1;
   }
 
   return null;

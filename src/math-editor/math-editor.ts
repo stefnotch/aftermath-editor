@@ -3,6 +3,8 @@ import { MathAst } from "./math-ast";
 import { MathIR, MathIRContainer, MathIRLayout, MathIRRow, MathIRSymbolLeaf, MathIRTextLeaf } from "./math-ir";
 import { fromElement as fromMathMLElement, toElement as toMathMLElement } from "./mathml-utils";
 import arrayUtils from "./array-utils";
+import { endingBrackets, startingBrackets } from "./mathml-spec";
+import { findOtherBracket, wrapInRow } from "./math-ir-utils";
 
 interface MathmlCaret {
   setPosition(x: number, y: number): void;
@@ -150,11 +152,16 @@ export class MathEditor {
     // https://w3c.github.io/uievents/tools/key-event-viewer.html
     // https://tkainrad.dev/posts/why-keyboard-shortcuts-dont-work-on-non-us-keyboard-layouts-and-how-to-fix-it/
 
+    // TODO: Parsing
+    // - 1. MathAst
+    // - 2. Bracket pairs
+    // - 3. A general enough parser that can handle tokens
+
     // Register keyboard handlers
     // TODO:
     // - up and down
-    // - fractions by typing /
-    // - sup and sub with placeholders, basically (placeholderBefore) ^(placeholderAfter) and then the existing content gets put there (order of operations is important in that case)
+    // - brackets and non-brackets
+    // - better placeholders, don't grab operators, but grab multiple symbols if possible (like if you have +|34 and hit /, the result should be +\frac{}{|34})
     // - space to move to the right (but only in some cases)
     // - Letters and numbers
     // - quotes to type "strings"?
@@ -503,37 +510,85 @@ export class MathEditor {
    * User typed some text
    */
   insertAtCaret(caret: MathCaret, text: string) {
-    if (caret.row.type == "row") {
-      if (text == "^") {
-        const mathIR: MathIR = {
-          type: "sup",
-          values: [
-            {
+    /**
+     * Used for "placeholders"
+     */
+    function takeElementOrBracket(mathAst: MathAst, caret: MathCaret, direction: "left" | "right"): MathIRRow | null {
+      if (caret.row.type == "row") {
+        const elementIndex = caret.offset + (direction == "left" ? -1 : 0);
+        const element = arrayUtils.get(caret.row.values, elementIndex) ?? null;
+
+        if (element == null) return null;
+        if (element.type == "bracket") {
+          if ((direction == "left" && startingBrackets.has(element.value)) || (direction == "right" && endingBrackets.has(element.value))) {
+            return null;
+          }
+
+          const otherBracketIndex = findOtherBracket(caret.row.values, elementIndex, direction);
+          if (otherBracketIndex) {
+            // TODO: Grab that entire bracketed thingy
+            const start = Math.min(elementIndex, otherBracketIndex);
+            const end = Math.max(elementIndex, otherBracketIndex);
+            const newRow: MathIRRow = {
               type: "row",
               values: [],
-            },
-          ],
-        };
-        this.mathAst.setParents(null, [mathIR]);
-        this.mathAst.insertChild(caret.row, mathIR, caret.offset);
+            };
+            const bracketedElements = caret.row.values.slice(start, end + 1);
+            for (let i = 0; i < bracketedElements.length; i++) {
+              mathAst.removeChild(caret.row, bracketedElements[i]);
+              mathAst.insertChild(newRow, bracketedElements[i], i);
+            }
+            if (direction == "left") {
+              caret.offset -= bracketedElements.length;
+            }
+            return newRow;
+          }
+        } else {
+          mathAst.removeChild(caret.row, element);
+          // So that the caret's location never becomes invalid
+          if (direction == "left") {
+            caret.offset -= 1;
+          }
+          return { type: "row", values: [element] };
+        }
+      }
+      return null;
+    }
+
+    const mathAst = this.mathAst;
+    function insertMathIR<T extends MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf>(mathIR: T): T {
+      assert(caret.row.type == "row");
+      mathAst.setParents(null, [mathIR]);
+      mathAst.insertChild(caret.row, mathIR, caret.offset);
+
+      return mathIR;
+    }
+
+    if (caret.row.type == "row") {
+      if (text == "^") {
+        const mathIR = insertMathIR({
+          type: "sup",
+          values: [takeElementOrBracket(this.mathAst, caret, "right") ?? { type: "row", values: [] }],
+        });
         caret.row = mathIR.values[0];
         caret.offset = 0;
       } else if (text == "_") {
-        const mathIR: MathIR = {
+        const mathIR = insertMathIR({
           type: "sub",
-          values: [
-            {
-              type: "row",
-              values: [],
-            },
-          ],
-        };
-        this.mathAst.setParents(null, [mathIR]);
-        this.mathAst.insertChild(caret.row, mathIR, caret.offset);
+          values: [takeElementOrBracket(this.mathAst, caret, "right") ?? { type: "row", values: [] }],
+        });
         caret.row = mathIR.values[0];
         caret.offset = 0;
       } else if (text == "/") {
-        // TODO: Fractions
+        const mathIR = insertMathIR({
+          type: "frac",
+          values: [
+            takeElementOrBracket(this.mathAst, caret, "left") ?? { type: "row", values: [] },
+            takeElementOrBracket(this.mathAst, caret, "right") ?? { type: "row", values: [] },
+          ],
+        });
+        caret.row = mathIR.values[1];
+        caret.offset = 0;
       } else if (text.length == 1) {
         // Broken unicode support ^
         this.mathAst.insertChild(
