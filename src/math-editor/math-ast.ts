@@ -1,47 +1,47 @@
 import { assert, assertUnreachable } from "../assert";
 import arrayUtils from "./array-utils";
-import type { MathIR, MathIRContainer, MathIRTextLeaf, MathIRRow, MathIRSymbolLeaf } from "./math-ir";
+import type { MathLayout, MathLayoutContainer, MathLayoutText, MathLayoutRow, MathLayoutSymbol } from "./math-layout";
 
 /*
- * MathIR with parent pointers. Currently not super safe, as it's possible to construct a cyclic tree (node.parent = node)
+ * MathLayout with parent pointers. Currently not super safe, as it's possible to construct a cyclic tree (node.parent = node)
  * Or calling insertChild with a subtree that doesn't have any valid parents
  */
 export interface MathAst {
-  mathIR: MathIRRow;
-  parents: Map<MathIR, MathIRRow | MathIRContainer | null>;
+  mathIR: MathLayoutRow;
+  parents: Map<MathLayout, MathLayoutRow | MathLayoutContainer | null>;
 
-  getParent(mathIR: MathIRRow): MathIRContainer | null;
-  getParent(mathIR: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf): MathIRRow | null;
-  getParent(mathIR: MathIR): MathIRRow | MathIRContainer | null;
+  getParent(mathIR: MathLayoutRow): MathLayoutContainer | null;
+  getParent(mathIR: MathLayoutContainer | MathLayoutSymbol | MathLayoutText): MathLayoutRow | null;
+  getParent(mathIR: MathLayout): MathLayoutRow | MathLayoutContainer | null;
 
-  getParentAndIndex(mathIR: MathIRRow): {
-    parent: MathIRContainer | null;
+  getParentAndIndex(mathIR: MathLayoutRow): {
+    parent: MathLayoutContainer | null;
     indexInParent: number;
   };
-  getParentAndIndex(mathIR: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf): { parent: MathIRRow | null; indexInParent: number };
-  getParentAndIndex(mathIR: MathIR): {
-    parent: MathIRRow | MathIRContainer | null;
+  getParentAndIndex(mathIR: MathLayoutContainer | MathLayoutSymbol | MathLayoutText): { parent: MathLayoutRow | null; indexInParent: number };
+  getParentAndIndex(mathIR: MathLayout): {
+    parent: MathLayoutRow | MathLayoutContainer | null;
     indexInParent: number;
   };
 
-  setChild(mathIR: MathIRRow, value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf, index: number): void;
-  setChild(mathIR: MathIRContainer, value: MathIRRow, index: number): void;
-  setChild(mathIR: MathIR & { type: "table" }, value: MathIRRow, indexA: number, indexB: number): void;
+  setChild(mathIR: MathLayoutRow, value: MathLayoutContainer | MathLayoutSymbol | MathLayoutText, index: number): void;
+  setChild(mathIR: MathLayoutContainer, value: MathLayoutRow, index: number): void;
+  setChild(mathIR: MathLayout & { type: "table" }, value: MathLayoutRow, indexA: number, indexB: number): void;
 
-  removeChild(mathIR: MathIRRow, value: MathIR): void;
-  insertChild(mathIR: MathIRRow, value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf, index: number): void;
+  removeChild(mathIR: MathLayoutRow, value: MathLayout): void;
+  insertChild(mathIR: MathLayoutRow, value: MathLayoutContainer | MathLayoutSymbol | MathLayoutText, index: number): void;
 
   /**
    * Recursively sets the parents, used to set all the parent links for a newly created subtree.
    * Example: `setParents(null, [mathIR]);`
    */
-  setParents(parent: MathIRRow | MathIRContainer | null, children: MathIR[]): void;
+  setParents(parent: MathLayoutRow | MathLayoutContainer | null, children: MathLayout[]): void;
 }
 
 /**
  * Math-ir with parent pointers. Super convenient for traversing the data structure
  */
-export function MathAst(mathIR: MathIRRow): MathAst {
+export function MathAst(mathIR: MathLayoutRow): MathAst {
   const ast: MathAst = {
     mathIR,
     parents: new Map(),
@@ -53,9 +53,9 @@ export function MathAst(mathIR: MathIRRow): MathAst {
     setParents,
   };
 
-  function getParent(mathIR: MathIRRow): MathIRContainer | null;
-  function getParent(mathIR: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf): MathIRRow | null;
-  function getParent(mathIR: MathIR): MathIRRow | MathIRContainer | null {
+  function getParent(mathIR: MathLayoutRow): MathLayoutContainer | null;
+  function getParent(mathIR: MathLayoutContainer | MathLayoutSymbol | MathLayoutText): MathLayoutRow | null;
+  function getParent(mathIR: MathLayout): MathLayoutRow | MathLayoutContainer | null {
     const parent = ast.parents.get(mathIR);
     if (parent) {
       return parent;
@@ -64,13 +64,16 @@ export function MathAst(mathIR: MathIRRow): MathAst {
     }
   }
 
-  function getParentAndIndex(mathIR: MathIRRow): {
-    parent: MathIRContainer | null;
+  function getParentAndIndex(mathIR: MathLayoutRow): {
+    parent: MathLayoutContainer | null;
     indexInParent: number;
   };
-  function getParentAndIndex(mathIR: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf): { parent: MathIRRow | null; indexInParent: number };
-  function getParentAndIndex(mathIR: MathIR): {
-    parent: MathIRRow | MathIRContainer | null;
+  function getParentAndIndex(mathIR: MathLayoutContainer | MathLayoutSymbol | MathLayoutText): {
+    parent: MathLayoutRow | null;
+    indexInParent: number;
+  };
+  function getParentAndIndex(mathIR: MathLayout): {
+    parent: MathLayoutRow | MathLayoutContainer | null;
     indexInParent: number;
   } {
     const parent = ast.parents.get(mathIR);
@@ -102,20 +105,20 @@ export function MathAst(mathIR: MathIRRow): MathAst {
     }
   }
 
-  function removeChild(mathIR: MathIRRow, value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf): void {
+  function removeChild(mathIR: MathLayoutRow, value: MathLayoutContainer | MathLayoutSymbol | MathLayoutText): void {
     assert(mathIR.type == "row");
     // Maybe check if it actually returned true
     arrayUtils.remove(mathIR.values, value);
     ast.parents.delete(value);
   }
 
-  function insertChild(mathIR: MathIRRow, value: MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf, index: number): void {
+  function insertChild(mathIR: MathLayoutRow, value: MathLayoutContainer | MathLayoutSymbol | MathLayoutText, index: number): void {
     assert(mathIR.type == "row");
     mathIR.values.splice(index, 0, value);
     ast.parents.set(value, mathIR);
   }
 
-  function setChild(mathIR: MathIR, value: MathIR, indexA: number, indexB?: number): void {
+  function setChild(mathIR: MathLayout, value: MathLayout, indexA: number, indexB?: number): void {
     if (mathIR.type == "row") {
       assert(indexA !== undefined);
       assert(value.type != "row");
@@ -146,7 +149,7 @@ export function MathAst(mathIR: MathIRRow): MathAst {
     }
   }
 
-  function setParents(parent: MathIRRow | MathIRContainer | null, children: MathIR[]) {
+  function setParents(parent: MathLayoutRow | MathLayoutContainer | null, children: MathLayout[]) {
     for (let i = 0; i < children.length; i++) {
       ast.parents.set(children[i], parent);
 
@@ -157,7 +160,7 @@ export function MathAst(mathIR: MathIRRow): MathAst {
     }
   }
 
-  function asRowOrContainer(mathIR: MathIR): MathIRRow | MathIRContainer | null {
+  function asRowOrContainer(mathIR: MathLayout): MathLayoutRow | MathLayoutContainer | null {
     if (mathIR.type == "row") {
       return mathIR;
     } else if (
@@ -175,7 +178,7 @@ export function MathAst(mathIR: MathIRRow): MathAst {
     }
   }
 
-  function getChildren(mathIR: MathIR) {
+  function getChildren(mathIR: MathLayout) {
     if (
       mathIR.type == "row" ||
       mathIR.type == "frac" ||

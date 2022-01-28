@@ -1,6 +1,6 @@
 import { assert, assertUnreachable } from ".././assert";
-import { MathIR, MathIRTextLeaf, MathIRRow, MathIRContainer, MathIRLayout } from "./math-ir";
-import { expectNChildren, findEitherEndingBracket, findOtherBracket, wrapInRow } from "./math-ir-utils";
+import { MathLayout, MathLayoutText, MathLayoutRow, MathLayoutContainer, MathPhysicalLayout } from "./math-layout";
+import { expectNChildren, findEitherEndingBracket, findOtherBracket, wrapInRow } from "./math-layout-utils";
 import { startingBrackets, endingBrackets, allBrackets, ambigousBrackets as eitherBrackets } from "./mathml-spec";
 
 type MathMLTags =
@@ -36,23 +36,23 @@ type MathMLTags =
   | "mtr"
   | "mtd";
 
-export function fromElement(element: HTMLElement): MathIRRow {
+export function fromElement(element: HTMLElement): MathLayoutRow {
   assert(tagIs(element, "math"));
-  const mathIR = toMathIR(element);
+  const mathIR = toMathLayout(element);
   assert(!Array.isArray(mathIR));
   assert(mathIR.type == "row");
 
   return mathIR;
 }
 
-export function toElement(mathIR: MathIR): {
+export function toElement(mathIR: MathLayout): {
   element: Element;
-  mathIRLayout: MathIRLayout;
+  physicalLayout: MathPhysicalLayout;
 } {
-  const mathIRLayout: MathIRLayout = new Map();
+  const physicalLayout: MathPhysicalLayout = new Map();
   const element = createMathElement("math", []);
 
-  const emittedMathML = fromMathIR(mathIR, mathIRLayout);
+  const emittedMathML = fromMathLayout(mathIR, physicalLayout);
   if (tagIs(emittedMathML, "mrow")) {
     // Remove duplicate mrow at the top
     element.append(...emittedMathML.childNodes);
@@ -62,7 +62,7 @@ export function toElement(mathIR: MathIR): {
 
   return {
     element,
-    mathIRLayout,
+    physicalLayout: physicalLayout,
   };
 }
 
@@ -82,14 +82,14 @@ function getText(element: Element) {
 
 // Time to iterate over the MathML and create a cute little tree
 // Doesn't deal with horrible MathML yet (so stuff like unnecessary nested mrows is bad, maybe that should be a post-processing step?)
-function toMathIR(element: Element): MathIR | MathIR[] {
+function toMathLayout(element: Element): MathLayout | MathLayout[] {
   let children = [...element.children];
 
   if (tagIs(element, "math", "mrow", "mtd")) {
     // Uses flatMap so that msub can return two elements...
-    return wrapInRow(children.flatMap((c) => toMathIR(c)));
+    return wrapInRow(children.flatMap((c) => toMathLayout(c)));
   } else if (tagIs(element, "semantics") && children.length > 0) {
-    return toMathIR(children[0]);
+    return toMathLayout(children[0]);
   } else if (tagIs(element, "mtext", "ms")) {
     return {
       type: "text",
@@ -124,7 +124,7 @@ function toMathIR(element: Element): MathIR | MathIR[] {
     return (
       expectNChildren(element, 2) ?? {
         type: "frac",
-        values: children.map((c) => wrapInRow(toMathIR(c))) as [MathIRRow, MathIRRow],
+        values: children.map((c) => wrapInRow(toMathLayout(c))) as [MathLayoutRow, MathLayoutRow],
       }
     );
   } else if (tagIs(element, "msqrt")) {
@@ -135,18 +135,18 @@ function toMathIR(element: Element): MathIR | MathIR[] {
           type: "symbol",
           value: "2",
         }),
-        wrapInRow(children.flatMap((c) => toMathIR(c))),
+        wrapInRow(children.flatMap((c) => toMathLayout(c))),
       ],
     };
   } else if (tagIs(element, "mroot")) {
     return (
       expectNChildren(element, 2) ?? {
         type: "root",
-        values: [wrapInRow(toMathIR(children[1])), wrapInRow(toMathIR(children[0]))],
+        values: [wrapInRow(toMathLayout(children[1])), wrapInRow(toMathLayout(children[0]))],
       }
     );
   } else if (tagIs(element, "msub")) {
-    let base = toMathIR(children[0]);
+    let base = toMathLayout(children[0]);
     if (!Array.isArray(base)) {
       base = [base];
     }
@@ -155,12 +155,12 @@ function toMathIR(element: Element): MathIR | MathIR[] {
         ...base,
         {
           type: "sub",
-          values: [wrapInRow(toMathIR(children[1]))],
+          values: [wrapInRow(toMathLayout(children[1]))],
         },
       ]
     );
   } else if (tagIs(element, "msup")) {
-    let base = toMathIR(children[0]);
+    let base = toMathLayout(children[0]);
     if (!Array.isArray(base)) {
       base = [base];
     }
@@ -169,12 +169,12 @@ function toMathIR(element: Element): MathIR | MathIR[] {
         ...base,
         {
           type: "sup",
-          values: [wrapInRow(toMathIR(children[1]))],
+          values: [wrapInRow(toMathLayout(children[1]))],
         },
       ]
     );
   } else if (tagIs(element, "msubsup")) {
-    let base = toMathIR(children[0]);
+    let base = toMathLayout(children[0]);
     if (!Array.isArray(base)) {
       base = [base];
     }
@@ -183,11 +183,11 @@ function toMathIR(element: Element): MathIR | MathIR[] {
         ...base,
         {
           type: "sub",
-          values: [wrapInRow(toMathIR(children[1]))],
+          values: [wrapInRow(toMathLayout(children[1]))],
         },
         {
           type: "sup",
-          values: [wrapInRow(toMathIR(children[2]))],
+          values: [wrapInRow(toMathLayout(children[2]))],
         },
       ]
     );
@@ -195,14 +195,14 @@ function toMathIR(element: Element): MathIR | MathIR[] {
     return (
       expectNChildren(element, 2) ?? {
         type: "under",
-        values: [wrapInRow(toMathIR(children[0])), wrapInRow(toMathIR(children[1]))],
+        values: [wrapInRow(toMathLayout(children[0])), wrapInRow(toMathLayout(children[1]))],
       }
     );
   } else if (tagIs(element, "mover")) {
     return (
       expectNChildren(element, 2) ?? {
         type: "over",
-        values: [wrapInRow(toMathIR(children[0])), wrapInRow(toMathIR(children[1]))],
+        values: [wrapInRow(toMathLayout(children[0])), wrapInRow(toMathLayout(children[1]))],
       }
     );
   } else if (tagIs(element, "munderover")) {
@@ -212,9 +212,9 @@ function toMathIR(element: Element): MathIR | MathIR[] {
         values: [
           wrapInRow({
             type: "under",
-            values: [wrapInRow(toMathIR(children[0])), wrapInRow(toMathIR(children[1]))],
+            values: [wrapInRow(toMathLayout(children[0])), wrapInRow(toMathLayout(children[1]))],
           }),
-          wrapInRow(toMathIR(children[2])),
+          wrapInRow(toMathLayout(children[2])),
         ],
       }
     );
@@ -228,7 +228,7 @@ function toMathIR(element: Element): MathIR | MathIR[] {
 
     return {
       type: "table",
-      values: children.map((c) => [...c.children].map((cc) => wrapInRow(toMathIR(cc)))),
+      values: children.map((c) => [...c.children].map((cc) => wrapInRow(toMathLayout(cc)))),
     };
   } else {
     return {
@@ -277,38 +277,38 @@ function getRowLayout(mathLayout: (() => DOMRect)[], index: number) {
   };
 }
 
-function fromMathIR(mathIR: MathIR, mathIRLayout: MathIRLayout): Element {
-  function setTextLayout(mathIR: MathIRTextLeaf, textNode: Text): Text {
-    mathIRLayout?.set(mathIR, (index) => getTextLayout(textNode, index));
+function fromMathLayout(mathIR: MathLayout, physicalLayout: MathPhysicalLayout): Element {
+  function setTextLayout(mathIR: MathLayoutText, textNode: Text): Text {
+    physicalLayout?.set(mathIR, (index) => getTextLayout(textNode, index));
     return textNode;
   }
 
-  function setRowLayout(mathIR: MathIRRow, mathLayout: (() => DOMRect)[]) {
-    mathIRLayout?.set(mathIR, (index) => getRowLayout(mathLayout, index));
+  function setRowLayout(mathIR: MathLayoutRow, mathLayout: (() => DOMRect)[]) {
+    physicalLayout?.set(mathIR, (index) => getRowLayout(mathLayout, index));
   }
 
   if (mathIR.type == "error") {
     return createMathElement("merror", [createMathElement("mtext", [setTextLayout(mathIR, document.createTextNode(mathIR.value))])]);
   } else if (mathIR.type == "frac") {
-    return createMathElement("mfrac", [fromMathIR(mathIR.values[0], mathIRLayout), fromMathIR(mathIR.values[1], mathIRLayout)]);
+    return createMathElement("mfrac", [fromMathLayout(mathIR.values[0], physicalLayout), fromMathLayout(mathIR.values[1], physicalLayout)]);
 
     // Maybe detect under-over?
   } else if (mathIR.type == "over") {
-    return createMathElement("mover", [fromMathIR(mathIR.values[0], mathIRLayout), fromMathIR(mathIR.values[1], mathIRLayout)]);
+    return createMathElement("mover", [fromMathLayout(mathIR.values[0], physicalLayout), fromMathLayout(mathIR.values[1], physicalLayout)]);
   } else if (mathIR.type == "under") {
-    return createMathElement("munder", [fromMathIR(mathIR.values[0], mathIRLayout), fromMathIR(mathIR.values[1], mathIRLayout)]);
+    return createMathElement("munder", [fromMathLayout(mathIR.values[0], physicalLayout), fromMathLayout(mathIR.values[1], physicalLayout)]);
   } else if (mathIR.type == "root") {
     // TODO: Sometimes create a msqrt
-    return createMathElement("mroot", [fromMathIR(mathIR.values[1], mathIRLayout), fromMathIR(mathIR.values[0], mathIRLayout)]);
+    return createMathElement("mroot", [fromMathLayout(mathIR.values[1], physicalLayout), fromMathLayout(mathIR.values[0], physicalLayout)]);
   } else if (mathIR.type == "row") {
     // TODO: Maybe don't emit every useless row
-    const parsedChildren = fromMathIRRow(mathIR.values, mathIRLayout);
+    const parsedChildren = fromMathLayoutRow(mathIR.values, physicalLayout);
     setRowLayout(mathIR, parsedChildren.mathLayout);
     return createMathElement("mrow", parsedChildren.elements);
   } else if (mathIR.type == "sub" || mathIR.type == "sup") {
     return createMathElement("merror", [createMathElement("mtext", [document.createTextNode("Unexpected " + mathIR.type)])]);
   } else if (mathIR.type == "symbol") {
-    const parsedChildren = fromMathIRRow([mathIR], mathIRLayout);
+    const parsedChildren = fromMathLayoutRow([mathIR], physicalLayout);
     return parsedChildren.elements.length == 1 ? parsedChildren.elements[0] : createMathElement("mrow", parsedChildren.elements);
   } else if (mathIR.type == "bracket") {
     const element = createMathElement("mo", [document.createTextNode(mathIR.value)]);
@@ -326,9 +326,9 @@ function fromMathIR(mathIR: MathIR, mathIRLayout: MathIRLayout): Element {
           v.map((cell) => {
             if (cell.type == "row") {
               // TODO: Does this introduce useless rows? (also remember, we need the row parsing logic from above)
-              return createMathElement("mtd", [fromMathIR(cell, mathIRLayout)]);
+              return createMathElement("mtd", [fromMathLayout(cell, physicalLayout)]);
             } else {
-              return createMathElement("mtd", [fromMathIR(cell, mathIRLayout)]);
+              return createMathElement("mtd", [fromMathLayout(cell, physicalLayout)]);
             }
           })
         )
@@ -347,9 +347,9 @@ const isNumber = /^\p{Nd}+(\.\p{Nd}*)?$/gu;
 /**
  * Parse all the children of a row, has some special logic
  */
-function fromMathIRRow(
-  mathIR: MathIR[],
-  mathIRLayout: MathIRLayout
+function fromMathLayoutRow(
+  mathIR: MathLayout[],
+  physicalLayout: MathPhysicalLayout
 ): {
   elements: Element[];
   mathLayout: (() => DOMRect)[];
@@ -382,7 +382,7 @@ function fromMathIRRow(
     const element = mathIR[i];
     if (element.type == "symbol") {
       if (element.value.search(isDigit) != -1) {
-        const parsed = fromMathIRNumber(mathIR, i);
+        const parsed = fromMathLayoutNumber(mathIR, i);
         output.push(parsed.element);
         mathLayout.push(...parsed.mathLayout);
         i = parsed.lastDigitIndex;
@@ -398,15 +398,15 @@ function fromMathIRRow(
       }
     } else if (element.type == "bracket") {
       if (endingBrackets.has(element.value)) {
-        pushOutput(fromMathIR(element, mathIRLayout)); // No opening bracket
+        pushOutput(fromMathLayout(element, physicalLayout)); // No opening bracket
       } else {
         // A starting bracket or an either bracket (funnily enough, the logic is almost the same for both)
         const endingBracketIndex = startingBrackets.has(element.value) ? findOtherBracket(mathIR, i, "right") : findEitherEndingBracket(mathIR, i);
         // TODO: maybe check if the ending bracket is actually the right type of bracket?
         if (endingBracketIndex == null) {
-          pushOutput(fromMathIR(element, mathIRLayout)); // No closing bracket
+          pushOutput(fromMathLayout(element, physicalLayout)); // No closing bracket
         } else {
-          const parsedChildren = fromMathIRRow(mathIR.slice(i + 1, endingBracketIndex), mathIRLayout);
+          const parsedChildren = fromMathLayoutRow(mathIR.slice(i + 1, endingBracketIndex), physicalLayout);
           const endingBracket = mathIR[endingBracketIndex];
           assert(endingBracket.type == "bracket");
           const startingBracketElement = createMathElement("mo", [document.createTextNode(element.value)]);
@@ -426,7 +426,7 @@ function fromMathIRRow(
     } else if (element.type == "sub" || element.type == "sup") {
       const lastElement = output.pop();
       if (lastElement) {
-        const subSupElement = fromMathIR(element.values[0], mathIRLayout);
+        const subSupElement = fromMathLayout(element.values[0], physicalLayout);
         mathLayout.push(() => {
           const boundingBox = lastElement.getBoundingClientRect();
           boundingBox.x += boundingBox.width;
@@ -436,10 +436,10 @@ function fromMathIRRow(
         output.push(createMathElement(element.type == "sub" ? "msub" : "msup", [lastElement, subSupElement]));
       } else {
         // A lonely sub or sup is an error, we let this function deal with it
-        pushOutput(fromMathIR(element, mathIRLayout));
+        pushOutput(fromMathLayout(element, physicalLayout));
       }
     } else {
-      pushOutput(fromMathIR(element, mathIRLayout));
+      pushOutput(fromMathLayout(element, physicalLayout));
     }
   }
 
@@ -467,8 +467,8 @@ function fromMathIRRow(
   return { elements: output, mathLayout: mathLayout };
 }
 
-function fromMathIRNumber(
-  mathIR: MathIR[],
+function fromMathLayoutNumber(
+  mathIR: MathLayout[],
   firstDigitIndex: number
 ): {
   element: Element;

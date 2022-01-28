@@ -1,11 +1,11 @@
 import { assert } from "../assert";
-import { MathIR, MathIRRow } from "./math-ir";
+import { MathLayout, MathLayoutRow } from "./math-layout";
 import { endingBrackets, startingBrackets } from "./mathml-spec";
 
 /**
  * Guarantees that something is wrapped in a row
  */
-export function wrapInRow(mathIR: MathIR | MathIR[] | null): MathIRRow {
+export function wrapInRow(mathIR: MathLayout | MathLayout[] | null): MathLayoutRow {
   if (mathIR == null) {
     return { type: "row", values: [] };
   }
@@ -33,7 +33,7 @@ export function wrapInRow(mathIR: MathIR | MathIR[] | null): MathIRRow {
  * Finds the starting/ending bracket for a given ending/starting bracket
  * @param direction the search direction, use "right" to find an ending bracket
  */
-export function findOtherBracket(mathIR: MathIR[], bracketIndex: number, direction: "left" | "right"): number | null {
+export function findOtherBracket(mathIR: MathLayout[], bracketIndex: number, direction: "left" | "right"): number | null {
   const isLeft = direction == "left";
   const bracket = mathIR[bracketIndex];
   assert(bracket.type == "bracket");
@@ -68,7 +68,7 @@ export function findOtherBracket(mathIR: MathIR[], bracketIndex: number, directi
 /**
  * Finds the next best bracket that is the same
  */
-export function findEitherEndingBracket(mathIR: MathIR[], startingBracketIndex: number): number | null {
+export function findEitherEndingBracket(mathIR: MathLayout[], startingBracketIndex: number): number | null {
   const startingBracket = mathIR[startingBracketIndex];
   assert(startingBracket.type == "bracket");
 
@@ -94,7 +94,7 @@ export function findEitherEndingBracket(mathIR: MathIR[], startingBracketIndex: 
   return null;
 }
 
-export function expectNChildren(element: Element, n: number): MathIR | null {
+export function expectNChildren(element: Element, n: number): MathLayout | null {
   if (element.children.length != n) {
     return {
       type: "error",

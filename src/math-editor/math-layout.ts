@@ -20,47 +20,47 @@
  * For instance, if the formula contains "0xe", we just say it has the characters 0, x, e.
  * We don't parse it as a hexadecimal or 0*x*e or anything. That part is done later.
  */
-export type MathIR = MathIRRow | MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf;
+export type MathLayout = MathLayoutRow | MathLayoutContainer | MathLayoutSymbol | MathLayoutText;
 
-export type MathIRContainer =
+export type MathLayoutContainer =
   | {
       type: "frac";
-      values: [MathIRRow, MathIRRow];
+      values: [MathLayoutRow, MathLayoutRow];
     }
   | {
       type: "root";
-      values: [MathIRRow, MathIRRow];
+      values: [MathLayoutRow, MathLayoutRow];
     }
   | {
       type: "under";
-      values: [MathIRRow, MathIRRow];
+      values: [MathLayoutRow, MathLayoutRow];
     }
   | {
       type: "over";
-      values: [MathIRRow, MathIRRow];
+      values: [MathLayoutRow, MathLayoutRow];
     }
   | {
       type: "sup";
-      values: [MathIRRow];
+      values: [MathLayoutRow];
     }
   | {
       type: "sub";
-      values: [MathIRRow];
+      values: [MathLayoutRow];
     }
   | {
       // rows and cells
       // Not sure about this one yet
       type: "table";
-      values: MathIRRow[][];
+      values: MathLayoutRow[][];
     };
 
-export type MathIRRow = {
+export type MathLayoutRow = {
   // the only thing that has an arbitrary number of children
   type: "row";
-  values: (MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf)[];
+  values: (MathLayoutContainer | MathLayoutSymbol | MathLayoutText)[];
 };
 
-export type MathIRSymbolLeaf =
+export type MathLayoutSymbol =
   | {
       // A bracket symbol
       // Brackets are not containers, cause that makes things like adding a closing bracket somewhere in a formula really awkward
@@ -76,7 +76,7 @@ export type MathIRSymbolLeaf =
       value: string;
     };
 
-export type MathIRTextLeaf =
+export type MathLayoutText =
   | {
       type: "text";
       value: string;
@@ -122,7 +122,7 @@ export type MathIRTextLeaf =
 // TODO: bracket pairs are to be resolved during inputting (pairs, ghost close bracket, esc and space, set builder |, |abs|, ||norm||, {x| |x| < 3})
 
 // The index has a different meaning depending on the element (child index, ignored, text index, 2D index)
-export type MathIRLayout = Map<
-  MathIRRow | MathIRTextLeaf, // row-container
+export type MathPhysicalLayout = Map<
+  MathLayoutRow | MathLayoutText, // row-container
   (index: number) => { x: number; y: number; height: number }
 >;

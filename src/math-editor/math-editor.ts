@@ -1,10 +1,10 @@
 import { assert, assertUnreachable } from "../assert";
 import { MathAst } from "./math-ast";
-import { MathIR, MathIRContainer, MathIRLayout, MathIRRow, MathIRSymbolLeaf, MathIRTextLeaf } from "./math-ir";
+import { MathLayout, MathLayoutContainer, MathPhysicalLayout, MathLayoutRow, MathLayoutSymbol, MathLayoutText } from "./math-layout";
 import { fromElement as fromMathMLElement, toElement as toMathMLElement } from "./mathml-utils";
 import arrayUtils from "./array-utils";
 import { endingBrackets, startingBrackets } from "./mathml-spec";
-import { findOtherBracket, wrapInRow } from "./math-ir-utils";
+import { findOtherBracket, wrapInRow } from "./math-layout-utils";
 
 interface MathmlCaret {
   setPosition(x: number, y: number): void;
@@ -77,9 +77,13 @@ function createInputHandler(documentBody: HTMLElement): MathmlInputHandler {
   };
 }
 
-function getAdjacentChild(parent: MathIRRow, element: MathIR, direction: number): (MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf) | null;
-function getAdjacentChild(parent: MathIRContainer, element: MathIR, direction: number): MathIRRow | null;
-function getAdjacentChild(parent: MathIRRow | MathIRContainer, element: MathIR, direction: number): MathIR | null {
+function getAdjacentChild(
+  parent: MathLayoutRow,
+  element: MathLayout,
+  direction: number
+): (MathLayoutText | MathLayoutContainer | MathLayoutSymbol) | null;
+function getAdjacentChild(parent: MathLayoutContainer, element: MathLayout, direction: number): MathLayoutRow | null;
+function getAdjacentChild(parent: MathLayoutRow | MathLayoutContainer, element: MathLayout, direction: number): MathLayout | null {
   assert(direction != 0);
   if (parent.type == "row") {
     if (element.type != "row") {
@@ -119,7 +123,7 @@ function getAdjacentChild(parent: MathIRRow | MathIRContainer, element: MathIR, 
 }
 
 export interface MathCaret {
-  row: MathIRRow | MathIRTextLeaf;
+  row: MathLayoutRow | MathLayoutText;
   offset: number;
   caretElement: MathmlCaret;
 }
@@ -128,7 +132,7 @@ export class MathEditor {
   carets: Set<MathCaret> = new Set<MathCaret>();
   mathAst: MathAst;
   render: () => void;
-  lastLayout: MathIRLayout | null = null;
+  lastLayout: MathPhysicalLayout | null = null;
   inputHandler: MathmlInputHandler;
 
   constructor(element: HTMLElement) {
@@ -221,7 +225,7 @@ export class MathEditor {
 
     this.render = () => {
       const newMathElement = toMathMLElement(this.mathAst.mathIR);
-      this.lastLayout = newMathElement.mathIRLayout;
+      this.lastLayout = newMathElement.physicalLayout;
       element.replaceChildren(...newMathElement.element.children);
       // Don't copy the attributes
 
@@ -263,13 +267,13 @@ export class MathEditor {
   moveCaret(caret: MathCaret, direction: "up" | "down" | "left" | "right") {
     const mathAst = this.mathAst;
 
-    function moveCaretInDirection(caretElement: MathIR, direction: "left" | "right"): boolean {
+    function moveCaretInDirection(caretElement: MathLayout, direction: "left" | "right"): boolean {
       const isLeft = direction == "left";
       const parent = mathAst.parents.get(caretElement);
       if (!parent) return false;
 
       if (parent.type == "row") {
-        const offset = (parent.values as MathIR[]).indexOf(caretElement);
+        const offset = (parent.values as MathLayout[]).indexOf(caretElement);
         assert(offset != -1);
         caret.row = parent;
         caret.offset = offset + (isLeft ? 0 : 1);
@@ -287,7 +291,7 @@ export class MathEditor {
       }
     }
 
-    function moveCaretRightDown(adjacentChild: MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf): boolean {
+    function moveCaretRightDown(adjacentChild: MathLayoutText | MathLayoutContainer | MathLayoutSymbol): boolean {
       if (adjacentChild.type == "text" || adjacentChild.type == "error") {
         caret.row = adjacentChild;
         caret.offset = 0;
@@ -305,7 +309,7 @@ export class MathEditor {
       }
     }
 
-    function moveCaretLeftDown(adjacentChild: MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf): boolean {
+    function moveCaretLeftDown(adjacentChild: MathLayoutText | MathLayoutContainer | MathLayoutSymbol): boolean {
       if (adjacentChild.type == "text" || adjacentChild.type == "error") {
         caret.row = adjacentChild;
         caret.offset = adjacentChild.value.length;
@@ -325,7 +329,7 @@ export class MathEditor {
       }
     }
 
-    function moveCaretInVerticalDirection(caretElement: MathIRRow | MathIRTextLeaf, direction: "up" | "down"): boolean {
+    function moveCaretInVerticalDirection(caretElement: MathLayoutRow | MathLayoutText, direction: "up" | "down"): boolean {
       // TODO: Potentially tweak this so that it attempts to keep the x-coordinate
       const { parent, indexInParent } = mathAst.getParentAndIndex(caretElement);
       if (!parent) return false;
@@ -412,7 +416,7 @@ export class MathEditor {
   /**
    * Gets the element that the caret is "touching"
    */
-  getElementAtCaret(caret: MathCaret, direction: "left" | "right"): MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf | null {
+  getElementAtCaret(caret: MathCaret, direction: "left" | "right"): MathLayoutText | MathLayoutContainer | MathLayoutSymbol | null {
     if (caret.row.type == "row") {
       const elementIndex = caret.offset + (direction == "left" ? -1 : 0);
       return arrayUtils.get(caret.row.values, elementIndex) ?? null;
@@ -427,9 +431,9 @@ export class MathEditor {
   deleteAtCaret(caret: MathCaret, direction: "left" | "right") {
     function removeButKeepChildren(
       mathAst: MathAst,
-      toRemove: MathIRContainer,
-      children: (MathIRContainer | MathIRSymbolLeaf | MathIRTextLeaf)[]
-    ): { parent: MathIRRow; indexInParent: number } {
+      toRemove: MathLayoutContainer,
+      children: (MathLayoutContainer | MathLayoutSymbol | MathLayoutText)[]
+    ): { parent: MathLayoutRow; indexInParent: number } {
       const { parent, indexInParent } = mathAst.getParentAndIndex(toRemove);
       assert(parent != null);
       for (let i = 0; i < children.length; i++) {
@@ -515,7 +519,7 @@ export class MathEditor {
     /**
      * Used for "placeholders"
      */
-    function takeElementOrBracket(mathAst: MathAst, caret: MathCaret, direction: "left" | "right"): MathIRRow | null {
+    function takeElementOrBracket(mathAst: MathAst, caret: MathCaret, direction: "left" | "right"): MathLayoutRow | null {
       if (caret.row.type == "row") {
         const elementIndex = caret.offset + (direction == "left" ? -1 : 0);
         const element = arrayUtils.get(caret.row.values, elementIndex) ?? null;
@@ -530,7 +534,7 @@ export class MathEditor {
           if (otherBracketIndex) {
             const start = Math.min(elementIndex, otherBracketIndex);
             const end = Math.max(elementIndex, otherBracketIndex);
-            const newRow: MathIRRow = {
+            const newRow: MathLayoutRow = {
               type: "row",
               values: [],
             };
@@ -557,7 +561,7 @@ export class MathEditor {
     }
 
     const mathAst = this.mathAst;
-    function insertMathIR<T extends MathIRTextLeaf | MathIRContainer | MathIRSymbolLeaf>(mathIR: T): T {
+    function insertMathLayout<T extends MathLayoutText | MathLayoutContainer | MathLayoutSymbol>(mathIR: T): T {
       assert(caret.row.type == "row");
       mathAst.setParents(null, [mathIR]);
       mathAst.insertChild(caret.row, mathIR, caret.offset);
@@ -567,21 +571,21 @@ export class MathEditor {
 
     if (caret.row.type == "row") {
       if (text == "^") {
-        const mathIR = insertMathIR({
+        const mathIR = insertMathLayout({
           type: "sup",
           values: [takeElementOrBracket(this.mathAst, caret, "right") ?? { type: "row", values: [] }],
         });
         caret.row = mathIR.values[0];
         caret.offset = 0;
       } else if (text == "_") {
-        const mathIR = insertMathIR({
+        const mathIR = insertMathLayout({
           type: "sub",
           values: [takeElementOrBracket(this.mathAst, caret, "right") ?? { type: "row", values: [] }],
         });
         caret.row = mathIR.values[0];
         caret.offset = 0;
       } else if (text == "/") {
-        const mathIR = insertMathIR({
+        const mathIR = insertMathLayout({
           type: "frac",
           values: [
             takeElementOrBracket(this.mathAst, caret, "left") ?? { type: "row", values: [] },
