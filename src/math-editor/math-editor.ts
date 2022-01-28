@@ -155,13 +155,15 @@ export class MathEditor {
     // TODO: Parsing
     // - 1. MathAst
     // - 2. Bracket pairs
-    // - 3. A general enough parser that can handle tokens
+    // - 3. A general enough recursive descent parser that can handle tokens
 
     // Register keyboard handlers
     // TODO:
+    // - special symbols (sum, for, forall, ...) ( https://github.com/arnog/mathlive/search?q=forall )
+    // - autocomplete popup
     // - up and down
     // - brackets and non-brackets
-    // - better placeholders, don't grab operators, but grab multiple symbols if possible (like if you have +|34 and hit /, the result should be +\frac{}{|34})
+    // - better placeholders, don't grab binary operators, but grab multiple symbols and unary operators if possible (like if you have 1+|34 and hit /, the result should be 1+\frac{}{|34})
     // - space to move to the right (but only in some cases)
     // - Letters and numbers
     // - quotes to type "strings"?
@@ -526,7 +528,6 @@ export class MathEditor {
 
           const otherBracketIndex = findOtherBracket(caret.row.values, elementIndex, direction);
           if (otherBracketIndex) {
-            // TODO: Grab that entire bracketed thingy
             const start = Math.min(elementIndex, otherBracketIndex);
             const end = Math.max(elementIndex, otherBracketIndex);
             const newRow: MathIRRow = {
