@@ -2,6 +2,7 @@ import { assert, assertUnreachable } from ".././assert";
 import { MathLayout, MathLayoutText, MathLayoutRow, MathLayoutContainer, MathPhysicalLayout } from "./math-layout";
 import { expectNChildren, findEitherEndingBracket, findOtherBracket, wrapInRow } from "./math-layout-utils";
 import { startingBrackets, endingBrackets, allBrackets, ambigousBrackets as eitherBrackets } from "./mathml-spec";
+import { TokenStream } from "./token-stream";
 
 type MathMLTags =
   | "math"
@@ -302,13 +303,13 @@ function fromMathLayout(mathIR: MathLayout, physicalLayout: MathPhysicalLayout):
     return createMathElement("mroot", [fromMathLayout(mathIR.values[1], physicalLayout), fromMathLayout(mathIR.values[0], physicalLayout)]);
   } else if (mathIR.type == "row") {
     // TODO: Maybe don't emit every useless row
-    const parsedChildren = fromMathLayoutRow(mathIR.values, physicalLayout);
+    const parsedChildren = fromMathLayoutRow(new TokenStream(mathIR.values, 0), physicalLayout);
     setRowLayout(mathIR, parsedChildren.mathLayout);
     return createMathElement("mrow", parsedChildren.elements);
   } else if (mathIR.type == "sub" || mathIR.type == "sup") {
     return createMathElement("merror", [createMathElement("mtext", [document.createTextNode("Unexpected " + mathIR.type)])]);
   } else if (mathIR.type == "symbol") {
-    const parsedChildren = fromMathLayoutRow([mathIR], physicalLayout);
+    const parsedChildren = fromMathLayoutRow(new TokenStream([mathIR], 0), physicalLayout);
     return parsedChildren.elements.length == 1 ? parsedChildren.elements[0] : createMathElement("mrow", parsedChildren.elements);
   } else if (mathIR.type == "bracket") {
     const element = createMathElement("mo", [document.createTextNode(mathIR.value)]);
@@ -348,7 +349,7 @@ const isNumber = /^\p{Nd}+(\.\p{Nd}*)?$/gu;
  * Parse all the children of a row, has some special logic
  */
 function fromMathLayoutRow(
-  mathIR: MathLayout[],
+  tokens: TokenStream<MathLayout>,
   physicalLayout: MathPhysicalLayout
 ): {
   elements: Element[];
@@ -378,14 +379,16 @@ function fromMathLayoutRow(
     mathLayout.push(() => element.getBoundingClientRect());
   }
 
-  for (let i = 0; i < mathIR.length; i++) {
-    const element = mathIR[i];
+  while (true) {
+    const element = tokens.next();
+    if (element === undefined) break;
+
     if (element.type == "symbol") {
       if (element.value.search(isDigit) != -1) {
-        const parsed = fromMathLayoutNumber(mathIR, i);
+        tokens.back();
+        const parsed = fromMathLayoutNumber(tokens);
         output.push(parsed.element);
         mathLayout.push(...parsed.mathLayout);
-        i = parsed.lastDigitIndex;
       } else if (allBrackets.has(element.value)) {
         const pseudoBracket = createMathElement("mo", [document.createTextNode(element.value)]);
         pseudoBracket.setAttribute("stretchy", "false");
@@ -401,14 +404,17 @@ function fromMathLayoutRow(
         pushOutput(fromMathLayout(element, physicalLayout)); // No opening bracket
       } else {
         // A starting bracket or an either bracket (funnily enough, the logic is almost the same for both)
-        const endingBracketIndex = startingBrackets.has(element.value) ? findOtherBracket(mathIR, i, "right") : findEitherEndingBracket(mathIR, i);
+        const endingBracketIndex = startingBrackets.has(element.value)
+          ? findOtherBracket(tokens.value, tokens.offset - 1, "right")
+          : findEitherEndingBracket(tokens.value, tokens.offset - 1);
         // TODO: maybe check if the ending bracket is actually the right type of bracket?
         if (endingBracketIndex == null) {
           pushOutput(fromMathLayout(element, physicalLayout)); // No closing bracket
         } else {
-          const parsedChildren = fromMathLayoutRow(mathIR.slice(i + 1, endingBracketIndex), physicalLayout);
-          const endingBracket = mathIR[endingBracketIndex];
+          const parsedChildren = fromMathLayoutRow(new TokenStream(tokens.value.slice(tokens.offset, endingBracketIndex), 0), physicalLayout);
+          const endingBracket = tokens.value[endingBracketIndex];
           assert(endingBracket.type == "bracket");
+          tokens.offset = endingBracketIndex + 1;
           const startingBracketElement = createMathElement("mo", [document.createTextNode(element.value)]);
           const endingBracketElement = createMathElement("mo", [document.createTextNode(endingBracket.value)]);
           output.push(
@@ -467,28 +473,25 @@ function fromMathLayoutRow(
   return { elements: output, mathLayout: mathLayout };
 }
 
-function fromMathLayoutNumber(
-  mathIR: MathLayout[],
-  firstDigitIndex: number
-): {
+function fromMathLayoutNumber(tokens: TokenStream<MathLayout>): {
   element: Element;
   mathLayout: (() => DOMRect)[];
-  lastDigitIndex: number;
 } {
   const mathLayout: (() => DOMRect)[] = [];
-  const firstDigit = mathIR[firstDigitIndex];
-  assert(firstDigit.type == "symbol");
+  const firstDigit = tokens.next();
+  assert(firstDigit?.type == "symbol");
 
   let digits = firstDigit.value;
-  let i = firstDigitIndex + 1; // Invariant: Always points at the next digit
   let count = 1;
-  while (i < mathIR.length) {
-    const element = mathIR[i];
+  while (true) {
+    const element = tokens.next();
+    if (element === undefined) break;
+
     if (element.type == "symbol" && (digits + element.value).search(isNumber) != -1) {
       digits += element.value;
-      i += 1;
       count += 1;
     } else {
+      tokens.back();
       break;
     }
   }
@@ -501,6 +504,5 @@ function fromMathLayoutNumber(
   return {
     element: createMathElement("mn", [textNode]),
     mathLayout: mathLayout,
-    lastDigitIndex: i - 1,
   };
 }

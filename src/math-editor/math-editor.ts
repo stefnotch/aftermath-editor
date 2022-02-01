@@ -6,6 +6,8 @@ import arrayUtils from "./array-utils";
 import { endingBrackets, startingBrackets } from "./mathml-spec";
 import { findOtherBracket, wrapInRow } from "./math-layout-utils";
 
+// TODO: Someday, re-evaluate the parent-pointer approach
+// The alternative is using zippers/focus-es everywhere http://learnyouahaskell.com/zippers
 interface MathmlCaret {
   setPosition(x: number, y: number): void;
   setHeight(v: number): void;
