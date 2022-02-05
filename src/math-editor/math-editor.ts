@@ -130,6 +130,8 @@ export interface MathCaret {
   caretElement: MathmlCaret;
 }
 
+// TODO: Turn this into a web-component. Then createCaret doesn't have to append stuff to the document anymore
+// TODO: Right click menu with "copy as"
 export class MathEditor {
   carets: Set<MathCaret> = new Set<MathCaret>();
   mathAst: MathAst;
@@ -161,13 +163,13 @@ export class MathEditor {
     // TODO: Parsing
     // - 1. MathAst
     // - 2. Bracket pairs
-    // - 3. A general enough recursive descent parser that can handle tokens
+    // - 3. A general enough recursive descent (or pratt) parser that can handle tokens
 
     // Register keyboard handlers
     // TODO:
+    // - turning it into a web-component is required for some of the items below
     // - special symbols (sum, for, forall, ...) ( https://github.com/arnog/mathlive/search?q=forall )
     // - autocomplete popup
-    // - up and down
     // - brackets and non-brackets
     // - better placeholders, don't grab binary operators, but grab multiple symbols and unary operators if possible (like if you have 1+|34 and hit /, the result should be 1+\frac{}{|34})
     // - space to move to the right (but only in some cases)
@@ -340,26 +342,30 @@ export class MathEditor {
         // TODO:
         return false;
       } else if (parent.type == "frac" || parent.type == "root" || parent.type == "under" || parent.type == "over") {
-        if (caretElement.type == "row") {
-          const newIndexInParent = indexInParent + (direction == "up" ? -1 : 1);
+        const newIndexInParent = indexInParent + (direction == "up" ? -1 : 1);
 
-          if (newIndexInParent < 0 || newIndexInParent >= parent.values.length) {
-            // Reached the top/bottom
-            const parentParent = mathAst.getParent(parent);
-            return parentParent == null ? false : moveCaretInVerticalDirection(parentParent, direction);
-          } else {
-            // Can move up or down
-            const row = parent.values[newIndexInParent];
-            caret.row = parent.values[newIndexInParent];
-            caret.offset = direction == "up" ? row.values.length : 0;
-            return true;
-          }
+        if (newIndexInParent < 0 || newIndexInParent >= parent.values.length) {
+          // Reached the top/bottom
+          const parentParent = mathAst.getParent(parent);
+          return parentParent == null ? false : moveCaretInVerticalDirection(parentParent, direction);
         } else {
-          return false;
+          // Can move up or down
+          const row = parent.values[newIndexInParent];
+          caret.row = parent.values[newIndexInParent];
+          caret.offset = direction == "up" ? row.values.length : 0;
+          return true;
         }
       } else if (parent.type == "sup" || parent.type == "sub") {
-        // TODO:
-        return false;
+        const { parent: parentParent, indexInParent: indexInParentParent } = mathAst.getParentAndIndex(parent);
+        if (parentParent == null) return false;
+
+        if ((parent.type == "sup" && direction == "down") || (parent.type == "sub" && direction == "up")) {
+          caret.row = parentParent;
+          caret.offset = indexInParentParent;
+          return true;
+        } else {
+          return moveCaretInVerticalDirection(parentParent, direction);
+        }
       } else {
         return moveCaretInVerticalDirection(parent, direction);
       }

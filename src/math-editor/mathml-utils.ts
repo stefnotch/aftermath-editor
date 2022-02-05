@@ -299,7 +299,7 @@ function fromMathLayout(mathIR: MathLayout, physicalLayout: MathPhysicalLayout):
   } else if (mathIR.type == "under") {
     return createMathElement("munder", [fromMathLayout(mathIR.values[0], physicalLayout), fromMathLayout(mathIR.values[1], physicalLayout)]);
   } else if (mathIR.type == "root") {
-    // TODO: Sometimes create a msqrt
+    // TODO: If it's a square root, make the 2 a bit lighter
     return createMathElement("mroot", [fromMathLayout(mathIR.values[1], physicalLayout), fromMathLayout(mathIR.values[0], physicalLayout)]);
   } else if (mathIR.type == "row") {
     // TODO: Maybe don't emit every useless row
