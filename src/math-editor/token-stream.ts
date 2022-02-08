@@ -23,8 +23,8 @@ export class TokenStream<T> {
   /**
    * Gets the current value
    */
-  peek(): T | undefined {
-    return this.eof() ? undefined : this.value[this.offset];
+  peek(plusOffset: number = 0): T | undefined {
+    return this.offset + plusOffset >= this.value.length ? undefined : this.value[this.offset + plusOffset];
   }
 
   /**

@@ -70,9 +70,6 @@ export type MathLayoutSymbol =
   | {
       // a single symbol
       type: "symbol";
-      // used to disambiguate between different uses of the same symbol
-      name?: string;
-      wikidata?: string;
       value: string;
     };
 

@@ -103,3 +103,21 @@ export function expectNChildren(element: Element, n: number): MathLayout | null 
   }
   return null;
 }
+
+export function isSame(a: MathLayout, b: MathLayout): boolean {
+  if (a.type != b.type) return false;
+
+  if (a.type == "row") {
+    assert(b.type == a.type);
+    return a.values.every((v, i) => isSame(v, b.values[i]));
+  } else if (a.type == "table") {
+    assert(b.type == a.type);
+    return a.values.every((v, i) => v.every((vv, j) => isSame(vv, b.values[i][j])));
+  } else if (a.type == "symbol" || a.type == "bracket" || a.type == "text" || a.type == "error") {
+    assert(b.type == a.type);
+    return a.value == b.value;
+  } else {
+    assert(b.type == a.type);
+    return a.values.every((v, i) => isSame(v, b.values[i]));
+  }
+}
