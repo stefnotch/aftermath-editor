@@ -37,18 +37,16 @@ export type MathJson =
   | [string, ...MathJson[]];
 
 /**
- * Interesting information about a given symbol.
- *
- * Note:
- * - Constants are functions with zero arguments
- * - Relations are functions with multiple arguments and a boolean return value
+ * Interesting information about a given symbol
  */
 export type MathDefinition = {
   documentation: MathJsonString;
+  // Constants are functions with zero arguments
   // Domains: https://cortexjs.io/compute-engine/reference/domains/
   // We need domains for units
   argumentDomains: MathJson[];
   returnDomain: MathJson;
+  // - Relations are just functions with multiple arguments and a boolean return value
 };
 
 // Road forward for now
@@ -63,6 +61,8 @@ export type MathDefinition = {
 
 I'm not certain about the orde of step 3 and 4 yet, but it doesn't matter.
 
+
+
 Partial functions are supported. So, if `++` is a concat operator, and `+` is a prefix operator...then `(++x)` will be parsed as ["++", "Missing", "x"]. Which is a beautiful partial function!
 To use `+` as a prefix operator, you have to use spaces `+ +x`.
 */
@@ -74,13 +74,6 @@ export type MathParseDefinition = {
   // - operators: forall d/dx + * -- ! (prefix, binary, suffix)
   // - TODO: special brackets: {s,e,t}, [v e c]
   // - TODO: integral dx (probably a special bracket, look at how mathcad-chan does this)
-
-  /**
-   * Atoms: [null, null]
-   * Prefix: [null, number]
-   * Infix: [number, number]
-   * Postfix: [number, null]
-   */
   bindingPower: [number | null, number | null];
 
   // While parsing, we attempt to tokenize the biggest expression. Then we parse that.
@@ -99,6 +92,11 @@ export type MathParseDefinition = {
   mathJson: () => MathJson;
 };
 
+// We might need something like this. At least every expression needs to keep track of which definitions it references.
+export interface MathDefinitions {
+  getDefinition(name: string): MathDefinition | null;
+}
+
 /**
  * This trie takes you to an approximate position, however there might be multiple definitions with overlapping token-hashes
  * So once we've found something, we need to check all MathDefinition.tokens again, to make sure they're exact matches
@@ -115,42 +113,6 @@ class MathParseTrie {
   children: Map<string, MathParseTrie> = new Map();
   constructor(definitions: MathParseDefinition[]) {
     definitions.forEach((v) => this.#insert(v));
-  }
-
-  nextToken<T>(
-    tokens: TokenStream<MathLayoutContainer | MathLayoutSymbol | MathLayoutText>,
-    sourceMap: Map<MathLayout, MathJson>,
-    callback: {
-      atom?: (definition: MathParseDefinition & { bindingPower: [null, null] }, consume: () => MathJson) => T;
-      prefix?: (definition: MathParseDefinition & { bindingPower: [null, number] }, consume: () => MathJson) => T;
-      infix?: (definition: MathParseDefinition & { bindingPower: [number, number] }, consume: () => MathJson) => T;
-      postfix?: (definition: MathParseDefinition & { bindingPower: [number, null] }, consume: () => MathJson) => T;
-    }
-  ): T | null {
-    const bindingPowerToCallback = (bp: [number | null, number | null]) => {
-      const hasBp = bp.map((v) => v != null);
-      if (!hasBp[0] && !hasBp[1]) return "atom";
-      else if (!hasBp[0] && hasBp[1]) return "prefix";
-      else if (hasBp[0] && hasBp[1]) return "infix";
-      else return "postfix";
-    };
-
-    const peekedToken = this.peekNextToken(tokens, (definition) => {
-      if (callback[bindingPowerToCallback(definition.bindingPower)]) {
-        return true;
-      } else {
-        return false;
-      }
-    });
-
-    if (peekedToken) {
-      // Not super type safe
-      const cb = callback[bindingPowerToCallback(peekedToken.definition.bindingPower)];
-      assert(cb !== undefined);
-      return cb(peekedToken.definition as any, () => peekedToken.consume(sourceMap));
-    } else {
-      return null;
-    }
   }
 
   /**
@@ -334,66 +296,72 @@ function parseRow(
   sourceMap: Map<MathLayout, MathJson>,
   minBindingPower: number
 ): MathJson {
+  // Either an "atom" or a prefix operator
   /** Expression to the left, has already been parsed */
-  let leftPart: MathJson | null = null;
-
-  {
-    // Parse a prefix token or an atom
-    leftPart = definitions.nextToken(tokens, sourceMap, {
-      atom: (_, consume) => consume(),
-      prefix: (definition, consume) => [consume(), parseRow(tokens, definitions, sourceMap, definition.bindingPower[1])],
-    });
-  }
-  // TODO: Brackets
+  let leftExpression: MathJson | null = null;
+  definitions.peekNextToken(tokens, (v) => v.bindingPower[0] == null);
 
   while (true) {
-    if (tokens.eof()) break;
+    // First step: Figure out which parser is the correct one
+    // After that: Parse it
+    const mathLayout = tokens.peek();
+    if (!mathLayout) break;
 
-    const postfixToken = definitions.nextToken(tokens, sourceMap, {
-      postfix: (definition, consume) => {
-        if (definition.bindingPower[0] >= minBindingPower) {
-          return [consume(), leftPart ?? ["Missing"]];
+    let parsedValue: { definition: MathParseDefinition; consume: (sourceMap: Map<MathLayout, MathJson>) => MathJson } | null =
+      definitions.peekNextToken(tokens, []);
+    // TODO: Set the source map correctly
+    /*if (!parsedValue) {
+      if (mathLayout.type == "symbol") {
+        if (isDigit.test(mathLayout.value)) {
+          parsedValue = parseNumber(tokens, definitions, sourceMap);
         }
-      },
-    });
-    if (postfixToken) {
-      leftPart = postfixToken;
-      continue;
-    }
+      } else if (mathLayout.type == "frac") {
+        parsedValue = {
+        mathJson: [
+          "Divide",
+          parseRow(new TokenStream(mathLayout.values[0].values, 0), definitions, sourceMap, 0),
+          parseRow(new TokenStream(mathLayout.values[1].values, 0), definitions, sourceMap, 0),
+        ],
+      };
+      sourceMap.set(mathLayout, parsedValue.mathJson);
+      } else {
+        // Actually there are more cases where the MathDefinitionTrie is relevant. Like "under - lim"
+      }
+    }*/
 
-    const infixToken = definitions.nextToken(tokens, sourceMap, {
-      infix: (definition, consume) => {
-        if (definition.bindingPower[0] >= minBindingPower) {
-          return [consume(), leftPart ?? ["Missing"], parseRow(tokens, definitions, sourceMap, definition.bindingPower[1])];
-        }
-      },
-    });
-    if (infixToken) {
-      leftPart = infixToken;
-      continue;
-    }
-
-    const atomToken = definitions.nextToken(tokens, sourceMap, {
-      atom: (definition, consume) => consume(),
-    });
-    if (atomToken) {
-      assert(leftPart != null);
-      leftPart = ["InvisibleOperator", leftPart, atomToken];
-    }
-
-    // Prefix tokens shouldn't happen here
-    // Default case
-    const peekedToken = tokens.peek();
-    if (!peekedToken) break;
-
-    if (peekedToken.type == "symbol") {
+    if (parsedValue == null) {
+      // TODO: Not parsed, huh
+      console.warn("Didn't parse anything here");
+    } else if (parsedValue.bindingPower[0] == null && parsedValue.bindingPower[1] == null) {
+      // It's a symbol
+      if (leftExpression) {
+        // which is unexpected. Apply the invisible operator
+        leftExpression = ["InvisibleOperator", leftExpression, parsedValue.mathJson()];
+      } else {
+        // or we're at the start
+        leftExpression = parsedValue.mathJson();
+      }
+    } else if (parsedValue.bindingPower[0] == null && parsedValue.bindingPower[1] != null) {
+      // Prefix operator
+      if (leftExpression) {
+        // which is unexpected. Apply the invisible operator
+        leftExpression = ["InvisibleOperator", leftExpression, parsedValue.mathJson()];
+      } else {
+        // or we're at the start
+        leftExpression = [parsedValue.mathJson(), parseRow(tokens, definitions, sourceMap, parsedValue.bindingPower[1])];
+      }
+    } else if (parsedValue.bindingPower[0] != null && parsedValue.bindingPower[1] == null) {
+      // Postfix operator
+      if (leftExpression) {
+        leftExpression = [parsedValue.mathJson(), leftExpression];
+      } else {
+      }
     } else {
+      // Infix/Binary operator
     }
-
-    throw new Error("We should never get here, TODO:Write some default case coode");
   }
 
-  return leftPart ?? ["Missing"];
+  return leftExpression ?? ["Missing"];
 }
 
 function parseNumber(
@@ -434,6 +402,7 @@ function parseNumber(
   }
 
   return {
+    parseType: "expression",
     bindingPower: [null, null],
     tokens: [],
     mathJson: () => mathJson,
