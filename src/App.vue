@@ -8,6 +8,22 @@ import MathEditor from "./components/MathEditor.vue";
         display='block'
         style='font-family: STIX Two'
       >
+        <mo>-</mo>
+        <mn>2</mn>
+        <mi>x</mi>
+        <mo>+</mo>
+        <mi>y</mi>
+        <mo>*</mo>
+        <mn>2</mn>
+      </math>"
+  >
+  </MathEditor>
+
+  <MathEditor
+    mathml="<math
+        display='block'
+        style='font-family: STIX Two'
+      >
         <msqrt>
           <msqrt>
             <mi>x</mi>
