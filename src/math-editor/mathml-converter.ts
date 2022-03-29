@@ -1,4 +1,4 @@
-import { assert, assertUnreachable } from ".././assert";
+import { assert, assertUnreachable } from "../assert";
 import { MathLayout, MathLayoutText, MathLayoutRow, MathLayoutContainer, MathPhysicalLayout } from "./math-layout/math-layout";
 import { findEitherEndingBracket, findOtherBracket, wrapInRow } from "./math-layout/math-layout-utils";
 import { startingBrackets, endingBrackets, allBrackets, ambigousBrackets as eitherBrackets } from "./mathml-spec";
@@ -65,20 +65,6 @@ export function toElement(mathIR: MathLayout): {
     element,
     physicalLayout: physicalLayout,
   };
-}
-
-const mathNamespace = "http://www.w3.org/1998/Math/MathML";
-function createMathElement(tagName: MathMLTags, children: Node[]) {
-  let element = document.createElementNS(mathNamespace, tagName);
-  children.forEach((c) => {
-    element.appendChild(c);
-  });
-  return element;
-}
-
-function getText(element: Element) {
-  // Good enough for now
-  return (element.textContent + "").trim();
 }
 
 // Time to iterate over the MathML and create a cute little tree
@@ -227,9 +213,18 @@ function toMathLayout(element: Element): MathLayout | MathLayout[] {
       };
     }
 
+    const tableWidth = children.map((c) => c.children.length).reduce((a, b) => Math.max(a, b), 0);
+
+    const tableCells = children.flatMap((c) =>
+      Array.from({ length: tableWidth }, (_, i) =>
+        i < c.children.length ? wrapInRow(toMathLayout(c.children[i])) : ({ type: "row", values: [] } as MathLayoutRow)
+      )
+    );
+
     return {
       type: "table",
-      values: children.map((c) => [...c.children].map((cc) => wrapInRow(toMathLayout(cc)))),
+      width: tableWidth,
+      values: tableCells,
     };
   } else {
     return {
@@ -289,18 +284,32 @@ function fromMathLayout(mathIR: MathLayout, physicalLayout: MathPhysicalLayout):
   }
 
   if (mathIR.type == "error") {
-    return createMathElement("merror", [createMathElement("mtext", [setTextLayout(mathIR, document.createTextNode(mathIR.value))])]);
+    return createMathElement("merror", [
+      createMathElement("mtext", [setTextLayout(mathIR, document.createTextNode(mathIR.value))]),
+    ]);
   } else if (mathIR.type == "frac") {
-    return createMathElement("mfrac", [fromMathLayout(mathIR.values[0], physicalLayout), fromMathLayout(mathIR.values[1], physicalLayout)]);
+    return createMathElement("mfrac", [
+      fromMathLayout(mathIR.values[0], physicalLayout),
+      fromMathLayout(mathIR.values[1], physicalLayout),
+    ]);
 
     // Maybe detect under-over?
   } else if (mathIR.type == "over") {
-    return createMathElement("mover", [fromMathLayout(mathIR.values[0], physicalLayout), fromMathLayout(mathIR.values[1], physicalLayout)]);
+    return createMathElement("mover", [
+      fromMathLayout(mathIR.values[0], physicalLayout),
+      fromMathLayout(mathIR.values[1], physicalLayout),
+    ]);
   } else if (mathIR.type == "under") {
-    return createMathElement("munder", [fromMathLayout(mathIR.values[0], physicalLayout), fromMathLayout(mathIR.values[1], physicalLayout)]);
+    return createMathElement("munder", [
+      fromMathLayout(mathIR.values[0], physicalLayout),
+      fromMathLayout(mathIR.values[1], physicalLayout),
+    ]);
   } else if (mathIR.type == "root") {
     // TODO: If it's a square root, make the 2 a bit lighter
-    return createMathElement("mroot", [fromMathLayout(mathIR.values[1], physicalLayout), fromMathLayout(mathIR.values[0], physicalLayout)]);
+    return createMathElement("mroot", [
+      fromMathLayout(mathIR.values[1], physicalLayout),
+      fromMathLayout(mathIR.values[0], physicalLayout),
+    ]);
   } else if (mathIR.type == "row") {
     // TODO: Maybe don't emit every useless row
     const parsedChildren = fromMathLayoutRow(new TokenStream(mathIR.values, 0), physicalLayout);
@@ -310,7 +319,9 @@ function fromMathLayout(mathIR: MathLayout, physicalLayout: MathPhysicalLayout):
     return createMathElement("merror", [createMathElement("mtext", [document.createTextNode("Unexpected " + mathIR.type)])]);
   } else if (mathIR.type == "symbol") {
     const parsedChildren = fromMathLayoutRow(new TokenStream([mathIR], 0), physicalLayout);
-    return parsedChildren.elements.length == 1 ? parsedChildren.elements[0] : createMathElement("mrow", parsedChildren.elements);
+    return parsedChildren.elements.length == 1
+      ? parsedChildren.elements[0]
+      : createMathElement("mrow", parsedChildren.elements);
   } else if (mathIR.type == "bracket") {
     const element = createMathElement("mo", [document.createTextNode(mathIR.value)]);
     element.setAttribute("stretchy", "false");
@@ -411,7 +422,10 @@ function fromMathLayoutRow(
         if (endingBracketIndex == null) {
           pushOutput(fromMathLayout(element, physicalLayout)); // No closing bracket
         } else {
-          const parsedChildren = fromMathLayoutRow(new TokenStream(tokens.value.slice(tokens.offset, endingBracketIndex), 0), physicalLayout);
+          const parsedChildren = fromMathLayoutRow(
+            new TokenStream(tokens.value.slice(tokens.offset, endingBracketIndex), 0),
+            physicalLayout
+          );
           const endingBracket = tokens.value[endingBracketIndex];
           assert(endingBracket.type == "bracket");
           tokens.offset = endingBracketIndex + 1;
@@ -420,7 +434,9 @@ function fromMathLayoutRow(
           output.push(
             createMathElement("mrow", [
               startingBracketElement,
-              parsedChildren.elements.length == 1 ? parsedChildren.elements[0] : createMathElement("mrow", parsedChildren.elements),
+              parsedChildren.elements.length == 1
+                ? parsedChildren.elements[0]
+                : createMathElement("mrow", parsedChildren.elements),
               endingBracketElement,
             ])
           );
@@ -516,4 +532,18 @@ export function expectNChildren(element: Element, n: number): MathLayout | null 
     };
   }
   return null;
+}
+
+const mathNamespace = "http://www.w3.org/1998/Math/MathML";
+function createMathElement(tagName: MathMLTags, children: Node[]) {
+  let element = document.createElementNS(mathNamespace, tagName);
+  children.forEach((c) => {
+    element.appendChild(c);
+  });
+  return element;
+}
+
+function getText(element: Element) {
+  // Good enough for now
+  return (element.textContent + "").trim();
 }
