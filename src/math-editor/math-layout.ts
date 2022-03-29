@@ -47,12 +47,15 @@ export type MathLayoutContainer =
       type: "sub";
       values: [MathLayoutRow];
     }
-  | {
-      // rows and cells
-      // Not sure about this one yet
-      type: "table";
-      values: MathLayoutRow[][];
-    };
+  | MathLayoutTable;
+
+export type MathLayoutTable = {
+  // rows and cells
+  // Not sure about this one yet
+  type: "table";
+  width: number;
+  values: MathLayoutRow[];
+};
 
 export type MathLayoutRow = {
   // the only thing that has an arbitrary number of children
