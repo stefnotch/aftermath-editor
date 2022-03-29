@@ -26,18 +26,6 @@ export default {
   },
 
   /**
-   * Gets an element or undefined if the element does not exist.
-   * Negative numbers to index from the end
-   */
-  at: function <T>(array: T[], index: number) {
-    // Taken from https://github.com/tc39/proposal-relative-indexing-method#polyfill
-    let n = Math.trunc(index) || 0;
-    if (n < 0) n += array.length;
-    if (n < 0 || n >= array.length) return undefined;
-    return array[n];
-  },
-
-  /**
    * Gets an element or undefined if the element does not exist
    */
   get: function <T>(array: T[], index: number) {

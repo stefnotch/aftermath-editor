@@ -451,6 +451,7 @@ function fromMathLayoutRow(
 
   // And push another last entry, since we can place a caret after the last one
   if (mathLayout.length > 0) {
+    // TODO: use .at(-1)
     const lastEntry = mathLayout[mathLayout.length - 1];
     mathLayout.push(() => {
       const boundingBox = lastEntry();

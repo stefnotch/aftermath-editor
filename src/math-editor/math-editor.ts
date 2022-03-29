@@ -321,6 +321,7 @@ export class MathEditor {
       } else if (adjacentChild.type == "bracket" || adjacentChild.type == "symbol") {
         return false;
       } else if (adjacentChild.type == "table") {
+        // TODO: Use .at()
         const lastTableRow = adjacentChild.values[adjacentChild.values.length - 1];
         caret.row = lastTableRow[lastTableRow.length - 1];
         caret.offset = 0;
