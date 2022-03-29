@@ -1,6 +1,6 @@
 import { assert, assertUnreachable } from ".././assert";
-import { MathLayout, MathLayoutText, MathLayoutRow, MathLayoutContainer, MathPhysicalLayout } from "./math-layout";
-import { expectNChildren, findEitherEndingBracket, findOtherBracket, wrapInRow } from "./math-layout-utils";
+import { MathLayout, MathLayoutText, MathLayoutRow, MathLayoutContainer, MathPhysicalLayout } from "./math-layout/math-layout";
+import { findEitherEndingBracket, findOtherBracket, wrapInRow } from "./math-layout/math-layout-utils";
 import { startingBrackets, endingBrackets, allBrackets, ambigousBrackets as eitherBrackets } from "./mathml-spec";
 import { TokenStream } from "./token-stream";
 
@@ -506,4 +506,14 @@ function fromMathLayoutNumber(tokens: TokenStream<MathLayout>): {
     element: createMathElement("mn", [textNode]),
     mathLayout: mathLayout,
   };
+}
+
+export function expectNChildren(element: Element, n: number): MathLayout | null {
+  if (element.children.length != n) {
+    return {
+      type: "error",
+      value: `Expected ${n} children in ${element.tagName.toLowerCase()}`,
+    };
+  }
+  return null;
 }

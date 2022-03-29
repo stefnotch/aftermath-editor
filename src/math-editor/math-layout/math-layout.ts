@@ -3,10 +3,6 @@
 // sub and sup are a bit special, they "apply" to the element before them
 // mmultiscripts won't be modeled for now
 
-// hm, having a "parent" link would be super useful. I'll get to that later
-
-// a caret basically points at some position in the tree
-
 // Placeholder symbol: ⬚
 // Canoical symbol form (like when there are multiple unicode characters or when some HTML escape has been used &lt;)
 
