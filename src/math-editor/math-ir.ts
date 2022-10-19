@@ -1,7 +1,7 @@
-import { assert } from "src/assert";
-import { MathLayout, MathLayoutContainer, MathLayoutRow, MathLayoutSymbol, MathLayoutText } from "./math-layout";
+import { assert } from "../assert";
+import { MathLayout, MathLayoutContainer, MathLayoutRow, MathLayoutSymbol, MathLayoutText } from "./math-layout/math-layout";
 import { TokenStream } from "./token-stream";
-import { isSame as isSameMathLayout } from "./math-layout-utils";
+import { isSame as isSameMathLayout } from "./math-layout/math-layout-utils";
 
 // A highly constrained version of MathJson
 // See https://cortexjs.io/math-json/
@@ -32,6 +32,8 @@ export type MathJson =
   | MathJsonString
   // Dictionaries
   | MathJsonDictionary
+  // Symbols
+  | MathJsonSymbol
   // Apply a function (head) to some arguments (tail)
   | MathJson[]
   | [string, ...MathJson[]];
@@ -67,37 +69,75 @@ Partial functions are supported. So, if `++` is a concat operator, and `+` is a 
 To use `+` as a prefix operator, you have to use spaces `+ +x`.
 */
 
-export type MathParseDefinition = {
-  // Parsing Stuff
-  // - Variables (bound ones): empty argumentDomains aka expressions
-  // - functions are just prefix operators: sin(), floor(), maybe add a "warning: expected brackets"
-  // - operators: forall d/dx + * -- ! (prefix, binary, suffix)
-  // - TODO: special brackets: {s,e,t}, [v e c]
-  // - TODO: integral dx (probably a special bracket, look at how mathcad-chan does this)
+function isAtom(definition: MathParseDefinition): definition is MathParseDefinition & { bindingPower: [null, null] } {
+  return definition.bindingPower[0] == null && definition.bindingPower[1] == null;
+}
+function isPrefix(definition: MathParseDefinition): definition is MathParseDefinition & { bindingPower: [null, number] } {
+  return definition.bindingPower[0] == null && definition.bindingPower[1] != null;
+}
+function isInfix(definition: MathParseDefinition): definition is MathParseDefinition & { bindingPower: [number, number] } {
+  return definition.bindingPower[0] != null && definition.bindingPower[1] != null;
+}
+function isPostfix(definition: MathParseDefinition): definition is MathParseDefinition & { bindingPower: [number, null] } {
+  return definition.bindingPower[0] != null && definition.bindingPower[1] == null;
+}
 
-  /**
-   * Atoms: [null, null]
-   * Prefix: [null, number]
-   * Infix: [number, number]
-   * Postfix: [number, null]
-   */
-  bindingPower: [number | null, number | null];
+export type MathParseDefinition =
+  | {
+      /**
+       * Atom
+       */
+      bindingPower: [null, null];
+      tokens: (MathLayoutContainer | MathLayoutSymbol | MathLayoutText)[];
+      mathJson: () => MathJson;
+    }
+  | {
+      /**
+       * Prefix
+       */
+      bindingPower: [null, number];
+      tokens: (MathLayoutContainer | MathLayoutSymbol | MathLayoutText)[];
+      mathJson: (leftSide: MathJson) => MathJson;
+    }
+  | {
+      /**
+       * Infix
+       */
+      bindingPower: [number, number];
+      tokens: (MathLayoutContainer | MathLayoutSymbol | MathLayoutText)[];
+      mathJson: (leftSide: MathJson, rightSide: MathJson) => MathJson;
+    }
+  | {
+      /**
+       * Postfix
+       */
+      bindingPower: [number, null];
+      tokens: (MathLayoutContainer | MathLayoutSymbol | MathLayoutText)[];
+      mathJson: (rightSide: MathJson) => MathJson;
+    };
+// Parsing Stuff
+// - Variables (bound ones): empty argumentDomains aka expressions
+// - functions are just prefix operators: sin(), floor(), maybe add a "warning: expected brackets"
+// - operators: forall d/dx + * -- ! (prefix, binary, suffix)
+// - TODO: special brackets: {s,e,t}, [v e c]
+// - TODO: integral dx (probably a special bracket, look at how mathcad-chan does this)
 
-  // While parsing, we attempt to tokenize the biggest expression. Then we parse that.
-  // - Multi letter names (lim and sin)
-  // - Multi letter with subscript names (C_s) (could be an entire sub-expression, woah)
-  // - TODO: Partial tokenizing (under-over-integral)?
-  // - TODO: Derivatives are even harder than sums: d/d(anything)
-  // - TODO: The fallback for multiple letters is to just take all of them and return a "free variable" (a = 3b)
-  /**
-   * Basic tokens, they also map to some basic MathJson
-   * For example, a_cat could be a basic token. And we would map it to ["Symbol", ["Subscript", {sym:"a"}, {sym:"cat"}], {dict: {"documentation": "aaa", argumentDomains: ...}} ]
-   *
-   * And then there are advanced tokens under-over-integral, lim with a subscript
-   */
-  tokens: (MathLayoutContainer | MathLayoutSymbol | MathLayoutText)[];
-  mathJson: () => MathJson;
-};
+// While parsing, we attempt to tokenize the biggest expression. Then we parse that.
+// - Multi letter names (lim and sin)
+// - Multi letter with subscript names (C_s) (could be an entire sub-expression, woah)
+// - TODO: Partial tokenizing (under-over-integral)?
+// - TODO: Derivatives are even harder than sums: d/d(anything)
+// - TODO: The fallback for multiple letters is to just take all of them and return a "free variable" (a = 3b)
+
+/**
+ * Basic tokens, they also map to some basic MathJson
+ * For example, a_cat could be a basic token. And we would map it to ["Symbol", ["Subscript", {sym:"a"}, {sym:"cat"}], {dict: {"documentation": "aaa", argumentDomains: ...}} ]
+ *
+ * And then there are advanced tokens under-over-integral, lim with a subscript
+ */
+
+//const myArray = [1,2,3,4,"5",6,7, undefined,9, 0]
+//const filteredArray = myArray.flatMap(val => typeof val === "number" ? val : [])
 
 /**
  * This trie takes you to an approximate position, however there might be multiple definitions with overlapping token-hashes
@@ -334,11 +374,29 @@ function parseRow(
   sourceMap: Map<MathLayout, MathJson>,
   minBindingPower: number
 ): MathJson {
+  debugger;
   /** Expression to the left, has already been parsed */
   let leftPart: MathJson | null = null;
 
   {
     // Parse a prefix token or an atom
+
+    // nextToken needs
+    // - tokens
+    // - sourceMap?
+    // - a filter (atom/prefix/infix/suffix)
+
+    // alternative: Have different dictionaries for atom/prefix/infix/suffix
+
+    // we get
+    // - a token definition, with a specified type ^
+    // - a "consume" function
+
+    // the consume function needs
+    // - sourceMap
+    // - leftSide/rightSide
+    // it advances the tokens, sets the sourceMap and returns MathJson
+
     leftPart = definitions.nextToken(tokens, sourceMap, {
       atom: (_, consume) => consume(),
       prefix: (definition, consume) => [consume(), parseRow(tokens, definitions, sourceMap, definition.bindingPower[1])],
@@ -349,48 +407,47 @@ function parseRow(
   while (true) {
     if (tokens.eof()) break;
 
-    const postfixToken = definitions.nextToken(tokens, sourceMap, {
-      postfix: (definition, consume) => {
-        if (definition.bindingPower[0] >= minBindingPower) {
-          return [consume(), leftPart ?? ["Missing"]];
-        }
-      },
-    });
-    if (postfixToken) {
-      leftPart = postfixToken;
-      continue;
-    }
+    let nextToken;
 
-    const infixToken = definitions.nextToken(tokens, sourceMap, {
-      infix: (definition, consume) => {
-        if (definition.bindingPower[0] >= minBindingPower) {
-          return [consume(), leftPart ?? ["Missing"], parseRow(tokens, definitions, sourceMap, definition.bindingPower[1])];
-        }
-      },
-    });
-    if (infixToken) {
-      leftPart = infixToken;
-      continue;
-    }
-
-    const atomToken = definitions.nextToken(tokens, sourceMap, {
-      atom: (definition, consume) => consume(),
-    });
-    if (atomToken) {
+    if (
+      (nextToken = definitions.nextToken(tokens, sourceMap, {
+        postfix: (definition, consume) => {
+          return { definition, consume };
+        },
+      }))
+    ) {
+      if (nextToken.definition.bindingPower[0] < minBindingPower) break;
+      leftPart = [nextToken.consume(), leftPart ?? ["Missing"]];
+    } else if (
+      (nextToken = definitions.nextToken(tokens, sourceMap, {
+        infix: (definition, consume) => {
+          return { definition, consume };
+        },
+      }))
+    ) {
+      if (nextToken.definition.bindingPower[0] < minBindingPower) break;
+      leftPart = [nextToken.consume(), leftPart ?? ["Missing"], parseRow(tokens, definitions, sourceMap, nextToken.definition.bindingPower[1])];
+    } else if (
+      (nextToken = definitions.nextToken(tokens, sourceMap, {
+        atom: (definition, consume) => {
+          return { definition, consume };
+        },
+      }))
+    ) {
       assert(leftPart != null);
-      leftPart = ["InvisibleOperator", leftPart, atomToken];
-    }
-
-    // Prefix tokens shouldn't happen here
-    // Default case
-    const peekedToken = tokens.peek();
-    if (!peekedToken) break;
-
-    if (peekedToken.type == "symbol") {
+      leftPart = ["InvisibleOperator", leftPart, nextToken.consume()];
     } else {
-    }
+      // Prefix tokens shouldn't happen here
+      // Default case
+      const peekedToken = tokens.peek();
+      if (!peekedToken) break;
 
-    throw new Error("We should never get here, TODO:Write some default case coode");
+      if (peekedToken.type == "symbol") {
+      } else {
+      }
+
+      throw new Error("We should never get here, TODO:Write some default case coode");
+    }
   }
 
   return leftPart ?? ["Missing"];

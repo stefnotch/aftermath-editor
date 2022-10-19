@@ -1,10 +1,18 @@
 import { assert, assertUnreachable } from "../assert";
 import { MathAst } from "./math-ast";
-import { MathLayout, MathLayoutContainer, MathPhysicalLayout, MathLayoutRow, MathLayoutSymbol, MathLayoutText } from "./math-layout";
-import { fromElement as fromMathMLElement, toElement as toMathMLElement } from "./mathml-utils";
+import {
+  MathLayout,
+  MathLayoutContainer,
+  MathPhysicalLayout,
+  MathLayoutRow,
+  MathLayoutSymbol,
+  MathLayoutText,
+} from "./math-layout/math-layout";
+import { fromElement as fromMathMLElement, toElement as toMathMLElement } from "./mathml-converter";
 import arrayUtils from "./array-utils";
 import { endingBrackets, startingBrackets } from "./mathml-spec";
-import { findOtherBracket, wrapInRow } from "./math-layout-utils";
+import { findOtherBracket, wrapInRow } from "./math-layout/math-layout-utils";
+import { MathJson, toMathJson } from "./math-ir";
 
 // TODO: Someday, re-evaluate the parent-pointer approach
 // The alternative is using zippers/focus-es everywhere http://learnyouahaskell.com/zippers
@@ -85,13 +93,19 @@ function getAdjacentChild(
   direction: number
 ): (MathLayoutText | MathLayoutContainer | MathLayoutSymbol) | null;
 function getAdjacentChild(parent: MathLayoutContainer, element: MathLayout, direction: number): MathLayoutRow | null;
-function getAdjacentChild(parent: MathLayoutRow | MathLayoutContainer, element: MathLayout, direction: number): MathLayout | null {
+function getAdjacentChild(
+  parent: MathLayoutRow | MathLayoutContainer,
+  element: MathLayout,
+  direction: number
+): MathLayout | null {
   assert(direction != 0);
   if (parent.type == "row") {
     if (element.type != "row") {
       const indexInParent = parent.values.indexOf(element);
       assert(indexInParent != -1);
-      return indexInParent + direction >= parent.values.length || indexInParent + direction < 0 ? null : parent.values[indexInParent + direction];
+      return indexInParent + direction >= parent.values.length || indexInParent + direction < 0
+        ? null
+        : parent.values[indexInParent + direction];
     } else {
       return null;
     }
@@ -106,7 +120,9 @@ function getAdjacentChild(parent: MathLayoutRow | MathLayoutContainer, element: 
 
         const oneDimensionalIndex = i * width + indexInParent;
         const adjacentIndex = oneDimensionalIndex + direction;
-        return adjacentIndex >= length * width || adjacentIndex < 0 ? null : parent.values[Math.trunc(adjacentIndex / width)][adjacentIndex % width];
+        return adjacentIndex >= length * width || adjacentIndex < 0
+          ? null
+          : parent.values[Math.trunc(adjacentIndex / width)][adjacentIndex % width];
       }
       // Unreachable
       throw new Error("Element not found in table");
@@ -117,7 +133,9 @@ function getAdjacentChild(parent: MathLayoutRow | MathLayoutContainer, element: 
     if (element.type == "row") {
       const indexInParent = parent.values.indexOf(element);
       assert(indexInParent != -1);
-      return indexInParent + direction >= parent.values.length || indexInParent + direction < 0 ? null : parent.values[indexInParent + direction];
+      return indexInParent + direction >= parent.values.length || indexInParent + direction < 0
+        ? null
+        : parent.values[indexInParent + direction];
     } else {
       return null;
     }
@@ -131,6 +149,7 @@ export interface MathCaret {
 }
 
 // TODO: Turn this into a web-component. Then createCaret doesn't have to append stuff to the document anymore
+// TODO: https://vuejs.org/api/reactivity-advanced.html#effectscope
 // TODO: Right click menu with "copy as"
 export class MathEditor {
   carets: Set<MathCaret> = new Set<MathCaret>();
@@ -232,6 +251,79 @@ export class MathEditor {
       this.lastLayout = newMathElement.physicalLayout;
       element.replaceChildren(...newMathElement.element.children);
       // Don't copy the attributes
+
+      try {
+        console.log(
+          toMathJson(this.mathAst.mathIR, [
+            {
+              bindingPower: [null, null],
+              tokens: [
+                {
+                  type: "symbol",
+                  value: "x",
+                },
+              ],
+              mathJson: () => ["Symbol", { sym: "x" }],
+            },
+            {
+              bindingPower: [null, null],
+              tokens: [
+                {
+                  type: "symbol",
+                  value: "y",
+                },
+              ],
+              mathJson: () => ["Symbol", { sym: "y" }],
+            },
+            {
+              bindingPower: [null, 9],
+              tokens: [
+                {
+                  type: "symbol",
+                  value: "-",
+                },
+              ],
+              // TODO: Negate?
+              mathJson: () => ["Symbol", { sym: "-" }],
+            },
+            {
+              bindingPower: [null, null],
+              tokens: [
+                {
+                  type: "symbol",
+                  value: "2",
+                },
+              ],
+              // TODO: 2
+              mathJson: () => ["Symbol", { sym: "2" }],
+            },
+            {
+              bindingPower: [5, 6],
+              tokens: [
+                {
+                  type: "symbol",
+                  value: "+",
+                },
+              ],
+              // TODO: Plus or Add?
+              mathJson: () => ["Symbol", { sym: "+" }],
+            },
+            {
+              bindingPower: [7, 8],
+              tokens: [
+                {
+                  type: "symbol",
+                  value: "*",
+                },
+              ],
+              // TODO: Multiply or Times?
+              mathJson: () => ["Symbol", { sym: "*" }],
+            },
+          ])
+        );
+      } catch (e) {
+        console.log("couldn't parse ", e);
+      }
 
       this.renderCarets();
     };
@@ -425,7 +517,10 @@ export class MathEditor {
   /**
    * Gets the element that the caret is "touching"
    */
-  getElementAtCaret(caret: MathCaret, direction: "left" | "right"): MathLayoutText | MathLayoutContainer | MathLayoutSymbol | null {
+  getElementAtCaret(
+    caret: MathCaret,
+    direction: "left" | "right"
+  ): MathLayoutText | MathLayoutContainer | MathLayoutSymbol | null {
     if (caret.row.type == "row") {
       const elementIndex = caret.offset + (direction == "left" ? -1 : 0);
       return arrayUtils.get(caret.row.values, elementIndex) ?? null;
@@ -465,7 +560,11 @@ export class MathEditor {
           } else {
             // Delete the fraction but keep its contents
             const parentContents = parent.values.flatMap((v) => v.values);
-            const { parent: parentParent, indexInParent: indexInParentParent } = removeButKeepChildren(this.mathAst, parent, parentContents);
+            const { parent: parentParent, indexInParent: indexInParentParent } = removeButKeepChildren(
+              this.mathAst,
+              parent,
+              parentContents
+            );
 
             caret.row = parentParent;
             caret.offset = indexInParentParent + parent.values[0].values.length;
@@ -473,7 +572,11 @@ export class MathEditor {
         } else if ((parent.type == "sup" || parent.type == "sub") && direction == "left") {
           // Delete the superscript/subscript but keep its contents
           const parentContents = parent.values.flatMap((v) => v.values);
-          const { parent: parentParent, indexInParent: indexInParentParent } = removeButKeepChildren(this.mathAst, parent, parentContents);
+          const { parent: parentParent, indexInParent: indexInParentParent } = removeButKeepChildren(
+            this.mathAst,
+            parent,
+            parentContents
+          );
 
           caret.row = parentParent;
           caret.offset = indexInParentParent;
@@ -481,7 +584,11 @@ export class MathEditor {
           if ((indexInParent == 0 && direction == "right") || (indexInParent == 1 && direction == "left")) {
             // Delete root but keep its contents
             const parentContents = parent.values[1].values;
-            const { parent: parentParent, indexInParent: indexInParentParent } = removeButKeepChildren(this.mathAst, parent, parentContents);
+            const { parent: parentParent, indexInParent: indexInParentParent } = removeButKeepChildren(
+              this.mathAst,
+              parent,
+              parentContents
+            );
 
             caret.row = parentParent;
             caret.offset = indexInParentParent;
@@ -499,7 +606,11 @@ export class MathEditor {
       } else if ((elementAtCaret.type == "sup" || elementAtCaret.type == "sub") && direction == "right") {
         // Delete the superscript/subscript but keep its contents
         const parentContents = elementAtCaret.values.flatMap((v) => v.values);
-        const { parent: parentParent, indexInParent: indexInParentParent } = removeButKeepChildren(this.mathAst, elementAtCaret, parentContents);
+        const { parent: parentParent, indexInParent: indexInParentParent } = removeButKeepChildren(
+          this.mathAst,
+          elementAtCaret,
+          parentContents
+        );
 
         caret.row = parentParent;
         caret.offset = indexInParentParent;
@@ -535,7 +646,10 @@ export class MathEditor {
 
         if (element == null) return null;
         if (element.type == "bracket") {
-          if ((direction == "left" && startingBrackets.has(element.value)) || (direction == "right" && endingBrackets.has(element.value))) {
+          if (
+            (direction == "left" && startingBrackets.has(element.value)) ||
+            (direction == "right" && endingBrackets.has(element.value))
+          ) {
             return null;
           }
 
