@@ -148,21 +148,35 @@ export interface MathCaret {
   caretElement: MathmlCaret;
 }
 
-// TODO: Turn this into a web-component. Then createCaret doesn't have to append stuff to the document anymore
-// TODO: https://vuejs.org/api/reactivity-advanced.html#effectscope
+function createElementFromHtml(html: string) {
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  return template.content.firstChild;
+}
+
+// TODO: createCaret doesn't have to append stuff to the document anymore
 // TODO: Right click menu with "copy as"
-export class MathEditor {
+export class MathEditor extends HTMLElement {
   carets: Set<MathCaret> = new Set<MathCaret>();
   mathAst: MathAst;
   render: () => void;
   lastLayout: MathPhysicalLayout | null = null;
   inputHandler: MathmlInputHandler;
 
-  constructor(element: HTMLElement) {
+  connectedCallback() {}
+
+  constructor() {
+    super();
+    const shadowRoot = this.attachShadow({ mode: "open" });
+    const container = document.createElement("span");
+
+    const element = createElementFromHtml(this.getAttribute("mathml") || "");
+    assert(element instanceof MathMLElement, "Mathml attribute must be a valid mathml element");
     element.style.userSelect = "none";
     element.style.display = "block";
     element.style.fontFamily = "STIX Two";
     element.tabIndex = 0;
+    container.append(element);
 
     this.mathAst = MathAst(fromMathMLElement(element));
     console.log(this.mathAst);
@@ -329,6 +343,15 @@ export class MathEditor {
     };
 
     this.render();
+
+    const style = document.createElement("style");
+    style.innerHTML = `mroot > :first-child::after {
+      content: "";
+      width: 2px;
+      height: 10px;
+      position: absolute;
+    }`;
+    shadowRoot.append(style, container);
   }
 
   renderCarets() {

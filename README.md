@@ -4,10 +4,10 @@ A prototype of a MathML editor. See it in action at https://stefnotch.github.io/
 
 ## History
 
-MathML is a lovely, but quite massive standard for *rendering* mathematical formulas on the web. 
+MathML is a lovely, but quite massive standard for _rendering_ mathematical formulas on the web.
 With the advent of [MathML Core](https://w3c.github.io/mathml-core/#introduction), it has become significantly sleeker, better documented and thus, more interesting for browser vendors. [So the lovely folks at Igalia](https://mathml.igalia.com/) decided to start getting MathML supported in Chromnium! [Here is the current status](https://chromestatus.com/feature/5240822173794304).
 
-My hope is that it'll get ready to ship in the next year(s). Then, having a *formula editor* that uses MathML for rendering will finally be a perfectly reasonable choice!
+My hope is that it'll get ready to ship in the next year(s). Then, having a _formula editor_ that uses MathML for rendering will finally be a perfectly reasonable choice!
 
 ## Developer info
 

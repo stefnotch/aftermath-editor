@@ -37,7 +37,7 @@ type MathMLTags =
   | "mtr"
   | "mtd";
 
-export function fromElement(element: HTMLElement): MathLayoutRow {
+export function fromElement(element: HTMLElement | MathMLElement): MathLayoutRow {
   assert(tagIs(element, "math"));
   const mathIR = toMathLayout(element);
   assert(!Array.isArray(mathIR));
