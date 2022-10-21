@@ -374,7 +374,7 @@ function parseRow(
   sourceMap: Map<MathLayout, MathJson>,
   minBindingPower: number
 ): MathJson {
-  debugger;
+  // TODO: debugger;
   /** Expression to the left, has already been parsed */
   let leftPart: MathJson | null = null;
 
@@ -426,7 +426,11 @@ function parseRow(
       }))
     ) {
       if (nextToken.definition.bindingPower[0] < minBindingPower) break;
-      leftPart = [nextToken.consume(), leftPart ?? ["Missing"], parseRow(tokens, definitions, sourceMap, nextToken.definition.bindingPower[1])];
+      leftPart = [
+        nextToken.consume(),
+        leftPart ?? ["Missing"],
+        parseRow(tokens, definitions, sourceMap, nextToken.definition.bindingPower[1]),
+      ];
     } else if (
       (nextToken = definitions.nextToken(tokens, sourceMap, {
         atom: (definition, consume) => {

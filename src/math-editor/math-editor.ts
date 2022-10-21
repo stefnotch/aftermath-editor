@@ -13,6 +13,11 @@ import arrayUtils from "./array-utils";
 import { endingBrackets, startingBrackets } from "./mathml-spec";
 import { findOtherBracket, wrapInRow } from "./math-layout/math-layout-utils";
 import { MathJson, toMathJson } from "./math-ir";
+import init, { greet } from "mathml-editor-rs";
+
+init().then(() => {
+  greet();
+});
 
 // TODO: Someday, re-evaluate the parent-pointer approach
 // The alternative is using zippers/focus-es everywhere http://learnyouahaskell.com/zippers
