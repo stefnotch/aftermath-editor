@@ -1,5 +1,7 @@
+mod math_layout;
 mod utils;
 
+use math_layout::MathLayoutContainer;
 use wasm_bindgen::prelude::*;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
@@ -16,4 +18,6 @@ extern "C" {
 #[wasm_bindgen]
 pub fn greet() {
     alert("Hello, mathml-editor-rs1!");
+
+    let x = MathLayoutContainer::Bracket("a".to_string());
 }

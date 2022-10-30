@@ -1,22 +1,9 @@
-// Time to try out the "IR" approach
-// Things like mpadded or mphantom or styling won't be modeled for now
-// sub and sup are a bit special, they "apply" to the element before them
-// mmultiscripts won't be modeled for now
-
-// Placeholder symbol: ⬚
-// Canoical symbol form (like when there are multiple unicode characters or when some HTML escape has been used &lt;)
-
-// Brackets question: sub-tree or nah? (includes |abs|)
-// if subtree: brackets stop being symbols, instead you can place the caret outside of the brackets and then there is another expression (usually row) inside them
-// if not subtree: we need to find the ending bracket. which means that in the case of |abs|, we need to wrap it in its own row. and when |abs| gets deleted or edited, we gotta get rid of the useless row
-
-/**
- * A simple, JSON-compatible representation of a math formula.
- * Optimized for editing, purposefully does not assign meaning to most characters.
- * For instance, if the formula contains "0xe", we just say it has the characters 0, x, e.
- * We don't parse it as a hexadecimal or 0*x*e or anything. That part is done later.
- */
 export type MathLayout = MathLayoutRow | MathLayoutContainer | MathLayoutSymbol | MathLayoutText;
+
+export type MathLayoutRow = {
+  type: "row";
+  values: (MathLayoutContainer | MathLayoutSymbol | MathLayoutText)[];
+};
 
 export type MathLayoutContainer =
   | {
@@ -46,28 +33,17 @@ export type MathLayoutContainer =
   | MathLayoutTable;
 
 export type MathLayoutTable = {
-  // rows and cells
-  // Not sure about this one yet
   type: "table";
   width: number;
   values: MathLayoutRow[];
 };
 
-export type MathLayoutRow = {
-  // the only thing that has an arbitrary number of children
-  type: "row";
-  values: (MathLayoutContainer | MathLayoutSymbol | MathLayoutText)[];
-};
-
 export type MathLayoutSymbol =
   | {
-      // A bracket symbol
-      // Brackets are not containers, cause that makes things like adding a closing bracket somewhere in a formula really awkward
       type: "bracket";
       value: string;
     }
   | {
-      // a single symbol
       type: "symbol";
       value: string;
     };
