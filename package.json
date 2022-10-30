@@ -8,16 +8,16 @@
   "sideEffects": false,
   "scripts": {
     "dev": "vite --open",
-    "rsw": "rsw",
-    "watch": "rsw watch",
-    "build": "rsw build && tsc && vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview",
     "deploy": "vite build --base=/mathml-editor/ && node utils/publish.js"
   },
   "devDependencies": {
     "gh-pages": "^4.0.0",
     "typescript": "^4.8.4",
-    "vite": "^3.1.8",
-    "vite-plugin-rsw": "^2.0.9"
+    "vite": "^3.2.1"
+  },
+  "dependencies": {
+    "ts-pattern": "^4.0.5"
   }
 }

@@ -1,62 +1,115 @@
-export type MathLayout = MathLayoutRow | MathLayoutContainer | MathLayoutSymbol | MathLayoutText;
+export type MathLayout = MathLayoutRow | MathLayoutContainer;
 
+/**
+ * A simple representation of what a math formula looks like.
+ * Optimized for editing, purposefully does not assign meaning to most characters.
+ * For instance, if the formula contains "0xe", we just say it has the characters 0, x, e.
+ * We don't parse it as a hexadecimal or 0*x*e or anything. That part is done later.
+ */
 export type MathLayoutRow = {
+  /**
+   * Rows have an arbitrary number of children
+   */
   type: "row";
-  values: (MathLayoutContainer | MathLayoutSymbol | MathLayoutText)[];
+  values: MathLayoutContainer[];
 };
 
 export type MathLayoutContainer =
   | {
-      type: "frac";
+      /**
+       * $\frac{a}{b}$
+       */
+      type: "fraction";
       values: [MathLayoutRow, MathLayoutRow];
     }
   | {
+      /**
+       * $\sqrt[a]{b}$
+       */
       type: "root";
       values: [MathLayoutRow, MathLayoutRow];
     }
   | {
+      /**
+       * $\underset{b}{a}$
+       */
       type: "under";
       values: [MathLayoutRow, MathLayoutRow];
     }
   | {
+      /**
+       * $\overset{b}{a}$
+       */
       type: "over";
       values: [MathLayoutRow, MathLayoutRow];
     }
   | {
+      /**
+       * $^a$
+       */
       type: "sup";
       values: [MathLayoutRow];
     }
   | {
+      /**
+       * $_a$
+       */
       type: "sub";
       values: [MathLayoutRow];
     }
-  | MathLayoutTable;
-
-export type MathLayoutTable = {
-  type: "table";
-  width: number;
-  values: MathLayoutRow[];
-};
-
-export type MathLayoutSymbol =
   | {
-      type: "bracket";
+      /**
+       * A rectangular table. Every cell is a row.
+       * $\begin{matrix}a&b\\c&d\end{matrix}$
+       */
+      type: "table";
+      width: number;
+      values: MathLayoutRow[];
+    }
+  | {
+      /**
+       * A single symbol
+       */
+      type: "symbol";
       value: string;
     }
   | {
-      type: "symbol";
+      /**
+       * TODO: Maybe add info about "is opening" and "is closing" bracket.
+       * A bracket symbol, with special handling.
+       * Brackets are not containers, because that makes things like adding a closing bracket somewhere in a formula really awkward.
+       */
+      type: "bracket";
       value: string;
-    };
+    }
+  | MathLayoutText;
 
-export type MathLayoutText =
+type MathLayoutText =
   | {
+      /**
+       * A single bit of text.
+       * $\text{a}$
+       */
       type: "text";
       value: string;
     }
   | {
+      /**
+       * Error message, used whenever the parser encounters something it doesn't understand.
+       */
       type: "error";
       value: string;
     };
+
+/*
+TODO:
+// Things like mpadded or mphantom or styling won't be modeled for now
+// sub and sup are a bit special, they "apply" to the element before them
+// mmultiscripts won't be modeled for now
+ */
+
+// TODO: Placeholder symbol: ⬚
+// TODO:Canoical symbol form (like when there are multiple unicode characters or when some HTML escape has been used &lt;)
 
 // Parsing maths 101
 // Info:
