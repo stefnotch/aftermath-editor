@@ -1,3 +1,7 @@
+:host {
+  display: inline;
+}
+
 mroot > :first-child::after {
   content: "";
   width: 2px;

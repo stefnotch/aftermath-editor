@@ -14,7 +14,7 @@ import { findOtherBracket, wrapInRow } from "../math-editor/math-layout/math-lay
 import { MathJson, toMathJson } from "../math-editor/math-ir";
 import caretStyles from "./caret-styles.css?inline";
 import mathEditorStyles from "./math-editor-styles.css?inline";
-import { createCaret } from "./caret";
+import { createCaret, MathmlCaret } from "./caret";
 
 // TODO: Someday, re-evaluate the parent-pointer approach
 // The alternative is using zippers/focus-es everywhere http://learnyouahaskell.com/zippers
@@ -128,12 +128,15 @@ export class MathEditor extends HTMLElement {
     super();
     const shadowRoot = this.attachShadow({ mode: "open" });
 
+    const caretContainer = document.createElement("span");
+    caretContainer.style.position = "absolute";
+
     const container = document.createElement("span");
 
     const mathMlElement = createElementFromHtml(this.getAttribute("mathml") || "");
     assert(mathMlElement instanceof MathMLElement, "Mathml attribute must be a valid mathml element");
     mathMlElement.style.userSelect = "none";
-    mathMlElement.style.display = "block";
+    mathMlElement.style.display = "inline";
     mathMlElement.style.fontFamily = "STIX Two";
     mathMlElement.tabIndex = 0;
     container.append(mathMlElement);
@@ -144,7 +147,7 @@ export class MathEditor extends HTMLElement {
     this.carets.add({
       row: this.mathAst.mathIR,
       offset: 0,
-      caretElement: createCaret(document.body),
+      caretElement: createCaret(caretContainer),
     });
 
     this.inputHandler = createInputHandler(document.body);
@@ -306,7 +309,7 @@ export class MathEditor extends HTMLElement {
 
     const styles = document.createElement("style");
     styles.textContent = `${mathEditorStyles}\n ${caretStyles}`;
-    shadowRoot.append(styles, container);
+    shadowRoot.append(styles, caretContainer, container);
   }
 
   renderCarets() {

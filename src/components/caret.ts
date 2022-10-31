@@ -1,3 +1,5 @@
+import { ViewportCoordinate } from "./viewport-coordinate";
+
 export interface MathmlCaret {
   setPosition(x: number, y: number): void;
   setHeight(v: number): void;
@@ -18,9 +20,11 @@ export function createCaret(documentBody: HTMLElement): MathmlCaret {
   caretElement.className = "math-caret";
   documentBody.appendChild(caretElement);
 
-  function setPosition(x: number, y: number) {
-    caretElement.style.left = `${x}px`;
-    caretElement.style.top = `${y}px`;
+  function setPosition(x: ViewportCoordinate, y: ViewportCoordinate) {
+    const parentPos = documentBody.getBoundingClientRect();
+
+    caretElement.style.left = `${x - parentPos.left}px`;
+    caretElement.style.top = `${y - parentPos.top}px`;
   }
 
   function setHeight(v: number) {
