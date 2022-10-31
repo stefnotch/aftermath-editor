@@ -1,3 +1,4 @@
+import { ViewportCoordinate } from "../../components/viewport-coordinate";
 import { assertUnreachable } from "../../utils/assert";
 
 // TODO: Get rid of this, you almost always want a MathLayoutRow instead
@@ -209,8 +210,9 @@ TODO:
 
 // TODO: bracket pairs are to be resolved during inputting (pairs, ghost close bracket, esc and space, set builder |, |abs|, ||norm||, {x| |x| < 3})
 
+// TODO: maybe use a MathLayoutZipper
 // The index has a different meaning depending on the element (child index, ignored, text index, 2D index)
 export type MathPhysicalLayout = Map<
   MathLayoutRow | MathLayoutText, // row-container
-  (index: number) => { x: number; y: number; height: number }
+  (index: number) => { x: ViewportCoordinate; y: ViewportCoordinate; height: number }
 >;

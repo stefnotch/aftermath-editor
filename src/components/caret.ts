@@ -1,12 +1,12 @@
 import { ViewportCoordinate } from "./viewport-coordinate";
 
-export interface MathmlCaret {
+export interface CaretElement {
   setPosition(x: number, y: number): void;
   setHeight(v: number): void;
   remove(): void;
 }
 
-export function createCaret(documentBody: HTMLElement): MathmlCaret {
+export function createCaret(documentBody: HTMLElement): CaretElement {
   const caretElement = document.createElement("span");
   caretElement.style.userSelect = "none";
   caretElement.style.position = "absolute";

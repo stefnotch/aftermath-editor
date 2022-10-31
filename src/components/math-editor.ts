@@ -14,8 +14,11 @@ import { findOtherBracket, wrapInRow } from "../math-editor/math-layout/math-lay
 import { MathJson, toMathJson } from "../math-editor/math-ir";
 import caretStyles from "./caret-styles.css?inline";
 import mathEditorStyles from "./math-editor-styles.css?inline";
-import { createCaret, MathmlCaret } from "./caret";
+import inputHandlerStyles from "./input-handler-style.css?inline";
+import { createCaret, CaretElement } from "./caret";
 import { createInputHandler, MathmlInputHandler } from "./input-handler";
+import { MathLayoutCaret } from "./math-layout-caret";
+import { MathLayoutRowZipper } from "../math-editor/math-layout/math-layout-zipper";
 
 // TODO: Someday, re-evaluate the parent-pointer approach
 // The alternative is using zippers/focus-es everywhere http://learnyouahaskell.com/zippers
@@ -72,9 +75,8 @@ function getAdjacentChild(
 }
 
 export interface MathCaret {
-  row: MathLayoutRow | MathLayoutText;
-  offset: number;
-  caretElement: MathmlCaret;
+  caret: MathLayoutCaret;
+  element: CaretElement;
 }
 
 function createElementFromHtml(html: string) {
@@ -86,7 +88,10 @@ function createElementFromHtml(html: string) {
 // TODO: createCaret doesn't have to append stuff to the document anymore
 export class MathEditor extends HTMLElement {
   carets: Set<MathCaret> = new Set<MathCaret>();
-  mathAst: MathAst;
+
+  // TODO: Rename mathAst to something (the name is a leftover from the old math-ast with parent pointers design)
+  mathAst: MathLayoutRowZipper;
+
   render: () => void;
   lastLayout: MathPhysicalLayout | null = null;
   inputHandler: MathmlInputHandler;
@@ -123,13 +128,12 @@ export class MathEditor extends HTMLElement {
     mathMlElement.tabIndex = 0;
     container.append(mathMlElement);
 
-    this.mathAst = MathAst(fromMathMLElement(mathMlElement));
+    this.mathAst = new MathLayoutRowZipper(fromMathMLElement(mathMlElement), null);
     console.log(this.mathAst);
 
     this.carets.add({
-      row: this.mathAst.mathIR,
-      offset: 0,
-      caretElement: createCaret(caretContainer),
+      caret: new MathLayoutCaret(this.mathAst, 0),
+      element: createCaret(caretContainer),
     });
 
     this.inputHandler = createInputHandler(inputContainer);
@@ -209,7 +213,7 @@ export class MathEditor extends HTMLElement {
     editorResizeObserver.observe(container, { box: "border-box" });
 
     this.render = () => {
-      const newMathElement = toMathMLElement(this.mathAst.mathIR);
+      const newMathElement = toMathMLElement(this.mathAst.value /** TODO: Use MathIR here */);
       this.lastLayout = newMathElement.physicalLayout;
       mathMlElement.replaceChildren(...newMathElement.element.children);
       // Don't copy the attributes
@@ -291,7 +295,7 @@ export class MathEditor extends HTMLElement {
     };
 
     const styles = document.createElement("style");
-    styles.textContent = `${mathEditorStyles}\n ${caretStyles}`;
+    styles.textContent = `${mathEditorStyles}\n ${inputHandlerStyles}\n ${caretStyles}`;
     shadowRoot.append(styles, caretContainer, inputContainer, container);
   }
 
@@ -317,7 +321,7 @@ export class MathEditor extends HTMLElement {
   }
 
   removeCaret(caret: MathCaret) {
-    caret.caretElement.remove();
+    caret.element.remove();
     this.carets.delete(caret);
   }
 
