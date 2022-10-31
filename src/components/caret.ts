@@ -18,7 +18,7 @@ export function createCaret(documentBody: HTMLElement): MathmlCaret {
   caretElement.style.top = "0px";
   // Maybe add some cute blinking
   caretElement.className = "math-caret";
-  documentBody.appendChild(caretElement);
+  documentBody.append(caretElement);
 
   function setPosition(x: ViewportCoordinate, y: ViewportCoordinate) {
     const parentPos = documentBody.getBoundingClientRect();

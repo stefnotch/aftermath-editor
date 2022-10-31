@@ -1,5 +1,5 @@
 import { assert } from "../utils/assert";
-import { MathLayout, MathLayoutContainer, MathLayoutRow, MathLayoutSymbol, MathLayoutText } from "./math-layout/math-layout";
+import { MathLayout, MathLayoutElement, MathLayoutRow, MathLayoutSymbol, MathLayoutText } from "./math-layout/math-layout";
 import { TokenStream } from "./token-stream";
 import { isSame as isSameMathLayout } from "./math-layout/math-layout-utils";
 
@@ -88,7 +88,7 @@ export type MathParseDefinition =
        * Atom
        */
       bindingPower: [null, null];
-      tokens: (MathLayoutContainer | MathLayoutSymbol | MathLayoutText)[];
+      tokens: (MathLayoutElement | MathLayoutSymbol | MathLayoutText)[];
       mathJson: () => MathJson;
     }
   | {
@@ -96,7 +96,7 @@ export type MathParseDefinition =
        * Prefix
        */
       bindingPower: [null, number];
-      tokens: (MathLayoutContainer | MathLayoutSymbol | MathLayoutText)[];
+      tokens: (MathLayoutElement | MathLayoutSymbol | MathLayoutText)[];
       mathJson: (leftSide: MathJson) => MathJson;
     }
   | {
@@ -104,7 +104,7 @@ export type MathParseDefinition =
        * Infix
        */
       bindingPower: [number, number];
-      tokens: (MathLayoutContainer | MathLayoutSymbol | MathLayoutText)[];
+      tokens: (MathLayoutElement | MathLayoutSymbol | MathLayoutText)[];
       mathJson: (leftSide: MathJson, rightSide: MathJson) => MathJson;
     }
   | {
@@ -112,7 +112,7 @@ export type MathParseDefinition =
        * Postfix
        */
       bindingPower: [number, null];
-      tokens: (MathLayoutContainer | MathLayoutSymbol | MathLayoutText)[];
+      tokens: (MathLayoutElement | MathLayoutSymbol | MathLayoutText)[];
       mathJson: (rightSide: MathJson) => MathJson;
     };
 // Parsing Stuff
@@ -150,7 +150,7 @@ class MathParseTrie {
   values: MathParseDefinition[] = [];
 
   /**
-   * Just has a token-hash instead of a proper MathLayoutContainer | MathLayoutSymbol | MathLayoutText
+   * Just has a token-hash instead of a proper MathLayoutElement | MathLayoutSymbol | MathLayoutText
    */
   children: Map<string, MathParseTrie> = new Map();
   constructor(definitions: MathParseDefinition[]) {
@@ -158,7 +158,7 @@ class MathParseTrie {
   }
 
   nextToken<T>(
-    tokens: TokenStream<MathLayoutContainer | MathLayoutSymbol | MathLayoutText>,
+    tokens: TokenStream<MathLayoutElement | MathLayoutSymbol | MathLayoutText>,
     sourceMap: Map<MathLayout, MathJson>,
     callback: {
       atom?: (definition: MathParseDefinition & { bindingPower: [null, null] }, consume: () => MathJson) => T;
@@ -200,14 +200,14 @@ class MathParseTrie {
    * @returns the parse definition and a consuming function to get the MathJson
    */
   peekNextToken(
-    tokens: TokenStream<MathLayoutContainer | MathLayoutSymbol | MathLayoutText>,
+    tokens: TokenStream<MathLayoutElement | MathLayoutSymbol | MathLayoutText>,
     filter: (definition: MathParseDefinition) => boolean
   ): { definition: MathParseDefinition; consume: (sourceMap: Map<MathLayout, MathJson>) => MathJson } | null {
     const matchingDefinitions = MathParseTrie.#peekNextTokenRecursive(tokens, filter, 0, this);
     return matchingDefinitions.length > 0 ? matchingDefinitions[0] : null;
   }
 
-  static #getTokenHash(token: MathLayoutContainer | MathLayoutSymbol | MathLayoutText): string {
+  static #getTokenHash(token: MathLayoutElement | MathLayoutSymbol | MathLayoutText): string {
     if (token.type == "table") {
       return `${token.type}-`;
     } else if (token.type == "symbol" || token.type == "bracket" || token.type == "text" || token.type == "error") {
@@ -237,7 +237,7 @@ class MathParseTrie {
   }
 
   static #peekNextTokenRecursive(
-    tokens: TokenStream<MathLayoutContainer | MathLayoutSymbol | MathLayoutText>,
+    tokens: TokenStream<MathLayoutElement | MathLayoutSymbol | MathLayoutText>,
     filter: (definition: MathParseDefinition) => boolean,
     plusOffset: number,
     trie: MathParseTrie
@@ -369,7 +369,7 @@ export function toMathJson(
 const isDigit = /^[0-9]+$/g;
 
 function parseRow(
-  tokens: TokenStream<MathLayoutContainer | MathLayoutSymbol | MathLayoutText>,
+  tokens: TokenStream<MathLayoutElement | MathLayoutSymbol | MathLayoutText>,
   definitions: MathParseTrie,
   sourceMap: Map<MathLayout, MathJson>,
   minBindingPower: number
@@ -458,7 +458,7 @@ function parseRow(
 }
 
 function parseNumber(
-  tokens: TokenStream<MathLayoutContainer | MathLayoutSymbol | MathLayoutText>,
+  tokens: TokenStream<MathLayoutElement | MathLayoutSymbol | MathLayoutText>,
   definitions: MathParseTrie,
   sourceMap: Map<MathLayout, MathJson>
 ): MathParseDefinition {

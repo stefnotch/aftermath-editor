@@ -2,7 +2,7 @@ import { assert, assertUnreachable } from "../utils/assert";
 import { MathAst } from "../math-editor/math-ast";
 import {
   MathLayout,
-  MathLayoutContainer,
+  MathLayoutElement,
   MathPhysicalLayout,
   MathLayoutRow,
   MathLayoutText,
@@ -20,10 +20,10 @@ import { createInputHandler, MathmlInputHandler } from "./input-handler";
 // TODO: Someday, re-evaluate the parent-pointer approach
 // The alternative is using zippers/focus-es everywhere http://learnyouahaskell.com/zippers
 
-function getAdjacentChild(parent: MathLayoutRow, element: MathLayout, direction: number): MathLayoutContainer | null;
-function getAdjacentChild(parent: MathLayoutContainer, element: MathLayout, direction: number): MathLayoutRow | null;
+function getAdjacentChild(parent: MathLayoutRow, element: MathLayout, direction: number): MathLayoutElement | null;
+function getAdjacentChild(parent: MathLayoutElement, element: MathLayout, direction: number): MathLayoutRow | null;
 function getAdjacentChild(
-  parent: MathLayoutRow | MathLayoutContainer,
+  parent: MathLayoutRow | MathLayoutElement,
   element: MathLayout,
   direction: number
 ): MathLayout | null {
@@ -107,6 +107,10 @@ export class MathEditor extends HTMLElement {
     const caretContainer = document.createElement("span");
     caretContainer.style.position = "absolute";
 
+    // Input handler container
+    const inputContainer = document.createElement("span");
+    inputContainer.style.position = "absolute";
+
     // Container for math formula
     const container = document.createElement("span");
     container.style.display = "inline-block"; // Needed for the resize observer
@@ -128,7 +132,7 @@ export class MathEditor extends HTMLElement {
       caretElement: createCaret(caretContainer),
     });
 
-    this.inputHandler = createInputHandler(document.body);
+    this.inputHandler = createInputHandler(inputContainer);
 
     // https://d-toybox.com/studio/lib/input_event_viewer.html
     // https://w3c.github.io/uievents/tools/key-event-viewer.html
@@ -288,7 +292,7 @@ export class MathEditor extends HTMLElement {
 
     const styles = document.createElement("style");
     styles.textContent = `${mathEditorStyles}\n ${caretStyles}`;
-    shadowRoot.append(styles, caretContainer, container);
+    shadowRoot.append(styles, caretContainer, inputContainer, container);
   }
 
   renderCarets() {
@@ -347,7 +351,7 @@ export class MathEditor extends HTMLElement {
       }
     }
 
-    function moveCaretRightDown(adjacentChild: MathLayoutContainer): boolean {
+    function moveCaretRightDown(adjacentChild: MathLayoutElement): boolean {
       if (adjacentChild.type == "text" || adjacentChild.type == "error") {
         caret.row = adjacentChild;
         caret.offset = 0;
@@ -365,7 +369,7 @@ export class MathEditor extends HTMLElement {
       }
     }
 
-    function moveCaretLeftDown(adjacentChild: MathLayoutContainer): boolean {
+    function moveCaretLeftDown(adjacentChild: MathLayoutElement): boolean {
       if (adjacentChild.type == "text" || adjacentChild.type == "error") {
         caret.row = adjacentChild;
         caret.offset = adjacentChild.value.length;
@@ -477,7 +481,7 @@ export class MathEditor extends HTMLElement {
   /**
    * Gets the element that the caret is "touching"
    */
-  getElementAtCaret(caret: MathCaret, direction: "left" | "right"): MathLayoutContainer | null {
+  getElementAtCaret(caret: MathCaret, direction: "left" | "right"): MathLayoutElement | null {
     if (caret.row.type == "row") {
       const elementIndex = caret.offset + (direction == "left" ? -1 : 0);
       return arrayUtils.get(caret.row.values, elementIndex) ?? null;
@@ -492,8 +496,8 @@ export class MathEditor extends HTMLElement {
   deleteAtCaret(caret: MathCaret, direction: "left" | "right") {
     function removeButKeepChildren(
       mathAst: MathAst,
-      toRemove: MathLayoutContainer,
-      children: MathLayoutContainer[]
+      toRemove: MathLayoutElement,
+      children: MathLayoutElement[]
     ): { parent: MathLayoutRow; indexInParent: number } {
       const { parent, indexInParent } = mathAst.getParentAndIndex(toRemove);
       assert(parent != null);
@@ -641,7 +645,7 @@ export class MathEditor extends HTMLElement {
     }
 
     const mathAst = this.mathAst;
-    function insertMathLayout<T extends MathLayoutContainer>(mathIR: T): T {
+    function insertMathLayout<T extends MathLayoutElement>(mathIR: T): T {
       assert(caret.row.type == "row");
       mathAst.setParents(null, [mathIR]);
       mathAst.insertChild(caret.row, mathIR, caret.offset);

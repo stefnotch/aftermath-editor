@@ -15,9 +15,8 @@ export function createInputHandler(documentBody: HTMLElement): MathmlInputHandle
   inputElement.style.clipPath = "polygon(0 0)";
   inputElement.style.width = "0px";
   inputElement.style.height = "0px";
-
   inputElement.className = "math-input-area";
-  documentBody.appendChild(inputElement);
+  documentBody.append(inputElement);
 
   function remove() {
     documentBody.removeChild(inputElement);

@@ -1,12 +1,6 @@
 import { assert, assertUnreachable } from "../utils/assert";
 import arrayUtils from "../utils/array-utils";
-import type {
-  MathLayout,
-  MathLayoutContainer,
-  MathLayoutText,
-  MathLayoutRow,
-  MathLayoutSymbol,
-} from "./math-layout/math-layout";
+import type { MathLayout, MathLayoutElement, MathLayoutText, MathLayoutRow, MathLayoutSymbol } from "./math-layout/math-layout";
 
 /*
  * MathLayout with parent pointers. Currently not super safe, as it's possible to construct a cyclic tree (node.parent = node)
@@ -14,37 +8,37 @@ import type {
  */
 export interface MathAst {
   mathIR: MathLayoutRow;
-  parents: Map<MathLayout, MathLayoutRow | MathLayoutContainer | null>;
+  parents: Map<MathLayout, MathLayoutRow | MathLayoutElement | null>;
 
-  getParent(mathIR: MathLayoutRow): MathLayoutContainer | null;
-  getParent(mathIR: MathLayoutContainer | MathLayoutSymbol | MathLayoutText): MathLayoutRow | null;
-  getParent(mathIR: MathLayout): MathLayoutRow | MathLayoutContainer | null;
+  getParent(mathIR: MathLayoutRow): MathLayoutElement | null;
+  getParent(mathIR: MathLayoutElement | MathLayoutSymbol | MathLayoutText): MathLayoutRow | null;
+  getParent(mathIR: MathLayout): MathLayoutRow | MathLayoutElement | null;
 
   getParentAndIndex(mathIR: MathLayoutRow): {
-    parent: MathLayoutContainer | null;
+    parent: MathLayoutElement | null;
     indexInParent: number;
   };
-  getParentAndIndex(mathIR: MathLayoutContainer | MathLayoutSymbol | MathLayoutText): {
+  getParentAndIndex(mathIR: MathLayoutElement | MathLayoutSymbol | MathLayoutText): {
     parent: MathLayoutRow | null;
     indexInParent: number;
   };
   getParentAndIndex(mathIR: MathLayout): {
-    parent: MathLayoutRow | MathLayoutContainer | null;
+    parent: MathLayoutRow | MathLayoutElement | null;
     indexInParent: number;
   };
 
-  setChild(mathIR: MathLayoutRow, value: MathLayoutContainer | MathLayoutSymbol | MathLayoutText, index: number): void;
-  setChild(mathIR: MathLayoutContainer, value: MathLayoutRow, index: number): void;
+  setChild(mathIR: MathLayoutRow, value: MathLayoutElement | MathLayoutSymbol | MathLayoutText, index: number): void;
+  setChild(mathIR: MathLayoutElement, value: MathLayoutRow, index: number): void;
   setChild(mathIR: MathLayout & { type: "table" }, value: MathLayoutRow, indexA: number, indexB: number): void;
 
   removeChild(mathIR: MathLayoutRow, value: MathLayout): void;
-  insertChild(mathIR: MathLayoutRow, value: MathLayoutContainer | MathLayoutSymbol | MathLayoutText, index: number): void;
+  insertChild(mathIR: MathLayoutRow, value: MathLayoutElement | MathLayoutSymbol | MathLayoutText, index: number): void;
 
   /**
    * Recursively sets the parents, used to set all the parent links for a newly created subtree.
    * Example: `setParents(null, [mathIR]);`
    */
-  setParents(parent: MathLayoutRow | MathLayoutContainer | null, children: MathLayout[]): void;
+  setParents(parent: MathLayoutRow | MathLayoutElement | null, children: MathLayout[]): void;
 }
 
 /**
@@ -62,9 +56,9 @@ export function MathAst(mathIR: MathLayoutRow): MathAst {
     setParents,
   };
 
-  function getParent(mathIR: MathLayoutRow): MathLayoutContainer | null;
-  function getParent(mathIR: MathLayoutContainer | MathLayoutSymbol | MathLayoutText): MathLayoutRow | null;
-  function getParent(mathIR: MathLayout): MathLayoutRow | MathLayoutContainer | null {
+  function getParent(mathIR: MathLayoutRow): MathLayoutElement | null;
+  function getParent(mathIR: MathLayoutElement | MathLayoutSymbol | MathLayoutText): MathLayoutRow | null;
+  function getParent(mathIR: MathLayout): MathLayoutRow | MathLayoutElement | null {
     const parent = ast.parents.get(mathIR);
     if (parent) {
       return parent;
@@ -74,15 +68,15 @@ export function MathAst(mathIR: MathLayoutRow): MathAst {
   }
 
   function getParentAndIndex(mathIR: MathLayoutRow): {
-    parent: MathLayoutContainer | null;
+    parent: MathLayoutElement | null;
     indexInParent: number;
   };
-  function getParentAndIndex(mathIR: MathLayoutContainer | MathLayoutSymbol | MathLayoutText): {
+  function getParentAndIndex(mathIR: MathLayoutElement | MathLayoutSymbol | MathLayoutText): {
     parent: MathLayoutRow | null;
     indexInParent: number;
   };
   function getParentAndIndex(mathIR: MathLayout): {
-    parent: MathLayoutRow | MathLayoutContainer | null;
+    parent: MathLayoutRow | MathLayoutElement | null;
     indexInParent: number;
   } {
     const parent = ast.parents.get(mathIR);
@@ -114,7 +108,7 @@ export function MathAst(mathIR: MathLayoutRow): MathAst {
     }
   }
 
-  function removeChild(mathIR: MathLayoutRow, value: MathLayoutContainer | MathLayoutSymbol | MathLayoutText): void {
+  function removeChild(mathIR: MathLayoutRow, value: MathLayoutElement | MathLayoutSymbol | MathLayoutText): void {
     assert(mathIR.type == "row");
     // Maybe check if it actually returned true
     arrayUtils.remove(mathIR.values, value);
@@ -123,7 +117,7 @@ export function MathAst(mathIR: MathLayoutRow): MathAst {
 
   function insertChild(
     mathIR: MathLayoutRow,
-    value: MathLayoutContainer | MathLayoutSymbol | MathLayoutText,
+    value: MathLayoutElement | MathLayoutSymbol | MathLayoutText,
     index: number
   ): void {
     assert(mathIR.type == "row");
@@ -162,7 +156,7 @@ export function MathAst(mathIR: MathLayoutRow): MathAst {
     }
   }
 
-  function setParents(parent: MathLayoutRow | MathLayoutContainer | null, children: MathLayout[]) {
+  function setParents(parent: MathLayoutRow | MathLayoutElement | null, children: MathLayout[]) {
     for (let i = 0; i < children.length; i++) {
       ast.parents.set(children[i], parent);
 
@@ -173,7 +167,7 @@ export function MathAst(mathIR: MathLayoutRow): MathAst {
     }
   }
 
-  function asRowOrContainer(mathIR: MathLayout): MathLayoutRow | MathLayoutContainer | null {
+  function asRowOrContainer(mathIR: MathLayout): MathLayoutRow | MathLayoutElement | null {
     if (mathIR.type == "row") {
       return mathIR;
     } else if (

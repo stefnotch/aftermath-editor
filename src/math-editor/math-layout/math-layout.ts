@@ -1,4 +1,7 @@
-export type MathLayout = MathLayoutRow | MathLayoutContainer;
+import { assertUnreachable } from "../../utils/assert";
+
+// TODO: Get rid of this, you almost always want a MathLayoutRow instead
+export type MathLayout = MathLayoutRow | MathLayoutElement;
 
 /**
  * A simple representation of what a math formula looks like.
@@ -11,9 +14,29 @@ export type MathLayoutRow = {
    * Rows have an arbitrary number of children
    */
   type: "row";
-  values: MathLayoutContainer[];
+  values: MathLayoutElement[];
 };
 
+export function isMathLayoutRow(value: MathLayoutRow | MathLayoutElement): value is MathLayoutRow {
+  const { type } = value as MathLayoutRow;
+  if (type === "row") {
+    return true;
+  }
+  assertUnreachable(type);
+}
+
+export type MathLayoutElement = MathLayoutContainer | MathLayoutTable | MathLayoutSymbol | MathLayoutText;
+export function isMathLayoutElement(value: MathLayoutRow | MathLayoutElement): value is MathLayoutElement {
+  const v = value as MathLayoutElement;
+  if (isMathLayoutContainer(v) || isMathLayoutTable(v) || isMathLayoutSymbol(v) || isMathLayoutText(v)) {
+    return true;
+  }
+  assertUnreachable(v);
+}
+
+/**
+ * A container with a fixed number of children
+ */
 export type MathLayoutContainer =
   | {
       /**
@@ -56,16 +79,39 @@ export type MathLayoutContainer =
        */
       type: "sub";
       values: [MathLayoutRow];
-    }
-  | {
-      /**
-       * A rectangular table. Every cell is a row.
-       * $\begin{matrix}a&b\\c&d\end{matrix}$
-       */
-      type: "table";
-      width: number;
-      values: MathLayoutRow[];
-    }
+    };
+export function isMathLayoutContainer(value: MathLayoutRow | MathLayoutElement): value is MathLayoutContainer {
+  const { type } = value as MathLayoutContainer;
+  if (type === "fraction" || type === "root" || type === "under" || type === "over" || type === "sup" || type === "sub") {
+    return true;
+  }
+  assertUnreachable(type);
+}
+
+/**
+ * A table with an arbitrary number of children
+ */
+export type MathLayoutTable = {
+  /**
+   * A rectangular table. Every cell is a row.
+   * $\begin{matrix}a&b\\c&d\end{matrix}$
+   */
+  type: "table";
+  width: number;
+  values: MathLayoutRow[];
+};
+export function isMathLayoutTable(value: MathLayoutRow | MathLayoutElement): value is MathLayoutTable {
+  const { type } = value as MathLayoutTable;
+  if (type === "table") {
+    return true;
+  }
+  assertUnreachable(type);
+}
+
+/**
+ * Symbols without children
+ */
+export type MathLayoutSymbol =
   | {
       /**
        * A single symbol
@@ -81,9 +127,19 @@ export type MathLayoutContainer =
        */
       type: "bracket";
       value: string;
-    }
-  | MathLayoutText;
+    };
 
+export function isMathLayoutSymbol(value: MathLayoutRow | MathLayoutElement): value is MathLayoutSymbol {
+  const { type } = value as MathLayoutSymbol;
+  if (type === "symbol" || type === "bracket") {
+    return true;
+  }
+  assertUnreachable(type);
+}
+
+/**
+ * Text without children, can be edited
+ */
 export type MathLayoutText =
   | {
       /**
@@ -100,6 +156,13 @@ export type MathLayoutText =
       type: "error";
       value: string;
     };
+export function isMathLayoutText(value: MathLayoutRow | MathLayoutElement): value is MathLayoutText {
+  const { type } = value as MathLayoutText;
+  if (type === "text" || type === "error") {
+    return true;
+  }
+  assertUnreachable(type);
+}
 
 /*
 TODO:
