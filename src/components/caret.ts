@@ -3,7 +3,7 @@ import { ViewportCoordinate } from "./viewport-coordinate";
 export interface MathmlCaret {
   setPosition(x: number, y: number): void;
   setHeight(v: number): void;
-  destroy(): void;
+  remove(): void;
 }
 
 export function createCaret(documentBody: HTMLElement): MathmlCaret {
@@ -31,13 +31,13 @@ export function createCaret(documentBody: HTMLElement): MathmlCaret {
     caretElement.style.height = `${v}px`;
   }
 
-  function destroy() {
+  function remove() {
     documentBody.removeChild(caretElement);
   }
 
   return {
     setPosition,
     setHeight,
-    destroy,
+    remove,
   };
 }

@@ -15,40 +15,10 @@ import { MathJson, toMathJson } from "../math-editor/math-ir";
 import caretStyles from "./caret-styles.css?inline";
 import mathEditorStyles from "./math-editor-styles.css?inline";
 import { createCaret, MathmlCaret } from "./caret";
+import { createInputHandler, MathmlInputHandler } from "./input-handler";
 
 // TODO: Someday, re-evaluate the parent-pointer approach
 // The alternative is using zippers/focus-es everywhere http://learnyouahaskell.com/zippers
-
-interface MathmlInputHandler {
-  inputElement: HTMLElement;
-  destroy(): void;
-}
-
-function createInputHandler(documentBody: HTMLElement): MathmlInputHandler {
-  // See also https://github.com/stefnotch/quantum-sheet/blob/6b445476559ab5354b8a1c68c24a4ceb24e050e9/src/ui/QuantumDocument.vue#L23
-  const inputElement = document.createElement("textarea");
-  inputElement.autocomplete = "off";
-  inputElement.spellcheck = false;
-  inputElement.setAttribute("autocorrect", "off");
-  inputElement.style.transform = "scale(0)";
-  inputElement.style.resize = "none";
-  inputElement.style.position = "absolute";
-  inputElement.style.clipPath = "polygon(0 0)";
-  inputElement.style.width = "0px";
-  inputElement.style.height = "0px";
-
-  inputElement.className = "math-input-area";
-  documentBody.appendChild(inputElement);
-
-  function destroy() {
-    documentBody.removeChild(inputElement);
-  }
-
-  return {
-    inputElement,
-    destroy,
-  };
-}
 
 function getAdjacentChild(parent: MathLayoutRow, element: MathLayout, direction: number): MathLayoutContainer | null;
 function getAdjacentChild(parent: MathLayoutContainer, element: MathLayout, direction: number): MathLayoutRow | null;
@@ -114,7 +84,6 @@ function createElementFromHtml(html: string) {
 }
 
 // TODO: createCaret doesn't have to append stuff to the document anymore
-// TODO: Right click menu with "copy as"
 export class MathEditor extends HTMLElement {
   carets: Set<MathCaret> = new Set<MathCaret>();
   mathAst: MathAst;
@@ -122,16 +91,25 @@ export class MathEditor extends HTMLElement {
   lastLayout: MathPhysicalLayout | null = null;
   inputHandler: MathmlInputHandler;
 
-  connectedCallback() {}
+  connectedCallback() {
+    this.render();
+  }
+
+  disconnectedCallback() {
+    // So far, everything gets cleaned up automatically
+  }
 
   constructor() {
     super();
     const shadowRoot = this.attachShadow({ mode: "open" });
 
+    // Position carets absolutely, relative to the math formula
     const caretContainer = document.createElement("span");
     caretContainer.style.position = "absolute";
 
+    // Container for math formula
     const container = document.createElement("span");
+    container.style.display = "inline-block"; // Needed for the resize observer
 
     const mathMlElement = createElementFromHtml(this.getAttribute("mathml") || "");
     assert(mathMlElement instanceof MathMLElement, "Mathml attribute must be a valid mathml element");
@@ -221,7 +199,10 @@ export class MathEditor extends HTMLElement {
       }
     });
 
-    window.addEventListener("resize", () => this.renderCarets());
+    const editorResizeObserver = new ResizeObserver(() => {
+      this.renderCarets();
+    });
+    editorResizeObserver.observe(container, { box: "border-box" });
 
     this.render = () => {
       const newMathElement = toMathMLElement(this.mathAst.mathIR);
@@ -305,8 +286,6 @@ export class MathEditor extends HTMLElement {
       this.renderCarets();
     };
 
-    this.render();
-
     const styles = document.createElement("style");
     styles.textContent = `${mathEditorStyles}\n ${caretStyles}`;
     shadowRoot.append(styles, caretContainer, container);
@@ -334,7 +313,7 @@ export class MathEditor extends HTMLElement {
   }
 
   removeCaret(caret: MathCaret) {
-    caret.caretElement.destroy();
+    caret.caretElement.remove();
     this.carets.delete(caret);
   }
 
@@ -713,12 +692,5 @@ export class MathEditor extends HTMLElement {
       caret.row.value = caret.row.value.slice(0, caret.offset) + text + caret.row.value.slice(caret.offset);
       caret.offset += text.length;
     }
-  }
-
-  destroy() {
-    [...this.carets].forEach((v) => this.removeCaret(v));
-    this.render = () => {};
-    this.lastLayout = null;
-    this.inputHandler.destroy();
   }
 }
