@@ -1,4 +1,4 @@
-import { assert } from "../assert";
+import { assert } from "../utils/assert";
 import { MathLayout, MathLayoutContainer, MathLayoutRow, MathLayoutSymbol, MathLayoutText } from "./math-layout/math-layout";
 import { TokenStream } from "./token-stream";
 import { isSame as isSameMathLayout } from "./math-layout/math-layout-utils";

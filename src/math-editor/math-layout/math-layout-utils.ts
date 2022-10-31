@@ -1,4 +1,4 @@
-import { assert } from "../../assert";
+import { assert } from "../../utils/assert";
 import { MathLayout, MathLayoutRow } from "./math-layout";
 import { endingBrackets, startingBrackets } from "../mathml-spec";
 

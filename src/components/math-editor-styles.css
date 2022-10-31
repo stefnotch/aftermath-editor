@@ -1,0 +1,6 @@
+mroot > :first-child::after {
+  content: "";
+  width: 2px;
+  height: 10px;
+  position: absolute;
+}

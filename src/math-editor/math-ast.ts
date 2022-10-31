@@ -1,5 +1,5 @@
-import { assert, assertUnreachable } from "../assert";
-import arrayUtils from "../array-utils";
+import { assert, assertUnreachable } from "../utils/assert";
+import arrayUtils from "../utils/array-utils";
 import type {
   MathLayout,
   MathLayoutContainer,

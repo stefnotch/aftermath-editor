@@ -1,4 +1,4 @@
-import { assert } from "../assert";
+import { assert } from "../utils/assert";
 
 export class TokenStream<T> {
   constructor(public value: T[], public offset: number) {}

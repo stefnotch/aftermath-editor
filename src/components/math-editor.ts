@@ -1,57 +1,27 @@
-import { assert, assertUnreachable } from "../assert";
-import { MathAst } from "./math-ast";
-import { MathLayout, MathLayoutContainer, MathPhysicalLayout, MathLayoutRow, MathLayoutText } from "./math-layout/math-layout";
-import { fromElement as fromMathMLElement, toElement as toMathMLElement } from "./mathml-converter";
-import arrayUtils from "../array-utils";
-import { endingBrackets, startingBrackets } from "./mathml-spec";
-import { findOtherBracket, wrapInRow } from "./math-layout/math-layout-utils";
-import { MathJson, toMathJson } from "./math-ir";
+import { assert, assertUnreachable } from "../utils/assert";
+import { MathAst } from "../math-editor/math-ast";
+import {
+  MathLayout,
+  MathLayoutContainer,
+  MathPhysicalLayout,
+  MathLayoutRow,
+  MathLayoutText,
+} from "../math-editor/math-layout/math-layout";
+import { fromElement as fromMathMLElement, toElement as toMathMLElement } from "../math-editor/mathml-converter";
+import arrayUtils from "../utils/array-utils";
+import { endingBrackets, startingBrackets } from "../math-editor/mathml-spec";
+import { findOtherBracket, wrapInRow } from "../math-editor/math-layout/math-layout-utils";
+import { MathJson, toMathJson } from "../math-editor/math-ir";
+import caretStyles from "./caret-styles.css?inline";
+import mathEditorStyles from "./math-editor-styles.css?inline";
+import { createCaret } from "./caret";
 
 // TODO: Someday, re-evaluate the parent-pointer approach
 // The alternative is using zippers/focus-es everywhere http://learnyouahaskell.com/zippers
-interface MathmlCaret {
-  setPosition(x: number, y: number): void;
-  setHeight(v: number): void;
-  destroy(): void;
-}
 
 interface MathmlInputHandler {
   inputElement: HTMLElement;
   destroy(): void;
-}
-
-function createCaret(documentBody: HTMLElement): MathmlCaret {
-  const caretElement = document.createElement("span");
-  caretElement.style.userSelect = "none";
-  caretElement.style.position = "absolute";
-  caretElement.style.height = "10px";
-  caretElement.style.width = "0px";
-  caretElement.style.margin = "0px";
-  caretElement.style.borderRightWidth = "0px";
-  caretElement.style.boxShadow = "0px 0px 0px 0.6px rgba(50, 50, 230, 50%)";
-  caretElement.style.top = "0px";
-  // Maybe add some cute blinking
-  caretElement.className = "math-cursor";
-  documentBody.appendChild(caretElement);
-
-  function setPosition(x: number, y: number) {
-    caretElement.style.left = `${x}px`;
-    caretElement.style.top = `${y}px`;
-  }
-
-  function setHeight(v: number) {
-    caretElement.style.height = `${v}px`;
-  }
-
-  function destroy() {
-    documentBody.removeChild(caretElement);
-  }
-
-  return {
-    setPosition,
-    setHeight,
-    destroy,
-  };
 }
 
 function createInputHandler(documentBody: HTMLElement): MathmlInputHandler {
@@ -157,17 +127,18 @@ export class MathEditor extends HTMLElement {
   constructor() {
     super();
     const shadowRoot = this.attachShadow({ mode: "open" });
+
     const container = document.createElement("span");
 
-    const element = createElementFromHtml(this.getAttribute("mathml") || "");
-    assert(element instanceof MathMLElement, "Mathml attribute must be a valid mathml element");
-    element.style.userSelect = "none";
-    element.style.display = "block";
-    element.style.fontFamily = "STIX Two";
-    element.tabIndex = 0;
-    container.append(element);
+    const mathMlElement = createElementFromHtml(this.getAttribute("mathml") || "");
+    assert(mathMlElement instanceof MathMLElement, "Mathml attribute must be a valid mathml element");
+    mathMlElement.style.userSelect = "none";
+    mathMlElement.style.display = "block";
+    mathMlElement.style.fontFamily = "STIX Two";
+    mathMlElement.tabIndex = 0;
+    container.append(mathMlElement);
 
-    this.mathAst = MathAst(fromMathMLElement(element));
+    this.mathAst = MathAst(fromMathMLElement(mathMlElement));
     console.log(this.mathAst);
 
     this.carets.add({
@@ -183,7 +154,7 @@ export class MathEditor extends HTMLElement {
     // https://tkainrad.dev/posts/why-keyboard-shortcuts-dont-work-on-non-us-keyboard-layouts-and-how-to-fix-it/
 
     // TODO: Parsing
-    // - 1. MathAst
+    // - 1. MathLayout
     // - 2. Bracket pairs
     // - 3. A general enough recursive descent (or pratt) parser that can handle tokens
 
@@ -209,7 +180,7 @@ export class MathEditor extends HTMLElement {
     // TODO:
     // - move carets to the same spot (merge)
     // - select and delete region that contains a caret
-    element.addEventListener("focus", (ev) => {
+    mathMlElement.addEventListener("focus", (ev) => {
       this.inputHandler.inputElement.focus();
     });
 
@@ -252,7 +223,7 @@ export class MathEditor extends HTMLElement {
     this.render = () => {
       const newMathElement = toMathMLElement(this.mathAst.mathIR);
       this.lastLayout = newMathElement.physicalLayout;
-      element.replaceChildren(...newMathElement.element.children);
+      mathMlElement.replaceChildren(...newMathElement.element.children);
       // Don't copy the attributes
 
       try {
@@ -333,14 +304,9 @@ export class MathEditor extends HTMLElement {
 
     this.render();
 
-    const style = document.createElement("style");
-    style.innerHTML = `mroot > :first-child::after {
-      content: "";
-      width: 2px;
-      height: 10px;
-      position: absolute;
-    }`;
-    shadowRoot.append(style, container);
+    const styles = document.createElement("style");
+    styles.textContent = `${mathEditorStyles}\n ${caretStyles}`;
+    shadowRoot.append(styles, container);
   }
 
   renderCarets() {
