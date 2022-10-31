@@ -1,23 +1,11 @@
 import { assert, assertUnreachable } from "../assert";
 import { MathAst } from "./math-ast";
-import {
-  MathLayout,
-  MathLayoutContainer,
-  MathPhysicalLayout,
-  MathLayoutRow,
-  MathLayoutSymbol,
-  MathLayoutText,
-} from "./math-layout/math-layout";
+import { MathLayout, MathLayoutContainer, MathPhysicalLayout, MathLayoutRow, MathLayoutText } from "./math-layout/math-layout";
 import { fromElement as fromMathMLElement, toElement as toMathMLElement } from "./mathml-converter";
-import arrayUtils from "./array-utils";
+import arrayUtils from "../array-utils";
 import { endingBrackets, startingBrackets } from "./mathml-spec";
 import { findOtherBracket, wrapInRow } from "./math-layout/math-layout-utils";
 import { MathJson, toMathJson } from "./math-ir";
-import init, { greet } from "mathml-editor-rs";
-
-init().then(() => {
-  greet();
-});
 
 // TODO: Someday, re-evaluate the parent-pointer approach
 // The alternative is using zippers/focus-es everywhere http://learnyouahaskell.com/zippers
@@ -92,11 +80,7 @@ function createInputHandler(documentBody: HTMLElement): MathmlInputHandler {
   };
 }
 
-function getAdjacentChild(
-  parent: MathLayoutRow,
-  element: MathLayout,
-  direction: number
-): (MathLayoutText | MathLayoutContainer | MathLayoutSymbol) | null;
+function getAdjacentChild(parent: MathLayoutRow, element: MathLayout, direction: number): MathLayoutContainer | null;
 function getAdjacentChild(parent: MathLayoutContainer, element: MathLayout, direction: number): MathLayoutRow | null;
 function getAdjacentChild(
   parent: MathLayoutRow | MathLayoutContainer,
@@ -415,7 +399,7 @@ export class MathEditor extends HTMLElement {
       }
     }
 
-    function moveCaretRightDown(adjacentChild: MathLayoutText | MathLayoutContainer | MathLayoutSymbol): boolean {
+    function moveCaretRightDown(adjacentChild: MathLayoutContainer): boolean {
       if (adjacentChild.type == "text" || adjacentChild.type == "error") {
         caret.row = adjacentChild;
         caret.offset = 0;
@@ -433,7 +417,7 @@ export class MathEditor extends HTMLElement {
       }
     }
 
-    function moveCaretLeftDown(adjacentChild: MathLayoutText | MathLayoutContainer | MathLayoutSymbol): boolean {
+    function moveCaretLeftDown(adjacentChild: MathLayoutContainer): boolean {
       if (adjacentChild.type == "text" || adjacentChild.type == "error") {
         caret.row = adjacentChild;
         caret.offset = adjacentChild.value.length;
@@ -545,10 +529,7 @@ export class MathEditor extends HTMLElement {
   /**
    * Gets the element that the caret is "touching"
    */
-  getElementAtCaret(
-    caret: MathCaret,
-    direction: "left" | "right"
-  ): MathLayoutText | MathLayoutContainer | MathLayoutSymbol | null {
+  getElementAtCaret(caret: MathCaret, direction: "left" | "right"): MathLayoutContainer | null {
     if (caret.row.type == "row") {
       const elementIndex = caret.offset + (direction == "left" ? -1 : 0);
       return arrayUtils.get(caret.row.values, elementIndex) ?? null;
@@ -564,7 +545,7 @@ export class MathEditor extends HTMLElement {
     function removeButKeepChildren(
       mathAst: MathAst,
       toRemove: MathLayoutContainer,
-      children: (MathLayoutContainer | MathLayoutSymbol | MathLayoutText)[]
+      children: MathLayoutContainer[]
     ): { parent: MathLayoutRow; indexInParent: number } {
       const { parent, indexInParent } = mathAst.getParentAndIndex(toRemove);
       assert(parent != null);
@@ -712,7 +693,7 @@ export class MathEditor extends HTMLElement {
     }
 
     const mathAst = this.mathAst;
-    function insertMathLayout<T extends MathLayoutText | MathLayoutContainer | MathLayoutSymbol>(mathIR: T): T {
+    function insertMathLayout<T extends MathLayoutContainer>(mathIR: T): T {
       assert(caret.row.type == "row");
       mathAst.setParents(null, [mathIR]);
       mathAst.insertChild(caret.row, mathIR, caret.offset);

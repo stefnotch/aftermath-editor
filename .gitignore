@@ -4,3 +4,4 @@ node_modules
 *.lock
 /libs
 /dist
+__unconfig_vite.config.ts

@@ -1,6 +1,12 @@
 import { assert, assertUnreachable } from "../assert";
-import arrayUtils from "./array-utils";
-import type { MathLayout, MathLayoutContainer, MathLayoutText, MathLayoutRow, MathLayoutSymbol } from "./math-layout/math-layout";
+import arrayUtils from "../array-utils";
+import type {
+  MathLayout,
+  MathLayoutContainer,
+  MathLayoutText,
+  MathLayoutRow,
+  MathLayoutSymbol,
+} from "./math-layout/math-layout";
 
 /*
  * MathLayout with parent pointers. Currently not super safe, as it's possible to construct a cyclic tree (node.parent = node)
@@ -18,7 +24,10 @@ export interface MathAst {
     parent: MathLayoutContainer | null;
     indexInParent: number;
   };
-  getParentAndIndex(mathIR: MathLayoutContainer | MathLayoutSymbol | MathLayoutText): { parent: MathLayoutRow | null; indexInParent: number };
+  getParentAndIndex(mathIR: MathLayoutContainer | MathLayoutSymbol | MathLayoutText): {
+    parent: MathLayoutRow | null;
+    indexInParent: number;
+  };
   getParentAndIndex(mathIR: MathLayout): {
     parent: MathLayoutRow | MathLayoutContainer | null;
     indexInParent: number;
@@ -112,7 +121,11 @@ export function MathAst(mathIR: MathLayoutRow): MathAst {
     ast.parents.delete(value);
   }
 
-  function insertChild(mathIR: MathLayoutRow, value: MathLayoutContainer | MathLayoutSymbol | MathLayoutText, index: number): void {
+  function insertChild(
+    mathIR: MathLayoutRow,
+    value: MathLayoutContainer | MathLayoutSymbol | MathLayoutText,
+    index: number
+  ): void {
     assert(mathIR.type == "row");
     mathIR.values.splice(index, 0, value);
     ast.parents.set(value, mathIR);

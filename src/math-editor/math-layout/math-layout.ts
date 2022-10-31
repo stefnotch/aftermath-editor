@@ -84,7 +84,7 @@ export type MathLayoutContainer =
     }
   | MathLayoutText;
 
-type MathLayoutText =
+export type MathLayoutText =
   | {
       /**
        * A single bit of text.
