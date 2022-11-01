@@ -1,12 +1,6 @@
 import { assert, assertUnreachable } from "../utils/assert";
 import { MathAst } from "../math-editor/math-ast";
-import {
-  MathLayout,
-  MathLayoutElement,
-  MathPhysicalLayout,
-  MathLayoutRow,
-  MathLayoutText,
-} from "../math-editor/math-layout/math-layout";
+import { MathLayoutElement, MathPhysicalLayout, MathLayoutRow, MathLayoutText } from "../math-editor/math-layout/math-layout";
 import { fromElement as fromMathMLElement, toElement as toMathMLElement } from "../math-editor/mathml-converter";
 import arrayUtils from "../utils/array-utils";
 import { endingBrackets, startingBrackets } from "../math-editor/mathml-spec";

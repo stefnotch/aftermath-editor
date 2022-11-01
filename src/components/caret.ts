@@ -6,7 +6,7 @@ export interface CaretElement {
   remove(): void;
 }
 
-export function createCaret(documentBody: HTMLElement): CaretElement {
+export function createCaret(container: HTMLElement): CaretElement {
   const caretElement = document.createElement("span");
   caretElement.style.userSelect = "none";
   caretElement.style.position = "absolute";
@@ -18,10 +18,10 @@ export function createCaret(documentBody: HTMLElement): CaretElement {
   caretElement.style.top = "0px";
   // Maybe add some cute blinking
   caretElement.className = "math-caret";
-  documentBody.append(caretElement);
+  container.append(caretElement);
 
   function setPosition(x: ViewportCoordinate, y: ViewportCoordinate) {
-    const parentPos = documentBody.getBoundingClientRect();
+    const parentPos = container.getBoundingClientRect();
 
     caretElement.style.left = `${x - parentPos.left}px`;
     caretElement.style.top = `${y - parentPos.top}px`;
@@ -32,7 +32,7 @@ export function createCaret(documentBody: HTMLElement): CaretElement {
   }
 
   function remove() {
-    documentBody.removeChild(caretElement);
+    container.removeChild(caretElement);
   }
 
   return {

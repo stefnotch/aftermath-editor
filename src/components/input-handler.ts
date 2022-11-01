@@ -3,7 +3,7 @@ export interface MathmlInputHandler {
   remove(): void;
 }
 
-export function createInputHandler(documentBody: HTMLElement): MathmlInputHandler {
+export function createInputHandler(container: HTMLElement): MathmlInputHandler {
   // See also https://github.com/stefnotch/quantum-sheet/blob/6b445476559ab5354b8a1c68c24a4ceb24e050e9/src/ui/QuantumDocument.vue#L23
   const inputElement = document.createElement("textarea");
   inputElement.autocomplete = "off";
@@ -16,10 +16,10 @@ export function createInputHandler(documentBody: HTMLElement): MathmlInputHandle
   inputElement.style.width = "0px";
   inputElement.style.height = "0px";
   inputElement.className = "math-input-area";
-  documentBody.append(inputElement);
+  container.append(inputElement);
 
   function remove() {
-    documentBody.removeChild(inputElement);
+    container.removeChild(inputElement);
   }
 
   return {
