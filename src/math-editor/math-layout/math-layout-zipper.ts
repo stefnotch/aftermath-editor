@@ -13,6 +13,7 @@ import {
 /**
  * A red-green tree: https://blog.yaakov.online/red-green-trees/
  * A zipper is a pointer to a node in a tree, with a reference to the parent node.
+ * See also: http://learnyouahaskell.com/zippers
  */
 interface MathLayoutZipper {
   readonly type: string;

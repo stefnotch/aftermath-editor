@@ -110,7 +110,7 @@ function toMathLayout(element: Element): MathLayout | MathLayout[] {
   } else if (tagIs(element, "mfrac")) {
     return (
       expectNChildren(element, 2) ?? {
-        type: "frac",
+        type: "fraction",
         values: children.map((c) => wrapInRow(toMathLayout(c))) as [MathLayoutRow, MathLayoutRow],
       }
     );
@@ -287,7 +287,7 @@ function fromMathLayout(mathIR: MathLayout, physicalLayout: MathPhysicalLayout):
     return createMathElement("merror", [
       createMathElement("mtext", [setTextLayout(mathIR, document.createTextNode(mathIR.value))]),
     ]);
-  } else if (mathIR.type == "frac") {
+  } else if (mathIR.type == "fraction") {
     return createMathElement("mfrac", [
       fromMathLayout(mathIR.values[0], physicalLayout),
       fromMathLayout(mathIR.values[1], physicalLayout),

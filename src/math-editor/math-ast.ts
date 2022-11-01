@@ -132,7 +132,7 @@ export function MathAst(mathIR: MathLayoutRow): MathAst {
       mathIR.values[indexA] = value;
       ast.parents.set(value, mathIR);
     } else if (
-      mathIR.type == "frac" ||
+      mathIR.type == "fraction" ||
       mathIR.type == "root" ||
       mathIR.type == "under" ||
       mathIR.type == "over" ||
@@ -171,7 +171,7 @@ export function MathAst(mathIR: MathLayoutRow): MathAst {
     if (mathIR.type == "row") {
       return mathIR;
     } else if (
-      mathIR.type == "frac" ||
+      mathIR.type == "fraction" ||
       mathIR.type == "root" ||
       mathIR.type == "under" ||
       mathIR.type == "over" ||
@@ -188,7 +188,7 @@ export function MathAst(mathIR: MathLayoutRow): MathAst {
   function getChildren(mathIR: MathLayout) {
     if (
       mathIR.type == "row" ||
-      mathIR.type == "frac" ||
+      mathIR.type == "fraction" ||
       mathIR.type == "root" ||
       mathIR.type == "under" ||
       mathIR.type == "over" ||

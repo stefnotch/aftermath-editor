@@ -20,9 +20,6 @@ import { createInputHandler, MathmlInputHandler } from "./input-handler";
 import { MathLayoutCaret } from "./math-layout-caret";
 import { MathLayoutRowZipper } from "../math-editor/math-layout/math-layout-zipper";
 
-// TODO: Someday, re-evaluate the parent-pointer approach
-// The alternative is using zippers/focus-es everywhere http://learnyouahaskell.com/zippers
-
 export interface MathCaret {
   caret: MathLayoutCaret;
   element: CaretElement;
@@ -34,7 +31,6 @@ function createElementFromHtml(html: string) {
   return template.content.firstChild;
 }
 
-// TODO: createCaret doesn't have to append stuff to the document anymore
 export class MathEditor extends HTMLElement {
   carets: Set<MathCaret> = new Set<MathCaret>();
 
@@ -169,7 +165,7 @@ export class MathEditor extends HTMLElement {
 
       try {
         console.log(
-          toMathJson(this.mathAst.mathIR, [
+          toMathJson(this.mathAst.value /** TODO: Use MathIR here */, [
             {
               bindingPower: [null, null],
               tokens: [
@@ -256,11 +252,11 @@ export class MathEditor extends HTMLElement {
     const lastLayout = this.lastLayout;
     if (!lastLayout) return;
 
-    const layoutGetter = lastLayout.get(caret.row);
+    const layoutGetter = lastLayout.get(caret.caret.zipper.value);
     assert(layoutGetter !== undefined);
-    const layout = layoutGetter(caret.offset);
-    caret.caretElement.setPosition(layout.x, layout.y);
-    caret.caretElement.setHeight(layout.height);
+    const layout = layoutGetter(caret.caret.offset);
+    caret.element.setPosition(layout.x, layout.y);
+    caret.element.setHeight(layout.height);
 
     // TODO: Highlight current element
     // - if inside sqrt, highlight that
@@ -278,79 +274,9 @@ export class MathEditor extends HTMLElement {
    * Note: Make sure to re-render the caret after moving it
    */
   moveCaret(caret: MathCaret, direction: "up" | "down" | "left" | "right") {
-    const mathAst = this.mathAst;
-
-    function moveCaretRightDown(adjacentChild: MathLayoutElement): boolean {
-      if (adjacentChild.type == "text" || adjacentChild.type == "error") {
-        caret.row = adjacentChild;
-        caret.offset = 0;
-        return true;
-      } else if (adjacentChild.type == "bracket" || adjacentChild.type == "symbol") {
-        return false;
-      } else if (adjacentChild.type == "table") {
-        caret.row = adjacentChild.values[0][0];
-        caret.offset = 0;
-        return true;
-      } else {
-        caret.row = adjacentChild.values[0];
-        caret.offset = 0;
-        return true;
-      }
-    }
-
-    function moveCaretLeftDown(adjacentChild: MathLayoutElement): boolean {
-      if (adjacentChild.type == "text" || adjacentChild.type == "error") {
-        caret.row = adjacentChild;
-        caret.offset = adjacentChild.value.length;
-        return true;
-      } else if (adjacentChild.type == "bracket" || adjacentChild.type == "symbol") {
-        return false;
-      } else if (adjacentChild.type == "table") {
-        // TODO: Use .at()
-        const lastTableRow = adjacentChild.values[adjacentChild.values.length - 1];
-        caret.row = lastTableRow[lastTableRow.length - 1];
-        caret.offset = 0;
-        return true;
-      } else {
-        const row = adjacentChild.values[adjacentChild.values.length - 1];
-        caret.row = row;
-        caret.offset = row.values.length;
-        return true;
-      }
-    }
-
-    if (direction == "right") {
-      if (this.isCaretAtEdge(caret, direction)) {
-        moveCaretInDirection(caret.row, direction);
-      } else {
-        if (caret.row.type == "row") {
-          const movedIntoTree = moveCaretRightDown(caret.row.values[caret.offset]);
-          if (!movedIntoTree) {
-            caret.offset += 1;
-          }
-        } else {
-          caret.offset += 1;
-        }
-      }
-    } else if (direction == "left") {
-      if (this.isCaretAtEdge(caret, direction)) {
-        moveCaretInDirection(caret.row, direction);
-      } else {
-        if (caret.row.type == "row") {
-          const movedIntoTree = moveCaretLeftDown(caret.row.values[caret.offset - 1]);
-          if (!movedIntoTree) {
-            caret.offset -= 1;
-          }
-        } else {
-          caret.offset -= 1;
-        }
-      }
-    } else if (direction == "up") {
-      moveCaretInVerticalDirection(caret.row, direction);
-    } else if (direction == "down") {
-      moveCaretInVerticalDirection(caret.row, direction);
-    } else {
-      assertUnreachable(direction);
+    const newCaret = caret.caret.move(direction);
+    if (newCaret) {
+      caret.caret = newCaret;
     }
   }
 
@@ -391,7 +317,7 @@ export class MathEditor extends HTMLElement {
         // At the start or end of a row
         const { parent, indexInParent } = this.mathAst.getParentAndIndex(caret.row);
         if (parent == null) return;
-        if (parent.type == "frac") {
+        if (parent.type == "fraction") {
           if ((indexInParent == 0 && direction == "left") || (indexInParent == 1 && direction == "right")) {
             this.moveCaret(caret, direction);
           } else {
@@ -546,7 +472,7 @@ export class MathEditor extends HTMLElement {
         caret.offset = 0;
       } else if (text == "/") {
         const mathIR = insertMathLayout({
-          type: "frac",
+          type: "fraction",
           values: [
             takeElementOrBracket(this.mathAst, caret, "left") ?? { type: "row", values: [] },
             takeElementOrBracket(this.mathAst, caret, "right") ?? { type: "row", values: [] },

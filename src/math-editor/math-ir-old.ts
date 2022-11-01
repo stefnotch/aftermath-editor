@@ -315,7 +315,7 @@ function parseRow(
         if (isDigit.test(mathLayout.value)) {
           parsedValue = parseNumber(tokens, definitions, sourceMap);
         }
-      } else if (mathLayout.type == "frac") {
+      } else if (mathLayout.type == "fraction") {
         parsedValue = {
         mathJson: [
           "Divide",

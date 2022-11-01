@@ -5,7 +5,7 @@ import {
   MathLayoutTableZipper,
   MathLayoutTextZipper,
 } from "../math-editor/math-layout/math-layout-zipper";
-import { assert, assertUnreachable } from "../utils/assert";
+import { assertUnreachable } from "../utils/assert";
 
 export type Direction = "left" | "right" | "up" | "down";
 
@@ -89,7 +89,36 @@ function moveHorizontalBeyondEdge(
 /**
  * Move to the left or right, but always attempt to move into a nested element if there is one.
  */
-function moveHorizontalInto(): MathLayoutCaret | null {}
+function moveHorizontalInto(
+  zipper: MathLayoutRowZipper,
+  caretOffset: number,
+  direction: "left" | "right"
+): MathLayoutCaret | null {
+  // Carets are always inbetween elements. Hence element[caretOffset] is the element to the right of the caret.
+  const adjacentChild = zipper.children[caretOffset + (direction === "left" ? -1 : 0)];
+
+  if (adjacentChild.type === "text" || adjacentChild.type === "error") {
+    const offset = direction === "left" ? adjacentChild.value.value.length : 0;
+    return new MathLayoutCaret(adjacentChild, offset);
+  } else if (adjacentChild.type === "bracket" || adjacentChild.type === "symbol") {
+    return null;
+  } else if (
+    adjacentChild.type === "table" ||
+    adjacentChild.type === "fraction" ||
+    adjacentChild.type === "root" ||
+    adjacentChild.type === "under" ||
+    adjacentChild.type === "over" ||
+    adjacentChild.type === "sup" ||
+    adjacentChild.type === "sub"
+  ) {
+    const adjacentRow =
+      direction === "left" ? adjacentChild.children[adjacentChild.children.length - 1] : adjacentChild.children[0];
+    const offset = direction === "left" ? adjacentRow.value.values.length : 0;
+    return new MathLayoutCaret(adjacentRow, offset);
+  } else {
+    assertUnreachable(adjacentChild.type);
+  }
+}
 
 // TODO: For text use https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Segmenter
 export class MathLayoutCaret {
@@ -100,35 +129,19 @@ export class MathLayoutCaret {
   }
 
   move(direction: Direction): MathLayoutCaret | null {
-    if (direction == "right") {
+    if (direction === "right" || direction === "left") {
       if (this.isTouchingEdge(direction)) {
         return moveHorizontalBeyondEdge(this.zipper, direction);
       } else {
         if (this.zipper.type == "row") {
-          // moveCaretRightDown
-          const moveIntoChildTree = moveHorizontalInto(caret.row.values[caret.offset], direction);
-          return moveIntoChildTree ?? new MathLayoutCaret(this.zipper, this.offset + 1);
+          const moveIntoChildTree = moveHorizontalInto(this.zipper, this.offset, direction);
+          return moveIntoChildTree ?? new MathLayoutCaret(this.zipper, this.offset + (direction === "left" ? -1 : +1));
         } else {
           // Moving in text
-          return new MathLayoutCaret(this.zipper, this.offset + 1);
+          return new MathLayoutCaret(this.zipper, this.offset + (direction === "left" ? -1 : +1));
         }
       }
-    } else if (direction == "left") {
-      if (this.isTouchingEdge(direction)) {
-        return moveHorizontalBeyondEdge(this.zipper, direction);
-      } else {
-        if (this.zipper.type == "row") {
-          // moveCaretLeftDown
-          const moveIntoChildTree = moveHorizontalInto(caret.row.values[caret.offset - 1], direction);
-          return moveIntoChildTree ?? new MathLayoutCaret(this.zipper, this.offset - 1);
-        } else {
-          // Moving in text
-          return new MathLayoutCaret(this.zipper, this.offset - 1);
-        }
-      }
-    } else if (direction == "up") {
-      return moveVertical(this.zipper, direction);
-    } else if (direction == "down") {
+    } else if (direction === "up" || direction === "down") {
       return moveVertical(this.zipper, direction);
     } else {
       assertUnreachable(direction);

@@ -1,5 +1,9 @@
 import { ViewportCoordinate } from "../../components/viewport-coordinate";
-import { assertUnreachable } from "../../utils/assert";
+
+/**
+ * Merely a Typescript hint to make sure that I don't miss any cases
+ */
+function typecheckIsNever(_: never) {}
 
 // TODO: Get rid of this, you almost always want a MathLayoutRow instead
 export type MathLayout = MathLayoutRow | MathLayoutElement;
@@ -22,8 +26,10 @@ export function isMathLayoutRow(value: MathLayoutRow | MathLayoutElement): value
   const { type } = value as MathLayoutRow;
   if (type === "row") {
     return true;
+  } else {
+    typecheckIsNever(type);
+    return false;
   }
-  assertUnreachable(type);
 }
 
 export type MathLayoutElement = MathLayoutContainer | MathLayoutTable | MathLayoutSymbol | MathLayoutText;
@@ -31,8 +37,10 @@ export function isMathLayoutElement(value: MathLayoutRow | MathLayoutElement): v
   const v = value as MathLayoutElement;
   if (isMathLayoutContainer(v) || isMathLayoutTable(v) || isMathLayoutSymbol(v) || isMathLayoutText(v)) {
     return true;
+  } else {
+    typecheckIsNever(v);
+    return false;
   }
-  assertUnreachable(v);
 }
 
 /**
@@ -85,8 +93,10 @@ export function isMathLayoutContainer(value: MathLayoutRow | MathLayoutElement):
   const { type } = value as MathLayoutContainer;
   if (type === "fraction" || type === "root" || type === "under" || type === "over" || type === "sup" || type === "sub") {
     return true;
+  } else {
+    typecheckIsNever(type);
+    return false;
   }
-  assertUnreachable(type);
 }
 
 /**
@@ -105,8 +115,10 @@ export function isMathLayoutTable(value: MathLayoutRow | MathLayoutElement): val
   const { type } = value as MathLayoutTable;
   if (type === "table") {
     return true;
+  } else {
+    typecheckIsNever(type);
+    return false;
   }
-  assertUnreachable(type);
 }
 
 /**
@@ -134,8 +146,10 @@ export function isMathLayoutSymbol(value: MathLayoutRow | MathLayoutElement): va
   const { type } = value as MathLayoutSymbol;
   if (type === "symbol" || type === "bracket") {
     return true;
+  } else {
+    typecheckIsNever(type);
+    return false;
   }
-  assertUnreachable(type);
 }
 
 /**
@@ -161,8 +175,10 @@ export function isMathLayoutText(value: MathLayoutRow | MathLayoutElement): valu
   const { type } = value as MathLayoutText;
   if (type === "text" || type === "error") {
     return true;
+  } else {
+    typecheckIsNever(type);
+    return false;
   }
-  assertUnreachable(type);
 }
 
 /*
