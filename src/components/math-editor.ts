@@ -23,57 +23,6 @@ import { MathLayoutRowZipper } from "../math-editor/math-layout/math-layout-zipp
 // TODO: Someday, re-evaluate the parent-pointer approach
 // The alternative is using zippers/focus-es everywhere http://learnyouahaskell.com/zippers
 
-function getAdjacentChild(parent: MathLayoutRow, element: MathLayout, direction: number): MathLayoutElement | null;
-function getAdjacentChild(parent: MathLayoutElement, element: MathLayout, direction: number): MathLayoutRow | null;
-function getAdjacentChild(
-  parent: MathLayoutRow | MathLayoutElement,
-  element: MathLayout,
-  direction: number
-): MathLayout | null {
-  assert(direction != 0);
-  if (parent.type == "row") {
-    if (element.type != "row") {
-      const indexInParent = parent.values.indexOf(element);
-      assert(indexInParent != -1);
-      return indexInParent + direction >= parent.values.length || indexInParent + direction < 0
-        ? null
-        : parent.values[indexInParent + direction];
-    } else {
-      return null;
-    }
-  } else if (parent.type == "table") {
-    if (element.type == "row") {
-      // We assume that tables are always rectangular
-      const length = parent.values.length;
-      const width = parent.values[0].length;
-      for (let i = 0; i < length; i++) {
-        const indexInParent = parent.values[i].indexOf(element);
-        if (indexInParent == -1) continue;
-
-        const oneDimensionalIndex = i * width + indexInParent;
-        const adjacentIndex = oneDimensionalIndex + direction;
-        return adjacentIndex >= length * width || adjacentIndex < 0
-          ? null
-          : parent.values[Math.trunc(adjacentIndex / width)][adjacentIndex % width];
-      }
-      // Unreachable
-      throw new Error("Element not found in table");
-    } else {
-      return null;
-    }
-  } else {
-    if (element.type == "row") {
-      const indexInParent = parent.values.indexOf(element);
-      assert(indexInParent != -1);
-      return indexInParent + direction >= parent.values.length || indexInParent + direction < 0
-        ? null
-        : parent.values[indexInParent + direction];
-    } else {
-      return null;
-    }
-  }
-}
-
 export interface MathCaret {
   caret: MathLayoutCaret;
   element: CaretElement;
@@ -128,7 +77,7 @@ export class MathEditor extends HTMLElement {
     mathMlElement.tabIndex = 0;
     container.append(mathMlElement);
 
-    this.mathAst = new MathLayoutRowZipper(fromMathMLElement(mathMlElement), null);
+    this.mathAst = new MathLayoutRowZipper(fromMathMLElement(mathMlElement), null, 0);
     console.log(this.mathAst);
 
     this.carets.add({
@@ -331,30 +280,6 @@ export class MathEditor extends HTMLElement {
   moveCaret(caret: MathCaret, direction: "up" | "down" | "left" | "right") {
     const mathAst = this.mathAst;
 
-    function moveCaretInDirection(caretElement: MathLayout, direction: "left" | "right"): boolean {
-      const isLeft = direction == "left";
-      const parent = mathAst.parents.get(caretElement);
-      if (!parent) return false;
-
-      if (parent.type == "row") {
-        const offset = (parent.values as MathLayout[]).indexOf(caretElement);
-        assert(offset != -1);
-        caret.row = parent;
-        caret.offset = offset + (isLeft ? 0 : 1);
-        return true;
-      } else {
-        const adjacentChild = getAdjacentChild(parent, caretElement, isLeft ? -1 : 1);
-        if (adjacentChild != null) {
-          caret.row = adjacentChild;
-          caret.offset = isLeft ? adjacentChild.values.length : 0;
-          return true;
-        } else {
-          // We're at the end, move up
-          return moveCaretInDirection(parent, direction);
-        }
-      }
-    }
-
     function moveCaretRightDown(adjacentChild: MathLayoutElement): boolean {
       if (adjacentChild.type == "text" || adjacentChild.type == "error") {
         caret.row = adjacentChild;
@@ -394,44 +319,6 @@ export class MathEditor extends HTMLElement {
       }
     }
 
-    function moveCaretInVerticalDirection(caretElement: MathLayoutRow | MathLayoutText, direction: "up" | "down"): boolean {
-      // TODO: Potentially tweak this so that it attempts to keep the x-coordinate
-      const { parent, indexInParent } = mathAst.getParentAndIndex(caretElement);
-      if (!parent) return false;
-
-      if (parent.type == "table") {
-        // TODO:
-        return false;
-      } else if (parent.type == "frac" || parent.type == "root" || parent.type == "under" || parent.type == "over") {
-        const newIndexInParent = indexInParent + (direction == "up" ? -1 : 1);
-
-        if (newIndexInParent < 0 || newIndexInParent >= parent.values.length) {
-          // Reached the top/bottom
-          const parentParent = mathAst.getParent(parent);
-          return parentParent == null ? false : moveCaretInVerticalDirection(parentParent, direction);
-        } else {
-          // Can move up or down
-          const row = parent.values[newIndexInParent];
-          caret.row = parent.values[newIndexInParent];
-          caret.offset = direction == "up" ? row.values.length : 0;
-          return true;
-        }
-      } else if (parent.type == "sup" || parent.type == "sub") {
-        const { parent: parentParent, indexInParent: indexInParentParent } = mathAst.getParentAndIndex(parent);
-        if (parentParent == null) return false;
-
-        if ((parent.type == "sup" && direction == "down") || (parent.type == "sub" && direction == "up")) {
-          caret.row = parentParent;
-          caret.offset = indexInParentParent;
-          return true;
-        } else {
-          return moveCaretInVerticalDirection(parentParent, direction);
-        }
-      } else {
-        return moveCaretInVerticalDirection(parent, direction);
-      }
-    }
-
     if (direction == "right") {
       if (this.isCaretAtEdge(caret, direction)) {
         moveCaretInDirection(caret.row, direction);
@@ -464,21 +351,6 @@ export class MathEditor extends HTMLElement {
       moveCaretInVerticalDirection(caret.row, direction);
     } else {
       assertUnreachable(direction);
-    }
-  }
-
-  /**
-   * Checks if the caret is moving at the very edge of its container
-   */
-  isCaretAtEdge(caret: MathCaret, direction: "left" | "right"): boolean {
-    if (direction == "right") {
-      if (caret.row.type == "row") {
-        return caret.offset >= caret.row.values.length;
-      } else {
-        return caret.offset >= caret.row.value.length;
-      }
-    } else {
-      return caret.offset <= 0;
     }
   }
 

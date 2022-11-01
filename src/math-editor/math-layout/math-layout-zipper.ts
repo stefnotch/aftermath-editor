@@ -15,7 +15,8 @@ import {
  * A zipper is a pointer to a node in a tree, with a reference to the parent node.
  */
 interface MathLayoutZipper {
-  type: string;
+  readonly type: string;
+  readonly indexInParent: number;
   equals(other: MathLayoutZipper): boolean;
 }
 
@@ -42,7 +43,8 @@ function zippersEqual<T extends ZipperInstance, U extends ZipperInstance>(a: T, 
 export class MathLayoutRowZipper implements MathLayoutZipper {
   constructor(
     public readonly value: MathLayoutRow,
-    public readonly parent: MathLayoutContainerZipper | MathLayoutTableZipper | null
+    public readonly parent: MathLayoutContainerZipper | MathLayoutTableZipper | null,
+    public readonly indexInParent: number
   ) {}
 
   equals<T extends ZipperInstance>(other: T): boolean {
@@ -53,22 +55,26 @@ export class MathLayoutRowZipper implements MathLayoutZipper {
     return this.value.type;
   }
   get children() {
-    return this.value.values.map((v) => {
+    return this.value.values.map((v, i) => {
       if (isMathLayoutSymbol(v)) {
-        return new MathLayoutSymbolZipper(v, this);
+        return new MathLayoutSymbolZipper(v, this, i);
       } else if (isMathLayoutText(v)) {
-        return new MathLayoutTextZipper(v, this);
+        return new MathLayoutTextZipper(v, this, i);
       } else if (isMathLayoutTable(v)) {
-        return new MathLayoutTableZipper(v, this);
+        return new MathLayoutTableZipper(v, this, i);
       } else {
-        return new MathLayoutContainerZipper(v, this);
+        return new MathLayoutContainerZipper(v, this, i);
       }
     });
   }
 }
 
 export class MathLayoutContainerZipper implements MathLayoutZipper {
-  constructor(public readonly value: MathLayoutContainer, public readonly parent: MathLayoutRowZipper) {}
+  constructor(
+    public readonly value: MathLayoutContainer,
+    public readonly parent: MathLayoutRowZipper,
+    public readonly indexInParent: number
+  ) {}
 
   equals<T extends ZipperInstance>(other: T): boolean {
     return zippersEqual(this, other);
@@ -79,13 +85,17 @@ export class MathLayoutContainerZipper implements MathLayoutZipper {
   }
 
   get children() {
-    return this.value.values.map((v) => new MathLayoutRowZipper(v, this));
+    return this.value.values.map((v, i) => new MathLayoutRowZipper(v, this, i));
   }
 }
 
 // Unsure if this is already good enough or if we need more stuff for navigating within a table
 export class MathLayoutTableZipper implements MathLayoutZipper {
-  constructor(public readonly value: MathLayoutTable, public readonly parent: MathLayoutRowZipper) {}
+  constructor(
+    public readonly value: MathLayoutTable,
+    public readonly parent: MathLayoutRowZipper,
+    public readonly indexInParent: number
+  ) {}
 
   equals<T extends ZipperInstance>(other: T): boolean {
     return zippersEqual(this, other);
@@ -96,12 +106,16 @@ export class MathLayoutTableZipper implements MathLayoutZipper {
   }
 
   get children() {
-    return this.value.values.map((v) => new MathLayoutRowZipper(v, this));
+    return this.value.values.map((v, i) => new MathLayoutRowZipper(v, this, i));
   }
 }
 
 export class MathLayoutSymbolZipper implements MathLayoutZipper {
-  constructor(public readonly value: MathLayoutSymbol, public readonly parent: MathLayoutRowZipper) {}
+  constructor(
+    public readonly value: MathLayoutSymbol,
+    public readonly parent: MathLayoutRowZipper,
+    public readonly indexInParent: number
+  ) {}
 
   equals<T extends ZipperInstance>(other: T): boolean {
     return zippersEqual(this, other);
@@ -113,7 +127,11 @@ export class MathLayoutSymbolZipper implements MathLayoutZipper {
 }
 
 export class MathLayoutTextZipper implements MathLayoutZipper {
-  constructor(public readonly value: MathLayoutText, public readonly parent: MathLayoutRowZipper) {}
+  constructor(
+    public readonly value: MathLayoutText,
+    public readonly parent: MathLayoutRowZipper,
+    public readonly indexInParent: number
+  ) {}
 
   equals<T extends ZipperInstance>(other: T): boolean {
     return zippersEqual(this, other);

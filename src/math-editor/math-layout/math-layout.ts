@@ -5,7 +5,7 @@ import { assertUnreachable } from "../../utils/assert";
 export type MathLayout = MathLayoutRow | MathLayoutElement;
 
 /**
- * A simple representation of what a math formula looks like.
+ * A simple representation of what a math formula looks like. Immutable.
  * Optimized for editing, purposefully does not assign meaning to most characters.
  * For instance, if the formula contains "0xe", we just say it has the characters 0, x, e.
  * We don't parse it as a hexadecimal or 0*x*e or anything. That part is done later.
@@ -14,8 +14,8 @@ export type MathLayoutRow = {
   /**
    * Rows have an arbitrary number of children
    */
-  type: "row";
-  values: MathLayoutElement[];
+  readonly type: "row";
+  readonly values: readonly MathLayoutElement[];
 };
 
 export function isMathLayoutRow(value: MathLayoutRow | MathLayoutElement): value is MathLayoutRow {
@@ -43,43 +43,43 @@ export type MathLayoutContainer =
       /**
        * $\frac{a}{b}$
        */
-      type: "fraction";
-      values: [MathLayoutRow, MathLayoutRow];
+      readonly type: "fraction";
+      readonly values: readonly [MathLayoutRow, MathLayoutRow];
     }
   | {
       /**
        * $\sqrt[a]{b}$
        */
-      type: "root";
-      values: [MathLayoutRow, MathLayoutRow];
+      readonly type: "root";
+      readonly values: readonly [MathLayoutRow, MathLayoutRow];
     }
   | {
       /**
        * $\underset{b}{a}$
        */
-      type: "under";
-      values: [MathLayoutRow, MathLayoutRow];
+      readonly type: "under";
+      readonly values: readonly [MathLayoutRow, MathLayoutRow];
     }
   | {
       /**
        * $\overset{b}{a}$
        */
-      type: "over";
-      values: [MathLayoutRow, MathLayoutRow];
+      readonly type: "over";
+      readonly values: readonly [MathLayoutRow, MathLayoutRow];
     }
   | {
       /**
        * $^a$
        */
-      type: "sup";
-      values: [MathLayoutRow];
+      readonly type: "sup";
+      readonly values: readonly [MathLayoutRow];
     }
   | {
       /**
        * $_a$
        */
-      type: "sub";
-      values: [MathLayoutRow];
+      readonly type: "sub";
+      readonly values: readonly [MathLayoutRow];
     };
 export function isMathLayoutContainer(value: MathLayoutRow | MathLayoutElement): value is MathLayoutContainer {
   const { type } = value as MathLayoutContainer;
@@ -97,9 +97,9 @@ export type MathLayoutTable = {
    * A rectangular table. Every cell is a row.
    * $\begin{matrix}a&b\\c&d\end{matrix}$
    */
-  type: "table";
-  width: number;
-  values: MathLayoutRow[];
+  readonly type: "table";
+  readonly width: number;
+  readonly values: MathLayoutRow[];
 };
 export function isMathLayoutTable(value: MathLayoutRow | MathLayoutElement): value is MathLayoutTable {
   const { type } = value as MathLayoutTable;
@@ -117,8 +117,8 @@ export type MathLayoutSymbol =
       /**
        * A single symbol
        */
-      type: "symbol";
-      value: string;
+      readonly type: "symbol";
+      readonly value: string;
     }
   | {
       /**
@@ -126,8 +126,8 @@ export type MathLayoutSymbol =
        * A bracket symbol, with special handling.
        * Brackets are not containers, because that makes things like adding a closing bracket somewhere in a formula really awkward.
        */
-      type: "bracket";
-      value: string;
+      readonly type: "bracket";
+      readonly value: string;
     };
 
 export function isMathLayoutSymbol(value: MathLayoutRow | MathLayoutElement): value is MathLayoutSymbol {
@@ -147,15 +147,15 @@ export type MathLayoutText =
        * A single bit of text.
        * $\text{a}$
        */
-      type: "text";
-      value: string;
+      readonly type: "text";
+      readonly value: string;
     }
   | {
       /**
        * Error message, used whenever the parser encounters something it doesn't understand.
        */
-      type: "error";
-      value: string;
+      readonly type: "error";
+      readonly value: string;
     };
 export function isMathLayoutText(value: MathLayoutRow | MathLayoutElement): value is MathLayoutText {
   const { type } = value as MathLayoutText;
