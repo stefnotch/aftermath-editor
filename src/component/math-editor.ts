@@ -268,7 +268,18 @@ export class MathEditor extends HTMLElement {
    * Note: Make sure to re-render the caret after moving it
    */
   moveCaret(caret: MathCaret, direction: "up" | "down" | "left" | "right") {
-    const newCaret = caret.caret.move(direction);
+    const lastLayout = this.lastLayout;
+    if (!lastLayout) return; // TODO: Maybe don't ignore the move command if the last layout doesn't exist?
+    const layoutGetter = lastLayout.get(caret.caret.zipper.value);
+    assert(layoutGetter !== undefined);
+    const layout = layoutGetter(caret.caret.offset);
+
+    const newCaret = caret.caret.move(direction, [layout.x, layout.y], (zipper, offset) => {
+      const layoutGetter = lastLayout.get(zipper.value);
+      assert(layoutGetter !== undefined);
+      const layout = layoutGetter(offset);
+      return [layout.x, layout.y];
+    });
     if (newCaret) {
       caret.caret = newCaret;
     }

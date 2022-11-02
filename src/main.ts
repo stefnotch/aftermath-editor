@@ -1,3 +1,3 @@
 import "./style.css";
-import { MathEditor } from "./components/math-editor";
+import { MathEditor } from "./component/math-editor";
 customElements.define("math-editor", MathEditor);

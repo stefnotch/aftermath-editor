@@ -1,4 +1,4 @@
-import { ViewportCoordinate } from "../components/viewport-coordinate";
+import { ViewportCoordinate } from "../component/viewport-coordinate";
 
 /**
  * Merely a Typescript hint to make sure that I don't miss any cases

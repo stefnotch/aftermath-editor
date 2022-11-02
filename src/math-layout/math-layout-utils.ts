@@ -1,25 +1,27 @@
 import { assert } from "../utils/assert";
-import { MathLayout, MathLayoutRow } from "./math-layout";
+import { MathLayoutElement, MathLayoutRow, MathLayoutTable } from "./math-layout";
 import { endingBrackets, startingBrackets } from "../math-editor/mathml-spec";
 
 /**
- * Guarantees that something is wrapped in a row
+ * Guarantees that something is wrapped in a row. Also flattens nested rows.
  */
-export function wrapInRow(mathIR: MathLayout | MathLayout[] | null): MathLayoutRow {
-  if (mathIR == null) {
+export function wrapInRow(
+  mathLayout: (MathLayoutRow | MathLayoutElement) | (MathLayoutRow | MathLayoutElement)[] | null
+): MathLayoutRow {
+  if (mathLayout == null) {
     return { type: "row", values: [] };
   }
 
-  if (!Array.isArray(mathIR)) {
-    if (mathIR.type == "row") {
-      return mathIR;
+  if (!Array.isArray(mathLayout)) {
+    if (mathLayout.type == "row") {
+      return mathLayout;
     }
-    mathIR = [mathIR];
+    mathLayout = [mathLayout];
   }
 
   return {
     type: "row",
-    values: mathIR.flatMap((v) => {
+    values: mathLayout.flatMap((v) => {
       if (v.type == "row") {
         return v.values;
       } else {
@@ -29,13 +31,26 @@ export function wrapInRow(mathIR: MathLayout | MathLayout[] | null): MathLayoutR
   };
 }
 
+export function tableIndexToPosition(table: MathLayoutTable, index: number): [number, number] {
+  return [index % table.width, Math.floor(index / table.width)];
+}
+
+export function tablePositionToIndex(table: MathLayoutTable, position: [number, number]): number {
+  return position[1] * table.width + position[0];
+}
+
 /**
+ * TODO: Change the mathLayout to be `row: MathLayoutRow`
  * Finds the starting/ending bracket for a given ending/starting bracket
  * @param direction the search direction, use "right" to find an ending bracket
  */
-export function findOtherBracket(mathIR: MathLayout[], bracketIndex: number, direction: "left" | "right"): number | null {
+export function findOtherBracket(
+  mathLayout: (MathLayoutRow | MathLayoutElement)[],
+  bracketIndex: number,
+  direction: "left" | "right"
+): number | null {
   const isLeft = direction == "left";
-  const bracket = mathIR[bracketIndex];
+  const bracket = mathLayout[bracketIndex];
   assert(bracket.type == "bracket");
 
   let bracketCounter = 0;
@@ -44,8 +59,8 @@ export function findOtherBracket(mathIR: MathLayout[], bracketIndex: number, dir
   const sameBracketType = isLeft ? endingBrackets : startingBrackets;
   const otherBracketType = isLeft ? startingBrackets : endingBrackets;
 
-  while (i >= 0 && i < mathIR.length) {
-    const element = mathIR[i];
+  while (i >= 0 && i < mathLayout.length) {
+    const element = mathLayout[i];
     if (element.type != "bracket") continue;
 
     if (sameBracketType.has(element.value)) {
@@ -68,13 +83,16 @@ export function findOtherBracket(mathIR: MathLayout[], bracketIndex: number, dir
 /**
  * Finds the next best bracket that is the same
  */
-export function findEitherEndingBracket(mathIR: MathLayout[], startingBracketIndex: number): number | null {
-  const startingBracket = mathIR[startingBracketIndex];
+export function findEitherEndingBracket(
+  mathLayout: (MathLayoutRow | MathLayoutElement)[],
+  startingBracketIndex: number
+): number | null {
+  const startingBracket = mathLayout[startingBracketIndex];
   assert(startingBracket.type == "bracket");
 
   let bracketCounter = 0;
-  for (let i = startingBracketIndex + 1; i < mathIR.length; i++) {
-    const element = mathIR[i];
+  for (let i = startingBracketIndex + 1; i < mathLayout.length; i++) {
+    const element = mathLayout[i];
     if (element.type != "bracket") continue;
 
     if (bracketCounter <= 0 && element.value == startingBracket.value) {
@@ -94,20 +112,20 @@ export function findEitherEndingBracket(mathIR: MathLayout[], startingBracketInd
   return null;
 }
 
-export function isSame(a: MathLayout, b: MathLayout): boolean {
-  if (a.type != b.type) return false;
+export function isSame(a: MathLayoutRow | MathLayoutElement, b: MathLayoutRow | MathLayoutElement): boolean {
+  if (a.type !== b.type) return false;
 
-  if (a.type == "row") {
-    assert(b.type == a.type);
+  if (a.type === "row") {
+    assert(b.type === a.type);
     return a.values.every((v, i) => isSame(v, b.values[i]));
-  } else if (a.type == "symbol" || a.type == "bracket" || a.type == "text" || a.type == "error") {
-    assert(b.type == a.type);
-    return a.value == b.value;
-  } else if (a.type == "table") {
-    assert(b.type == a.type);
-    return a.width == b.width && a.values.length == b.values.length && a.values.every((v, i) => isSame(v, b.values[i]));
+  } else if (a.type === "symbol" || a.type === "bracket" || a.type === "text" || a.type === "error") {
+    assert(b.type === a.type);
+    return a.value === b.value;
+  } else if (a.type === "table") {
+    assert(b.type === a.type);
+    return a.width === b.width && a.values.length === b.values.length && a.values.every((v, i) => isSame(v, b.values[i]));
   } else {
-    assert(b.type == a.type);
+    assert(b.type === a.type);
     return a.values.every((v, i) => isSame(v, b.values[i]));
   }
 }
