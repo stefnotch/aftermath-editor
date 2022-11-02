@@ -1,6 +1,6 @@
 import { assert, assertUnreachable } from "../utils/assert";
-import { MathLayout, MathLayoutText, MathLayoutRow, MathLayoutElement, MathPhysicalLayout } from "./math-layout/math-layout";
-import { findEitherEndingBracket, findOtherBracket, wrapInRow } from "./math-layout/math-layout-utils";
+import { MathLayout, MathLayoutText, MathLayoutRow, MathLayoutElement, MathPhysicalLayout } from "../math-layout/math-layout";
+import { findEitherEndingBracket, findOtherBracket, wrapInRow } from "../math-layout/math-layout-utils";
 import { startingBrackets, endingBrackets, allBrackets, ambigousBrackets as eitherBrackets } from "./mathml-spec";
 import { TokenStream } from "./token-stream";
 

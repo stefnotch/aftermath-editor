@@ -1,6 +1,6 @@
-import { assert } from "../../utils/assert";
+import { assert } from "../utils/assert";
 import { MathLayout, MathLayoutRow } from "./math-layout";
-import { endingBrackets, startingBrackets } from "../mathml-spec";
+import { endingBrackets, startingBrackets } from "../math-editor/mathml-spec";
 
 /**
  * Guarantees that something is wrapped in a row

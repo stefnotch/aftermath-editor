@@ -1,6 +1,12 @@
 import { assert, assertUnreachable } from "../utils/assert";
 import arrayUtils from "../utils/array-utils";
-import type { MathLayout, MathLayoutElement, MathLayoutText, MathLayoutRow, MathLayoutSymbol } from "./math-layout/math-layout";
+import type {
+  MathLayout,
+  MathLayoutElement,
+  MathLayoutText,
+  MathLayoutRow,
+  MathLayoutSymbol,
+} from "../math-layout/math-layout";
 
 /*
  * MathLayout with parent pointers. Currently not super safe, as it's possible to construct a cyclic tree (node.parent = node)

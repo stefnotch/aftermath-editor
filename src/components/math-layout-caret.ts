@@ -4,7 +4,7 @@ import {
   MathLayoutRowZipper,
   MathLayoutTableZipper,
   MathLayoutTextZipper,
-} from "../math-editor/math-layout/math-layout-zipper";
+} from "../math-layout/math-layout-zipper";
 import { assertUnreachable } from "../utils/assert";
 
 export type Direction = "left" | "right" | "up" | "down";

@@ -1,10 +1,10 @@
 import { assert, assertUnreachable } from "../utils/assert";
 import { MathAst } from "../math-editor/math-ast";
-import { MathLayoutElement, MathPhysicalLayout, MathLayoutRow, MathLayoutText } from "../math-editor/math-layout/math-layout";
+import { MathLayoutElement, MathPhysicalLayout, MathLayoutRow, MathLayoutText } from "../math-layout/math-layout";
 import { fromElement as fromMathMLElement, toElement as toMathMLElement } from "../math-editor/mathml-converter";
 import arrayUtils from "../utils/array-utils";
 import { endingBrackets, startingBrackets } from "../math-editor/mathml-spec";
-import { findOtherBracket, wrapInRow } from "../math-editor/math-layout/math-layout-utils";
+import { findOtherBracket, wrapInRow } from "../math-layout/math-layout-utils";
 import { MathJson, toMathJson } from "../math-editor/math-ir";
 import caretStyles from "./caret-styles.css?inline";
 import mathEditorStyles from "./math-editor-styles.css?inline";
@@ -12,7 +12,7 @@ import inputHandlerStyles from "./input-handler-style.css?inline";
 import { createCaret, CaretElement } from "./caret";
 import { createInputHandler, MathmlInputHandler } from "./input-handler";
 import { MathLayoutCaret } from "./math-layout-caret";
-import { MathLayoutRowZipper } from "../math-editor/math-layout/math-layout-zipper";
+import { MathLayoutRowZipper } from "../math-layout/math-layout-zipper";
 
 export interface MathCaret {
   caret: MathLayoutCaret;

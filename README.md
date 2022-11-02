@@ -11,10 +11,10 @@ My hope is that it'll get ready to ship in the next year(s). Then, having a _for
 
 ## Developer info
 
-- `src/MathEditor.vue` contains a Vue wrapper for the mathematical editor
-- `src/math-editor` contains all the code for the mathematical editor
-- `src/math-editor/math-ir.ts` is the "intermediate representation" of a formula
-- `src/math-editor/math-ast.ts` is the same representation plus links to parents
+- `src/components/math-editor.ts` contains a web component for the mathematical editor
+- `src/math-layout` contains all the code for the representation of what a math formula _looks_ like
+- `src/math-editor` is a WIP
+- `src/math-editor` is a WIP
 
 ## Future plans
 

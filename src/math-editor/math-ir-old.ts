@@ -1,7 +1,7 @@
 import { assert } from "src/assert";
-import { MathLayout, MathLayoutElement, MathLayoutRow, MathLayoutSymbol, MathLayoutText } from "./math-layout/math-layout";
+import { MathLayout, MathLayoutElement, MathLayoutRow, MathLayoutSymbol, MathLayoutText } from "../math-layout/math-layout";
 import { TokenStream } from "./token-stream";
-import { isSame as isSameMathLayout } from "./math-layout/math-layout-utils";
+import { isSame as isSameMathLayout } from "../math-layout/math-layout-utils";
 
 // A highly constrained version of MathJson
 // See https://cortexjs.io/math-json/
