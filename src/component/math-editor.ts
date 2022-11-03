@@ -1,5 +1,4 @@
 import { assert, assertUnreachable } from "../utils/assert";
-import { MathAst } from "../math-editor/math-ast";
 import { MathLayoutElement, MathPhysicalLayout, MathLayoutRow, MathLayoutText } from "../math-layout/math-layout";
 import { fromElement as fromMathMLElement, toElement as toMathMLElement } from "../math-editor/mathml-converter";
 import arrayUtils from "../utils/array-utils";
@@ -88,7 +87,6 @@ export class MathEditor extends HTMLElement {
 
     // Register keyboard handlers
     // TODO:
-    // - turning it into a web-component is required for some of the items below
     // - special symbols (sum, for, forall, ...) ( https://github.com/arnog/mathlive/search?q=forall )
     // - autocomplete popup
     // - brackets and non-brackets
@@ -108,7 +106,7 @@ export class MathEditor extends HTMLElement {
     // TODO:
     // - move carets to the same spot (merge)
     // - select and delete region that contains a caret
-    mathMlElement.addEventListener("focus", (ev) => {
+    mathMlElement.addEventListener("focus", () => {
       this.inputHandler.inputElement.focus();
     });
 

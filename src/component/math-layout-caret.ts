@@ -15,7 +15,10 @@ export type Direction = "left" | "right" | "up" | "down";
  */
 type Offset = number;
 
-// TODO: https://github.com/stefnotch/mathml-editor/issues/13
+/**
+ * Whether the editor attempts to keep the caret in the same-ish x-coordinate when moving up.
+ * See https://github.com/stefnotch/mathml-editor/issues/13
+ */
 const KeepXPosition = false;
 
 /**
