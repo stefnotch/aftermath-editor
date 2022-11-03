@@ -1,7 +1,7 @@
 import { assert } from "../utils/assert";
 
 export class TokenStream<T> {
-  constructor(public value: T[], public offset: number) {}
+  constructor(public value: readonly T[], public offset: number) {}
 
   /**
    * Gets the current value and removes it

@@ -45,7 +45,7 @@ export function tablePositionToIndex(table: MathLayoutTable, position: [number, 
  * @param direction the search direction, use "right" to find an ending bracket
  */
 export function findOtherBracket(
-  mathLayout: (MathLayoutRow | MathLayoutElement)[],
+  mathLayout: readonly (MathLayoutRow | MathLayoutElement)[],
   bracketIndex: number,
   direction: "left" | "right"
 ): number | null {
@@ -84,7 +84,7 @@ export function findOtherBracket(
  * Finds the next best bracket that is the same
  */
 export function findEitherEndingBracket(
-  mathLayout: (MathLayoutRow | MathLayoutElement)[],
+  mathLayout: readonly (MathLayoutRow | MathLayoutElement)[],
   startingBracketIndex: number
 ): number | null {
   const startingBracket = mathLayout[startingBracketIndex];

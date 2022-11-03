@@ -37,18 +37,25 @@ type MathMLTags =
   | "mtr"
   | "mtd";
 
+/**
+ * Takes a MathML DOM tree and returns a MathLayout
+ */
 export function fromElement(element: HTMLElement | MathMLElement): MathLayoutRow {
   assert(tagIs(element, "math"));
-  const mathIR = toMathLayout(element);
-  assert(!Array.isArray(mathIR));
-  assert(mathIR.type == "row");
+  const mathLayout = toMathLayout(element);
+  assert(!Array.isArray(mathLayout));
+  assert(mathLayout.type == "row");
 
-  return mathIR;
+  return mathLayout;
 }
 
-export function toElement(mathIR: MathLayout): {
+/**
+ * Takes a MathLayout and returns a MathML DOM tree
+ */
+export function toElement(mathIR: MathLayoutRow): {
   element: Element;
   physicalLayout: MathPhysicalLayout;
+  // TODO: Return something like https://github.com/stefnotch/mathml-editor/issues/15#issuecomment-1301763225
 } {
   const physicalLayout: MathPhysicalLayout = new Map();
   const element = createMathElement("math", []);
@@ -330,19 +337,18 @@ function fromMathLayout(mathIR: MathLayout, physicalLayout: MathPhysicalLayout):
     // TODO: Special styling for empty text
     return createMathElement("mtext", [setTextLayout(mathIR, document.createTextNode(mathIR.value))]);
   } else if (mathIR.type == "table") {
+    const width = mathIR.width;
+    const rows: MathLayoutRow[][] = [];
+    // copy rows from mathIR.values into rows
+    for (let i = 0; i < mathIR.values.length; i += width) {
+      rows.push(mathIR.values.slice(i, i + width));
+    }
     return createMathElement(
       "mtable",
-      mathIR.values.map((v) =>
+      rows.map((row) =>
         createMathElement(
           "mtr",
-          v.map((cell) => {
-            if (cell.type == "row") {
-              // TODO: Does this introduce useless rows? (also remember, we need the row parsing logic from above)
-              return createMathElement("mtd", [fromMathLayout(cell, physicalLayout)]);
-            } else {
-              return createMathElement("mtd", [fromMathLayout(cell, physicalLayout)]);
-            }
-          })
+          row.map((cell) => fromMathLayout(cell, physicalLayout))
         )
       )
     );
