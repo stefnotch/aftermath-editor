@@ -1,8 +1,9 @@
 import { assert, assertUnreachable } from "../utils/assert";
 import { MathLayoutElement, MathPhysicalLayout, MathLayoutRow, MathLayoutText } from "../math-layout/math-layout";
-import { fromElement as fromMathMLElement, toElement as toMathMLElement } from "../math-editor/mathml-converter";
+import { fromElement as fromMathMLElement } from "../mathml/parsing";
+import { toElement as toMathMLElement } from "../mathml/rendering";
 import arrayUtils from "../utils/array-utils";
-import { endingBrackets, startingBrackets } from "../math-editor/mathml-spec";
+import { endingBrackets, startingBrackets } from "../mathml/mathml-spec";
 import { findOtherBracket, wrapInRow } from "../math-layout/math-layout-utils";
 import { MathJson, toMathJson } from "../math-editor/math-ir";
 import caretStyles from "./caret-styles.css?inline";

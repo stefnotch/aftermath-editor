@@ -1,54 +1,9 @@
 import { assert, assertUnreachable } from "../utils/assert";
-import { MathLayout, MathLayoutText, MathLayoutRow, MathLayoutElement, MathPhysicalLayout } from "../math-layout/math-layout";
-import { findEitherEndingBracket, findOtherBracket, wrapInRow } from "../math-layout/math-layout-utils";
-import { startingBrackets, endingBrackets, allBrackets, ambigousBrackets as eitherBrackets } from "./mathml-spec";
-import { TokenStream } from "./token-stream";
+import { MathLayout, MathLayoutText, MathLayoutRow, MathPhysicalLayout } from "../math-layout/math-layout";
+import { findEitherEndingBracket, findOtherBracket } from "../math-layout/math-layout-utils";
+import { startingBrackets, endingBrackets, allBrackets, MathMLTags } from "./mathml-spec";
+import { TokenStream } from "../math-editor/token-stream";
 import { tagIs } from "../utils/dom-utils";
-
-type MathMLTags =
-  | "math"
-  | "semantics"
-  | "annotation"
-  | "annotation-xml"
-  | "mtext"
-  | "mi"
-  | "mn"
-  | "mo"
-  | "mspace"
-  | "ms"
-  | "mrow"
-  | "mfrac"
-  | "msqrt"
-  | "mroot"
-  | "mstyle"
-  | "merror"
-  | "maction"
-  | "mpadded"
-  | "mphantom"
-  | "msub"
-  | "msup"
-  | "msubsup"
-  | "munder"
-  | "mover"
-  | "munderover"
-  | "mmultiscripts"
-  | "none"
-  | "mprescripts"
-  | "mtable"
-  | "mtr"
-  | "mtd";
-
-/**
- * Takes a MathML DOM tree and returns a MathLayout
- */
-export function fromElement(element: HTMLElement | MathMLElement): MathLayoutRow {
-  assert(tagIs(element, "math"));
-  const mathLayout = toMathLayout(element);
-  assert(!Array.isArray(mathLayout));
-  assert(mathLayout.type == "row");
-
-  return mathLayout;
-}
 
 /**
  * Takes a MathLayout and returns a MathML DOM tree
@@ -74,205 +29,6 @@ export function toElement(mathIR: MathLayoutRow): {
   return {
     element,
     physicalLayout: physicalLayout,
-  };
-}
-
-// Time to iterate over the MathML and create a cute little tree
-// Doesn't deal with horrible MathML yet (so stuff like unnecessary nested mrows is bad, maybe that should be a post-processing step?)
-function toMathLayout(element: Element): MathLayout | MathLayout[] {
-  let children = [...element.children];
-
-  if (tagIs(element, "math", "mrow", "mtd")) {
-    // Uses flatMap so that msub can return two elements...
-    return wrapInRow(children.flatMap((c) => toMathLayout(c)));
-  } else if (tagIs(element, "semantics") && children.length > 0) {
-    return toMathLayout(children[0]);
-  } else if (tagIs(element, "mtext", "ms")) {
-    return {
-      type: "text",
-      value: getText(element),
-    };
-  } else if (tagIs(element, "mi", "mn")) {
-    return getText(element)
-      .split("")
-      .map((v) => {
-        return {
-          type: "symbol",
-          value: v,
-        };
-      });
-  } else if (tagIs(element, "mo")) {
-    return getText(element)
-      .split("")
-      .map((v) => {
-        if (element.getAttribute("stretchy") != "false" && allBrackets.has(v)) {
-          return {
-            type: "bracket",
-            value: v,
-          };
-        } else {
-          return {
-            type: "symbol",
-            value: v,
-          };
-        }
-      });
-  } else if (tagIs(element, "mfrac")) {
-    return (
-      expectNChildren(element, 2) ?? {
-        type: "fraction",
-        values: children.map((c) => wrapInRow(toMathLayout(c))) as [MathLayoutRow, MathLayoutRow],
-      }
-    );
-  } else if (tagIs(element, "msqrt")) {
-    return {
-      type: "root",
-      values: [
-        wrapInRow({
-          type: "symbol",
-          value: "2",
-        }),
-        wrapInRow(children.flatMap((c) => toMathLayout(c))),
-      ],
-    };
-  } else if (tagIs(element, "mroot")) {
-    return (
-      expectNChildren(element, 2) ?? {
-        type: "root",
-        values: [wrapInRow(toMathLayout(children[1])), wrapInRow(toMathLayout(children[0]))],
-      }
-    );
-  } else if (tagIs(element, "msub")) {
-    let base = toMathLayout(children[0]);
-    if (!Array.isArray(base)) {
-      base = [base];
-    }
-    return (
-      expectNChildren(element, 2) ?? [
-        ...base,
-        {
-          type: "sub",
-          values: [wrapInRow(toMathLayout(children[1]))],
-        },
-      ]
-    );
-  } else if (tagIs(element, "msup")) {
-    let base = toMathLayout(children[0]);
-    if (!Array.isArray(base)) {
-      base = [base];
-    }
-    return (
-      expectNChildren(element, 2) ?? [
-        ...base,
-        {
-          type: "sup",
-          values: [wrapInRow(toMathLayout(children[1]))],
-        },
-      ]
-    );
-  } else if (tagIs(element, "msubsup")) {
-    let base = toMathLayout(children[0]);
-    if (!Array.isArray(base)) {
-      base = [base];
-    }
-    return (
-      expectNChildren(element, 3) ?? [
-        ...base,
-        {
-          type: "sub",
-          values: [wrapInRow(toMathLayout(children[1]))],
-        },
-        {
-          type: "sup",
-          values: [wrapInRow(toMathLayout(children[2]))],
-        },
-      ]
-    );
-  } else if (tagIs(element, "munder")) {
-    return (
-      expectNChildren(element, 2) ?? {
-        type: "under",
-        values: [wrapInRow(toMathLayout(children[0])), wrapInRow(toMathLayout(children[1]))],
-      }
-    );
-  } else if (tagIs(element, "mover")) {
-    return (
-      expectNChildren(element, 2) ?? {
-        type: "over",
-        values: [wrapInRow(toMathLayout(children[0])), wrapInRow(toMathLayout(children[1]))],
-      }
-    );
-  } else if (tagIs(element, "munderover")) {
-    return (
-      expectNChildren(element, 3) ?? {
-        type: "over",
-        values: [
-          wrapInRow({
-            type: "under",
-            values: [wrapInRow(toMathLayout(children[0])), wrapInRow(toMathLayout(children[1]))],
-          }),
-          wrapInRow(toMathLayout(children[2])),
-        ],
-      }
-    );
-  } else if (tagIs(element, "mtable")) {
-    if (!children.every((c) => tagIs(c, "mtr") && [...c.children].every((cc) => tagIs(cc, "mtd")))) {
-      return {
-        type: "error",
-        value: "Unexpected children " + element,
-      };
-    }
-
-    const tableWidth = children.map((c) => c.children.length).reduce((a, b) => Math.max(a, b), 0);
-
-    const tableCells = children.flatMap((c) =>
-      Array.from({ length: tableWidth }, (_, i) =>
-        i < c.children.length ? wrapInRow(toMathLayout(c.children[i])) : ({ type: "row", values: [] } as MathLayoutRow)
-      )
-    );
-
-    return {
-      type: "table",
-      width: tableWidth,
-      values: tableCells,
-    };
-  } else {
-    return {
-      type: "error",
-      value: "Unknown element " + element,
-    };
-  }
-}
-
-function getTextBoundingBox(t: Text, index: number) {
-  const range = document.createRange();
-  range.setStart(t, index);
-  if (t.length > 0) {
-    range.setEnd(t, index + 1); // Select the entire character
-  }
-  return range.getBoundingClientRect();
-}
-
-function getTextLayout(t: Text, index: number) {
-  const atEnd = index >= t.length;
-  const boundingBox = !atEnd ? getTextBoundingBox(t, index) : getTextBoundingBox(t, Math.max(0, t.length - 1));
-
-  return {
-    x: boundingBox.x + (atEnd ? boundingBox.width : 0) + window.scrollX,
-    y: boundingBox.y + window.scrollY,
-    height: boundingBox.height,
-  };
-}
-
-function getRowLayout(mathLayout: (() => DOMRect)[], index: number) {
-  console.log("getRowLayout", index);
-  assert(index <= mathLayout.length);
-  const boundingBox = mathLayout[index]();
-
-  return {
-    x: boundingBox.x + window.scrollX,
-    y: boundingBox.y + window.scrollY,
-    height: boundingBox.height, // TODO: Use the script level or font size instead or the new "math-depth" CSS property
   };
 }
 
@@ -529,14 +285,13 @@ function fromMathLayoutNumber(tokens: TokenStream<MathLayout>): {
   };
 }
 
-export function expectNChildren(element: Element, n: number): MathLayout | null {
-  if (element.children.length != n) {
-    return {
-      type: "error",
-      value: `Expected ${n} children in ${element.tagName.toLowerCase()}`,
-    };
+function getTextBoundingBox(t: Text, index: number) {
+  const range = document.createRange();
+  range.setStart(t, index);
+  if (t.length > 0) {
+    range.setEnd(t, index + 1); // Select the entire character
   }
-  return null;
+  return range.getBoundingClientRect();
 }
 
 const mathNamespace = "http://www.w3.org/1998/Math/MathML";
@@ -548,7 +303,25 @@ function createMathElement(tagName: MathMLTags, children: Node[]) {
   return element;
 }
 
-function getText(element: Element) {
-  // Good enough for now
-  return (element.textContent + "").trim();
+function getTextLayout(t: Text, index: number) {
+  const atEnd = index >= t.length;
+  const boundingBox = !atEnd ? getTextBoundingBox(t, index) : getTextBoundingBox(t, Math.max(0, t.length - 1));
+
+  return {
+    x: boundingBox.x + (atEnd ? boundingBox.width : 0) + window.scrollX,
+    y: boundingBox.y + window.scrollY,
+    height: boundingBox.height,
+  };
+}
+
+function getRowLayout(mathLayout: (() => DOMRect)[], index: number) {
+  console.log("getRowLayout", index);
+  assert(index <= mathLayout.length);
+  const boundingBox = mathLayout[index]();
+
+  return {
+    x: boundingBox.x + window.scrollX,
+    y: boundingBox.y + window.scrollY,
+    height: boundingBox.height, // TODO: Use the script level or font size instead or the new "math-depth" CSS property
+  };
 }

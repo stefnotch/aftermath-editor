@@ -1,3 +1,36 @@
+export type MathMLTags =
+  | "math"
+  | "semantics"
+  | "annotation"
+  | "annotation-xml"
+  | "mtext"
+  | "mi"
+  | "mn"
+  | "mo"
+  | "mspace"
+  | "ms"
+  | "mrow"
+  | "mfrac"
+  | "msqrt"
+  | "mroot"
+  | "mstyle"
+  | "merror"
+  | "maction"
+  | "mpadded"
+  | "mphantom"
+  | "msub"
+  | "msup"
+  | "msubsup"
+  | "munder"
+  | "mover"
+  | "munderover"
+  | "mmultiscripts"
+  | "none"
+  | "mprescripts"
+  | "mtable"
+  | "mtr"
+  | "mtd";
+
 // See https://www.w3.org/TR/mathml-core/#operator-dictionary
 // https://github.com/w3c/mathml-core/issues/112
 const bracketsList: [string, string][] = [
