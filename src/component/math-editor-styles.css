@@ -2,6 +2,11 @@
   display: inline;
 }
 
+math {
+  display: inline;
+  font-family: "STIX Two";
+}
+
 mroot > :first-child::after {
   content: "";
   width: 2px;

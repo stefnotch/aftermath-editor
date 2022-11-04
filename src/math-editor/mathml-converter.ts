@@ -3,6 +3,7 @@ import { MathLayout, MathLayoutText, MathLayoutRow, MathLayoutElement, MathPhysi
 import { findEitherEndingBracket, findOtherBracket, wrapInRow } from "../math-layout/math-layout-utils";
 import { startingBrackets, endingBrackets, allBrackets, ambigousBrackets as eitherBrackets } from "./mathml-spec";
 import { TokenStream } from "./token-stream";
+import { tagIs } from "../utils/dom-utils";
 
 type MathMLTags =
   | "math"
@@ -53,7 +54,7 @@ export function fromElement(element: HTMLElement | MathMLElement): MathLayoutRow
  * Takes a MathLayout and returns a MathML DOM tree
  */
 export function toElement(mathIR: MathLayoutRow): {
-  element: Element;
+  element: MathMLElement;
   physicalLayout: MathPhysicalLayout;
   // TODO: Return something like https://github.com/stefnotch/mathml-editor/issues/15#issuecomment-1301763225
 } {
@@ -67,6 +68,8 @@ export function toElement(mathIR: MathLayoutRow): {
   } else {
     element.append(emittedMathML);
   }
+
+  assert(element instanceof MathMLElement);
 
   return {
     element,
@@ -241,13 +244,6 @@ function toMathLayout(element: Element): MathLayout | MathLayout[] {
   }
 }
 
-/**
- * Checks if an element has a given tag name
- */
-function tagIs(element: Element, ...tagNames: string[]): boolean {
-  return tagNames.includes(element.tagName.toLowerCase());
-}
-
 function getTextBoundingBox(t: Text, index: number) {
   const range = document.createRange();
   range.setStart(t, index);
@@ -393,7 +389,10 @@ function fromMathLayoutRow(
 
   function pushOutput(element: Element) {
     output.push(element);
-    mathLayout.push(() => element.getBoundingClientRect());
+    mathLayout.push(() => {
+      assert(element.isConnected); // Element needs to be rendered for this to make sense
+      return element.getBoundingClientRect();
+    });
   }
 
   while (true) {

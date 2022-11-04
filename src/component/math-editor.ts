@@ -12,6 +12,7 @@ import { createCaret, CaretElement } from "./caret";
 import { createInputHandler, MathmlInputHandler } from "./input-handler";
 import { MathLayoutCaret } from "./math-layout-caret";
 import { MathLayoutRowZipper } from "../math-layout/math-layout-zipper";
+import { tagIs } from "../utils/dom-utils";
 
 export interface MathCaret {
   caret: MathLayoutCaret;
@@ -31,16 +32,11 @@ export class MathEditor extends HTMLElement {
   mathAst: MathLayoutRowZipper;
 
   render: () => void;
+  createCaret: (zipper: MathLayoutRowZipper, offset: number) => MathCaret;
   lastLayout: MathPhysicalLayout | null = null;
   inputHandler: MathmlInputHandler;
 
-  connectedCallback() {
-    this.render();
-  }
-
-  disconnectedCallback() {
-    // So far, everything gets cleaned up automatically
-  }
+  mathMlElement: ChildNode;
 
   constructor() {
     super();
@@ -53,28 +49,37 @@ export class MathEditor extends HTMLElement {
     // Input handler container
     const inputContainer = document.createElement("span");
     inputContainer.style.position = "absolute";
+    this.inputHandler = createInputHandler(inputContainer);
 
     // Container for math formula
     const container = document.createElement("span");
     container.style.display = "inline-block"; // Needed for the resize observer
+    container.style.userSelect = "none";
+    container.tabIndex = 0;
 
-    const mathMlElement = createElementFromHtml(this.getAttribute("mathml") || "");
-    assert(mathMlElement instanceof MathMLElement, "Mathml attribute must be a valid mathml element");
-    mathMlElement.style.userSelect = "none";
-    mathMlElement.style.display = "inline";
-    mathMlElement.style.fontFamily = "STIX Two";
-    mathMlElement.tabIndex = 0;
-    container.append(mathMlElement);
-
-    this.mathAst = new MathLayoutRowZipper(fromMathMLElement(mathMlElement), null, 0);
-    console.log(this.mathAst);
-
-    this.carets.add({
-      caret: new MathLayoutCaret(this.mathAst, 0),
-      element: createCaret(caretContainer),
+    // Click to focus
+    container.addEventListener("focus", () => {
+      this.inputHandler.inputElement.focus();
     });
 
-    this.inputHandler = createInputHandler(inputContainer);
+    // Resize - rerender carets in correct locations
+    const editorResizeObserver = new ResizeObserver(() => {
+      this.renderCarets();
+    });
+    editorResizeObserver.observe(container, { box: "border-box" });
+
+    // Mathml DOM element
+    this.mathMlElement = document.createElement("math");
+    container.append(this.mathMlElement);
+
+    // Math formula
+    this.mathAst = new MathLayoutRowZipper({ type: "row", values: [] }, null, 0);
+
+    // Caret creation function
+    this.createCaret = (zipper: MathLayoutRowZipper, offset: number) => ({
+      caret: new MathLayoutCaret(zipper, offset),
+      element: createCaret(caretContainer),
+    });
 
     // https://d-toybox.com/studio/lib/input_event_viewer.html
     // https://w3c.github.io/uievents/tools/key-event-viewer.html
@@ -106,9 +111,6 @@ export class MathEditor extends HTMLElement {
     // TODO:
     // - move carets to the same spot (merge)
     // - select and delete region that contains a caret
-    mathMlElement.addEventListener("focus", () => {
-      this.inputHandler.inputElement.focus();
-    });
 
     this.inputHandler.inputElement.addEventListener("keydown", (ev) => {
       console.info(ev);
@@ -144,15 +146,11 @@ export class MathEditor extends HTMLElement {
       }
     });
 
-    const editorResizeObserver = new ResizeObserver(() => {
-      this.renderCarets();
-    });
-    editorResizeObserver.observe(container, { box: "border-box" });
-
     this.render = () => {
+      if (!this.isConnected) return;
       const newMathElement = toMathMLElement(this.mathAst.value /** TODO: Use MathIR here */);
       this.lastLayout = newMathElement.physicalLayout;
-      mathMlElement.replaceChildren(...newMathElement.element.children);
+      this.setMathMl(newMathElement.element);
       // Don't copy the attributes
 
       try {
@@ -236,7 +234,39 @@ export class MathEditor extends HTMLElement {
     shadowRoot.append(styles, caretContainer, inputContainer, container);
   }
 
+  connectedCallback() {
+    // Try to initialize the math element
+    this.attributeChangedCallback("mathml", "", this.getAttribute("mathml") ?? "");
+    this.render();
+  }
+
+  disconnectedCallback() {
+    // So far, everything gets cleaned up automatically
+  }
+
+  attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
+    console.log("Attribute changed", name, oldValue, newValue);
+    if (name === "mathml") {
+      const mathMlElement = createElementFromHtml(newValue || "<math></math>");
+      assert(mathMlElement instanceof MathMLElement, "Mathml attribute must be a valid mathml element");
+      this.setMathMl(mathMlElement);
+
+      this.mathAst = new MathLayoutRowZipper(fromMathMLElement(mathMlElement), null, 0);
+      this.carets.forEach((c) => c.element.remove());
+      this.carets.clear();
+      this.carets.add(this.createCaret(this.mathAst, 0));
+
+      console.log(this.mathAst);
+      this.render();
+    }
+  }
+
+  static get observedAttributes() {
+    return ["mathml"];
+  }
+
   renderCarets() {
+    if (!this.isConnected) return;
     this.carets.forEach((v) => this.renderCaret(v));
   }
 
@@ -501,5 +531,12 @@ export class MathEditor extends HTMLElement {
       caret.row.value = caret.row.value.slice(0, caret.offset) + text + caret.row.value.slice(caret.offset);
       caret.offset += text.length;
     }
+  }
+
+  setMathMl(mathMl: MathMLElement) {
+    assert(mathMl instanceof MathMLElement);
+    assert(tagIs(mathMl, "math"));
+    this.mathMlElement.replaceWith(mathMl);
+    this.mathMlElement = mathMl;
   }
 }
