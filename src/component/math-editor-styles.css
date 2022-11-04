@@ -13,3 +13,9 @@ mroot > :first-child::after {
   height: 10px;
   position: absolute;
 }
+/** TODO: Remove this, this is a part of the default styles */
+mtd {
+  display: table-cell;
+  text-align: center;
+  padding: 0.5ex 0.4em;
+}

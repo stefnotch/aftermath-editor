@@ -54,27 +54,25 @@ export function findOtherBracket(
   assert(bracket.type == "bracket");
 
   let bracketCounter = 0;
-  let i = bracketIndex + (isLeft ? -1 : +1);
 
   const sameBracketType = isLeft ? endingBrackets : startingBrackets;
   const otherBracketType = isLeft ? startingBrackets : endingBrackets;
 
-  while (i >= 0 && i < mathLayout.length) {
+  const iIncrement = isLeft ? -1 : 1;
+  for (let i = bracketIndex + iIncrement; 0 <= i && i < mathLayout.length; i += iIncrement) {
     const element = mathLayout[i];
-    if (element.type != "bracket") continue;
-
-    if (sameBracketType.has(element.value)) {
-      bracketCounter += 1;
-    } else if (otherBracketType.has(element.value)) {
-      if (bracketCounter <= 0) {
-        // Doesn't bother finding the absolutely correct bracket type
-        return i;
-      } else {
-        bracketCounter -= 1;
+    if (element.type === "bracket") {
+      if (sameBracketType.has(element.value)) {
+        bracketCounter += 1;
+      } else if (otherBracketType.has(element.value)) {
+        if (bracketCounter <= 0) {
+          // Doesn't bother finding the absolutely correct bracket type
+          return i;
+        } else {
+          bracketCounter -= 1;
+        }
       }
     }
-
-    i += isLeft ? -1 : +1;
   }
 
   return null;
@@ -93,7 +91,7 @@ export function findEitherEndingBracket(
   let bracketCounter = 0;
   for (let i = startingBracketIndex + 1; i < mathLayout.length; i++) {
     const element = mathLayout[i];
-    if (element.type != "bracket") continue;
+    if (element.type !== "bracket") continue;
 
     if (bracketCounter <= 0 && element.value == startingBracket.value) {
       return i;

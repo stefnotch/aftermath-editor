@@ -344,7 +344,7 @@ function fromMathLayout(mathIR: MathLayout, physicalLayout: MathPhysicalLayout):
       rows.map((row) =>
         createMathElement(
           "mtr",
-          row.map((cell) => fromMathLayout(cell, physicalLayout))
+          row.map((cell) => createMathElement("mtd", [fromMathLayout(cell, physicalLayout)]))
         )
       )
     );
