@@ -69,30 +69,6 @@ class MathTextDomTranslator<T extends MathLayoutSymbol = MathLayoutSymbol> imple
   }
 }
 
-type MathDomRanges = Map<Element, PartialRange>;
-
-/**
- * Pretty please make sure that ranges don't overlap, and that no possible caret location gets ignored.
- */
-type PartialRange =
-  | {
-      /**
-       * Lets one reconstruct the zipper by looking at this and the parents.
-       *
-       */
-      indexInParent: number | null;
-      from: Offset;
-      to: Offset;
-    }
-  | {
-      /**
-       * Lets one reconstruct the zipper by looking at this and the parents.
-       */
-      indexInParent: number;
-    };
-
-const PartialRangeAttributeName = "data-range";
-
 /**
  * Takes a MathLayout and returns a MathML DOM tree
  */
