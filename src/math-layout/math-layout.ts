@@ -224,6 +224,9 @@ TODO:
 
 // Annotated symbols support? (unmatched bracket, colors, ...)
 
+// TODO: Might be an operator
+// ⊥  is both a symbol (false) and an operator (A perpendicular B)
+
 // TODO: bracket pairs are to be resolved during inputting (pairs, ghost close bracket, esc and space, set builder |, |abs|, ||norm||, {x| |x| < 3})
 
 // TODO: maybe use a MathLayoutZipper

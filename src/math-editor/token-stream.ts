@@ -12,6 +12,14 @@ export class TokenStream<T> {
     return v;
   }
 
+  nextWithIndex() {
+    const offset = this.offset;
+    return {
+      value: this.next(),
+      index: offset,
+    };
+  }
+
   /**
    * Moves one step back
    */

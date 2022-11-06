@@ -1,9 +1,97 @@
 import { assert, assertUnreachable } from "../utils/assert";
-import { MathLayout, MathLayoutText, MathLayoutRow, MathPhysicalLayout } from "../math-layout/math-layout";
+import {
+  MathLayout,
+  MathLayoutText,
+  MathLayoutRow,
+  MathPhysicalLayout,
+  MathLayoutElement,
+  MathLayoutSymbol,
+  MathLayoutTable,
+  MathLayoutContainer,
+} from "../math-layout/math-layout";
 import { findEitherEndingBracket, findOtherBracket } from "../math-layout/math-layout-utils";
 import { startingBrackets, endingBrackets, allBrackets, MathMLTags } from "./mathml-spec";
 import { TokenStream } from "../math-editor/token-stream";
 import { tagIs } from "../utils/dom-utils";
+import { Offset } from "../math-layout/math-layout-offset";
+
+// I am debating the usefulness of the generics here
+interface MathDomTranslator<T extends { readonly type: string }> {
+  readonly type: T["type"];
+}
+
+class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements MathDomTranslator<T> {
+  constructor(
+    public readonly value: T,
+    public readonly element: Element,
+    public readonly children: (
+      | MathContainerDomTranslator
+      | MathTableDomTranslator
+      | MathSymbolDomTranslator
+      | MathTextDomTranslator
+    )[]
+  ) {}
+
+  get type(): T["type"] {
+    return this.value.type;
+  }
+}
+
+class MathContainerDomTranslator<T extends MathLayoutContainer = MathLayoutContainer> implements MathDomTranslator<T> {
+  constructor(public readonly value: T, public readonly element: Element, public readonly children: MathRowDomTranslator[]) {}
+
+  get type(): T["type"] {
+    return this.value.type;
+  }
+}
+
+class MathTableDomTranslator<T extends MathLayoutTable = MathLayoutTable> implements MathDomTranslator<T> {
+  constructor(public readonly value: T, public readonly element: Element, public readonly children: MathRowDomTranslator[]) {}
+
+  get type(): T["type"] {
+    return this.value.type;
+  }
+}
+
+class MathSymbolDomTranslator<T extends MathLayoutSymbol = MathLayoutSymbol> implements MathDomTranslator<T> {
+  constructor(public readonly value: MathLayoutSymbol, public readonly element: Element) {}
+
+  get type(): MathLayoutSymbol["type"] {
+    return this.value.type;
+  }
+}
+
+class MathTextDomTranslator<T extends MathLayoutSymbol = MathLayoutSymbol> implements MathDomTranslator<T> {
+  constructor(public readonly value: T, public readonly element: Element) {}
+
+  get type(): T["type"] {
+    return this.value.type;
+  }
+}
+
+type MathDomRanges = Map<Element, PartialRange>;
+
+/**
+ * Pretty please make sure that ranges don't overlap, and that no possible caret location gets ignored.
+ */
+type PartialRange =
+  | {
+      /**
+       * Lets one reconstruct the zipper by looking at this and the parents.
+       *
+       */
+      indexInParent: number | null;
+      from: Offset;
+      to: Offset;
+    }
+  | {
+      /**
+       * Lets one reconstruct the zipper by looking at this and the parents.
+       */
+      indexInParent: number;
+    };
+
+const PartialRangeAttributeName = "data-range";
 
 /**
  * Takes a MathLayout and returns a MathML DOM tree
@@ -11,15 +99,35 @@ import { tagIs } from "../utils/dom-utils";
 export function toElement(mathIR: MathLayoutRow): {
   element: MathMLElement;
   physicalLayout: MathPhysicalLayout;
-  // TODO: Return something like https://github.com/stefnotch/mathml-editor/issues/15#issuecomment-1301763225
+  domRanges: MathDomRanges;
 } {
+  // TODO: domRanges
+  const domRanges = new Map<Element, PartialRange>();
   const physicalLayout: MathPhysicalLayout = new Map();
-  const element = createMathElement("math", []);
+  const element = createMathElement("math", [], domRanges, { from: 0, to: 0, indexInParent: null });
 
-  const emittedMathML = fromMathLayout(mathIR, physicalLayout);
+  // Right now I know:
+  // - The mathLayout element, along with its children. So here I can say from: 0, to: children.length
+  // - That there is no parent, so partialZipper is empty
+
+  // now let's assume we have two children. We are inside the recursive call where we go over the row itself and have a lot of info, but we lost the parents-above-info
+  // one symbol
+  // - the index in the row
+  // - the mathlayout element
+  // - since its in a row, we can also add the from: 0, to: 1 info
+  // + one symbol (recursive call)
+  //   - attach the index in the row (we get that from the parent)
+  // one fraction
+  // - the index in the row
+  // - the mathlayout element
+  // - since its in a row, we can also add the from: 1, to: 2 info
+  const emittedMathML = fromMathLayout(mathIR, physicalLayout, domRanges);
   if (tagIs(emittedMathML, "mrow")) {
     // Remove duplicate mrow at the top
     element.append(...emittedMathML.childNodes);
+    const rangeAttributeValue = emittedMathML.getAttribute(PartialRangeAttributeName);
+    assert(rangeAttributeValue !== null);
+    element.setAttribute(PartialRangeAttributeName, rangeAttributeValue);
   } else {
     element.append(emittedMathML);
   }
@@ -28,11 +136,16 @@ export function toElement(mathIR: MathLayoutRow): {
 
   return {
     element,
-    physicalLayout: physicalLayout,
+    physicalLayout,
+    domRanges,
   };
 }
 
-function fromMathLayout(mathIR: MathLayout, physicalLayout: MathPhysicalLayout): Element {
+function fromMathLayout(
+  mathIR: MathLayout,
+  physicalLayout: MathPhysicalLayout,
+  domRanges: MathDomRanges
+): { element: Element; translator: MathDomTranslator } {
   function setTextLayout(mathIR: MathLayoutText, textNode: Text): Text {
     physicalLayout?.set(mathIR, (index) => getTextLayout(textNode, index));
     return textNode;
@@ -48,36 +161,35 @@ function fromMathLayout(mathIR: MathLayout, physicalLayout: MathPhysicalLayout):
     ]);
   } else if (mathIR.type == "fraction") {
     return createMathElement("mfrac", [
-      fromMathLayout(mathIR.values[0], physicalLayout),
-      fromMathLayout(mathIR.values[1], physicalLayout),
+      fromMathLayout(mathIR.values[0], physicalLayout, domRanges),
+      fromMathLayout(mathIR.values[1], physicalLayout, domRanges),
     ]);
 
     // Maybe detect under-over?
   } else if (mathIR.type == "over") {
     return createMathElement("mover", [
-      fromMathLayout(mathIR.values[0], physicalLayout),
-      fromMathLayout(mathIR.values[1], physicalLayout),
+      fromMathLayout(mathIR.values[0], physicalLayout, domRanges),
+      fromMathLayout(mathIR.values[1], physicalLayout, domRanges),
     ]);
   } else if (mathIR.type == "under") {
     return createMathElement("munder", [
-      fromMathLayout(mathIR.values[0], physicalLayout),
-      fromMathLayout(mathIR.values[1], physicalLayout),
+      fromMathLayout(mathIR.values[0], physicalLayout, domRanges),
+      fromMathLayout(mathIR.values[1], physicalLayout, domRanges),
     ]);
   } else if (mathIR.type == "root") {
     // TODO: If it's a square root, make the 2 a bit lighter
     return createMathElement("mroot", [
-      fromMathLayout(mathIR.values[1], physicalLayout),
-      fromMathLayout(mathIR.values[0], physicalLayout),
+      fromMathLayout(mathIR.values[1], physicalLayout, domRanges),
+      fromMathLayout(mathIR.values[0], physicalLayout, domRanges),
     ]);
   } else if (mathIR.type == "row") {
-    // TODO: Maybe don't emit every useless row
-    const parsedChildren = fromMathLayoutRow(new TokenStream(mathIR.values, 0), physicalLayout);
+    const parsedChildren = fromMathLayoutRow(new TokenStream(mathIR.values, 0), physicalLayout, domRanges);
     setRowLayout(mathIR, parsedChildren.mathLayout);
-    return createMathElement("mrow", parsedChildren.elements);
+    return createMathElement("mrow", parsedChildren.elements, domRanges);
   } else if (mathIR.type == "sub" || mathIR.type == "sup") {
     return createMathElement("merror", [createMathElement("mtext", [document.createTextNode("Unexpected " + mathIR.type)])]);
   } else if (mathIR.type == "symbol") {
-    const parsedChildren = fromMathLayoutRow(new TokenStream([mathIR], 0), physicalLayout);
+    const parsedChildren = fromMathLayoutRow(new TokenStream([mathIR], 0), physicalLayout, domRanges);
     return parsedChildren.elements.length == 1
       ? parsedChildren.elements[0]
       : createMathElement("mrow", parsedChildren.elements);
@@ -100,7 +212,7 @@ function fromMathLayout(mathIR: MathLayout, physicalLayout: MathPhysicalLayout):
       rows.map((row) =>
         createMathElement(
           "mtr",
-          row.map((cell) => createMathElement("mtd", [fromMathLayout(cell, physicalLayout)]))
+          row.map((cell) => createMathElement("mtd", [fromMathLayout(cell, physicalLayout, domRanges)]))
         )
       )
     );
@@ -119,7 +231,8 @@ const isNumber = /^\p{Nd}+(\.\p{Nd}*)?$/gu;
  */
 function fromMathLayoutRow(
   tokens: TokenStream<MathLayout>,
-  physicalLayout: MathPhysicalLayout
+  physicalLayout: MathPhysicalLayout,
+  domRanges: MathDomRanges
 ): {
   elements: Element[];
   mathLayout: (() => DOMRect)[];
@@ -152,28 +265,32 @@ function fromMathLayoutRow(
   }
 
   while (true) {
-    const element = tokens.next();
+    const { value: element, index: elementIndex } = tokens.nextWithIndex();
     if (element === undefined) break;
 
     if (element.type == "symbol") {
+      // TODO: Replace with correct parser
       if (element.value.search(isDigit) != -1) {
         tokens.back();
-        const parsed = fromMathLayoutNumber(tokens);
+        const parsed = fromMathLayoutNumber(tokens, domRanges);
         output.push(parsed.element);
         mathLayout.push(...parsed.mathLayout);
       } else if (allBrackets.has(element.value)) {
-        const pseudoBracket = createMathElement("mo", [document.createTextNode(element.value)]);
+        const pseudoBracket = createMathElement("mo", [document.createTextNode(element.value)], domRanges, {
+          indexInParent: elementIndex,
+        });
         pseudoBracket.setAttribute("stretchy", "false");
         pushOutput(pseudoBracket);
       } else {
-        // TODO: Might be an operator
-        // ⊥  is both a symbol (false) and an operator (A perpendicular B)
-
-        pushOutput(createMathElement("mi", [document.createTextNode(element.value)]));
+        pushOutput(
+          createMathElement("mi", [document.createTextNode(element.value)], domRanges, {
+            indexInParent: elementIndex,
+          })
+        );
       }
     } else if (element.type == "bracket") {
       if (endingBrackets.has(element.value)) {
-        pushOutput(fromMathLayout(element, physicalLayout)); // No opening bracket
+        pushOutput(fromMathLayout(element, physicalLayout, domRanges)); // No opening bracket
       } else {
         // A starting bracket or an either bracket (funnily enough, the logic is almost the same for both)
         const endingBracketIndex = startingBrackets.has(element.value)
@@ -181,11 +298,12 @@ function fromMathLayoutRow(
           : findEitherEndingBracket(tokens.value, tokens.offset - 1);
         // TODO: maybe check if the ending bracket is actually the right type of bracket?
         if (endingBracketIndex == null) {
-          pushOutput(fromMathLayout(element, physicalLayout)); // No closing bracket
+          pushOutput(fromMathLayout(element, physicalLayout, domRanges)); // No closing bracket
         } else {
           const parsedChildren = fromMathLayoutRow(
             new TokenStream(tokens.value.slice(tokens.offset, endingBracketIndex), 0),
-            physicalLayout
+            physicalLayout,
+            domRanges
           );
           const endingBracket = tokens.value[endingBracketIndex];
           assert(endingBracket.type == "bracket");
@@ -209,7 +327,7 @@ function fromMathLayoutRow(
     } else if (element.type == "sub" || element.type == "sup") {
       const lastElement = output.pop();
       if (lastElement) {
-        const subSupElement = fromMathLayout(element.values[0], physicalLayout);
+        const subSupElement = fromMathLayout(element.values[0], physicalLayout, domRanges);
         mathLayout.push(() => {
           const boundingBox = lastElement.getBoundingClientRect();
           boundingBox.x += boundingBox.width;
@@ -219,16 +337,16 @@ function fromMathLayoutRow(
         output.push(createMathElement(element.type == "sub" ? "msub" : "msup", [lastElement, subSupElement]));
       } else {
         // A lonely sub or sup is an error, we let this function deal with it
-        pushOutput(fromMathLayout(element, physicalLayout));
+        pushOutput(fromMathLayout(element, physicalLayout, domRanges));
       }
     } else {
-      pushOutput(fromMathLayout(element, physicalLayout));
+      pushOutput(fromMathLayout(element, physicalLayout, domRanges));
     }
   }
 
   // And push another last entry, since we can place a caret after the last one
   if (mathLayout.length > 0) {
-    // TODO: use .at(-1)
+    // TODO: Not sure if we'll still need this
     const lastEntry = mathLayout[mathLayout.length - 1];
     mathLayout.push(() => {
       const boundingBox = lastEntry();
@@ -238,7 +356,11 @@ function fromMathLayoutRow(
     });
   } else {
     // Placeholder element, so that the row doesn't collapse to a zero-width
-    const placeholder = createMathElement("mtext", [document.createTextNode("⬚")]);
+    const placeholder = createMathElement("mtext", [document.createTextNode("⬚")], domRanges, {
+      to: 0,
+      from: 0,
+      indexInParent: null,
+    });
     output.push(placeholder);
     mathLayout.push(() => {
       const boundingBox = placeholder.getBoundingClientRect();
@@ -251,12 +373,15 @@ function fromMathLayoutRow(
   return { elements: output, mathLayout: mathLayout };
 }
 
-function fromMathLayoutNumber(tokens: TokenStream<MathLayout>): {
+function fromMathLayoutNumber(
+  tokens: TokenStream<MathLayout>,
+  domRanges: MathDomRanges
+): {
   element: Element;
   mathLayout: (() => DOMRect)[];
 } {
   const mathLayout: (() => DOMRect)[] = [];
-  const firstDigit = tokens.next();
+  const { value: firstDigit, index: from } = tokens.nextWithIndex();
   assert(firstDigit?.type == "symbol");
 
   let digits = firstDigit.value;
@@ -280,7 +405,8 @@ function fromMathLayoutNumber(tokens: TokenStream<MathLayout>): {
   }
 
   return {
-    element: createMathElement("mn", [textNode]),
+    // TODO: here we've got an interesting case. It doesn't cleanly map to the MathLayout.
+    element: createMathElement("mn", [textNode], domRanges, { indexInParent: null, from, to: from + count }),
     mathLayout: mathLayout,
   };
 }
@@ -295,11 +421,14 @@ function getTextBoundingBox(t: Text, index: number) {
 }
 
 const mathNamespace = "http://www.w3.org/1998/Math/MathML";
-function createMathElement(tagName: MathMLTags, children: Node[]) {
-  let element = document.createElementNS(mathNamespace, tagName);
+function createMathElement(tagName: MathMLTags, children: Node[], domRanges?: MathDomRanges, partialRange?: PartialRange) {
+  const element = document.createElementNS(mathNamespace, tagName);
   children.forEach((c) => {
     element.appendChild(c);
   });
+  if (domRanges && partialRange) {
+    domRanges.set(element, partialRange);
+  }
   return element;
 }
 

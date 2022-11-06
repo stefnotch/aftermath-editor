@@ -1,4 +1,5 @@
 import { match } from "ts-pattern";
+import { Offset } from "../math-layout/math-layout-offset";
 import { tableIndexToPosition, tablePositionToIndex } from "../math-layout/math-layout-utils";
 import {
   MathLayoutContainerZipper,
@@ -10,10 +11,6 @@ import { assert, assertUnreachable } from "../utils/assert";
 import { ViewportCoordinate } from "./viewport-coordinate";
 
 export type Direction = "left" | "right" | "up" | "down";
-/**
- * A caret offset is a number that goes from 0 to the length of the array (inclusive).
- */
-type Offset = number;
 
 /**
  * Whether the editor attempts to keep the caret in the same-ish x-coordinate when moving up.

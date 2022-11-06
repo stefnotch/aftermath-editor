@@ -1,3 +1,4 @@
+import { TokenStream } from "../math-editor/token-stream";
 import {
   MathLayoutRow,
   MathLayoutContainer,
@@ -15,8 +16,9 @@ import {
  * A zipper is a pointer to a node in a tree, with a reference to the parent node.
  * See also: http://learnyouahaskell.com/zippers
  */
+// TODO: Try adding <T extends {type: string}>
 interface MathLayoutZipper {
-  readonly type: string;
+  readonly type: MathLayoutRow["type"] | MathLayoutElement["type"];
   readonly indexInParent: number;
   equals(other: MathLayoutZipper): boolean;
 }
@@ -55,6 +57,7 @@ export class MathLayoutRowZipper implements MathLayoutZipper {
   get type(): MathLayoutRow["type"] {
     return this.value.type;
   }
+
   get children() {
     return this.value.values.map((v, i) => {
       if (isMathLayoutSymbol(v)) {
@@ -67,6 +70,10 @@ export class MathLayoutRowZipper implements MathLayoutZipper {
         return new MathLayoutContainerZipper(v, this, i);
       }
     });
+  }
+
+  get childrenStream() {
+    return new TokenStream(this.children, 0);
   }
 }
 
@@ -88,9 +95,12 @@ export class MathLayoutContainerZipper implements MathLayoutZipper {
   get children() {
     return this.value.values.map((v, i) => new MathLayoutRowZipper(v, this, i));
   }
+
+  get childrenStream() {
+    return new TokenStream(this.children, 0);
+  }
 }
 
-// Unsure if this is already good enough or if we need more stuff for navigating within a table
 export class MathLayoutTableZipper implements MathLayoutZipper {
   constructor(
     public readonly value: MathLayoutTable,
@@ -108,6 +118,10 @@ export class MathLayoutTableZipper implements MathLayoutZipper {
 
   get children() {
     return this.value.values.map((v, i) => new MathLayoutRowZipper(v, this, i));
+  }
+
+  get childrenStream() {
+    return new TokenStream(this.children, 0);
   }
 }
 
