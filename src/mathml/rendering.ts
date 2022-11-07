@@ -30,7 +30,8 @@ class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements M
       | MathTableDomTranslator
       | MathSymbolDomTranslator
       | MathTextDomTranslator
-    )[]
+    )[],
+    public readonly finalElement: Element
   ) {}
 
   get type(): T["type"] {
@@ -38,16 +39,39 @@ class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements M
   }
 
   offsetToPosition(offset: Offset): { x: ViewportValue; y: ViewportValue; height: ViewportValue } {
-    throw new Error("TODO: Method not implemented.");
+    // https://github.com/stefnotch/mathml-editor/issues/15#issuecomment-1305718639
 
-    // TODO: One interesting thing to think about and document:
-    // - every child has a "bounding box" (x, y, width, height) -> we can get positions, even the final position
-    // vs
-    // - every child has a "position" (x, y) and a "height" -> we can get positions, but not the final position
-    //   for the final position, we add a dummy child or something
-    // vs
-    // - every child has a "before-position" and "after-position", cause the height is the caret height!
-    //   And the position.y is just where the caret should be, not how deep the element is
+    // Special case for the end of the row
+    // Also elegantly deals with empty rows
+    if (offset >= this.children.length) {
+      const finalBoundingBox = this.finalElement.getBoundingClientRect();
+      return {
+        x: finalBoundingBox.x + finalBoundingBox.width / 2 + window.scrollX,
+        y: this.baseline(),
+        height: this.caretHeight(),
+      };
+    }
+
+    const child = this.children[offset];
+    return {
+      x: child.startEndPosition().start,
+      y: this.baseline(),
+      height: this.caretHeight(),
+    };
+  }
+
+  private baseline(): ViewportValue {
+    // TODO: Get the correct baseline for this mrow
+    return this.element.getBoundingClientRect().bottom + window.scrollY;
+  }
+
+  private caretHeight(): ViewportValue {
+    // TODO: Get the correct height for this mrow
+    return 20;
+  }
+
+  startEndPosition(): { start: ViewportValue; end: ViewportValue } {
+    return getElementLayoutStartEnd(this.element);
   }
 }
 
@@ -57,6 +81,10 @@ class MathContainerDomTranslator<T extends MathLayoutContainer = MathLayoutConta
   get type(): T["type"] {
     return this.value.type;
   }
+
+  startEndPosition(): { start: ViewportValue; end: ViewportValue } {
+    return getElementLayoutStartEnd(this.element);
+  }
 }
 
 class MathTableDomTranslator<T extends MathLayoutTable = MathLayoutTable> implements MathDomTranslator<T> {
@@ -65,15 +93,34 @@ class MathTableDomTranslator<T extends MathLayoutTable = MathLayoutTable> implem
   get type(): T["type"] {
     return this.value.type;
   }
+
+  startEndPosition(): { start: ViewportValue; end: ViewportValue } {
+    return getElementLayoutStartEnd(this.element);
+  }
 }
 
 class MathSymbolDomTranslator<T extends MathLayoutSymbol = MathLayoutSymbol> implements MathDomTranslator<T> {
-  constructor(public readonly value: MathLayoutSymbol) {}
+  constructor(
+    public readonly value: MathLayoutSymbol,
+    /**
+     * The element that contains this symbol. Note that the element might be shared with another symbol.
+     * Make sure to use the index to find the correct symbol.
+     */
+    public readonly element: Text,
+    // TODO: This should be a range
+    public readonly index: number
+  ) {}
 
   get type(): T["type"] {
     return this.value.type;
   }
-  // Doesn't actually need to correspond to an element. The element might be shared with another symbol or something.
+
+  startEndPosition(): { start: ViewportValue; end: ViewportValue } {
+    return {
+      start: getTextLayout(this.element, this.index).x,
+      end: getTextLayout(this.element, this.index + 1).x,
+    };
+  }
 }
 
 class MathTextDomTranslator<T extends MathLayoutText = MathLayoutText> implements MathDomTranslator<T> {
@@ -87,6 +134,13 @@ class MathTextDomTranslator<T extends MathLayoutText = MathLayoutText> implement
 
   offsetToPosition(offset: Offset): { x: ViewportValue; y: ViewportValue; height: ViewportValue } {
     return getTextLayout(this.element, offset);
+  }
+
+  startEndPosition(): { start: ViewportValue; end: ViewportValue } {
+    return {
+      start: this.offsetToPosition(0).x,
+      end: this.offsetToPosition(this.value.value.length).x,
+    };
   }
 }
 
@@ -115,9 +169,11 @@ function fromMathLayoutRow(mathIR: MathLayoutRow): { element: Element; translato
   if (mathIR.type === "row") {
     const parsedChildren = fromMathLayoutRowChildren(new TokenStream(mathIR.values, 0));
     const element = createMathElement("mrow", parsedChildren.elements);
+    const finalElement = parsedChildren.elements.at(-1);
+    assert(finalElement !== undefined);
     return {
       element,
-      translator: new MathRowDomTranslator(mathIR, element, parsedChildren.translators),
+      translator: new MathRowDomTranslator(mathIR, element, parsedChildren.translators, finalElement),
     };
   } else {
     assertUnreachable(mathIR.type);
@@ -162,9 +218,10 @@ function fromMathLayoutElement<T extends MathLayoutElement>(
     const translator = new MathContainerDomTranslator(mathIR, element, [childA.translator, childB.translator]);
     return { element, translator };
   } else if (mathIR.type == "bracket") {
+    const textNode = document.createTextNode(mathIR.value);
     const element = createMathElement("mo", [document.createTextNode(mathIR.value)]);
     element.setAttribute("stretchy", "false");
-    const translator = new MathSymbolDomTranslator(mathIR);
+    const translator = new MathSymbolDomTranslator(mathIR, textNode, 0);
     return { element, translator };
   } else if (mathIR.type == "text") {
     // TODO: Special styling for empty text
@@ -333,21 +390,20 @@ function fromMathLayoutRowChildren(tokens: TokenStream<MathLayout>): {
 
 function fromMathLayoutNumber(tokens: TokenStream<MathLayout>): {
   element: Element;
-  mathLayout: (() => DOMRect)[];
+  translators: MathSymbolDomTranslator[];
 } {
-  const mathLayout: (() => DOMRect)[] = [];
-  const { value: firstDigit, index: from } = tokens.nextWithIndex();
+  const symbolTokens: MathLayoutSymbol[] = [];
+  const firstDigit = tokens.next();
   assert(firstDigit?.type == "symbol");
 
   let digits = firstDigit.value;
-  let count = 1;
   while (true) {
-    const element = tokens.next();
-    if (element === undefined) break;
+    const token = tokens.next();
+    if (token === undefined) break;
 
-    if (element.type == "symbol" && (digits + element.value).search(isNumber) != -1) {
-      digits += element.value;
-      count += 1;
+    if (token.type == "symbol" && (digits + token.value).search(isNumber) != -1) {
+      digits += token.value;
+      symbolTokens.push(token);
     } else {
       tokens.back();
       break;
@@ -355,14 +411,14 @@ function fromMathLayoutNumber(tokens: TokenStream<MathLayout>): {
   }
 
   const textNode = document.createTextNode(digits);
-  for (let j = 0; j < count; j++) {
-    mathLayout.push(() => getTextBoundingBox(textNode, j));
-  }
+  const element = createMathElement("mn", [textNode]);
+  const translators: MathSymbolDomTranslator[] = symbolTokens.map(
+    (symbolToken, i) => new MathSymbolDomTranslator(symbolToken, textNode, i)
+  );
 
   return {
-    // TODO: here we've got an interesting case. It doesn't cleanly map to the MathLayout.
-    element: createMathElement("mn", [textNode]),
-    mathLayout: mathLayout,
+    element: element,
+    translators,
   };
 }
 
@@ -395,14 +451,10 @@ function getTextBoundingBox(t: Text, index: number) {
   return range.getBoundingClientRect();
 }
 
-function getRowLayout(mathLayout: (() => DOMRect)[], index: number) {
-  console.log("getRowLayout", index);
-  assert(index <= mathLayout.length);
-  const boundingBox = mathLayout[index]();
-
+function getElementLayoutStartEnd(element: Element) {
+  const boundingBox = element.getBoundingClientRect();
   return {
-    x: boundingBox.x + window.scrollX,
-    y: boundingBox.y + window.scrollY,
-    height: boundingBox.height, // TODO: Use the script level or font size instead or the new "math-depth" CSS property
+    start: boundingBox.x + window.scrollX,
+    end: boundingBox.x + boundingBox.width + window.scrollX,
   };
 }
