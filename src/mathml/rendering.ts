@@ -8,10 +8,8 @@ import {
   MathLayoutTable,
   MathLayoutContainer,
 } from "../math-layout/math-layout";
-import { findEitherEndingBracket, findOtherBracket } from "../math-layout/math-layout-utils";
 import { startingBrackets, endingBrackets, allBrackets, MathMLTags } from "./mathml-spec";
 import { TokenStream } from "../math-editor/token-stream";
-import { tagIs } from "../utils/dom-utils";
 import { Offset } from "../math-layout/math-layout-offset";
 import { ViewportValue } from "../component/viewport-coordinate";
 import {
@@ -51,10 +49,10 @@ class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements M
 
     // Special case for the end of the row
     // Also elegantly deals with empty rows
-    if (offset >= this.children.length) {
+    if (offset >= this.value.values.length) {
       const finalBoundingBox = this.finalElement.getBoundingClientRect();
       return {
-        x: finalBoundingBox.x + finalBoundingBox.width / 2 + window.scrollX,
+        x: finalBoundingBox.x + finalBoundingBox.width / 2,
         y: this.baseline(),
         height: this.caretHeight(),
       };
@@ -78,7 +76,8 @@ class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements M
     // - insert a 0px element
     // - get its bounding box
     // - figure out where it is relative to the parent
-    return this.element.getBoundingClientRect().bottom + window.scrollY;
+    // TODO: Please get the baseline and not the top
+    return this.element.getBoundingClientRect().y;
   }
 
   private caretHeight(): ViewportValue {
@@ -271,7 +270,7 @@ function fromMathLayoutElement<T extends MathLayoutElement>(
     return { element, translator };
   } else if (mathIR.type == "bracket") {
     const textNode = document.createTextNode(mathIR.value);
-    const element = createMathElement("mo", [document.createTextNode(mathIR.value)]);
+    const element = createMathElement("mo", [textNode]);
     element.setAttribute("stretchy", "false");
     const translator = new MathSymbolDomTranslator(mathIR, textNode, 0);
     return { element, translator };
@@ -347,14 +346,14 @@ function fromMathLayoutRowChildren(tokens: TokenStream<MathLayoutElement>): {
       } else if (allBrackets.has(token.value)) {
         // Bit of code duplication, but it's fine since I'm ripping this out later anyways or something
         const textNode = document.createTextNode(token.value);
-        const pseudoBracket = createMathElement("mo", [document.createTextNode(token.value)]);
+        const pseudoBracket = createMathElement("mo", [textNode]);
         pseudoBracket.setAttribute("stretchy", "false");
         const translator = new MathSymbolDomTranslator(token, textNode, 0);
         output.push(pseudoBracket);
         translators.push(translator);
       } else {
         const textNode = document.createTextNode(token.value);
-        const element = createMathElement("mi", [document.createTextNode(token.value)]);
+        const element = createMathElement("mi", [textNode]);
         element.setAttribute("stretchy", "false");
         const translator = new MathSymbolDomTranslator(token, textNode, 0);
         output.push(element);
@@ -476,12 +475,14 @@ function createMathElement(tagName: MathMLTags, children: Node[]) {
 }
 
 function getTextLayout(t: Text, index: number) {
+  assert(t.isConnected);
   const atEnd = index >= t.length;
   const boundingBox = !atEnd ? getTextBoundingBox(t, index) : getTextBoundingBox(t, Math.max(0, t.length - 1));
 
   return {
-    x: boundingBox.x + (atEnd ? boundingBox.width : 0) + window.scrollX,
-    y: boundingBox.y + window.scrollY,
+    x: boundingBox.x + (atEnd ? boundingBox.width : 0),
+    // TODO: Please get the text's baseline and not the top
+    y: boundingBox.y,
     height: boundingBox.height,
   };
 }
@@ -496,9 +497,10 @@ function getTextBoundingBox(t: Text, index: number) {
 }
 
 function getElementLayoutStartEnd(element: Element) {
+  assert(element.isConnected);
   const boundingBox = element.getBoundingClientRect();
   return {
-    start: boundingBox.x + window.scrollX,
-    end: boundingBox.x + boundingBox.width + window.scrollX,
+    start: boundingBox.x,
+    end: boundingBox.x + boundingBox.width,
   };
 }

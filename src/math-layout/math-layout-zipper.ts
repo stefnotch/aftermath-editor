@@ -168,6 +168,7 @@ export function getAncestors(zipper: MathLayoutRowZipper | MathLayoutTextZipper)
       current = current.parent;
     }
   }
+  ancestors.reverse();
   return ancestors;
 }
 
@@ -178,5 +179,6 @@ export function getAncestorIndices(zipper: MathLayoutRowZipper | MathLayoutTextZ
     ancestorIndices.push(current.indexInParent);
     current = current.parent;
   }
+  ancestorIndices.reverse();
   return ancestorIndices;
 }
