@@ -1,7 +1,7 @@
 import { assert, assertUnreachable } from "../utils/assert";
-import { MathLayoutElement, MathPhysicalLayout, MathLayoutRow, MathLayoutText } from "../math-layout/math-layout";
+import { MathLayoutElement, MathLayoutRow, MathLayoutText } from "../math-layout/math-layout";
 import { fromElement as fromMathMLElement } from "../mathml/parsing";
-import { toElement as toMathMLElement } from "../mathml/rendering";
+import { MathPhysicalLayout, toElement as toMathMLElement } from "../mathml/rendering";
 import arrayUtils from "../utils/array-utils";
 import { endingBrackets, startingBrackets } from "../mathml/mathml-spec";
 import { findOtherBracket, wrapInRow } from "../math-layout/math-layout-utils";
@@ -275,7 +275,7 @@ export class MathEditor extends HTMLElement {
     const lastLayout = this.lastLayout;
     if (!lastLayout) return;
 
-    const layoutGetter = lastLayout.get(caret.caret.zipper.value);
+    const layoutGetter = lastLayout.get(caret.caret.zipper);
     assert(layoutGetter !== undefined);
     const layout = layoutGetter(caret.caret.offset);
     caret.element.setPosition(layout.x, layout.y);
@@ -299,12 +299,12 @@ export class MathEditor extends HTMLElement {
   moveCaret(caret: MathCaret, direction: "up" | "down" | "left" | "right") {
     const lastLayout = this.lastLayout;
     if (!lastLayout) return; // TODO: Maybe don't ignore the move command if the last layout doesn't exist?
-    const layoutGetter = lastLayout.get(caret.caret.zipper.value);
+    const layoutGetter = lastLayout.get(caret.caret.zipper);
     assert(layoutGetter !== undefined);
     const layout = layoutGetter(caret.caret.offset);
 
     const newCaret = caret.caret.move(direction, [layout.x, layout.y], (zipper, offset) => {
-      const layoutGetter = lastLayout.get(zipper.value);
+      const layoutGetter = lastLayout.get(zipper);
       assert(layoutGetter !== undefined);
       const layout = layoutGetter(offset);
       return [layout.x, layout.y];

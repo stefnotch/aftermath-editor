@@ -36,13 +36,6 @@ For a full implementation, we would still need some further details such as:
 
 type ZipperInstance = MathLayoutZipper & { value: MathLayoutRow | MathLayoutElement; parent: ZipperInstance | null };
 
-function zippersEqual<T extends ZipperInstance, U extends ZipperInstance>(a: T, b: U): boolean {
-  if (b.type !== a.type) return false;
-  if (a.value !== b.value) return false;
-  if (a.parent === null || b.parent === null) return a.parent === b.parent;
-  return a.parent.equals(b.parent);
-}
-
 export class MathLayoutRowZipper implements MathLayoutZipper {
   constructor(
     public readonly value: MathLayoutRow,
@@ -155,4 +148,35 @@ export class MathLayoutTextZipper implements MathLayoutZipper {
   get type(): MathLayoutText["type"] {
     return this.value.type;
   }
+}
+
+function zippersEqual<T extends ZipperInstance, U extends ZipperInstance>(a: T, b: U): boolean {
+  if (b.type !== a.type) return false;
+  if (a.value !== b.value) return false;
+  if (a.parent === null || b.parent === null) return a.parent === b.parent;
+  return a.parent.equals(b.parent);
+}
+
+export function getAncestors(zipper: MathLayoutRowZipper | MathLayoutTextZipper) {
+  const ancestors: (MathLayoutRow | MathLayoutElement)[] = [];
+  let current: MathLayoutRowZipper | MathLayoutTextZipper | MathLayoutContainerZipper | MathLayoutTableZipper = zipper;
+  while (true) {
+    ancestors.push(current.value);
+    if (current.parent === null) {
+      break;
+    } else {
+      current = current.parent;
+    }
+  }
+  return ancestors;
+}
+
+export function getAncestorIndices(zipper: MathLayoutRowZipper | MathLayoutTextZipper) {
+  const ancestorIndices: number[] = [];
+  let current: MathLayoutRowZipper | MathLayoutTextZipper | MathLayoutContainerZipper | MathLayoutTableZipper = zipper;
+  while (current.parent !== null) {
+    ancestorIndices.push(current.indexInParent);
+    current = current.parent;
+  }
+  return ancestorIndices;
 }

@@ -1,4 +1,5 @@
 import { ViewportValue } from "../component/viewport-coordinate";
+import { MathLayoutRowZipper, MathLayoutTextZipper } from "./math-layout-zipper";
 
 /**
  * Merely a Typescript hint to make sure that I don't miss any cases
@@ -228,10 +229,3 @@ TODO:
 // ⊥  is both a symbol (false) and an operator (A perpendicular B)
 
 // TODO: bracket pairs are to be resolved during inputting (pairs, ghost close bracket, esc and space, set builder |, |abs|, ||norm||, {x| |x| < 3})
-
-// TODO: maybe use a MathLayoutZipper
-// The index has a different meaning depending on the element (child index, ignored, text index, 2D index)
-export type MathPhysicalLayout = Map<
-  MathLayoutRow | MathLayoutText, // row-container
-  (index: number) => { x: ViewportValue; y: ViewportValue; height: number }
->;

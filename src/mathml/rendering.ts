@@ -3,7 +3,6 @@ import {
   MathLayout,
   MathLayoutText,
   MathLayoutRow,
-  MathPhysicalLayout,
   MathLayoutElement,
   MathLayoutSymbol,
   MathLayoutTable,
@@ -15,6 +14,13 @@ import { TokenStream } from "../math-editor/token-stream";
 import { tagIs } from "../utils/dom-utils";
 import { Offset } from "../math-layout/math-layout-offset";
 import { ViewportValue } from "../component/viewport-coordinate";
+import {
+  getAncestorIndices,
+  MathLayoutContainerZipper,
+  MathLayoutRowZipper,
+  MathLayoutTableZipper,
+  MathLayoutTextZipper,
+} from "../math-layout/math-layout-zipper";
 
 // I am debating the usefulness of the generics here
 interface MathDomTranslator<T extends { readonly type: string }> {
@@ -32,7 +38,9 @@ class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements M
       | MathTextDomTranslator
     )[],
     public readonly finalElement: Element
-  ) {}
+  ) {
+    assert(children.length >= value.values.length);
+  }
 
   get type(): T["type"] {
     return this.value.type;
@@ -62,6 +70,14 @@ class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements M
 
   private baseline(): ViewportValue {
     // TODO: Get the correct baseline for this mrow
+
+    // TODO: Figure out where the baseline is (line-descent, line-ascent and that stuff)
+    // Because you can't really rely on "look at where the next element is"
+    // One silly hack for getting the baseline is:
+    // - get the bounding box of the parent
+    // - insert a 0px element
+    // - get its bounding box
+    // - figure out where it is relative to the parent
     return this.element.getBoundingClientRect().bottom + window.scrollY;
   }
 
@@ -76,7 +92,9 @@ class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements M
 }
 
 class MathContainerDomTranslator<T extends MathLayoutContainer = MathLayoutContainer> implements MathDomTranslator<T> {
-  constructor(public readonly value: T, public readonly element: Element, public readonly children: MathRowDomTranslator[]) {}
+  constructor(public readonly value: T, public readonly element: Element, public readonly children: MathRowDomTranslator[]) {
+    assert(children.length === value.values.length);
+  }
 
   get type(): T["type"] {
     return this.value.type;
@@ -88,7 +106,9 @@ class MathContainerDomTranslator<T extends MathLayoutContainer = MathLayoutConta
 }
 
 class MathTableDomTranslator<T extends MathLayoutTable = MathLayoutTable> implements MathDomTranslator<T> {
-  constructor(public readonly value: T, public readonly element: Element, public readonly children: MathRowDomTranslator[]) {}
+  constructor(public readonly value: T, public readonly element: Element, public readonly children: MathRowDomTranslator[]) {
+    assert(children.length === value.values.length);
+  }
 
   get type(): T["type"] {
     return this.value.type;
@@ -144,6 +164,13 @@ class MathTextDomTranslator<T extends MathLayoutText = MathLayoutText> implement
   }
 }
 
+// TODO: Remove/refactor this
+// The index has a different meaning depending on the element (child index, ignored, text index, 2D index)
+export type MathPhysicalLayout = Map<
+  MathLayoutRowZipper | MathLayoutTextZipper, // row-container
+  (index: number) => { x: ViewportValue; y: ViewportValue; height: number }
+>;
+
 /**
  * Takes a MathLayout and returns a MathML DOM tree
  */
@@ -160,7 +187,29 @@ export function toElement(mathIR: MathLayoutRow): {
 
   return {
     element,
-    physicalLayout: null as any, // TODO: Replace with a dummy implementation that queries the translator
+    physicalLayout: {
+      // TODO: Refactor this prototype implementation that queries the translator
+      get(mathLayout: MathLayoutRowZipper | MathLayoutTextZipper) {
+        return (index: Offset) => {
+          const ancestorIndices = getAncestorIndices(mathLayout);
+
+          let current:
+            | MathRowDomTranslator
+            | MathContainerDomTranslator
+            | MathTableDomTranslator
+            | MathSymbolDomTranslator
+            | MathTextDomTranslator = translator;
+          for (const ancestorIndex of ancestorIndices) {
+            assert("children" in current); // We could write better code, but this assertion will do for now
+            current = current.children[ancestorIndex];
+          }
+
+          // We could write better code, but this assertion will do for now
+          assert(current instanceof MathRowDomTranslator || current instanceof MathTextDomTranslator);
+          return current.offsetToPosition(index);
+        };
+      },
+    } as any,
     mathDomTranslator: translator,
   };
 }
@@ -183,7 +232,10 @@ function fromMathLayoutRow(mathIR: MathLayoutRow): { element: Element; translato
 function fromMathLayoutElement<T extends MathLayoutElement>(
   // A few things are excluded for now and are being handled by fromMathLayoutRow
   mathIR: Exclude<T, { type: "sub" } | { type: "sup" } | { type: "symbol" }>
-): { element: Element; translator: MathDomTranslator<T> } {
+): {
+  element: Element;
+  translator: MathContainerDomTranslator | MathTableDomTranslator | MathSymbolDomTranslator | MathTextDomTranslator;
+} {
   // this almost sort a feels like a monad hmmm
   // TODO: Ugly code duplication
   if (mathIR.type == "error") {
@@ -264,7 +316,7 @@ const isNumber = /^\p{Nd}+(\.\p{Nd}*)?$/gu;
 /**
  * Parse all the children of a row, has some special logic
  */
-function fromMathLayoutRowChildren(tokens: TokenStream<MathLayout>): {
+function fromMathLayoutRowChildren(tokens: TokenStream<MathLayoutElement>): {
   elements: Element[];
   translators: (MathContainerDomTranslator | MathTableDomTranslator | MathSymbolDomTranslator | MathTextDomTranslator)[];
 } {
@@ -278,47 +330,53 @@ function fromMathLayoutRowChildren(tokens: TokenStream<MathLayout>): {
   //   Instead we'll expose some "parser" API to the user and let them deal with fun like "wait, what e is that"
 
   const output: Element[] = [];
-  // TODO: Figure out where the baseline is (line-descent, line-ascent and that stuff)
-  // Because you can't really rely on "look at where the next element is"
-  // One silly hack for getting the baseline is:
-  // - get the bounding box of the parent
-  // - insert a 0px element
-  // - get its bounding box
-  // - figure out where it is relative to the parent
-
-  function pushOutput(element: Element) {
-    output.push(element);
-  }
+  const translators: (MathContainerDomTranslator | MathTableDomTranslator | MathSymbolDomTranslator | MathTextDomTranslator)[] =
+    [];
 
   while (true) {
-    const { value: element, index: elementIndex } = tokens.nextWithIndex();
-    if (element === undefined) break;
+    const { value: token } = tokens.nextWithIndex();
+    if (token === undefined) break;
 
-    if (element.type == "symbol") {
+    if (token.type == "symbol") {
       // TODO: Replace with correct parser
-      if (element.value.search(isDigit) != -1) {
+      if (token.value.search(isDigit) != -1) {
         tokens.back();
         const parsed = fromMathLayoutNumber(tokens);
         output.push(parsed.element);
-        mathLayout.push(...parsed.mathLayout);
-      } else if (allBrackets.has(element.value)) {
-        const pseudoBracket = createMathElement("mo", [document.createTextNode(element.value)]);
+        translators.push(...parsed.translators);
+      } else if (allBrackets.has(token.value)) {
+        // Bit of code duplication, but it's fine since I'm ripping this out later anyways or something
+        const textNode = document.createTextNode(token.value);
+        const pseudoBracket = createMathElement("mo", [document.createTextNode(token.value)]);
         pseudoBracket.setAttribute("stretchy", "false");
-        pushOutput(pseudoBracket);
+        const translator = new MathSymbolDomTranslator(token, textNode, 0);
+        output.push(pseudoBracket);
+        translators.push(translator);
       } else {
-        pushOutput(createMathElement("mi", [document.createTextNode(element.value)]));
+        const textNode = document.createTextNode(token.value);
+        const element = createMathElement("mi", [document.createTextNode(token.value)]);
+        element.setAttribute("stretchy", "false");
+        const translator = new MathSymbolDomTranslator(token, textNode, 0);
+        output.push(element);
+        translators.push(translator);
       }
-    } else if (element.type == "bracket") {
-      if (endingBrackets.has(element.value)) {
-        pushOutput(fromMathLayoutElement(element)); // No opening bracket
+    } else if (token.type == "bracket") {
+      if (endingBrackets.has(token.value) || true /*TODO: Remove || true and reimplement commented out code */) {
+        // No opening bracket
+        const parsed = fromMathLayoutElement(token);
+        output.push(parsed.element);
+        translators.push(parsed.translator);
       } else {
+        /*
+        Commented out code:
+
         // A starting bracket or an either bracket (funnily enough, the logic is almost the same for both)
-        const endingBracketIndex = startingBrackets.has(element.value)
+        const endingBracketIndex = startingBrackets.has(token.value)
           ? findOtherBracket(tokens.value, tokens.offset - 1, "right")
           : findEitherEndingBracket(tokens.value, tokens.offset - 1);
         // TODO: maybe check if the ending bracket is actually the right type of bracket?
         if (endingBracketIndex == null) {
-          pushOutput(fromMathLayoutElement(element)); // No closing bracket
+          pushOutput(fromMathLayoutElement(token)); // No closing bracket
         } else {
           const parsedChildren = fromMathLayoutRowChildren(
             new TokenStream(tokens.value.slice(tokens.offset, endingBracketIndex), 0)
@@ -326,7 +384,7 @@ function fromMathLayoutRowChildren(tokens: TokenStream<MathLayout>): {
           const endingBracket = tokens.value[endingBracketIndex];
           assert(endingBracket.type == "bracket");
           tokens.offset = endingBracketIndex + 1;
-          const startingBracketElement = createMathElement("mo", [document.createTextNode(element.value)]);
+          const startingBracketElement = createMathElement("mo", [document.createTextNode(token.value)]);
           const endingBracketElement = createMathElement("mo", [document.createTextNode(endingBracket.value)]);
           output.push(
             createMathElement("mrow", [
@@ -340,49 +398,34 @@ function fromMathLayoutRowChildren(tokens: TokenStream<MathLayout>): {
           mathLayout.push(() => startingBracketElement.getBoundingClientRect());
           mathLayout.push(...parsedChildren.mathLayout);
           mathLayout.push(() => endingBracketElement.getBoundingClientRect());
-        }
+        }*/
       }
-    } else if (element.type == "sub" || element.type == "sup") {
-      const lastElement = output.pop();
-      if (lastElement) {
-        const subSupElement = fromMathLayout(element.values[0], physicalLayout, domRanges);
-        mathLayout.push(() => {
-          const boundingBox = lastElement.getBoundingClientRect();
-          boundingBox.x += boundingBox.width;
-          boundingBox.width = subSupElement.getBoundingClientRect().width;
-          return boundingBox;
-        });
-        output.push(createMathElement(element.type == "sub" ? "msub" : "msup", [lastElement, subSupElement]));
-      } else {
-        // A lonely sub or sup is an error
-        // TODO: Deal with the lonely sub or sup
-        //pushOutput(fromMathLayout(element)); // No element to put the sub or sup on
+    } else if (token.type == "sub" || token.type == "sup") {
+      let lastElement = output.pop();
+      if (!lastElement) {
+        // No element to put the sub or sup on, so we create a placeholder
+        lastElement = createMathElement("mtext", [document.createTextNode("⬚")]);
       }
+      const parsedSubSup = fromMathLayoutRow(token.values[0]);
+      const translator = new MathContainerDomTranslator(token, parsedSubSup.element, [parsedSubSup.translator]);
+      output.push(createMathElement(token.type == "sub" ? "msub" : "msup", [lastElement, parsedSubSup.element]));
+      translators.push(translator);
     } else {
-      pushOutput(fromMathLayoutElement(element));
+      const parsed = fromMathLayoutElement(token);
+      output.push(parsed.element);
+      translators.push(parsed.translator);
     }
   }
 
   // And push another last entry, since we can place a caret after the last one
-  if (mathLayout.length > 0) {
-    // TODO: Not sure if we'll still need this
-    const lastEntry = mathLayout[mathLayout.length - 1];
-    mathLayout.push(() => {
-      const boundingBox = lastEntry();
-      boundingBox.x += boundingBox.width;
-      boundingBox.width = 0;
-      return boundingBox;
-    });
+  if (output.length > 0) {
+    // We still need this, because fromMathLayoutRow takes the last child and uses it as that specially treated "finalElement"
+    const dummyElement = createMathElement("mphantom", []);
+    output.push(dummyElement);
   } else {
     // Placeholder element, so that the row doesn't collapse to a zero-width
     const placeholder = createMathElement("mtext", [document.createTextNode("⬚")]);
     output.push(placeholder);
-    mathLayout.push(() => {
-      const boundingBox = placeholder.getBoundingClientRect();
-      boundingBox.x += boundingBox.width / 2;
-      boundingBox.width = 0;
-      return boundingBox;
-    });
   }
 
   return { elements: output, translators };
@@ -395,6 +438,7 @@ function fromMathLayoutNumber(tokens: TokenStream<MathLayout>): {
   const symbolTokens: MathLayoutSymbol[] = [];
   const firstDigit = tokens.next();
   assert(firstDigit?.type == "symbol");
+  symbolTokens.push(firstDigit);
 
   let digits = firstDigit.value;
   while (true) {
