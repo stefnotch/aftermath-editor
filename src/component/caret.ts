@@ -1,4 +1,4 @@
-import { ViewportCoordinate } from "./viewport-coordinate";
+import { ViewportValue } from "./viewport-coordinate";
 
 export interface CaretElement {
   setPosition(x: number, y: number): void;
@@ -20,7 +20,7 @@ export function createCaret(container: HTMLElement): CaretElement {
   caretElement.className = "math-caret";
   container.append(caretElement);
 
-  function setPosition(x: ViewportCoordinate, y: ViewportCoordinate) {
+  function setPosition(x: ViewportValue, y: ViewportValue) {
     const parentPos = container.getBoundingClientRect();
 
     caretElement.style.left = `${x - parentPos.left}px`;

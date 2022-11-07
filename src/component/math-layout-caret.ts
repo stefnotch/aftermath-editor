@@ -8,7 +8,7 @@ import {
   MathLayoutTextZipper,
 } from "../math-layout/math-layout-zipper";
 import { assert, assertUnreachable } from "../utils/assert";
-import { ViewportCoordinate } from "./viewport-coordinate";
+import { ViewportValue } from "./viewport-coordinate";
 
 export type Direction = "left" | "right" | "up" | "down";
 
@@ -24,11 +24,8 @@ const KeepXPosition = false;
 function moveVertical(
   zipper: MathLayoutRowZipper | MathLayoutTextZipper,
   direction: "up" | "down",
-  desiredXPosition: ViewportCoordinate,
-  getCaretPosition: (
-    zipper: MathLayoutRowZipper | MathLayoutTextZipper,
-    offset: Offset
-  ) => [ViewportCoordinate, ViewportCoordinate]
+  desiredXPosition: ViewportValue,
+  getCaretPosition: (zipper: MathLayoutRowZipper | MathLayoutTextZipper, offset: Offset) => [ViewportValue, ViewportValue]
 ): MathLayoutCaret | null {
   const parent = zipper.parent;
   if (parent === null) return null;
@@ -89,10 +86,7 @@ function moveVertical(
 function moveVerticalClosestPosition(
   newZipper: MathLayoutRowZipper | MathLayoutTextZipper,
   desiredXPosition: number,
-  getCaretPosition: (
-    zipper: MathLayoutRowZipper | MathLayoutTextZipper,
-    offset: Offset
-  ) => [ViewportCoordinate, ViewportCoordinate]
+  getCaretPosition: (zipper: MathLayoutRowZipper | MathLayoutTextZipper, offset: Offset) => [ViewportValue, ViewportValue]
 ) {
   // TODO: Attempt to keep x-screen position. This is not trivial, especially with cases where the top fraction has some nested elements
   // Also do walk into nested elements if possible.
@@ -225,11 +219,8 @@ export class MathLayoutCaret {
    */
   move(
     direction: Direction,
-    caretPosition: [ViewportCoordinate, ViewportCoordinate],
-    getCaretPosition: (
-      zipper: MathLayoutRowZipper | MathLayoutTextZipper,
-      offset: Offset
-    ) => [ViewportCoordinate, ViewportCoordinate]
+    caretPosition: [ViewportValue, ViewportValue],
+    getCaretPosition: (zipper: MathLayoutRowZipper | MathLayoutTextZipper, offset: Offset) => [ViewportValue, ViewportValue]
   ): MathLayoutCaret | null {
     if (direction === "right" || direction === "left") {
       if (this.isTouchingEdge(direction)) {

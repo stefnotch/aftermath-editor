@@ -1,4 +1,4 @@
-import { ViewportCoordinate } from "../component/viewport-coordinate";
+import { ViewportValue } from "../component/viewport-coordinate";
 
 /**
  * Merely a Typescript hint to make sure that I don't miss any cases
@@ -233,5 +233,5 @@ TODO:
 // The index has a different meaning depending on the element (child index, ignored, text index, 2D index)
 export type MathPhysicalLayout = Map<
   MathLayoutRow | MathLayoutText, // row-container
-  (index: number) => { x: ViewportCoordinate; y: ViewportCoordinate; height: number }
+  (index: number) => { x: ViewportValue; y: ViewportValue; height: number }
 >;
