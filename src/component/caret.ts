@@ -29,6 +29,8 @@ export function createCaret(container: HTMLElement): CaretElement {
 
   function setHeight(v: number) {
     caretElement.style.height = `${v}px`;
+    // Grow from the bottom
+    caretElement.style.marginTop = `${-v}px`;
   }
 
   function remove() {

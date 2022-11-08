@@ -53,36 +53,17 @@ class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements M
       const finalBoundingBox = this.finalElement.getBoundingClientRect();
       return {
         x: finalBoundingBox.x + finalBoundingBox.width / 2,
-        y: this.baseline(),
-        height: this.caretHeight(),
+        y: getBaseline(this.element),
+        height: getFontSize(this.element),
       };
     }
 
     const child = this.children[offset];
     return {
       x: child.startEndPosition().start,
-      y: this.baseline(),
-      height: this.caretHeight(),
+      y: getBaseline(this.element),
+      height: getFontSize(this.element),
     };
-  }
-
-  private baseline(): ViewportValue {
-    // TODO: Get the correct baseline for this mrow
-
-    // TODO: Figure out where the baseline is (line-descent, line-ascent and that stuff)
-    // Because you can't really rely on "look at where the next element is"
-    // One silly hack for getting the baseline is:
-    // - get the bounding box of the parent
-    // - insert a 0px element
-    // - get its bounding box
-    // - figure out where it is relative to the parent
-    // TODO: Please get the baseline and not the top
-    return this.element.getBoundingClientRect().y;
-  }
-
-  private caretHeight(): ViewportValue {
-    // TODO: Get the correct height for this mrow
-    return 20;
   }
 
   startEndPosition(): { start: ViewportValue; end: ViewportValue } {
@@ -152,7 +133,17 @@ class MathTextDomTranslator<T extends MathLayoutText = MathLayoutText> implement
   }
 
   offsetToPosition(offset: Offset): { x: ViewportValue; y: ViewportValue; height: ViewportValue } {
-    return getTextLayout(this.element, offset);
+    const textBoundingBox = getTextLayout(this.element, offset);
+
+    // TODO: This is a bit of a hack, but it works for now
+    // I'm walking up twice to get to an mrow or similar. Actually, this is broken for errors.
+    const parentElement = this.element.parentElement?.parentElement;
+    assert(parentElement !== null && parentElement !== undefined);
+    return {
+      x: textBoundingBox.x,
+      y: getBaseline(parentElement),
+      height: getFontSize(parentElement),
+    };
   }
 
   startEndPosition(): { start: ViewportValue; end: ViewportValue } {
@@ -481,8 +472,7 @@ function getTextLayout(t: Text, index: number) {
 
   return {
     x: boundingBox.x + (atEnd ? boundingBox.width : 0),
-    // TODO: Please get the text's baseline and not the top
-    y: boundingBox.y,
+    y: boundingBox.bottom,
     height: boundingBox.height,
   };
 }
@@ -503,4 +493,27 @@ function getElementLayoutStartEnd(element: Element) {
     start: boundingBox.x,
     end: boundingBox.x + boundingBox.width,
   };
+}
+
+/**
+ * Gets the text's baseline for a given element.
+ */
+function getBaseline(element: Element): ViewportValue {
+  // One silly hack for getting the baseline is:
+  // - get the bounding box of the parent
+  // - insert a 0px element
+  // - get its bounding box
+  // - figure out where it is relative to the parent
+  // See also https://github.com/w3c/mathml-core/issues/38
+  const baselineReaderElement = createMathElement("mphantom", []);
+  element.append(baselineReaderElement);
+  const baseline = baselineReaderElement.getBoundingClientRect().bottom;
+  baselineReaderElement.remove();
+  return baseline;
+}
+
+function getFontSize(element: Element): ViewportValue {
+  const fontSize = +globalThis.getComputedStyle(element).getPropertyValue("font-size").replace("px", "");
+  assert(!isNaN(fontSize) && fontSize > 0);
+  return fontSize;
 }
