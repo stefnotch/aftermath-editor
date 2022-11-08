@@ -47,3 +47,4 @@ My hope is that it'll get ready to ship in the next year(s). Then, having a _for
   - https://fred-wang.github.io/TeXZilla/examples/customElement.html
 - [Mathml operator priority](https://github.com/w3c/mathml/issues/161) and [this](https://www.w3.org/TR/MathML3/appendixc.html)
 - [Mathml operators](https://w3c.github.io/mathml-core/#operator-tables)
+- https://en.wikipedia.org/wiki/Glossary_of_mathematical_symbols
