@@ -16,7 +16,6 @@ import {
  * A zipper is a pointer to a node in a tree, with a reference to the parent node.
  * See also: http://learnyouahaskell.com/zippers
  */
-// TODO: Try adding <T extends {type: string}>
 interface MathLayoutZipper {
   readonly type: MathLayoutRow["type"] | MathLayoutElement["type"];
   readonly indexInParent: number;

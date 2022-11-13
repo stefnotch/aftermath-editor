@@ -1,6 +1,5 @@
 import { assert, assertUnreachable } from "../utils/assert";
 import {
-  MathLayout,
   MathLayoutText,
   MathLayoutRow,
   MathLayoutElement,
@@ -19,6 +18,7 @@ import {
   MathLayoutTableZipper,
   MathLayoutTextZipper,
 } from "../math-layout/math-layout-zipper";
+import { tagIs } from "../utils/dom-utils";
 
 // I am debating the usefulness of the generics here
 interface MathDomTranslator<T extends { readonly type: string }> {
@@ -135,14 +135,17 @@ class MathTextDomTranslator<T extends MathLayoutText = MathLayoutText> implement
   offsetToPosition(offset: Offset): { x: ViewportValue; y: ViewportValue; height: ViewportValue } {
     const textBoundingBox = getTextLayout(this.element, offset);
 
-    // TODO: This is a bit of a hack, but it works for now
-    // I'm walking up twice to get to an mrow or similar. Actually, this is broken for errors.
-    const parentElement = this.element.parentElement?.parentElement;
-    assert(parentElement !== null && parentElement !== undefined);
+    // This is a bit of a hack to get the nearest mrow so that we can get the baseline
+    // See also https://github.com/w3c/mathml-core/issues/38
+    let parentRow = this.element.parentElement;
+    while (parentRow !== null && !tagIs(parentRow, "mrow")) {
+      parentRow = parentRow.parentElement;
+    }
+    assert(parentRow !== null);
     return {
       x: textBoundingBox.x,
-      y: getBaseline(parentElement),
-      height: getFontSize(parentElement),
+      y: getBaseline(parentRow),
+      height: getFontSize(parentRow),
     };
   }
 
@@ -154,54 +157,63 @@ class MathTextDomTranslator<T extends MathLayoutText = MathLayoutText> implement
   }
 }
 
-// TODO: Remove/refactor this
-// The index has a different meaning depending on the element (child index, ignored, text index, 2D index)
-export type MathPhysicalLayout = Map<
-  MathLayoutRowZipper | MathLayoutTextZipper, // row-container
-  (index: number) => { x: ViewportValue; y: ViewportValue; height: number }
->;
+export class MathmlLayout {
+  constructor(public readonly element: MathMLElement, public readonly domTranslator: MathRowDomTranslator) {}
+
+  caretToPosition(mathLayout: MathLayoutRowZipper | MathLayoutTextZipper, offset: Offset) {
+    return this.caretToDomTranslator(mathLayout).offsetToPosition(offset);
+  }
+
+  caretContainerElement(mathLayout: MathLayoutRowZipper | MathLayoutTextZipper) {
+    return this.caretToDomTranslator(mathLayout).element;
+  }
+
+  private caretToDomTranslator(mathLayout: MathLayoutRowZipper | MathLayoutTextZipper) {
+    const ancestorIndices = getAncestorIndices(mathLayout);
+
+    let current:
+      | MathRowDomTranslator
+      | MathContainerDomTranslator
+      | MathTableDomTranslator
+      | MathSymbolDomTranslator
+      | MathTextDomTranslator = this.domTranslator;
+    for (const ancestorIndex of ancestorIndices) {
+      assert("children" in current); // We could write better code, but this assertion will do for now
+      current = current.children[ancestorIndex];
+    }
+
+    // We could write better code, but this assertion will do for now
+    assert(current instanceof MathRowDomTranslator || current instanceof MathTextDomTranslator);
+    return current;
+  }
+
+  positionToCaret(element: Element, position: { x: ViewportValue; y: ViewportValue }) {
+    const domAncestors = getDomAncestors(element, this.domTranslator.element);
+    if (domAncestors[0] !== this.domTranslator.element) {
+      // We aren't querying an element inside the MathML
+      return null;
+    }
+
+    let current = this.domTranslator;
+    let i = 0;
+    while (true) {
+      // TODO: Then we walk down the tree, each time attempting to find the correct node which has one of the DOM elements.
+      return;
+    }
+  }
+}
 
 /**
  * Takes a MathLayout and returns a MathML DOM tree
  */
-export function toElement(mathIR: MathLayoutRow): {
-  element: MathMLElement;
-  physicalLayout: MathPhysicalLayout;
-  mathDomTranslator: MathRowDomTranslator;
-} {
+export function toElement(mathIR: MathLayoutRow): MathmlLayout {
   let { element, translator } = fromMathLayoutRow(mathIR);
 
   // Always wrap in a math element
   element = createMathElement("math", [element]);
   assert(element instanceof MathMLElement);
 
-  return {
-    element,
-    physicalLayout: {
-      // TODO: Refactor this prototype implementation that queries the translator
-      get(mathLayout: MathLayoutRowZipper | MathLayoutTextZipper) {
-        return (index: Offset) => {
-          const ancestorIndices = getAncestorIndices(mathLayout);
-
-          let current:
-            | MathRowDomTranslator
-            | MathContainerDomTranslator
-            | MathTableDomTranslator
-            | MathSymbolDomTranslator
-            | MathTextDomTranslator = translator;
-          for (const ancestorIndex of ancestorIndices) {
-            assert("children" in current); // We could write better code, but this assertion will do for now
-            current = current.children[ancestorIndex];
-          }
-
-          // We could write better code, but this assertion will do for now
-          assert(current instanceof MathRowDomTranslator || current instanceof MathTextDomTranslator);
-          return current.offsetToPosition(index);
-        };
-      },
-    } as any,
-    mathDomTranslator: translator,
-  };
+  return new MathmlLayout(element, translator);
 }
 
 function fromMathLayoutRow(mathIR: MathLayoutRow): { element: Element; translator: MathRowDomTranslator } {
@@ -421,7 +433,7 @@ function fromMathLayoutRowChildren(tokens: TokenStream<MathLayoutElement>): {
   return { elements: output, translators };
 }
 
-function fromMathLayoutNumber(tokens: TokenStream<MathLayout>): {
+function fromMathLayoutNumber(tokens: TokenStream<MathLayoutElement>): {
   element: Element;
   translators: MathSymbolDomTranslator[];
 } {
@@ -516,4 +528,22 @@ function getFontSize(element: Element): ViewportValue {
   const fontSize = +globalThis.getComputedStyle(element).getPropertyValue("font-size").replace("px", "");
   assert(!isNaN(fontSize) && fontSize > 0);
   return fontSize;
+}
+/**
+ * Returns an array with all ancestors and the element. Includes the root.
+ */
+function getDomAncestors(element: Element, root: Element) {
+  let current: Element | null = element;
+
+  const domAncestors: Element[] = [];
+  while (current !== null && current !== root) {
+    domAncestors.push(current);
+    current = current.parentElement;
+  }
+  if (current === root) {
+    domAncestors.push(current);
+  }
+  domAncestors.reverse();
+
+  return domAncestors;
 }

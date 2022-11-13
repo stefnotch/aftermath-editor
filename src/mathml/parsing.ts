@@ -1,5 +1,5 @@
 import { assert } from "../utils/assert";
-import { MathLayout, MathLayoutRow } from "../math-layout/math-layout";
+import { MathLayoutElement, MathLayoutRow, MathLayoutText } from "../math-layout/math-layout";
 import { wrapInRow } from "../math-layout/math-layout-utils";
 import { allBrackets } from "./mathml-spec";
 import { tagIs } from "../utils/dom-utils";
@@ -18,7 +18,7 @@ export function fromElement(element: HTMLElement | MathMLElement): MathLayoutRow
 
 // Time to iterate over the MathML and create a cute little tree
 // Doesn't deal with horrible MathML yet (so stuff like unnecessary nested mrows is bad, maybe that should be a post-processing step?)
-function toMathLayout(element: Element): MathLayout | MathLayout[] {
+function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (MathLayoutRow | MathLayoutElement)[] {
   let children = [...element.children];
 
   if (tagIs(element, "math", "mrow", "mtd")) {
@@ -183,7 +183,7 @@ function toMathLayout(element: Element): MathLayout | MathLayout[] {
   }
 }
 
-export function expectNChildren(element: Element, n: number): MathLayout | null {
+export function expectNChildren(element: Element, n: number): (MathLayoutText & { type: "error" }) | null {
   if (element.children.length != n) {
     return {
       type: "error",

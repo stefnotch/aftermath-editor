@@ -1,6 +1,3 @@
-import { ViewportValue } from "../component/viewport-coordinate";
-import { MathLayoutRowZipper, MathLayoutTextZipper } from "./math-layout-zipper";
-
 /**
  * Merely a Typescript hint to make sure that I don't miss any cases
  */

@@ -1,7 +1,7 @@
 import { assert, assertUnreachable } from "../utils/assert";
 import { MathLayoutElement, MathLayoutRow, MathLayoutText } from "../math-layout/math-layout";
 import { fromElement as fromMathMLElement } from "../mathml/parsing";
-import { MathPhysicalLayout, toElement as toMathMLElement } from "../mathml/rendering";
+import { MathmlLayout, toElement as toMathMLElement } from "../mathml/rendering";
 import arrayUtils from "../utils/array-utils";
 import { endingBrackets, startingBrackets } from "../mathml/mathml-spec";
 import { findOtherBracket, wrapInRow } from "../math-layout/math-layout-utils";
@@ -34,7 +34,7 @@ export class MathEditor extends HTMLElement {
 
   render: () => void;
   createCaret: (zipper: MathLayoutRowZipper, offset: number) => MathCaret;
-  lastLayout: MathPhysicalLayout | null = null;
+  lastLayout: MathmlLayout | null = null;
   inputHandler: MathmlInputHandler;
 
   mathMlElement: ChildNode;
@@ -149,9 +149,9 @@ export class MathEditor extends HTMLElement {
 
     this.render = () => {
       if (!this.isConnected) return;
-      const newMathElement = toMathMLElement(this.mathAst.value /** TODO: Use MathIR here */);
-      this.lastLayout = newMathElement.physicalLayout;
-      this.setMathMl(newMathElement.element);
+      const newMathLayout = toMathMLElement(this.mathAst.value /** TODO: Use MathIR here */);
+      this.lastLayout = newMathLayout;
+      this.setMathMl(newMathLayout.element);
       // Don't copy the attributes
 
       try {
@@ -275,9 +275,7 @@ export class MathEditor extends HTMLElement {
     const lastLayout = this.lastLayout;
     if (!lastLayout) return;
 
-    const layoutGetter = lastLayout.get(caret.caret.zipper);
-    assert(layoutGetter !== undefined);
-    const layout = layoutGetter(caret.caret.offset);
+    const layout = lastLayout.caretToPosition(caret.caret.zipper, caret.caret.offset);
     caret.element.setPosition(layout.x, layout.y);
     caret.element.setHeight(layout.height);
 
@@ -299,14 +297,10 @@ export class MathEditor extends HTMLElement {
   moveCaret(caret: MathCaret, direction: "up" | "down" | "left" | "right") {
     const lastLayout = this.lastLayout;
     if (!lastLayout) return; // TODO: Maybe don't ignore the move command if the last layout doesn't exist?
-    const layoutGetter = lastLayout.get(caret.caret.zipper);
-    assert(layoutGetter !== undefined);
-    const layout = layoutGetter(caret.caret.offset);
+    const layout = lastLayout.caretToPosition(caret.caret.zipper, caret.caret.offset);
 
     const newCaret = caret.caret.move(direction, [layout.x, layout.y], (zipper, offset) => {
-      const layoutGetter = lastLayout.get(zipper);
-      assert(layoutGetter !== undefined);
-      const layout = layoutGetter(offset);
+      const layout = lastLayout.caretToPosition(zipper, offset);
       return [layout.x, layout.y];
     });
     if (newCaret) {
