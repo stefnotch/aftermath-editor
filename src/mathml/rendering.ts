@@ -7,15 +7,14 @@ import {
   MathLayoutTable,
   MathLayoutContainer,
 } from "../math-layout/math-layout";
-import { startingBrackets, endingBrackets, allBrackets, MathMLTags } from "./mathml-spec";
+import { endingBrackets, allBrackets, MathMLTags } from "./mathml-spec";
 import { TokenStream } from "../math-editor/token-stream";
 import { Offset } from "../math-layout/math-layout-offset";
 import { ViewportValue } from "../component/viewport-coordinate";
 import {
+  fromAncestorIndices,
   getAncestorIndices,
-  MathLayoutContainerZipper,
   MathLayoutRowZipper,
-  MathLayoutTableZipper,
   MathLayoutTextZipper,
 } from "../math-layout/math-layout-zipper";
 import { tagIs } from "../utils/dom-utils";
@@ -42,6 +41,10 @@ class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements M
 
   get type(): T["type"] {
     return this.value.type;
+  }
+
+  get length(): number {
+    return this.value.values.length;
   }
 
   offsetToPosition(offset: Offset): { x: ViewportValue; y: ViewportValue; height: ViewportValue } {
@@ -132,6 +135,13 @@ class MathTextDomTranslator<T extends MathLayoutText = MathLayoutText> implement
     return this.value.type;
   }
 
+  get length(): number {
+    return this.value.value.length;
+  }
+
+  /**
+   * Very slow, because it causes a reflow
+   */
   offsetToPosition(offset: Offset): { x: ViewportValue; y: ViewportValue; height: ViewportValue } {
     const textBoundingBox = getTextLayout(this.element, offset);
 
@@ -161,16 +171,45 @@ export class MathmlLayout {
   constructor(public readonly element: MathMLElement, public readonly domTranslator: MathRowDomTranslator) {}
 
   caretToPosition(mathLayout: MathLayoutRowZipper | MathLayoutTextZipper, offset: Offset) {
-    return this.caretToDomTranslator(mathLayout).offsetToPosition(offset);
+    const ancestorIndices = getAncestorIndices(mathLayout);
+    return this.caretToDomTranslator(ancestorIndices).offsetToPosition(offset);
   }
 
   caretContainerElement(mathLayout: MathLayoutRowZipper | MathLayoutTextZipper) {
-    return this.caretToDomTranslator(mathLayout).element;
+    const ancestorIndices = getAncestorIndices(mathLayout);
+    return this.caretToDomTranslator(ancestorIndices).element;
   }
 
-  private caretToDomTranslator(mathLayout: MathLayoutRowZipper | MathLayoutTextZipper) {
-    const ancestorIndices = getAncestorIndices(mathLayout);
+  positionToCaret(element: Element | Text, position: { x: ViewportValue; y: ViewportValue }, rootZipper: MathLayoutRowZipper) {
+    const domAncestors = getDomAncestors(element, this.domTranslator.element);
+    if (domAncestors[0] !== this.domTranslator.element) {
+      // We aren't querying an element inside the MathML
+      return null;
+    }
 
+    // TODO: Handle text and handle msup/msub/msubsup
+
+    // We walk down the tree, each time attempting to find the correct node which has one of the DOM elements.
+    const ancestorIndices = getAncestorIndicesFromDom(domAncestors, this.domTranslator);
+    const domTranslator = this.caretToDomTranslator(ancestorIndices);
+    console.log(domAncestors, ancestorIndices, domTranslator);
+
+    const length = domTranslator.length;
+    let closestDistance = Infinity;
+    let closestIndex = 0;
+    for (let i = 0; i <= length; i++) {
+      const { x, y } = domTranslator.offsetToPosition(i);
+      const distance = Math.hypot(x - position.x, y - position.y);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestIndex = i;
+      }
+    }
+
+    return { zipper: fromAncestorIndices(rootZipper, ancestorIndices), offset: closestIndex };
+  }
+
+  private caretToDomTranslator(ancestorIndices: number[]) {
     let current:
       | MathRowDomTranslator
       | MathContainerDomTranslator
@@ -185,21 +224,6 @@ export class MathmlLayout {
     // We could write better code, but this assertion will do for now
     assert(current instanceof MathRowDomTranslator || current instanceof MathTextDomTranslator);
     return current;
-  }
-
-  positionToCaret(element: Element, position: { x: ViewportValue; y: ViewportValue }) {
-    const domAncestors = getDomAncestors(element, this.domTranslator.element);
-    if (domAncestors[0] !== this.domTranslator.element) {
-      // We aren't querying an element inside the MathML
-      return null;
-    }
-
-    let current = this.domTranslator;
-    let i = 0;
-    while (true) {
-      // TODO: Then we walk down the tree, each time attempting to find the correct node which has one of the DOM elements.
-      return;
-    }
   }
 }
 
@@ -532,10 +556,10 @@ function getFontSize(element: Element): ViewportValue {
 /**
  * Returns an array with all ancestors and the element. Includes the root.
  */
-function getDomAncestors(element: Element, root: Element) {
-  let current: Element | null = element;
+function getDomAncestors(element: Element | Text, root: Element) {
+  let current: Element | Text | null = element;
 
-  const domAncestors: Element[] = [];
+  const domAncestors: (Element | Text)[] = [];
   while (current !== null && current !== root) {
     domAncestors.push(current);
     current = current.parentElement;
@@ -546,4 +570,55 @@ function getDomAncestors(element: Element, root: Element) {
   domAncestors.reverse();
 
   return domAncestors;
+}
+
+/**
+ * Walks down the DOM, and returns the ancestor indices up until a MathRowDomTranslator or a MathTextDomTranslator
+ */
+function getAncestorIndicesFromDom(domAncestors: (Element | Text)[], domTranslator: MathRowDomTranslator) {
+  // TODO: Use satisfies here
+  let current = domTranslator as MathRowDomTranslator | MathContainerDomTranslator | MathTableDomTranslator;
+  let domAncestorsIndex = 0;
+  const ancestorIndices: number[] = [];
+  const nextAncestorIndices: number[] = [];
+  while (true) {
+    let childWithElement:
+      | MathRowDomTranslator
+      | MathContainerDomTranslator
+      | MathTableDomTranslator
+      | MathSymbolDomTranslator
+      | MathTextDomTranslator
+      | null = null;
+
+    for (let i = 0; i < current.children.length; i++) {
+      const child = current.children[i];
+      const indexOfElement = domAncestors.indexOf(child.element, domAncestorsIndex);
+      if (indexOfElement !== -1) {
+        domAncestorsIndex = indexOfElement + 1;
+        childWithElement = child;
+        nextAncestorIndices.push(i);
+        break;
+      }
+    }
+
+    if (childWithElement === null) {
+      break;
+    } else if (childWithElement instanceof MathRowDomTranslator) {
+      ancestorIndices.push(...nextAncestorIndices);
+      nextAncestorIndices.length = 0;
+      current = childWithElement;
+    } else if (childWithElement instanceof MathTextDomTranslator) {
+      // We only care about rows or text
+      ancestorIndices.push(...nextAncestorIndices);
+      nextAncestorIndices.length = 0;
+      break;
+    } else if (childWithElement instanceof MathSymbolDomTranslator) {
+      // We don't want to walk down into the symbol
+      break;
+    } else {
+      current = childWithElement;
+    }
+  }
+
+  return ancestorIndices;
 }

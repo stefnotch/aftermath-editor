@@ -1,4 +1,5 @@
 import { TokenStream } from "../math-editor/token-stream";
+import { assert } from "../utils/assert";
 import {
   MathLayoutRow,
   MathLayoutContainer,
@@ -171,7 +172,19 @@ export function getAncestors(zipper: MathLayoutRowZipper | MathLayoutTextZipper)
   return ancestors;
 }
 
-export function getAncestorIndices(zipper: MathLayoutRowZipper | MathLayoutTextZipper) {
+/**
+ * Indices of a row or text in the tree.
+ * The first index is where in the root one should go.
+ * The second index is where in the first child one should go, etc.
+ * The last index is where in the last child one should go to find the row or text.
+ */
+export type AncestorIndices = number[];
+
+/**
+ * Gets the indices of the given zipper in the tree.
+ * As in, every "indexInParent" of every element that has a parent, including the starting one.
+ */
+export function getAncestorIndices(zipper: MathLayoutRowZipper | MathLayoutTextZipper): AncestorIndices {
   const ancestorIndices: number[] = [];
   let current: MathLayoutRowZipper | MathLayoutTextZipper | MathLayoutContainerZipper | MathLayoutTableZipper = zipper;
   while (current.parent !== null) {
@@ -180,4 +193,23 @@ export function getAncestorIndices(zipper: MathLayoutRowZipper | MathLayoutTextZ
   }
   ancestorIndices.reverse();
   return ancestorIndices;
+}
+
+export function fromAncestorIndices(root: MathLayoutRowZipper, ancestorIndices: AncestorIndices) {
+  // TODO: use satisfies
+  let current = root as MathLayoutRowZipper | MathLayoutContainerZipper | MathLayoutTableZipper;
+  for (const index of ancestorIndices) {
+    const child = current.children[index];
+    if (child.type === "symbol" || child.type === "bracket") {
+      throw new Error("Cannot get a symbol or bracket from ancestor indices");
+    } else if (child.type === "error" || child.type === "text") {
+      return child;
+    } else {
+      assert(!(child instanceof MathLayoutSymbolZipper) && !(child instanceof MathLayoutTextZipper));
+      current = child;
+    }
+  }
+
+  assert(current instanceof MathLayoutRowZipper || current instanceof MathLayoutTextZipper);
+  return current;
 }

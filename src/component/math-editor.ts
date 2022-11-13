@@ -12,7 +12,7 @@ import inputHandlerStyles from "./input-handler-style.css?inline";
 import { createCaret, CaretElement } from "./caret";
 import { createInputHandler, MathmlInputHandler } from "./input-handler";
 import { MathLayoutCaret } from "./math-layout-caret";
-import { MathLayoutRowZipper } from "../math-layout/math-layout-zipper";
+import { MathLayoutRowZipper, MathLayoutTextZipper } from "../math-layout/math-layout-zipper";
 import { tagIs } from "../utils/dom-utils";
 
 export interface MathCaret {
@@ -33,7 +33,7 @@ export class MathEditor extends HTMLElement {
   mathAst: MathLayoutRowZipper;
 
   render: () => void;
-  createCaret: (zipper: MathLayoutRowZipper, offset: number) => MathCaret;
+  createCaret: (zipper: MathLayoutRowZipper | MathLayoutTextZipper, offset: number) => MathCaret;
   lastLayout: MathmlLayout | null = null;
   inputHandler: MathmlInputHandler;
 
@@ -63,6 +63,23 @@ export class MathEditor extends HTMLElement {
       this.inputHandler.inputElement.focus();
     });
 
+    container.addEventListener("pointerdown", (e) => {
+      const lastLayout = this.lastLayout;
+      if (!lastLayout) return;
+
+      const isElementTarget = e.target instanceof Element || e.target instanceof Text;
+      if (!isElementTarget) return;
+      const newCaret = lastLayout.positionToCaret(e.target, { x: e.clientX, y: e.clientY }, this.mathAst);
+      if (!newCaret) return;
+
+      console.log(e.target);
+
+      this.carets.forEach((c) => c.element.remove());
+      this.carets.clear();
+      this.carets.add(this.createCaret(newCaret.zipper, newCaret.offset));
+      this.renderCarets();
+    });
+
     // Resize - rerender carets in correct locations
     const editorResizeObserver = new ResizeObserver(() => {
       this.renderCarets();
@@ -77,7 +94,7 @@ export class MathEditor extends HTMLElement {
     this.mathAst = new MathLayoutRowZipper({ type: "row", values: [] }, null, 0);
 
     // Caret creation function
-    this.createCaret = (zipper: MathLayoutRowZipper, offset: number) => ({
+    this.createCaret = (zipper: MathLayoutRowZipper | MathLayoutTextZipper, offset: number) => ({
       caret: new MathLayoutCaret(zipper, offset),
       element: createCaret(caretContainer),
     });
