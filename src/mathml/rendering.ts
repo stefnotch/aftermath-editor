@@ -129,7 +129,7 @@ class MathSymbolDomTranslator<T extends MathLayoutSymbol = MathLayoutSymbol> imp
 class MathTextDomTranslator<T extends MathLayoutText = MathLayoutText> implements MathDomTranslator<T> {
   // For now I'll just count the characters that the Text has, but in later implementations we can have a function
   // (As in, a reference to a static function that takes the element and gives me the character at a given position or something)
-  constructor(public readonly value: T, public readonly element: Text) {}
+  constructor(public readonly value: T, public readonly element: Element, public readonly textNode: Text) {}
 
   get type(): T["type"] {
     return this.value.type;
@@ -143,7 +143,7 @@ class MathTextDomTranslator<T extends MathLayoutText = MathLayoutText> implement
    * Very slow, because it causes a reflow
    */
   offsetToPosition(offset: Offset): { x: ViewportValue; y: ViewportValue; height: ViewportValue } {
-    const textBoundingBox = getTextLayout(this.element, offset);
+    const textBoundingBox = getTextLayout(this.textNode, offset);
 
     // This is a bit of a hack to get the nearest mrow so that we can get the baseline
     // See also https://github.com/w3c/mathml-core/issues/38
@@ -186,8 +186,6 @@ export class MathmlLayout {
       // We aren't querying an element inside the MathML
       return null;
     }
-
-    // TODO: Handle text and handle msup/msub/msubsup
 
     // We walk down the tree, each time attempting to find the correct node which has one of the DOM elements.
     const ancestorIndices = getAncestorIndicesFromDom(domAncestors, this.domTranslator);
@@ -266,8 +264,9 @@ function fromMathLayoutElement<T extends MathLayoutElement>(
   // TODO: Ugly code duplication
   if (mathIR.type == "error") {
     const textNode = document.createTextNode(mathIR.value);
-    const translator = new MathTextDomTranslator(mathIR, textNode);
-    return { element: createMathElement("merror", [createMathElement("mtext", [textNode])]), translator };
+    const element = createMathElement("merror", [createMathElement("mtext", [textNode])]);
+    const translator = new MathTextDomTranslator(mathIR, element, textNode);
+    return { element, translator };
   } else if (mathIR.type == "fraction") {
     const childA = fromMathLayoutRow(mathIR.values[0]);
     const childB = fromMathLayoutRow(mathIR.values[1]);
@@ -304,8 +303,9 @@ function fromMathLayoutElement<T extends MathLayoutElement>(
   } else if (mathIR.type == "text") {
     // TODO: Special styling for empty text
     const textNode = document.createTextNode(mathIR.value);
-    const translator = new MathTextDomTranslator(mathIR, textNode);
-    return { element: createMathElement("mtext", [textNode]), translator };
+    const element = createMathElement("mtext", [textNode]);
+    const translator = new MathTextDomTranslator(mathIR, element, textNode);
+    return { element, translator };
   } else if (mathIR.type == "table") {
     const width = mathIR.width;
     const rows: MathLayoutRow[][] = [];
@@ -433,8 +433,10 @@ function fromMathLayoutRowChildren(tokens: TokenStream<MathLayoutElement>): {
         lastElement = createMathElement("mtext", [document.createTextNode("⬚")]);
       }
       const parsedSubSup = fromMathLayoutRow(token.values[0]);
-      const translator = new MathContainerDomTranslator(token, parsedSubSup.element, [parsedSubSup.translator]);
-      output.push(createMathElement(token.type == "sub" ? "msub" : "msup", [lastElement, parsedSubSup.element]));
+      // The sub-sup shouldn't share its mrow with the row below it
+      const element = createMathElement("mrow", [parsedSubSup.element]);
+      const translator = new MathContainerDomTranslator(token, element, [parsedSubSup.translator]);
+      output.push(createMathElement(token.type == "sub" ? "msub" : "msup", [lastElement, element]));
       translators.push(translator);
     } else {
       const parsed = fromMathLayoutElement(token);
