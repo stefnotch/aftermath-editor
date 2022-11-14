@@ -74,8 +74,7 @@ export class MathEditor extends HTMLElement {
 
       console.log(e.target);
 
-      this.carets.forEach((c) => c.element.remove());
-      this.carets.clear();
+      this.removeAllCarets();
       this.carets.add(this.createCaret(newCaret.zipper, newCaret.offset));
       this.renderCarets();
     });
@@ -270,8 +269,7 @@ export class MathEditor extends HTMLElement {
       this.setMathMl(mathMlElement);
 
       this.mathAst = new MathLayoutRowZipper(fromMathMLElement(mathMlElement), null, 0);
-      this.carets.forEach((c) => c.element.remove());
-      this.carets.clear();
+      this.removeAllCarets();
       this.carets.add(this.createCaret(this.mathAst, 0));
 
       console.log(this.mathAst);
@@ -296,16 +294,18 @@ export class MathEditor extends HTMLElement {
     caret.element.setPosition(layout.x, layout.y);
     caret.element.setHeight(layout.height);
 
-    // TODO: Highlight current element
-    // - if inside sqrt, highlight that
-    // - if inside text, highlight that
-    // - if next to variable, highlight it and all occurrences
-    // - if next to bracket, highlight it and its pair
+    const container = lastLayout.caretContainer(caret.caret.zipper);
+    caret.element.setHighlightContainer(container);
   }
 
   removeCaret(caret: MathCaret) {
     caret.element.remove();
     this.carets.delete(caret);
+  }
+
+  removeAllCarets() {
+    this.carets.forEach((c) => c.element.remove());
+    this.carets.clear();
   }
 
   /**

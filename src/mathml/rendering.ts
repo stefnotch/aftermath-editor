@@ -170,6 +170,11 @@ class MathTextDomTranslator<T extends MathLayoutText = MathLayoutText> implement
 export class MathmlLayout {
   constructor(public readonly element: MathMLElement, public readonly domTranslator: MathRowDomTranslator) {}
 
+  caretContainer(mathLayout: MathLayoutRowZipper | MathLayoutTextZipper): Element {
+    const ancestorIndices = getAncestorIndices(mathLayout);
+    return this.caretToDomTranslator(ancestorIndices).element;
+  }
+
   caretToPosition(mathLayout: MathLayoutRowZipper | MathLayoutTextZipper, offset: Offset) {
     const ancestorIndices = getAncestorIndices(mathLayout);
     return this.caretToDomTranslator(ancestorIndices).offsetToPosition(offset);
