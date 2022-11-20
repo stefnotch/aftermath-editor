@@ -16,6 +16,17 @@ import { MathLayoutRowZipper, MathLayoutTextZipper } from "../math-layout/math-l
 import { tagIs } from "../utils/dom-utils";
 import { applyEdit, MathLayoutEdit } from "./math-layout-edit";
 
+const debugSettings = {
+  debugRenderRows: false,
+};
+
+if (import.meta.env.DEV) {
+  import("lil-gui").then((GUI) => {
+    const gui = new GUI.GUI();
+    gui.add(debugSettings, "debugRenderRows");
+  });
+}
+
 export interface MathCaret {
   caret: MathLayoutCaret;
   element: CaretElement;
@@ -252,6 +263,39 @@ export class MathEditor extends HTMLElement {
       }
 
       this.renderCarets();
+
+      if (import.meta.env.DEV) {
+        if (debugSettings.debugRenderRows) {
+          const lastLayout = this.lastLayout;
+          if (lastLayout) {
+            function debugRenderRow(domTranslator: typeof lastLayout.domTranslator) {
+              domTranslator.element.classList.add("row-debug");
+
+              domTranslator.children.forEach((child) => {
+                if (child.type === "text" || child.type === "error") {
+                  child.element.classList.add("text-debug");
+                } else if (child.type === "symbol" || child.type === "bracket") {
+                  // Do nothing
+                } else if (child.type === "table") {
+                  child.children.forEach((row) => debugRenderRow(row));
+                } else if (
+                  child.type === "fraction" ||
+                  child.type === "root" ||
+                  child.type === "under" ||
+                  child.type === "over" ||
+                  child.type === "sup" ||
+                  child.type === "sub" ||
+                  child.type === "table"
+                ) {
+                  child.children.forEach((row) => debugRenderRow(row));
+                }
+              });
+            }
+
+            debugRenderRow(lastLayout.domTranslator);
+          }
+        }
+      }
     };
 
     const styles = document.createElement("style");

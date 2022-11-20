@@ -181,11 +181,6 @@ export class MathmlLayout {
     return this.caretToDomTranslator(ancestorIndices).offsetToPosition(offset);
   }
 
-  caretContainerElement(mathLayout: MathLayoutRowZipper | MathLayoutTextZipper) {
-    const ancestorIndices = getAncestorIndices(mathLayout);
-    return this.caretToDomTranslator(ancestorIndices).element;
-  }
-
   positionToCaret(element: Element | Text, position: { x: ViewportValue; y: ViewportValue }, rootZipper: MathLayoutRowZipper) {
     const domAncestors = getDomAncestors(element, this.domTranslator.element);
     if (domAncestors[0] !== this.domTranslator.element) {

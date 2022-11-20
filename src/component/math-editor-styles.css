@@ -19,3 +19,12 @@ mtd {
   text-align: center;
   padding: 0.5ex 0.4em;
 }
+
+.row-debug {
+  border-radius: 8px;
+  box-shadow: 0 1px 0 rgba(255, 0, 0, 0.425);
+}
+.text-debug {
+  border-radius: 8px;
+  box-shadow: 0 1px 0 rgba(255, 181, 21, 0.605);
+}
