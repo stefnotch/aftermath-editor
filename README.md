@@ -16,6 +16,23 @@ My hope is that it'll get ready to ship in the next year(s). Then, having a _for
 - `src/math-editor` is a WIP
 - `src/math-editor` is a WIP
 
+### Trees
+
+Similar to https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/syntax.md#design-goals
+
+- `MathLayout`: Green nodes, simply represent the formula's structure like `{ type: "frac", values: [top, bottom] }`. Are immutable, and are built from the bottom up. Could be renamed to `MathStructure`.
+  - Categories of nodes include: rows, containers, tables, symbols, text, errors
+- `MathLayoutZipper`: Red nodes around it, a wrapper datastructure that keeps track of the parent nodes as you walk down the tree.
+  - Also has editing utilities that create a new tree, which try to reuse as many of the green nodes as possible. As an implementation details, this is created lazily/on-demand. This means that they only incur an overhead when you actually use them.
+- `MathAst`: An actually parsed representation of the formula, which tries to assign a meaning to each symbol. Like tagging digits as numbers, or taking `|x|` and deciding that it's the absolute value of x.
+
+Sources:
+
+- Eric Lippert explaining red-green trees https://ericlippert.com/2012/06/08/red-green-trees/ , also has a bit of info about "widths"/"ranges"/"absolute positions", just like this https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/syntax.md#greennode has
+- Simple post about red-green trees https://blog.yaakov.online/red-green-trees/
+- Roslyn archives https://github.com/KirillOsenkov/Bliki/wiki/Roslyn-Immutable-Trees
+- Rust Analyzer https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/syntax.md
+
 ## Future plans
 
 ### Type Theory
