@@ -80,24 +80,26 @@ export class MathLayoutRowZipper implements MathLayoutZipper {
     const values = this.value.values.slice();
     values.splice(offset, 0, newChild);
 
+    const newZipper = this.replaceSelf({
+      type: this.value.type,
+      values,
+    });
     return {
-      newRoot: this.root,
-      newZipper: this.replaceSelf({
-        type: this.value.type,
-        values,
-      }),
+      newRoot: newZipper.root,
+      newZipper,
     };
   }
 
   remove(index: number) {
     assert(index >= 0 && index < this.value.values.length, "index out of range");
 
+    const newZipper = this.replaceSelf({
+      type: this.value.type,
+      values: [...this.value.values.slice(0, index), ...this.value.values.slice(index + 1)],
+    });
     return {
-      newRoot: this.root,
-      newZipper: this.replaceSelf({
-        type: this.value.type,
-        values: [...this.value.values.slice(0, index), ...this.value.values.slice(index + 1)],
-      }),
+      newRoot: newZipper.root,
+      newZipper,
     };
   }
 
@@ -281,25 +283,26 @@ export class MathLayoutTextZipper implements MathLayoutZipper {
 
   insert(offset: Offset, newChild: string) {
     assert(offset >= 0 && offset <= this.value.value.length, "offset out of range");
-
+    const newZipper = this.replaceSelf({
+      type: this.value.type,
+      value: this.value.value.slice(0, offset) + newChild + this.value.value.slice(offset),
+    });
     return {
-      newRoot: this.root,
-      newZipper: this.replaceSelf({
-        type: this.value.type,
-        value: this.value.value.slice(0, offset) + newChild + this.value.value.slice(offset),
-      }),
+      newRoot: newZipper.root,
+      newZipper: newZipper,
     };
   }
 
   remove(index: number) {
     assert(index >= 0 && index < this.value.value.length, "index out of range");
 
+    const newZipper = this.replaceSelf({
+      type: this.value.type,
+      value: this.value.value.slice(0, index) + this.value.value.slice(index + 1),
+    });
     return {
-      newRoot: this.root,
-      newZipper: this.replaceSelf({
-        type: this.value.type,
-        value: this.value.value.slice(0, index) + this.value.value.slice(index + 1),
-      }),
+      newRoot: newZipper.root,
+      newZipper: newZipper,
     };
   }
 

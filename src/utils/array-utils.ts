@@ -30,7 +30,7 @@ export default {
   /**
    * Gets an element or undefined if the element does not exist
    */
-  get: function <T>(array: T[], index: number) {
+  get: function <T>(array: readonly T[], index: number) {
     let n = Math.trunc(index) || 0;
     if (n < 0 || n >= array.length) return undefined;
     return array[n];

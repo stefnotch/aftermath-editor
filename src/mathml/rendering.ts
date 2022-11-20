@@ -12,6 +12,7 @@ import { TokenStream } from "../math-editor/token-stream";
 import { Offset } from "../math-layout/math-layout-offset";
 import { ViewportValue } from "../component/viewport-coordinate";
 import {
+  AncestorIndices,
   fromAncestorIndices,
   getAncestorIndices,
   MathLayoutRowZipper,
@@ -212,7 +213,7 @@ export class MathmlLayout {
     return { zipper: fromAncestorIndices(rootZipper, ancestorIndices), offset: closestIndex };
   }
 
-  private caretToDomTranslator(ancestorIndices: number[]) {
+  private caretToDomTranslator(ancestorIndices: AncestorIndices) {
     let current:
       | MathRowDomTranslator
       | MathContainerDomTranslator

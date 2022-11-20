@@ -11,9 +11,10 @@ import mathEditorStyles from "./math-editor-styles.css?inline";
 import inputHandlerStyles from "./input-handler-style.css?inline";
 import { createCaret, CaretElement } from "./caret";
 import { createInputHandler, MathmlInputHandler } from "./input-handler";
-import { MathLayoutCaret } from "./math-layout-caret";
+import { CaretEdit, MathLayoutCaret, moveCaret, removeAtCaret } from "./math-layout-caret";
 import { MathLayoutRowZipper, MathLayoutTextZipper } from "../math-layout/math-layout-zipper";
 import { tagIs } from "../utils/dom-utils";
+import { applyEdit, MathLayoutEdit } from "./math-layout-edit";
 
 export interface MathCaret {
   caret: MathLayoutCaret;
@@ -38,6 +39,8 @@ export class MathEditor extends HTMLElement {
   inputHandler: MathmlInputHandler;
 
   mathMlElement: ChildNode;
+
+  redoStack: MathLayoutEdit[] = [];
 
   constructor() {
     super();
@@ -148,12 +151,17 @@ export class MathEditor extends HTMLElement {
 
     this.inputHandler.inputElement.addEventListener("beforeinput", (ev) => {
       console.info(ev);
+      const lastLayout = this.lastLayout;
+      if (!lastLayout) return; // TODO: Maybe don't ignore the input command if the last layout doesn't exist?
+
       if (ev.inputType == "deleteContentBackward" || ev.inputType == "deleteWordBackward") {
-        this.carets.forEach((caret) => this.deleteAtCaret(caret, "left"));
-        this.render();
+        const edit = this.recordEdit([...this.carets].map((v) => removeAtCaret(v.caret, "left", lastLayout)));
+        this.saveEdit(edit);
+        this.applyEdit(edit);
       } else if (ev.inputType == "deleteContentForward" || ev.inputType == "deleteWordForward") {
-        this.carets.forEach((caret) => this.deleteAtCaret(caret, "right"));
-        this.render();
+        const edit = this.recordEdit([...this.carets].map((v) => removeAtCaret(v.caret, "right", lastLayout)));
+        this.saveEdit(edit);
+        this.applyEdit(edit);
       } else if (ev.inputType == "insertText") {
         const data = ev.data;
         if (data != null) {
@@ -308,135 +316,48 @@ export class MathEditor extends HTMLElement {
     this.carets.clear();
   }
 
+  recordEdit(edits: readonly CaretEdit[]): MathLayoutEdit {
+    const caretsBefore = [...this.carets].map((v) => MathLayoutCaret.serialize(v.caret.zipper, v.caret.offset));
+
+    return {
+      type: "multi",
+      edits: edits.flatMap((v) => v.edits),
+      caretsBefore,
+      caretsAfter: edits.map((v) => v.caret),
+    };
+  }
+
+  saveEdit(edit: MathLayoutEdit) {
+    if (edit.edits.length > 0) {
+      this.redoStack.push(edit);
+    }
+  }
+
+  applyEdit(edit: MathLayoutEdit) {
+    this.removeAllCarets();
+
+    const result = applyEdit(this.mathAst, edit);
+
+    this.mathAst = result.root;
+
+    // TODO: Deduplicate carets
+    result.carets.forEach((v) => {
+      this.carets.add(this.createCaret(v.zipper, v.offset));
+    });
+
+    this.render();
+  }
+
   /**
    * Note: Make sure to re-render the caret after moving it
    */
   moveCaret(caret: MathCaret, direction: "up" | "down" | "left" | "right") {
     const lastLayout = this.lastLayout;
     if (!lastLayout) return; // TODO: Maybe don't ignore the move command if the last layout doesn't exist?
-    const layout = lastLayout.caretToPosition(caret.caret.zipper, caret.caret.offset);
 
-    const newCaret = caret.caret.move(direction, [layout.x, layout.y], (zipper, offset) => {
-      const layout = lastLayout.caretToPosition(zipper, offset);
-      return [layout.x, layout.y];
-    });
+    const newCaret = moveCaret(caret.caret, direction, lastLayout);
     if (newCaret) {
       caret.caret = newCaret;
-    }
-  }
-
-  /**
-   * Gets the element that the caret is "touching"
-   */
-  getElementAtCaret(caret: MathCaret, direction: "left" | "right"): MathLayoutElement | null {
-    if (caret.row.type == "row") {
-      const elementIndex = caret.offset + (direction == "left" ? -1 : 0);
-      return arrayUtils.get(caret.row.values, elementIndex) ?? null;
-    } else {
-      return null;
-    }
-  }
-
-  /**
-   * Note: Make sure to re-render after deleting
-   */
-  deleteAtCaret(caret: MathCaret, direction: "left" | "right") {
-    function removeButKeepChildren(
-      mathAst: MathAst,
-      toRemove: MathLayoutElement,
-      children: MathLayoutElement[]
-    ): { parent: MathLayoutRow; indexInParent: number } {
-      const { parent, indexInParent } = mathAst.getParentAndIndex(toRemove);
-      assert(parent != null);
-      for (let i = 0; i < children.length; i++) {
-        mathAst.insertChild(parent, children[i], indexInParent + i);
-      }
-      mathAst.removeChild(parent, toRemove);
-      return { parent, indexInParent };
-    }
-
-    if (caret.row.type == "row") {
-      // Row deletion
-      const elementAtCaret = this.getElementAtCaret(caret, direction);
-      if (elementAtCaret == null) {
-        // At the start or end of a row
-        const { parent, indexInParent } = this.mathAst.getParentAndIndex(caret.row);
-        if (parent == null) return;
-        if (parent.type == "fraction") {
-          if ((indexInParent == 0 && direction == "left") || (indexInParent == 1 && direction == "right")) {
-            this.moveCaret(caret, direction);
-          } else {
-            // Delete the fraction but keep its contents
-            const parentContents = parent.values.flatMap((v) => v.values);
-            const { parent: parentParent, indexInParent: indexInParentParent } = removeButKeepChildren(
-              this.mathAst,
-              parent,
-              parentContents
-            );
-
-            caret.row = parentParent;
-            caret.offset = indexInParentParent + parent.values[0].values.length;
-          }
-        } else if ((parent.type == "sup" || parent.type == "sub") && direction == "left") {
-          // Delete the superscript/subscript but keep its contents
-          const parentContents = parent.values.flatMap((v) => v.values);
-          const { parent: parentParent, indexInParent: indexInParentParent } = removeButKeepChildren(
-            this.mathAst,
-            parent,
-            parentContents
-          );
-
-          caret.row = parentParent;
-          caret.offset = indexInParentParent;
-        } else if (parent.type == "root") {
-          if ((indexInParent == 0 && direction == "right") || (indexInParent == 1 && direction == "left")) {
-            // Delete root but keep its contents
-            const parentContents = parent.values[1].values;
-            const { parent: parentParent, indexInParent: indexInParentParent } = removeButKeepChildren(
-              this.mathAst,
-              parent,
-              parentContents
-            );
-
-            caret.row = parentParent;
-            caret.offset = indexInParentParent;
-          } else {
-            this.moveCaret(caret, direction);
-          }
-        } else {
-          this.moveCaret(caret, direction);
-        }
-      } else if (elementAtCaret.type == "symbol" || elementAtCaret.type == "bracket") {
-        this.mathAst.removeChild(caret.row, elementAtCaret);
-        if (direction == "left") {
-          caret.offset -= 1;
-        }
-      } else if ((elementAtCaret.type == "sup" || elementAtCaret.type == "sub") && direction == "right") {
-        // Delete the superscript/subscript but keep its contents
-        const parentContents = elementAtCaret.values.flatMap((v) => v.values);
-        const { parent: parentParent, indexInParent: indexInParentParent } = removeButKeepChildren(
-          this.mathAst,
-          elementAtCaret,
-          parentContents
-        );
-
-        caret.row = parentParent;
-        caret.offset = indexInParentParent;
-      } else {
-        this.moveCaret(caret, direction);
-      }
-    } else {
-      // Text deletion
-      if ((direction == "left" && caret.offset <= 0) || (direction == "right" && caret.offset >= caret.row.value.length)) {
-        this.moveCaret(caret, direction);
-      } else {
-        if (direction == "left") {
-          caret.row.value = caret.row.value.slice(0, caret.offset - 1) + caret.row.value.slice(caret.offset);
-          caret.offset -= 1;
-        } else {
-          caret.row.value = caret.row.value.slice(0, caret.offset) + caret.row.value.slice(caret.offset + 1);
-        }
-      }
     }
   }
 
@@ -444,6 +365,7 @@ export class MathEditor extends HTMLElement {
    * User typed some text
    */
   insertAtCaret(caret: MathCaret, text: string) {
+    return;
     /**
      * Used for "placeholders"
      */
