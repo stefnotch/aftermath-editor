@@ -11,6 +11,8 @@ My hope is that it'll get ready to ship in the next year(s). Then, having a _for
 
 ## Developer info
 
+Check out the roadmap https://github.com/users/stefnotch/projects/1/views/1
+
 - `src/components/math-editor.ts` contains a web component for the mathematical editor
 - `src/math-layout` contains all the code for the representation of what a math formula _looks_ like
 - `src/math-editor` is a WIP
@@ -34,6 +36,8 @@ Sources:
 - Rust Analyzer https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/syntax.md
 
 ## Future plans
+
+
 
 ### Type Theory
 
