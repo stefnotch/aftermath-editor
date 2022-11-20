@@ -11,6 +11,10 @@ export type MathLayout = MathLayoutRow | MathLayoutElement;
  * Optimized for editing, purposefully does not assign meaning to most characters.
  * For instance, if the formula contains "0xe", we just say it has the characters 0, x, e.
  * We don't parse it as a hexadecimal or 0*x*e or anything. That part is done later.
+ *
+ * One invariant here is: The parent-child order is always Row -> Element -> Row -> Element -> ....
+ *
+ * See also: Zipper
  */
 export type MathLayoutRow = {
   /**

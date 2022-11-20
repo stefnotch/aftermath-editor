@@ -11,6 +11,7 @@ import {
   isMathLayoutTable,
   MathLayoutElement,
 } from "./math-layout";
+import { Offset } from "./math-layout-offset";
 
 /**
  * A red-green tree: https://blog.yaakov.online/red-green-trees/
@@ -19,6 +20,7 @@ import {
  */
 interface MathLayoutZipper {
   readonly type: MathLayoutRow["type"] | MathLayoutElement["type"];
+  readonly root: MathLayoutRowZipper;
   readonly indexInParent: number;
   equals(other: MathLayoutZipper): boolean;
 }
@@ -68,6 +70,67 @@ export class MathLayoutRowZipper implements MathLayoutZipper {
   get childrenStream() {
     return new TokenStream(this.children, 0);
   }
+
+  get root(): MathLayoutRowZipper {
+    return this.parent?.root ?? this;
+  }
+
+  insert(offset: Offset, newChild: MathLayoutElement) {
+    assert(offset >= 0 && offset <= this.value.values.length, "offset out of range");
+    const values = this.value.values.slice();
+    values.splice(offset, 0, newChild);
+
+    return {
+      newRoot: this.root,
+      newZipper: this.replaceSelf({
+        type: this.value.type,
+        values,
+      }),
+    };
+  }
+
+  remove(index: number) {
+    assert(index >= 0 && index < this.value.values.length, "index out of range");
+
+    return {
+      newRoot: this.root,
+      newZipper: this.replaceSelf({
+        type: this.value.type,
+        values: [...this.value.values.slice(0, index), ...this.value.values.slice(index + 1)],
+      }),
+    };
+  }
+
+  /**
+   * Mostly internal method, use insert and remove instead
+   */
+  replaceSelf(newValue: MathLayoutRow) {
+    return new MathLayoutRowZipper(
+      newValue,
+      this.parent?.replaceChild(this.indexInParent, newValue) ?? null,
+      this.indexInParent
+    );
+  }
+
+  /**
+   * Mostly internal method, use insert and remove instead
+   */
+  replaceChild(index: number, newChild: MathLayoutElement): MathLayoutRowZipper {
+    assert(index >= 0 && index < this.value.values.length, "index out of range");
+
+    const values = this.value.values.slice();
+    values[index] = newChild;
+    const newValue: MathLayoutRow = {
+      type: this.value.type,
+      values,
+    };
+
+    return new MathLayoutRowZipper(
+      newValue,
+      this.parent?.replaceChild(this.indexInParent, newValue) ?? null,
+      this.indexInParent
+    );
+  }
 }
 
 export class MathLayoutContainerZipper implements MathLayoutZipper {
@@ -91,6 +154,28 @@ export class MathLayoutContainerZipper implements MathLayoutZipper {
 
   get childrenStream() {
     return new TokenStream(this.children, 0);
+  }
+
+  get root(): MathLayoutRowZipper {
+    return this.parent.root;
+  }
+
+  replaceSelf(newValue: MathLayoutContainer) {
+    return new MathLayoutContainerZipper(newValue, this.parent?.replaceChild(this.indexInParent, newValue), this.indexInParent);
+  }
+
+  // TODO: lots of almost code duplication, not just the signatures but also the implementation
+  replaceChild(index: number, newChild: MathLayoutRow) {
+    assert(index >= 0 && index < this.value.values.length, "index out of range");
+
+    const values = this.value.values.slice();
+    values[index] = newChild;
+    const newValue: MathLayoutContainer = {
+      type: this.value.type,
+      values: values as any, // TODO: Type safety would be nice
+    };
+
+    return new MathLayoutContainerZipper(newValue, this.parent?.replaceChild(this.indexInParent, newValue), this.indexInParent);
   }
 }
 
@@ -116,6 +201,28 @@ export class MathLayoutTableZipper implements MathLayoutZipper {
   get childrenStream() {
     return new TokenStream(this.children, 0);
   }
+
+  get root(): MathLayoutRowZipper {
+    return this.parent.root;
+  }
+
+  replaceSelf(newValue: MathLayoutTable) {
+    return new MathLayoutTableZipper(newValue, this.parent?.replaceChild(this.indexInParent, newValue), this.indexInParent);
+  }
+
+  replaceChild(index: number, newChild: MathLayoutRow) {
+    assert(index >= 0 && index < this.value.values.length, "index out of range");
+
+    const values = this.value.values.slice();
+    values[index] = newChild;
+    const newValue: MathLayoutTable = {
+      type: this.value.type,
+      width: this.value.width,
+      values: values,
+    };
+
+    return new MathLayoutTableZipper(newValue, this.parent?.replaceChild(this.indexInParent, newValue), this.indexInParent);
+  }
 }
 
 export class MathLayoutSymbolZipper implements MathLayoutZipper {
@@ -132,6 +239,25 @@ export class MathLayoutSymbolZipper implements MathLayoutZipper {
   get type(): MathLayoutSymbol["type"] {
     return this.value.type;
   }
+
+  get root(): MathLayoutRowZipper {
+    return this.parent.root;
+  }
+
+  replaceSelf(newValue: MathLayoutSymbol) {
+    return new MathLayoutSymbolZipper(newValue, this.parent?.replaceChild(this.indexInParent, newValue), this.indexInParent);
+  }
+
+  replaceChild(index: number, newChild: string) {
+    assert(index >= 0 && index < 1, "index out of range");
+
+    const newValue: MathLayoutSymbol = {
+      type: this.value.type,
+      value: newChild,
+    };
+
+    return new MathLayoutSymbolZipper(newValue, this.parent?.replaceChild(this.indexInParent, newValue), this.indexInParent);
+  }
 }
 
 export class MathLayoutTextZipper implements MathLayoutZipper {
@@ -147,6 +273,49 @@ export class MathLayoutTextZipper implements MathLayoutZipper {
 
   get type(): MathLayoutText["type"] {
     return this.value.type;
+  }
+
+  get root(): MathLayoutRowZipper {
+    return this.parent.root;
+  }
+
+  insert(offset: Offset, newChild: string) {
+    assert(offset >= 0 && offset <= this.value.value.length, "offset out of range");
+
+    return {
+      newRoot: this.root,
+      newZipper: this.replaceSelf({
+        type: this.value.type,
+        value: this.value.value.slice(0, offset) + newChild + this.value.value.slice(offset),
+      }),
+    };
+  }
+
+  remove(index: number) {
+    assert(index >= 0 && index < this.value.value.length, "index out of range");
+
+    return {
+      newRoot: this.root,
+      newZipper: this.replaceSelf({
+        type: this.value.type,
+        value: this.value.value.slice(0, index) + this.value.value.slice(index + 1),
+      }),
+    };
+  }
+
+  replaceSelf(newValue: MathLayoutText) {
+    return new MathLayoutTextZipper(newValue, this.parent?.replaceChild(this.indexInParent, newValue), this.indexInParent);
+  }
+
+  replaceChild(index: number, newChild: string) {
+    assert(index >= 0 && index < this.value.value.length, "index out of range");
+
+    const newValue: MathLayoutText = {
+      type: this.value.type,
+      value: this.value.value.substring(0, index) + newChild + this.value.value.substring(index + 1),
+    };
+
+    return new MathLayoutTextZipper(newValue, this.parent?.replaceChild(this.indexInParent, newValue), this.indexInParent);
   }
 }
 
@@ -178,7 +347,7 @@ export function getAncestors(zipper: MathLayoutRowZipper | MathLayoutTextZipper)
  * The second index is where in the first child one should go, etc.
  * The last index is where in the last child one should go to find the row or text.
  */
-export type AncestorIndices = number[];
+export type AncestorIndices = readonly number[];
 
 /**
  * Gets the indices of the given zipper in the tree.
