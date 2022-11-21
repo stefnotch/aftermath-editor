@@ -14,7 +14,8 @@ import { createInputHandler, MathmlInputHandler } from "./input-handler";
 import { CaretEdit, MathLayoutCaret, moveCaret, removeAtCaret } from "./math-layout-caret";
 import { MathLayoutRowZipper, MathLayoutTextZipper } from "../math-layout/math-layout-zipper";
 import { tagIs } from "../utils/dom-utils";
-import { applyEdit, MathLayoutEdit } from "./math-layout-edit";
+import { applyEdit, inverseEdit, MathLayoutEdit } from "./editing/math-layout-edit";
+import { UndoRedoManager } from "./editing/undo-redo-manager";
 
 const debugSettings = {
   debugRenderRows: true,
@@ -51,7 +52,7 @@ export class MathEditor extends HTMLElement {
 
   mathMlElement: ChildNode;
 
-  redoStack: MathLayoutEdit[] = [];
+  undoRedoStack = new UndoRedoManager<MathLayoutEdit>(inverseEdit);
 
   constructor() {
     super();
@@ -144,41 +145,61 @@ export class MathEditor extends HTMLElement {
     // - select and delete region that contains a caret
 
     this.inputHandler.inputElement.addEventListener("keydown", (ev) => {
-      console.info(ev);
-      if (ev.key == "ArrowUp") {
+      console.info("keydown", ev);
+      if (ev.key === "ArrowUp") {
         this.carets.forEach((caret) => this.moveCaret(caret, "up"));
         this.renderCarets();
-      } else if (ev.key == "ArrowDown") {
+      } else if (ev.key === "ArrowDown") {
         this.carets.forEach((caret) => this.moveCaret(caret, "down"));
         this.renderCarets();
-      } else if (ev.key == "ArrowLeft") {
+      } else if (ev.key === "ArrowLeft") {
         this.carets.forEach((caret) => this.moveCaret(caret, "left"));
         this.renderCarets();
-      } else if (ev.key == "ArrowRight") {
+      } else if (ev.key === "ArrowRight") {
         this.carets.forEach((caret) => this.moveCaret(caret, "right"));
         this.renderCarets();
+      } else if (ev.code === "KeyZ" && ev.ctrlKey) {
+        const undoAction = this.undoRedoStack.undo();
+        if (undoAction !== null) {
+          this.applyEdit(undoAction);
+        }
+      } else if (ev.code === "KeyY" && ev.ctrlKey) {
+        const redoAction = this.undoRedoStack.redo();
+        if (redoAction !== null) {
+          this.applyEdit(redoAction);
+        }
       }
     });
 
     this.inputHandler.inputElement.addEventListener("beforeinput", (ev) => {
-      console.info(ev);
+      console.info("beforeinput", ev);
       const lastLayout = this.lastLayout;
       if (!lastLayout) return; // TODO: Maybe don't ignore the input command if the last layout doesn't exist?
 
-      if (ev.inputType == "deleteContentBackward" || ev.inputType == "deleteWordBackward") {
+      if (ev.inputType === "deleteContentBackward" || ev.inputType === "deleteWordBackward") {
         const edit = this.recordEdit([...this.carets].map((v) => removeAtCaret(v.caret, "left", lastLayout)));
         this.saveEdit(edit);
         this.applyEdit(edit);
-      } else if (ev.inputType == "deleteContentForward" || ev.inputType == "deleteWordForward") {
+      } else if (ev.inputType === "deleteContentForward" || ev.inputType === "deleteWordForward") {
         const edit = this.recordEdit([...this.carets].map((v) => removeAtCaret(v.caret, "right", lastLayout)));
         this.saveEdit(edit);
         this.applyEdit(edit);
-      } else if (ev.inputType == "insertText") {
+      } else if (ev.inputType === "insertText") {
         const data = ev.data;
         if (data != null) {
           this.carets.forEach((caret) => this.insertAtCaret(caret, data));
         }
         this.render();
+      } else if (ev.inputType === "historyUndo") {
+        // Doesn't reliably fire, ugh
+        // I might be able to hack around this by firing keyboard events such that the browser has something to undo
+        // Or I could just wait for the Keyboard API to get implemented
+        ev.preventDefault();
+      } else if (ev.inputType === "historyRedo") {
+        // Doesn't reliably fire, ugh
+        // I might be able to hack around this by firing keyboard events such that the browser has something to redo
+        // Or I could just wait for the Keyboard API to get implemented
+        ev.preventDefault();
       }
     });
 
@@ -373,7 +394,7 @@ export class MathEditor extends HTMLElement {
 
   saveEdit(edit: MathLayoutEdit) {
     if (edit.edits.length > 0) {
-      this.redoStack.push(edit);
+      this.undoRedoStack.push(edit);
     }
   }
 

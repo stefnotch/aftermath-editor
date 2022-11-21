@@ -1,8 +1,8 @@
-import { MathLayoutElement } from "../math-layout/math-layout";
-import { Offset } from "../math-layout/math-layout-offset";
-import { AncestorIndices, fromAncestorIndices, MathLayoutRowZipper } from "../math-layout/math-layout-zipper";
-import { assert, assertUnreachable } from "../utils/assert";
-import { MathLayoutCaret, SerializedCaret } from "./math-layout-caret";
+import { MathLayoutElement } from "../../math-layout/math-layout";
+import { Offset } from "../../math-layout/math-layout-offset";
+import { AncestorIndices, fromAncestorIndices, MathLayoutRowZipper } from "../../math-layout/math-layout-zipper";
+import { assert, assertUnreachable } from "../../utils/assert";
+import { MathLayoutCaret, SerializedCaret } from "../math-layout-caret";
 
 export type MathLayoutEdit = {
   readonly type: "multi";
@@ -75,10 +75,10 @@ function applySimpleEdit(root: MathLayoutRowZipper, edit: MathLayoutSimpleEdit):
   }
 }
 
-// TODO: Function to turn an edit into an undo edit on the fly.
-// Invariant is that undo(und(edit)) = edit.
-
-/*
+/**
+ * Turns an edit into an undo edit on the fly.
+ * Invariant is that undo(und(edit)) = edit.
+ */
 export function inverseEdit(edit: MathLayoutEdit): MathLayoutEdit {
   if (edit.type === "multi") {
     const edits = edit.edits.map(inverseSimpleEdit);
@@ -86,31 +86,30 @@ export function inverseEdit(edit: MathLayoutEdit): MathLayoutEdit {
     return {
       type: "multi",
       edits,
+      caretsBefore: edit.caretsAfter,
+      caretsAfter: edit.caretsBefore,
     };
   } else {
-    return inverseSimpleEdit(edit);
+    assertUnreachable(edit.type);
   }
 }
 
 function inverseSimpleEdit(edit: MathLayoutSimpleEdit): MathLayoutSimpleEdit {
   if (edit.type === "insert") {
-    // No idea if this is correct
     return {
       type: "remove",
       zipper: edit.zipper,
       index: edit.offset,
-      caretBefore: edit.caretAfter,
-      caretAfter: edit.caretBefore,
+      value: edit.value,
     };
-  } else {
+  } else if (edit.type === "remove") {
     return {
       type: "insert",
       zipper: edit.zipper,
       offset: edit.index,
       value: edit.value,
-      caretBefore: edit.caretAfter,
-      caretAfter: edit.caretBefore,
     };
+  } else {
+    assertUnreachable(edit);
   }
 }
-*/

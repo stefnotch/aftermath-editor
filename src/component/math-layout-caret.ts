@@ -15,7 +15,7 @@ import {
 import { MathmlLayout } from "../mathml/rendering";
 import arrayUtils from "../utils/array-utils";
 import { assert, assertUnreachable } from "../utils/assert";
-import { MathLayoutSimpleEdit } from "./math-layout-edit";
+import { MathLayoutSimpleEdit } from "./editing/math-layout-edit";
 import { ViewportValue } from "./viewport-coordinate";
 
 export type Direction = "left" | "right" | "up" | "down";
