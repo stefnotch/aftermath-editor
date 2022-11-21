@@ -4,8 +4,8 @@
 - Highlighting container at caret
 - Deleting elements
 - Integrate [lil-gui](https://github.com/georgealways/lil-gui) for dev purposes
-- Add rows debug rendering, see #7 
-
+- Add rows debug rendering, see #7
+- Implement undoing and redoing
 
 # v0.0.3
 
