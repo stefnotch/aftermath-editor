@@ -2,6 +2,9 @@
 
 - Caret clicking on DOM node and resolving that location
 - Highlighting container at caret
+- Deleting elements
+- Integrate [lil-gui](https://github.com/georgealways/lil-gui) for dev purposes
+- Add rows debug rendering, see #7 
 
 
 # v0.0.3
