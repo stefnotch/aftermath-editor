@@ -302,8 +302,7 @@ function fromMathLayoutElement<T extends MathLayoutElement>(
     const translator = new MathSymbolDomTranslator(mathIR, textNode, 0);
     return { element, translator };
   } else if (mathIR.type == "text") {
-    // TODO: Special styling for empty text
-    const textNode = document.createTextNode(mathIR.value);
+    const textNode = mathIR.value.length > 0 ? document.createTextNode(mathIR.value) : createPlaceholder();
     const element = createMathElement("mtext", [textNode]);
     const translator = new MathTextDomTranslator(mathIR, element, textNode);
     return { element, translator };
@@ -431,7 +430,7 @@ function fromMathLayoutRowChildren(tokens: TokenStream<MathLayoutElement>): {
       let lastElement = output.pop();
       if (!lastElement) {
         // No element to put the sub or sup on, so we create a placeholder
-        lastElement = createMathElement("mtext", [document.createTextNode("⬚")]);
+        lastElement = createMathElement("mtext", [createPlaceholder()]);
       }
       const parsedSubSup = fromMathLayoutRow(token.values[0]);
       // The sub-sup shouldn't share its mrow with the row below it
@@ -453,7 +452,7 @@ function fromMathLayoutRowChildren(tokens: TokenStream<MathLayoutElement>): {
     output.push(dummyElement);
   } else {
     // Placeholder element, so that the row doesn't collapse to a zero-width
-    const placeholder = createMathElement("mtext", [document.createTextNode("⬚")]);
+    const placeholder = createMathElement("mtext", [createPlaceholder()]);
     output.push(placeholder);
   }
 
@@ -624,4 +623,8 @@ function getAncestorIndicesFromDom(domAncestors: (Element | Text)[], domTranslat
   }
 
   return ancestorIndices;
+}
+
+function createPlaceholder() {
+  return document.createTextNode("⬚");
 }

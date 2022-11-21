@@ -17,7 +17,7 @@ import { tagIs } from "../utils/dom-utils";
 import { applyEdit, MathLayoutEdit } from "./math-layout-edit";
 
 const debugSettings = {
-  debugRenderRows: false,
+  debugRenderRows: true,
 };
 
 if (import.meta.env.DEV) {

@@ -300,7 +300,7 @@ export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right
 
   // Remove a zipper and its children
   const removeAction = (
-    zipper: MathLayoutContainerZipper | MathLayoutTableZipper | MathLayoutSymbolZipper
+    zipper: MathLayoutContainerZipper | MathLayoutTableZipper | MathLayoutSymbolZipper | MathLayoutTextZipper
   ): MathLayoutSimpleEdit => ({
     type: "remove" as const,
     zipper: getAncestorIndices(zipper.parent),
@@ -393,7 +393,16 @@ export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right
     }
   } else {
     // Text deletion
-    if ((direction === "left" && caret.offset <= 0) || (direction === "right" && caret.offset >= zipper.value.value.length)) {
+    if (zipper.value.value.length === 0) {
+      const actions = [removeAction(zipper)];
+      return {
+        edits: actions,
+        caret: MathLayoutCaret.serialize(zipper.parent, zipper.indexInParent),
+      };
+    } else if (
+      (direction === "left" && caret.offset <= 0) ||
+      (direction === "right" && caret.offset >= zipper.value.value.length)
+    ) {
       return move();
     } else {
       const offsetDelta = direction === "left" ? -1 : 0;

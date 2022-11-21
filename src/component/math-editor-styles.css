@@ -7,12 +7,14 @@ math {
   font-family: "STIX Two";
 }
 
+/** So that there's a visible space after the square root */
 mroot > :first-child::after {
   content: "";
   width: 2px;
   height: 10px;
   position: absolute;
 }
+
 /** TODO: Remove this, this is a part of the default styles */
 mtd {
   display: table-cell;
