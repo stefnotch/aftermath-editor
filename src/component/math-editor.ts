@@ -82,7 +82,8 @@ class MathEditorCarets {
 
   finishPointerDownCaret(pointerId: number) {
     const caret = this.pointerDownCarets.get(pointerId) ?? null;
-    assert(caret !== null);
+    if (caret === null) return;
+    this.pointerDownCarets.delete(pointerId);
     this.carets.add(caret);
   }
 
@@ -142,28 +143,36 @@ export class MathEditor extends HTMLElement {
     container.addEventListener("pointerdown", (e) => {
       const lastLayout = this.lastLayout;
       if (!lastLayout) return;
-
       const isElementTarget = e.target instanceof Element || e.target instanceof Text;
       if (!isElementTarget) return;
       const newCaret = lastLayout.positionToCaret(e.target, { x: e.clientX, y: e.clientY }, this.mathAst);
       if (!newCaret) return;
-
-      container.setPointerCapture(e.pointerId);
 
       this.carets.clearCarets();
       this.carets.addPointerDownCaret(e.pointerId, newCaret.zipper, newCaret.offset);
       this.renderCarets();
     });
     container.addEventListener("pointerup", (e) => {
-      container.releasePointerCapture(e.pointerId);
       this.carets.finishPointerDownCaret(e.pointerId);
+      this.renderCarets();
     });
     container.addEventListener("pointercancel", (e) => {
-      container.releasePointerCapture(e.pointerId);
       this.carets.finishPointerDownCaret(e.pointerId);
+      this.renderCarets();
     });
     container.addEventListener("pointermove", (e) => {
-      // TODO: Selection
+      const caret = this.carets.pointerDownCarets.get(e.pointerId);
+      if (!caret) return;
+
+      const lastLayout = this.lastLayout;
+      if (!lastLayout) return;
+      const isElementTarget = e.target instanceof Element || e.target instanceof Text;
+      if (!isElementTarget) return;
+      const newCaret = lastLayout.positionToCaret(e.target, { x: e.clientX, y: e.clientY }, this.mathAst);
+      if (!newCaret) return;
+
+      caret.selection = new MathLayoutSelection(caret.caret, new MathLayoutCaret(newCaret.zipper, newCaret.offset));
+      this.renderCarets();
     });
 
     // Resize - rerender carets in correct locations
@@ -435,6 +444,20 @@ export class MathEditor extends HTMLElement {
 
     const container = lastLayout.caretContainer(caret.caret.zipper);
     caret.element.setHighlightContainer(container);
+
+    caret.element.clearSelections();
+    const selection = caret.selection;
+    if (selection !== null) {
+      const selectedRanges = selection.getRanges();
+      selectedRanges.forEach((range) => {
+        const rangeLayoutStart = lastLayout.caretToPosition(range.zipper, range.startOffset);
+        const rangeLayoutEnd = lastLayout.caretToPosition(range.zipper, range.endOffset);
+
+        const width = rangeLayoutEnd.x - rangeLayoutStart.x;
+        const height = rangeLayoutStart.height;
+        caret.element.addSelection(rangeLayoutStart.x, rangeLayoutStart.y, width, height);
+      });
+    }
   }
 
   recordEdit(edits: readonly CaretEdit[]): MathLayoutEdit {

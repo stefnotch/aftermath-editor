@@ -191,7 +191,6 @@ export class MathmlLayout {
     // We walk down the tree, each time attempting to find the correct node which has one of the DOM elements.
     const ancestorIndices = getAncestorIndicesFromDom(domAncestors, this.domTranslator);
     const domTranslator = this.caretToDomTranslator(ancestorIndices);
-    console.log(domAncestors, ancestorIndices, domTranslator);
 
     const length = domTranslator.length;
     let closestDistance = Infinity;

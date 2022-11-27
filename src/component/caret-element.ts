@@ -4,6 +4,8 @@ export interface CaretElement {
   setPosition(x: number, y: number): void;
   setHeight(v: number): void;
   setHighlightContainer(element: Element): void;
+  addSelection(x: number, y: number, width: number, height: number): void;
+  clearSelections(): void;
   remove(): void;
 }
 
@@ -20,6 +22,12 @@ export function createCaret(container: HTMLElement): CaretElement {
   // Maybe add some cute blinking
   caretElement.className = "math-caret";
   container.append(caretElement);
+
+  const selectionsContainer = document.createElement("div");
+  selectionsContainer.style.position = "absolute";
+  selectionsContainer.style.top = "0px";
+  selectionsContainer.style.left = "0px";
+  container.append(selectionsContainer);
 
   let highlightContainer: Element | null = null;
 
@@ -42,15 +50,37 @@ export function createCaret(container: HTMLElement): CaretElement {
     highlightContainer?.classList.add("math-container-highlight");
   }
 
+  function addSelection(x: number, y: number, width: number, height: number) {
+    const parentPos = container.getBoundingClientRect();
+    const selection = document.createElement("span");
+    selection.className = "math-selection";
+    selection.style.position = "absolute";
+    selection.style.left = `${x - parentPos.left}px`;
+    selection.style.top = `${y - parentPos.top}px`;
+    selection.style.width = `${width}px`;
+    selection.style.height = `${height}px`;
+    // Grow from the bottom
+    selection.style.marginTop = `${-height}px`;
+    selectionsContainer.append(selection);
+  }
+
+  function clearSelections() {
+    selectionsContainer.replaceChildren();
+  }
+
   function remove() {
     setHighlightContainer(null);
+    clearSelections();
     container.removeChild(caretElement);
+    container.removeChild(selectionsContainer);
   }
 
   return {
     setPosition,
     setHeight,
     setHighlightContainer,
+    addSelection,
+    clearSelections,
     remove,
   };
 }
