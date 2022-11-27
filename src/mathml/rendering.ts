@@ -137,7 +137,7 @@ class MathTextDomTranslator<T extends MathLayoutText = MathLayoutText> implement
   }
 
   get length(): number {
-    return this.value.value.length;
+    return this.value.values.length;
   }
 
   /**
@@ -163,7 +163,7 @@ class MathTextDomTranslator<T extends MathLayoutText = MathLayoutText> implement
   startEndPosition(): { start: ViewportValue; end: ViewportValue } {
     return {
       start: this.offsetToPosition(0).x,
-      end: this.offsetToPosition(this.value.value.length).x,
+      end: this.offsetToPosition(this.value.values.length).x,
     };
   }
 }
@@ -264,7 +264,7 @@ function fromMathLayoutElement<T extends MathLayoutElement>(
   // this almost sort a feels like a monad hmmm
   // TODO: Ugly code duplication
   if (mathIR.type == "error") {
-    const textNode = document.createTextNode(mathIR.value);
+    const textNode = document.createTextNode(mathIR.values);
     const element = createMathElement("merror", [createMathElement("mtext", [textNode])]);
     const translator = new MathTextDomTranslator(mathIR, element, textNode);
     return { element, translator };
@@ -302,7 +302,7 @@ function fromMathLayoutElement<T extends MathLayoutElement>(
     const translator = new MathSymbolDomTranslator(mathIR, textNode, 0);
     return { element, translator };
   } else if (mathIR.type == "text") {
-    const textNode = mathIR.value.length > 0 ? document.createTextNode(mathIR.value) : createPlaceholder();
+    const textNode = mathIR.values.length > 0 ? document.createTextNode(mathIR.values) : createPlaceholder();
     const element = createMathElement("mtext", [textNode]);
     const translator = new MathTextDomTranslator(mathIR, element, textNode);
     return { element, translator };

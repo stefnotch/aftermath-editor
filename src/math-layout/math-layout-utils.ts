@@ -118,7 +118,7 @@ export function isSame(a: MathLayoutRow | MathLayoutElement, b: MathLayoutRow | 
     return a.values.every((v, i) => isSame(v, b.values[i]));
   } else if (a.type === "symbol" || a.type === "bracket" || a.type === "text" || a.type === "error") {
     assert(b.type === a.type);
-    return a.value === b.value;
+    return a.values === b.values;
   } else if (a.type === "table") {
     assert(b.type === a.type);
     return a.width === b.width && a.values.length === b.values.length && a.values.every((v, i) => isSame(v, b.values[i]));

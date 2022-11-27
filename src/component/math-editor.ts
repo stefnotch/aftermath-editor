@@ -9,13 +9,15 @@ import { MathJson, toMathJson } from "../math-editor/math-ir";
 import caretStyles from "./caret-styles.css?inline";
 import mathEditorStyles from "./math-editor-styles.css?inline";
 import inputHandlerStyles from "./input-handler-style.css?inline";
-import { createCaret, CaretElement } from "./caret";
-import { createInputHandler, MathmlInputHandler } from "./input-handler";
-import { CaretEdit, MathLayoutCaret, moveCaret, removeAtCaret } from "./math-layout-caret";
+import { createCaret, CaretElement } from "./caret-element";
+import { createInputHandler, MathmlInputHandler } from "./input-handler-element";
+import { MathLayoutCaret, moveCaret } from "./editing/math-layout-caret";
 import { MathLayoutRowZipper, MathLayoutTextZipper } from "../math-layout/math-layout-zipper";
 import { tagIs } from "../utils/dom-utils";
 import { applyEdit, inverseEdit, MathLayoutEdit } from "./editing/math-layout-edit";
 import { UndoRedoManager } from "./editing/undo-redo-manager";
+import { CaretEdit, removeAtCaret } from "./editing/math-layout-caret-edit";
+import { MathLayoutSelection } from "./editing/math-layout-selection";
 
 const debugSettings = {
   debugRenderRows: true,
@@ -30,6 +32,7 @@ if (import.meta.env.DEV) {
 
 export interface MathCaret {
   caret: MathLayoutCaret;
+  selection: MathLayoutSelection | null;
   element: CaretElement;
 }
 
@@ -39,14 +42,70 @@ function createElementFromHtml(html: string) {
   return template.content.firstChild;
 }
 
-export class MathEditor extends HTMLElement {
+class MathEditorCarets {
   carets: Set<MathCaret> = new Set<MathCaret>();
+  pointerDownCarets: Map<number, MathCaret> = new Map<number, MathCaret>();
+
+  constructor(private containerElement: HTMLElement) {}
+
+  add(zipper: MathLayoutRowZipper | MathLayoutTextZipper, offset: number) {
+    const caret = this.createCaret(zipper, offset);
+    this.carets.add(caret);
+  }
+
+  remove(caret: MathCaret) {
+    caret.element.remove();
+    this.carets.delete(caret);
+  }
+
+  clearCarets() {
+    this.carets.forEach((caret) => {
+      caret.element.remove();
+    });
+    this.carets.clear();
+  }
+
+  updateCaret(caret: MathCaret, newCaret: MathLayoutCaret | null) {
+    if (newCaret) {
+      caret.caret = newCaret;
+    }
+  }
+
+  addPointerDownCaret(pointerId: number, zipper: MathLayoutRowZipper | MathLayoutTextZipper, offset: number) {
+    const caret = this.createCaret(zipper, offset);
+    this.pointerDownCarets.set(pointerId, caret);
+  }
+
+  removePointerDownCaret(pointerId: number) {
+    this.pointerDownCarets.delete(pointerId);
+  }
+
+  finishPointerDownCaret(pointerId: number) {
+    const caret = this.pointerDownCarets.get(pointerId) ?? null;
+    assert(caret !== null);
+    this.carets.add(caret);
+  }
+
+  map<T>(fn: (caret: MathCaret) => T): T[] {
+    return Array.from(this.carets).concat(Array.from(this.pointerDownCarets.values())).map(fn);
+  }
+
+  private createCaret(zipper: MathLayoutRowZipper | MathLayoutTextZipper, offset: number) {
+    return {
+      caret: new MathLayoutCaret(zipper, offset),
+      selection: null,
+      element: createCaret(this.containerElement),
+    };
+  }
+}
+
+export class MathEditor extends HTMLElement {
+  carets: MathEditorCarets;
 
   // TODO: Rename mathAst to something (the name is a leftover from the old math-ast with parent pointers design)
   mathAst: MathLayoutRowZipper;
 
   render: () => void;
-  createCaret: (zipper: MathLayoutRowZipper | MathLayoutTextZipper, offset: number) => MathCaret;
   lastLayout: MathmlLayout | null = null;
   inputHandler: MathmlInputHandler;
 
@@ -78,6 +137,8 @@ export class MathEditor extends HTMLElement {
       this.inputHandler.inputElement.focus();
     });
 
+    this.carets = new MathEditorCarets(caretContainer);
+
     container.addEventListener("pointerdown", (e) => {
       const lastLayout = this.lastLayout;
       if (!lastLayout) return;
@@ -87,11 +148,22 @@ export class MathEditor extends HTMLElement {
       const newCaret = lastLayout.positionToCaret(e.target, { x: e.clientX, y: e.clientY }, this.mathAst);
       if (!newCaret) return;
 
-      console.log(e.target);
+      container.setPointerCapture(e.pointerId);
 
-      this.removeAllCarets();
-      this.carets.add(this.createCaret(newCaret.zipper, newCaret.offset));
+      this.carets.clearCarets();
+      this.carets.addPointerDownCaret(e.pointerId, newCaret.zipper, newCaret.offset);
       this.renderCarets();
+    });
+    container.addEventListener("pointerup", (e) => {
+      container.releasePointerCapture(e.pointerId);
+      this.carets.finishPointerDownCaret(e.pointerId);
+    });
+    container.addEventListener("pointercancel", (e) => {
+      container.releasePointerCapture(e.pointerId);
+      this.carets.finishPointerDownCaret(e.pointerId);
+    });
+    container.addEventListener("pointermove", (e) => {
+      // TODO: Selection
     });
 
     // Resize - rerender carets in correct locations
@@ -106,12 +178,6 @@ export class MathEditor extends HTMLElement {
 
     // Math formula
     this.mathAst = new MathLayoutRowZipper({ type: "row", values: [] }, null, 0);
-
-    // Caret creation function
-    this.createCaret = (zipper: MathLayoutRowZipper | MathLayoutTextZipper, offset: number) => ({
-      caret: new MathLayoutCaret(zipper, offset),
-      element: createCaret(caretContainer),
-    });
 
     // https://d-toybox.com/studio/lib/input_event_viewer.html
     // https://w3c.github.io/uievents/tools/key-event-viewer.html
@@ -147,16 +213,16 @@ export class MathEditor extends HTMLElement {
     this.inputHandler.inputElement.addEventListener("keydown", (ev) => {
       console.info("keydown", ev);
       if (ev.key === "ArrowUp") {
-        this.carets.forEach((caret) => this.moveCaret(caret, "up"));
+        this.carets.map((caret) => this.moveCaret(caret, "up"));
         this.renderCarets();
       } else if (ev.key === "ArrowDown") {
-        this.carets.forEach((caret) => this.moveCaret(caret, "down"));
+        this.carets.map((caret) => this.moveCaret(caret, "down"));
         this.renderCarets();
       } else if (ev.key === "ArrowLeft") {
-        this.carets.forEach((caret) => this.moveCaret(caret, "left"));
+        this.carets.map((caret) => this.moveCaret(caret, "left"));
         this.renderCarets();
       } else if (ev.key === "ArrowRight") {
-        this.carets.forEach((caret) => this.moveCaret(caret, "right"));
+        this.carets.map((caret) => this.moveCaret(caret, "right"));
         this.renderCarets();
       } else if (ev.code === "KeyZ" && ev.ctrlKey) {
         const undoAction = this.undoRedoStack.undo();
@@ -177,17 +243,17 @@ export class MathEditor extends HTMLElement {
       if (!lastLayout) return; // TODO: Maybe don't ignore the input command if the last layout doesn't exist?
 
       if (ev.inputType === "deleteContentBackward" || ev.inputType === "deleteWordBackward") {
-        const edit = this.recordEdit([...this.carets].map((v) => removeAtCaret(v.caret, "left", lastLayout)));
+        const edit = this.recordEdit(this.carets.map((v) => removeAtCaret(v.caret, "left", lastLayout)));
         this.saveEdit(edit);
         this.applyEdit(edit);
       } else if (ev.inputType === "deleteContentForward" || ev.inputType === "deleteWordForward") {
-        const edit = this.recordEdit([...this.carets].map((v) => removeAtCaret(v.caret, "right", lastLayout)));
+        const edit = this.recordEdit(this.carets.map((v) => removeAtCaret(v.caret, "right", lastLayout)));
         this.saveEdit(edit);
         this.applyEdit(edit);
       } else if (ev.inputType === "insertText") {
         const data = ev.data;
         if (data != null) {
-          this.carets.forEach((caret) => this.insertAtCaret(caret, data));
+          this.carets.map((caret) => this.insertAtCaret(caret, data));
         }
         this.render();
       } else if (ev.inputType === "historyUndo") {
@@ -342,8 +408,8 @@ export class MathEditor extends HTMLElement {
       this.setMathMl(mathMlElement);
 
       this.mathAst = new MathLayoutRowZipper(fromMathMLElement(mathMlElement), null, 0);
-      this.removeAllCarets();
-      this.carets.add(this.createCaret(this.mathAst, 0));
+      this.carets.clearCarets();
+      this.carets.add(this.mathAst, 0);
 
       console.log(this.mathAst);
       this.render();
@@ -356,7 +422,7 @@ export class MathEditor extends HTMLElement {
 
   renderCarets() {
     if (!this.isConnected) return;
-    this.carets.forEach((v) => this.renderCaret(v));
+    this.carets.map((v) => this.renderCaret(v));
   }
 
   renderCaret(caret: MathCaret) {
@@ -371,18 +437,8 @@ export class MathEditor extends HTMLElement {
     caret.element.setHighlightContainer(container);
   }
 
-  removeCaret(caret: MathCaret) {
-    caret.element.remove();
-    this.carets.delete(caret);
-  }
-
-  removeAllCarets() {
-    this.carets.forEach((c) => c.element.remove());
-    this.carets.clear();
-  }
-
   recordEdit(edits: readonly CaretEdit[]): MathLayoutEdit {
-    const caretsBefore = [...this.carets].map((v) => MathLayoutCaret.serialize(v.caret.zipper, v.caret.offset));
+    const caretsBefore = this.carets.map((v) => MathLayoutCaret.serialize(v.caret.zipper, v.caret.offset));
 
     return {
       type: "multi",
@@ -399,7 +455,7 @@ export class MathEditor extends HTMLElement {
   }
 
   applyEdit(edit: MathLayoutEdit) {
-    this.removeAllCarets();
+    this.carets.clearCarets();
 
     const result = applyEdit(this.mathAst, edit);
 
@@ -407,7 +463,7 @@ export class MathEditor extends HTMLElement {
 
     // TODO: Deduplicate carets
     result.carets.forEach((v) => {
-      this.carets.add(this.createCaret(v.zipper, v.offset));
+      this.carets.add(v.zipper, v.offset);
     });
 
     this.render();

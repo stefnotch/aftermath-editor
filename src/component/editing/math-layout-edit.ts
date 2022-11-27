@@ -2,7 +2,7 @@ import { MathLayoutElement } from "../../math-layout/math-layout";
 import { Offset } from "../../math-layout/math-layout-offset";
 import { AncestorIndices, fromAncestorIndices, MathLayoutRowZipper } from "../../math-layout/math-layout-zipper";
 import { assert, assertUnreachable } from "../../utils/assert";
-import { MathLayoutCaret, SerializedCaret } from "../math-layout-caret";
+import { MathLayoutCaret, SerializedCaret } from "./math-layout-caret";
 
 export type MathLayoutEdit = {
   readonly type: "multi";
@@ -12,6 +12,10 @@ export type MathLayoutEdit = {
   readonly caretsAfter: readonly SerializedCaret[];
 };
 
+/**
+ * Useless note: A MathLayoutSimpleEdit[] together with the .concat() method forms an algebraic group.
+ * It is associative, has an identity element ([]) and can be inverted.
+ */
 export type MathLayoutSimpleEdit =
   | {
       readonly type: "insert";

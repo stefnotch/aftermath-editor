@@ -29,7 +29,7 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
   } else if (tagIs(element, "mtext", "ms")) {
     return {
       type: "text",
-      value: getText(element),
+      values: getText(element),
     };
   } else if (tagIs(element, "mi", "mn")) {
     return getText(element)
@@ -158,7 +158,7 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
     if (!children.every((c) => tagIs(c, "mtr") && [...c.children].every((cc) => tagIs(cc, "mtd")))) {
       return {
         type: "error",
-        value: "Unexpected children " + element,
+        values: "Unexpected children " + element,
       };
     }
 
@@ -178,7 +178,7 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
   } else {
     return {
       type: "error",
-      value: "Unknown element " + element,
+      values: "Unknown element " + element,
     };
   }
 }
@@ -187,7 +187,7 @@ export function expectNChildren(element: Element, n: number): (MathLayoutText & 
   if (element.children.length != n) {
     return {
       type: "error",
-      value: `Expected ${n} children in ${element.tagName.toLowerCase()}`,
+      values: `Expected ${n} children in ${element.tagName.toLowerCase()}`,
     };
   }
   return null;

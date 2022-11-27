@@ -164,14 +164,14 @@ export type MathLayoutText =
        * $\text{a}$
        */
       readonly type: "text";
-      readonly value: string;
+      readonly values: string;
     }
   | {
       /**
        * Error message, used whenever the parser encounters something it doesn't understand.
        */
       readonly type: "error";
-      readonly value: string;
+      readonly values: string;
     };
 export function isMathLayoutText(value: MathLayoutRow | MathLayoutElement): value is MathLayoutText {
   const { type } = value as MathLayoutText;

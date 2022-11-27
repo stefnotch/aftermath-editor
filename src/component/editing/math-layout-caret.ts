@@ -1,7 +1,7 @@
 import { match } from "ts-pattern";
-import type { MathLayout, MathLayoutElement } from "../math-layout/math-layout";
-import { Offset } from "../math-layout/math-layout-offset";
-import { tableIndexToPosition, tablePositionToIndex } from "../math-layout/math-layout-utils";
+import type { MathLayout, MathLayoutElement } from "../../math-layout/math-layout";
+import { Offset } from "../../math-layout/math-layout-offset";
+import { tableIndexToPosition, tablePositionToIndex } from "../../math-layout/math-layout-utils";
 import {
   AncestorIndices,
   fromAncestorIndices,
@@ -11,12 +11,12 @@ import {
   MathLayoutSymbolZipper,
   MathLayoutTableZipper,
   MathLayoutTextZipper,
-} from "../math-layout/math-layout-zipper";
-import { MathmlLayout } from "../mathml/rendering";
-import arrayUtils from "../utils/array-utils";
-import { assert, assertUnreachable } from "../utils/assert";
-import { MathLayoutSimpleEdit } from "./editing/math-layout-edit";
-import { ViewportValue } from "./viewport-coordinate";
+} from "../../math-layout/math-layout-zipper";
+import { MathmlLayout } from "../../mathml/rendering";
+import arrayUtils from "../../utils/array-utils";
+import { assert, assertUnreachable } from "../../utils/assert";
+import { MathLayoutSimpleEdit } from "./math-layout-edit";
+import { ViewportValue } from "../viewport-coordinate";
 
 export type Direction = "left" | "right" | "up" | "down";
 
@@ -121,7 +121,7 @@ function moveVerticalClosestPosition(
         assert(childZipper !== undefined);
         if (childZipper.type === "text" || childZipper.type === "error") {
           // Can we beat the currently best position?
-          const childOffset = caretX < desiredXPosition ? 0 : childZipper.value.value.length;
+          const childOffset = caretX < desiredXPosition ? 0 : childZipper.value.values.length;
           const childCaretX = getCaretPosition(childZipper, childOffset)[0];
           const isBetter = Math.abs(childCaretX - desiredXPosition) < Math.abs(caretX - desiredXPosition);
           if (isBetter) {
@@ -144,7 +144,7 @@ function moveVerticalClosestPosition(
 }
 
 function offsetInBounds(zipper: MathLayoutRowZipper | MathLayoutTextZipper, offset: number) {
-  return 0 <= offset && offset <= (zipper.type === "row" ? zipper.value.values.length : zipper.value.value.length);
+  return 0 <= offset && offset <= (zipper.type === "row" ? zipper.value.values.length : zipper.value.values.length);
 }
 
 /**
@@ -192,7 +192,7 @@ function moveHorizontalInto(
   const adjacentChild = zipper.children[caretOffset + (direction === "left" ? -1 : 0)];
 
   if (adjacentChild.type === "text" || adjacentChild.type === "error") {
-    const offset = direction === "left" ? adjacentChild.value.value.length : 0;
+    const offset = direction === "left" ? adjacentChild.value.values.length : 0;
     return new MathLayoutCaret(adjacentChild, offset);
   } else if (adjacentChild.type === "bracket" || adjacentChild.type === "symbol") {
     return null;
@@ -215,6 +215,9 @@ function moveHorizontalInto(
 }
 
 // TODO: For text use https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Segmenter
+/**
+ * TODO: Consider renaming to MathLayoutPosition
+ */
 export class MathLayoutCaret {
   constructor(public readonly zipper: MathLayoutRowZipper | MathLayoutTextZipper, public readonly offset: number) {}
 
@@ -270,148 +273,10 @@ export class MathLayoutCaret {
         if (this.zipper.type == "row") {
           return this.offset >= this.zipper.value.values.length;
         } else {
-          return this.offset >= this.zipper.value.value.length;
+          return this.offset >= this.zipper.value.values.length;
         }
       })
       .exhaustive();
-  }
-}
-
-export type CaretEdit = {
-  /**
-   * What edits to perform
-   */
-  edits: MathLayoutSimpleEdit[];
-  /**
-   * Where the caret should end up after the edits
-   */
-  caret: SerializedCaret;
-};
-
-export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right", layout: MathmlLayout): CaretEdit {
-  // Nothing to delete, just move the caret
-  const move = () => {
-    const newCaret = moveCaret(caret, direction, layout) ?? caret;
-    return {
-      caret: MathLayoutCaret.serialize(newCaret.zipper, newCaret.offset),
-      edits: [],
-    };
-  };
-
-  // Remove a zipper and its children
-  const removeAction = (
-    zipper: MathLayoutContainerZipper | MathLayoutTableZipper | MathLayoutSymbolZipper | MathLayoutTextZipper
-  ): MathLayoutSimpleEdit => ({
-    type: "remove" as const,
-    zipper: getAncestorIndices(zipper.parent),
-    index: zipper.indexInParent,
-    value: zipper.value,
-  });
-
-  // Removes a zipper, and then inserts new elements at the same position
-  const replaceActions = (
-    zipper: MathLayoutContainerZipper | MathLayoutTableZipper,
-    values: readonly MathLayoutElement[]
-  ): MathLayoutSimpleEdit[] =>
-    [removeAction(zipper)].concat(
-      values.map((v, i) => ({
-        type: "insert" as const,
-        zipper: getAncestorIndices(zipper.parent),
-        offset: zipper.indexInParent + i,
-        value: v,
-      }))
-    );
-
-  const zipper = caret.zipper;
-  if (zipper.type === "row") {
-    // Row deletion
-    const atCaret = getAdjacentZipper(caret, direction);
-    if (atCaret === null) {
-      // At the start or end of a row
-      const { parent: parentZipper, indexInParent } = zipper;
-      if (parentZipper == null) return { caret: MathLayoutCaret.serialize(caret.zipper, caret.offset), edits: [] };
-      const parentValue = parentZipper.value;
-      if (parentValue.type === "fraction") {
-        if ((indexInParent === 0 && direction === "left") || (indexInParent === 1 && direction === "right")) {
-          return move();
-        } else {
-          // Delete the fraction but keep its contents
-          const parentContents = parentValue.values.flatMap((v) => v.values);
-          const actions = replaceActions(parentZipper, parentContents);
-
-          return {
-            edits: actions,
-            caret: MathLayoutCaret.serialize(
-              parentZipper.parent,
-              parentZipper.indexInParent + parentValue.values[0].values.length
-            ),
-          };
-        }
-      } else if ((parentValue.type === "sup" || parentValue.type === "sub") && direction === "left") {
-        // Delete the superscript/subscript but keep its contents
-        const parentContents = parentValue.values.flatMap((v) => v.values);
-        const actions = replaceActions(parentZipper, parentContents);
-
-        return {
-          edits: actions,
-          caret: MathLayoutCaret.serialize(parentZipper.parent, parentZipper.indexInParent),
-        };
-      } else if (parentValue.type === "root") {
-        if ((indexInParent === 0 && direction === "right") || (indexInParent === 1 && direction === "left")) {
-          // Delete root but keep its contents
-          const parentContents = parentValue.values[1].values;
-          const actions = replaceActions(parentZipper, parentContents);
-
-          return {
-            edits: actions,
-            caret: MathLayoutCaret.serialize(parentZipper.parent, parentZipper.indexInParent),
-          };
-        } else {
-          return move();
-        }
-      } else {
-        return move();
-      }
-    } else if (atCaret.type === "symbol" || atCaret.type === "bracket") {
-      const actions = [removeAction(atCaret)];
-      return {
-        edits: actions,
-        caret: MathLayoutCaret.serialize(zipper, caret.offset + (direction === "left" ? -1 : 0)),
-      };
-    } else if ((atCaret.type === "sup" || atCaret.type === "sub") && direction === "right") {
-      // Delete the superscript/subscript but keep its contents
-      // cat|^3 becomes cat|3
-      const subSupContents = atCaret.value.values.flatMap((v) => v.values);
-      const actions = replaceActions(atCaret, subSupContents);
-
-      return {
-        edits: actions,
-        caret: MathLayoutCaret.serialize(atCaret.parent, atCaret.indexInParent),
-      };
-    } else {
-      return move();
-    }
-  } else {
-    // Text deletion
-    if (zipper.value.value.length === 0) {
-      const actions = [removeAction(zipper)];
-      return {
-        edits: actions,
-        caret: MathLayoutCaret.serialize(zipper.parent, zipper.indexInParent),
-      };
-    } else if (
-      (direction === "left" && caret.offset <= 0) ||
-      (direction === "right" && caret.offset >= zipper.value.value.length)
-    ) {
-      return move();
-    } else {
-      const offsetDelta = direction === "left" ? -1 : 0;
-      const newCaret = MathLayoutCaret.serialize(caret.zipper, caret.offset + offsetDelta);
-      return {
-        edits: [{ type: "remove", zipper: newCaret.zipper, index: newCaret.offset, value: zipper.value.value[caret.offset] }],
-        caret: newCaret,
-      };
-    }
   }
 }
 
@@ -430,21 +295,4 @@ export function moveCaret(
   if (newCaret === null) return null;
 
   return newCaret;
-}
-
-/**
- * Gets the zipper of the element that the caret is touching
- */
-function getAdjacentZipper(
-  caret: MathLayoutCaret,
-  direction: "left" | "right"
-): MathLayoutContainerZipper | MathLayoutTableZipper | MathLayoutSymbolZipper | MathLayoutTextZipper | null {
-  if (caret.zipper.type === "row") {
-    const index = caret.offset + (direction === "left" ? -1 : 0);
-    const adjacentZipper = arrayUtils.get(caret.zipper.children, index);
-    if (adjacentZipper === undefined) return null;
-    return adjacentZipper;
-  } else {
-    return null;
-  }
 }

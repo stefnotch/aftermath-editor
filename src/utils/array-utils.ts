@@ -48,4 +48,20 @@ export default {
       return false;
     }
   },
+  skipWhile: function <T>(array: readonly T[], predicate: (element: T, index: number) => boolean) {
+    const index = array.findIndex((a, i) => !predicate(a, i));
+    if (index >= 0) {
+      return array.slice(index);
+    } else {
+      return array.slice();
+    }
+  },
+  takeWhile: function <T>(array: readonly T[], predicate: (element: T, index: number) => boolean) {
+    const index = array.findIndex((a, i) => !predicate(a, i));
+    if (index >= 0) {
+      return array.slice(0, index);
+    } else {
+      return array.slice();
+    }
+  },
 };
