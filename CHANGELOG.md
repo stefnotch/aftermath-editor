@@ -1,5 +1,9 @@
 # next
 
+- 
+
+# v0.0.6
+
 - Caret clicking on DOM node and resolving that location
 - Highlighting container at caret
 - Deleting elements
