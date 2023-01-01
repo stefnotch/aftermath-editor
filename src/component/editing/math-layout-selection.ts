@@ -11,8 +11,12 @@ export class MathLayoutSelection {
     this.isForwards = isBeforeOrEqual(start, end);
   }
 
-  public get isBackwards(): boolean {
+  get isBackwards(): boolean {
     return !this.isForwards;
+  }
+
+  get root() {
+    return this.start.zipper.root;
   }
 }
 

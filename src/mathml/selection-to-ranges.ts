@@ -14,13 +14,40 @@ export class MathRowRange {
   ) {}
 }
 
-export function selectionToRanges(selection: MathLayoutSelection): MathRowRange[] {}
+/**
+ * A selection of a tree can end up selecting lots of individual ranges.
+ * For example, $a|b_{cd}^{e|f}$ where $b_{cd}^{e}$ is the selected part, gives you the following ranges:
+ * - One for the row where $ab_{..}$ is, this is also the shared parent
+ * - One for the superscript where $ef$ is
+ */
+export function selectionToRanges(selection: MathLayoutSelection): MathRowRange[] {
+  if (selection.isCollapsed) {
+    return [];
+  }
 
-function getSharedParent(zipperA: MathLayoutRowZipper, zipperB: MathLayoutRowZipper): MathLayoutRowZipper {
-  // I wonder if I could make this recursive or more functional
-  const ancestorIndicesA = getAncestorIndices(zipperA);
-  const ancestorIndicesB = getAncestorIndices(zipperB);
+  const startAncestorIndices = getAncestorIndices(selection.start.zipper);
+  const endAncestorIndices = getAncestorIndices(selection.end.zipper);
+  const sharedParentPart = getSharedParentPart(startAncestorIndices, endAncestorIndices);
+  const sharedParent = fromAncestorIndices(selection.root, sharedParentPart);
 
+  const ranges: MathRowRange[] = [];
+
+  if (selection.isForwards) {
+    ranges.push(
+      ...getRanges(sharedParent, startAncestorIndices.slice(sharedParentPart.length), selection.start.offset, "left")
+    );
+    ranges.push(...getRanges(sharedParent, endAncestorIndices.slice(sharedParentPart.length), selection.end.offset, "right"));
+  } else {
+    ranges.push(...getRanges(sharedParent, endAncestorIndices.slice(sharedParentPart.length), selection.end.offset, "left"));
+    ranges.push(
+      ...getRanges(sharedParent, startAncestorIndices.slice(sharedParentPart.length), selection.start.offset, "right")
+    );
+  }
+
+  return ranges;
+}
+
+function getSharedParentPart(ancestorIndicesA: AncestorIndices, ancestorIndicesB: AncestorIndices): AncestorIndices {
   const sharedAncestorIndices: [number, number][] = [];
   for (let i = 0; i < ancestorIndicesA.length && i < ancestorIndicesB.length; i++) {
     const a = ancestorIndicesA[i];
@@ -32,55 +59,38 @@ function getSharedParent(zipperA: MathLayoutRowZipper, zipperB: MathLayoutRowZip
     }
   }
 
-  return fromAncestorIndices(zipperA.root, sharedAncestorIndices);
+  return sharedAncestorIndices;
 }
 
 /**
- * A selection of a tree can end up selecting lots of individual ranges.
- * For example, $a|b_{cd}^{e|f}$ where $b_{cd}^{e}$ is the selected part, gives you the following ranges:
- * - One for the row where $ab_{..}$ is, this is also the shared parent
- * - One for the superscript where $ef$ is
+ * Goes top down and gets the ranges for the given direction
  */
-function getRanges() {
-  // Start at one thing, work your way until the shared parent
-  // Start at the other side, work your way until the shared parent
-  if (this.isCollapsed) {
-    return [];
-  }
-
-  const sharedParent = this.getSharedParent();
-
+function getRanges(
+  parent: MathLayoutRowZipper,
+  ancestorIndices: AncestorIndices,
+  finalOffset: number,
+  direction: "right" | "left"
+) {
   const ranges: MathRowRange[] = [];
-  let topRange: number[] = [];
+  for (let i = 0; i < ancestorIndices.length; i++) {
+    const [containerIndex, rowIndex] = ancestorIndices[i];
+    const range =
+      direction === "left"
+        ? new MathRowRange(parent, containerIndex + 1, parent.children.length)
+        : new MathRowRange(parent, 0, containerIndex);
+    ranges.push(range);
 
-  const addRanges = (zipper: MathLayoutRowZipper, index: number, direction: "right" | "left") => {
-    let current = zipper as MathLayoutRowZipper | MathLayoutContainerZipper | MathLayoutTableZipper;
-    while (!current.equals(sharedParent)) {
-      const range =
-        direction === "right"
-          ? new MathRowRange(zipper, index, zipper.value.values.length)
-          : new MathRowRange(zipper, 0, index);
-      ranges.push(range);
-
-      const parent = current.parent;
-      assert(parent !== null);
-      index = current.indexInParent;
-      current = parent;
-    }
-
-    topRange.push(index);
-  };
-
-  if (this.isForwards) {
-    addRanges(this.start.zipper, this.start.offset, "right");
-    addRanges(this.end.zipper, this.end.offset, "left");
-  } else {
-    addRanges(this.end.zipper, this.end.offset, "right");
-    addRanges(this.start.zipper, this.start.offset, "left");
+    parent = parent.children[containerIndex].children[rowIndex];
   }
+  // Remove the first range, it's the shared parent
+  ranges.shift();
 
-  assert(topRange.length === 2);
-  ranges.push(new MathRowRange(sharedParent, Math.min(...topRange), Math.max(...topRange)));
+  // Add the final range
+  const range =
+    direction === "left"
+      ? new MathRowRange(parent, finalOffset, parent.children.length)
+      : new MathRowRange(parent, 0, finalOffset);
+  ranges.push(range);
 
   return ranges;
 }
