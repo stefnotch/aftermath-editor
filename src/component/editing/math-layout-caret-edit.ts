@@ -3,7 +3,6 @@ import {
   MathLayoutContainerZipper,
   MathLayoutTableZipper,
   MathLayoutSymbolZipper,
-  MathLayoutTextZipper,
   getAncestorIndices,
 } from "../../math-layout/math-layout-zipper";
 import { MathmlLayout } from "../../mathml/rendering";
@@ -22,6 +21,7 @@ export type CaretEdit = {
   caret: SerializedCaret;
 };
 
+// TODO: Caret + selection
 export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right", layout: MathmlLayout): CaretEdit {
   // Nothing to delete, just move the caret
   const move = () => {
@@ -34,7 +34,7 @@ export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right
 
   // Remove a zipper and its children
   const removeAction = (
-    zipper: MathLayoutContainerZipper | MathLayoutTableZipper | MathLayoutSymbolZipper | MathLayoutTextZipper
+    zipper: MathLayoutContainerZipper | MathLayoutTableZipper | MathLayoutSymbolZipper
   ): MathLayoutSimpleEdit => ({
     type: "remove" as const,
     zipper: getAncestorIndices(zipper.parent),
@@ -57,95 +57,72 @@ export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right
     );
 
   const zipper = caret.zipper;
-  if (zipper.type === "row") {
-    // Row deletion
-    const atCaret = getAdjacentZipper(caret, direction);
-    if (atCaret === null) {
-      // At the start or end of a row
-      const { parent: parentZipper, indexInParent } = zipper;
-      if (parentZipper == null) return { caret: MathLayoutCaret.serialize(caret.zipper, caret.offset), edits: [] };
-      const parentValue = parentZipper.value;
-      if (parentValue.type === "fraction") {
-        if ((indexInParent === 0 && direction === "left") || (indexInParent === 1 && direction === "right")) {
-          return move();
-        } else {
-          // Delete the fraction but keep its contents
-          const parentContents = parentValue.values.flatMap((v) => v.values);
-          const actions = replaceActions(parentZipper, parentContents);
-
-          return {
-            edits: actions,
-            caret: MathLayoutCaret.serialize(
-              parentZipper.parent,
-              parentZipper.indexInParent + parentValue.values[0].values.length
-            ),
-          };
-        }
-      } else if ((parentValue.type === "sup" || parentValue.type === "sub") && direction === "left") {
-        // Delete the superscript/subscript but keep its contents
+  // Row deletion
+  const atCaret = getAdjacentZipper(caret, direction);
+  if (atCaret === null) {
+    // At the start or end of a row
+    const { parent: parentZipper, indexInParent } = zipper;
+    if (parentZipper == null) return { caret: MathLayoutCaret.serialize(caret.zipper, caret.offset), edits: [] };
+    const parentValue = parentZipper.value;
+    if (parentValue.type === "fraction") {
+      if ((indexInParent === 0 && direction === "left") || (indexInParent === 1 && direction === "right")) {
+        return move();
+      } else {
+        // Delete the fraction but keep its contents
         const parentContents = parentValue.values.flatMap((v) => v.values);
+        const actions = replaceActions(parentZipper, parentContents);
+
+        return {
+          edits: actions,
+          caret: MathLayoutCaret.serialize(
+            parentZipper.parent,
+            parentZipper.indexInParent + parentValue.values[0].values.length
+          ),
+        };
+      }
+    } else if ((parentValue.type === "sup" || parentValue.type === "sub") && direction === "left") {
+      // Delete the superscript/subscript but keep its contents
+      const parentContents = parentValue.values.flatMap((v) => v.values);
+      const actions = replaceActions(parentZipper, parentContents);
+
+      return {
+        edits: actions,
+        caret: MathLayoutCaret.serialize(parentZipper.parent, parentZipper.indexInParent),
+      };
+    } else if (parentValue.type === "root") {
+      if ((indexInParent === 0 && direction === "right") || (indexInParent === 1 && direction === "left")) {
+        // Delete root but keep its contents
+        const parentContents = parentValue.values[1].values;
         const actions = replaceActions(parentZipper, parentContents);
 
         return {
           edits: actions,
           caret: MathLayoutCaret.serialize(parentZipper.parent, parentZipper.indexInParent),
         };
-      } else if (parentValue.type === "root") {
-        if ((indexInParent === 0 && direction === "right") || (indexInParent === 1 && direction === "left")) {
-          // Delete root but keep its contents
-          const parentContents = parentValue.values[1].values;
-          const actions = replaceActions(parentZipper, parentContents);
-
-          return {
-            edits: actions,
-            caret: MathLayoutCaret.serialize(parentZipper.parent, parentZipper.indexInParent),
-          };
-        } else {
-          return move();
-        }
       } else {
         return move();
       }
-    } else if (atCaret.type === "symbol" || atCaret.type === "bracket") {
-      const actions = [removeAction(atCaret)];
-      return {
-        edits: actions,
-        caret: MathLayoutCaret.serialize(zipper, caret.offset + (direction === "left" ? -1 : 0)),
-      };
-    } else if ((atCaret.type === "sup" || atCaret.type === "sub") && direction === "right") {
-      // Delete the superscript/subscript but keep its contents
-      // cat|^3 becomes cat|3
-      const subSupContents = atCaret.value.values.flatMap((v) => v.values);
-      const actions = replaceActions(atCaret, subSupContents);
+    } else {
+      return move();
+    }
+  } else if (atCaret.type === "symbol" || atCaret.type === "bracket" || atCaret.type === "error") {
+    const actions = [removeAction(atCaret)];
+    return {
+      edits: actions,
+      caret: MathLayoutCaret.serialize(zipper, caret.offset + (direction === "left" ? -1 : 0)),
+    };
+  } else if ((atCaret.type === "sup" || atCaret.type === "sub") && direction === "right") {
+    // Delete the superscript/subscript but keep its contents
+    // cat|^3 becomes cat|3
+    const subSupContents = atCaret.value.values.flatMap((v) => v.values);
+    const actions = replaceActions(atCaret, subSupContents);
 
-      return {
-        edits: actions,
-        caret: MathLayoutCaret.serialize(atCaret.parent, atCaret.indexInParent),
-      };
-    } else {
-      return move();
-    }
+    return {
+      edits: actions,
+      caret: MathLayoutCaret.serialize(atCaret.parent, atCaret.indexInParent),
+    };
   } else {
-    // Text deletion
-    if (zipper.value.values.length === 0) {
-      const actions = [removeAction(zipper)];
-      return {
-        edits: actions,
-        caret: MathLayoutCaret.serialize(zipper.parent, zipper.indexInParent),
-      };
-    } else if (
-      (direction === "left" && caret.offset <= 0) ||
-      (direction === "right" && caret.offset >= zipper.value.values.length)
-    ) {
-      return move();
-    } else {
-      const offsetDelta = direction === "left" ? -1 : 0;
-      const newCaret = MathLayoutCaret.serialize(caret.zipper, caret.offset + offsetDelta);
-      return {
-        edits: [{ type: "remove", zipper: newCaret.zipper, index: newCaret.offset, value: zipper.value.values[caret.offset] }],
-        caret: newCaret,
-      };
-    }
+    return move();
   }
 }
 
@@ -180,13 +157,8 @@ export function insertAtCaret(caret: MathLayoutCaret, value: CaretInsertCommand,
 function getAdjacentZipper(
   caret: MathLayoutCaret,
   direction: "left" | "right"
-): MathLayoutContainerZipper | MathLayoutTableZipper | MathLayoutSymbolZipper | MathLayoutTextZipper | null {
-  if (caret.zipper.type === "row") {
-    const index = caret.offset + (direction === "left" ? -1 : 0);
-    const adjacentZipper = arrayUtils.get(caret.zipper.children, index);
-    if (adjacentZipper === undefined) return null;
-    return adjacentZipper;
-  } else {
-    return null;
-  }
+): MathLayoutContainerZipper | MathLayoutTableZipper | MathLayoutSymbolZipper | null {
+  const index = caret.offset + (direction === "left" ? -1 : 0);
+  const adjacentZipper = arrayUtils.get(caret.zipper.children, index);
+  return adjacentZipper ?? null;
 }

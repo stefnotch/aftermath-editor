@@ -1,10 +1,10 @@
 import { assert, assertUnreachable } from "../utils/assert";
-import { MathLayoutElement, MathLayoutRow, MathLayoutText } from "../math-layout/math-layout";
+import { MathLayoutElement, MathLayoutRow } from "../math-layout/math-layout";
 import { fromElement as fromMathMLElement } from "../mathml/parsing";
 import { MathmlLayout, toElement as toMathMLElement } from "../mathml/rendering";
 import arrayUtils from "../utils/array-utils";
 import { endingBrackets, startingBrackets } from "../mathml/mathml-spec";
-import { findOtherBracket, wrapInRow } from "../math-layout/math-layout-utils";
+import { findOtherBracket, mathLayoutWithWidth, wrapInRow } from "../math-layout/math-layout-utils";
 import { MathJson, toMathJson } from "../math-editor/math-ir";
 import caretStyles from "./caret-styles.css?inline";
 import mathEditorStyles from "./math-editor-styles.css?inline";
@@ -12,7 +12,7 @@ import inputHandlerStyles from "./input-handler-style.css?inline";
 import { createCaret, CaretElement } from "./caret-element";
 import { createInputHandler, MathmlInputHandler } from "./input-handler-element";
 import { MathLayoutCaret, moveCaret } from "./editing/math-layout-caret";
-import { MathLayoutRowZipper, MathLayoutTextZipper } from "../math-layout/math-layout-zipper";
+import { MathLayoutRowZipper } from "../math-layout/math-layout-zipper";
 import { tagIs } from "../utils/dom-utils";
 import { applyEdit, inverseEdit, MathLayoutEdit } from "./editing/math-layout-edit";
 import { UndoRedoManager } from "./editing/undo-redo-manager";
@@ -48,7 +48,7 @@ class MathEditorCarets {
 
   constructor(private containerElement: HTMLElement) {}
 
-  add(zipper: MathLayoutRowZipper | MathLayoutTextZipper, offset: number) {
+  add(zipper: MathLayoutRowZipper, offset: number) {
     const caret = this.createCaret(zipper, offset);
     this.carets.add(caret);
   }
@@ -71,7 +71,7 @@ class MathEditorCarets {
     }
   }
 
-  addPointerDownCaret(pointerId: number, zipper: MathLayoutRowZipper | MathLayoutTextZipper, offset: number) {
+  addPointerDownCaret(pointerId: number, zipper: MathLayoutRowZipper, offset: number) {
     const caret = this.createCaret(zipper, offset);
     this.pointerDownCarets.set(pointerId, caret);
   }
@@ -91,7 +91,7 @@ class MathEditorCarets {
     return Array.from(this.carets).concat(Array.from(this.pointerDownCarets.values())).map(fn);
   }
 
-  private createCaret(zipper: MathLayoutRowZipper | MathLayoutTextZipper, offset: number) {
+  private createCaret(zipper: MathLayoutRowZipper, offset: number) {
     return {
       caret: new MathLayoutCaret(zipper, offset),
       selection: null,
@@ -186,7 +186,7 @@ export class MathEditor extends HTMLElement {
     container.append(this.mathMlElement);
 
     // Math formula
-    this.mathAst = new MathLayoutRowZipper({ type: "row", values: [] }, null, 0);
+    this.mathAst = new MathLayoutRowZipper(mathLayoutWithWidth({ type: "row", values: [], width: 0 }), null, 0, 0);
 
     // https://d-toybox.com/studio/lib/input_event_viewer.html
     // https://w3c.github.io/uievents/tools/key-event-viewer.html
@@ -416,7 +416,7 @@ export class MathEditor extends HTMLElement {
       assert(mathMlElement instanceof MathMLElement, "Mathml attribute must be a valid mathml element");
       this.setMathMl(mathMlElement);
 
-      this.mathAst = new MathLayoutRowZipper(fromMathMLElement(mathMlElement), null, 0);
+      this.mathAst = new MathLayoutRowZipper(fromMathMLElement(mathMlElement), null, 0, 0);
       this.carets.clearCarets();
       this.carets.add(this.mathAst, 0);
 

@@ -6,6 +6,9 @@
 - Integrate [lil-gui](https://github.com/georgealways/lil-gui) for dev purposes
 - Add rows debug rendering, see #7
 - Implement undoing and redoing
+- Selecting math
+- Add ranges to data structure
+- Simplify text representation
 
 # v0.0.3
 

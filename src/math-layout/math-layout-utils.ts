@@ -1,5 +1,5 @@
 import { assert } from "../utils/assert";
-import { MathLayoutElement, MathLayoutRow, MathLayoutTable } from "./math-layout";
+import { isMathLayoutRow, isMathLayoutSymbol, MathLayoutElement, MathLayoutRow, MathLayoutTable } from "./math-layout";
 import { endingBrackets, startingBrackets } from "../mathml/mathml-spec";
 
 /**
@@ -9,7 +9,7 @@ export function wrapInRow(
   mathLayout: (MathLayoutRow | MathLayoutElement) | (MathLayoutRow | MathLayoutElement)[] | null
 ): MathLayoutRow {
   if (mathLayout == null) {
-    return { type: "row", values: [] };
+    return mathLayoutWithWidth({ type: "row", values: [], width: 0 });
   }
 
   if (!Array.isArray(mathLayout)) {
@@ -19,7 +19,7 @@ export function wrapInRow(
     mathLayout = [mathLayout];
   }
 
-  return {
+  return mathLayoutWithWidth({
     type: "row",
     values: mathLayout.flatMap((v) => {
       if (v.type == "row") {
@@ -28,15 +28,30 @@ export function wrapInRow(
         return v;
       }
     }),
-  };
+    width: 0,
+  });
 }
 
 export function tableIndexToPosition(table: MathLayoutTable, index: number): [number, number] {
-  return [index % table.width, Math.floor(index / table.width)];
+  return [index % table.rowWidth, Math.floor(index / table.rowWidth)];
 }
 
 export function tablePositionToIndex(table: MathLayoutTable, position: [number, number]): number {
-  return position[1] * table.width + position[0];
+  return position[1] * table.rowWidth + position[0];
+}
+
+function calculateMathLayoutWidth(values: readonly MathLayoutRow[] | readonly MathLayoutElement[]): number {
+  return values.map((v) => v.width).reduce((a, b) => a + b, 0);
+}
+export function mathLayoutWithWidth<T extends MathLayoutRow | MathLayoutElement>(value: T): T {
+  if (isMathLayoutSymbol(value)) {
+    return { ...value, width: 0 };
+  } else if (isMathLayoutRow(value)) {
+    const numberOfOffsets = value.values.length + 1;
+    return { ...value, width: numberOfOffsets + calculateMathLayoutWidth(value.values) };
+  } else {
+    return { ...value, width: calculateMathLayoutWidth(value.values) };
+  }
 }
 
 /**
@@ -112,16 +127,17 @@ export function findEitherEndingBracket(
 
 export function isSame(a: MathLayoutRow | MathLayoutElement, b: MathLayoutRow | MathLayoutElement): boolean {
   if (a.type !== b.type) return false;
+  if (a.width !== b.width) return false;
 
   if (a.type === "row") {
     assert(b.type === a.type);
     return a.values.every((v, i) => isSame(v, b.values[i]));
-  } else if (a.type === "symbol" || a.type === "bracket" || a.type === "text" || a.type === "error") {
+  } else if (a.type === "symbol" || a.type === "bracket" || a.type === "error") {
     assert(b.type === a.type);
-    return a.values === b.values;
+    return a.value === b.value;
   } else if (a.type === "table") {
     assert(b.type === a.type);
-    return a.width === b.width && a.values.length === b.values.length && a.values.every((v, i) => isSame(v, b.values[i]));
+    return a.rowWidth === b.rowWidth && a.values.length === b.values.length && a.values.every((v, i) => isSame(v, b.values[i]));
   } else {
     assert(b.type === a.type);
     return a.values.every((v, i) => isSame(v, b.values[i]));

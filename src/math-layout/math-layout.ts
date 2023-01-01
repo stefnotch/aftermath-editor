@@ -6,6 +6,8 @@ function typecheckIsNever(_: never) {}
 // TODO: Get rid of this, you almost always want a MathLayoutRow instead
 export type MathLayout = MathLayoutRow | MathLayoutElement;
 
+// Could be wrapped with interfaces and stuff
+
 /**
  * A simple representation of what a math formula looks like. Immutable.
  * Optimized for editing, purposefully does not assign meaning to most characters.
@@ -22,6 +24,13 @@ export type MathLayoutRow = {
    */
   readonly type: "row";
   readonly values: readonly MathLayoutElement[];
+  /**
+   * TODO: Rename to offsetCount
+   * If there's one element, then the width is 2.
+   * And the offsets are [0, 1].
+   * Notice how this gives you an exclusive upper bound.
+   */
+  readonly width: number;
 };
 
 export function isMathLayoutRow(value: MathLayoutRow | MathLayoutElement): value is MathLayoutRow {
@@ -34,10 +43,10 @@ export function isMathLayoutRow(value: MathLayoutRow | MathLayoutElement): value
   }
 }
 
-export type MathLayoutElement = MathLayoutContainer | MathLayoutTable | MathLayoutSymbol | MathLayoutText;
+export type MathLayoutElement = MathLayoutContainer | MathLayoutTable | MathLayoutSymbol;
 export function isMathLayoutElement(value: MathLayoutRow | MathLayoutElement): value is MathLayoutElement {
   const v = value as MathLayoutElement;
-  if (isMathLayoutContainer(v) || isMathLayoutTable(v) || isMathLayoutSymbol(v) || isMathLayoutText(v)) {
+  if (isMathLayoutContainer(v) || isMathLayoutTable(v) || isMathLayoutSymbol(v)) {
     return true;
   } else {
     typecheckIsNever(v);
@@ -55,6 +64,7 @@ export type MathLayoutContainer =
        */
       readonly type: "fraction";
       readonly values: readonly [MathLayoutRow, MathLayoutRow];
+      readonly width: number;
     }
   | {
       /**
@@ -62,6 +72,7 @@ export type MathLayoutContainer =
        */
       readonly type: "root";
       readonly values: readonly [MathLayoutRow, MathLayoutRow];
+      readonly width: number;
     }
   | {
       /**
@@ -69,6 +80,7 @@ export type MathLayoutContainer =
        */
       readonly type: "under";
       readonly values: readonly [MathLayoutRow, MathLayoutRow];
+      readonly width: number;
     }
   | {
       /**
@@ -76,6 +88,7 @@ export type MathLayoutContainer =
        */
       readonly type: "over";
       readonly values: readonly [MathLayoutRow, MathLayoutRow];
+      readonly width: number;
     }
   | {
       /**
@@ -83,6 +96,7 @@ export type MathLayoutContainer =
        */
       readonly type: "sup";
       readonly values: readonly [MathLayoutRow];
+      readonly width: number;
     }
   | {
       /**
@@ -90,10 +104,29 @@ export type MathLayoutContainer =
        */
       readonly type: "sub";
       readonly values: readonly [MathLayoutRow];
+      readonly width: number;
+    }
+  | {
+      /**
+       * A single bit of text.
+       * TODO: This can also end up containing fractions and stuff, so maybe rename to "text container" or otherwise un-curse it?
+       * $\text{a}$
+       */
+      readonly type: "text";
+      readonly values: readonly [MathLayoutRow];
+      readonly width: number;
     };
 export function isMathLayoutContainer(value: MathLayoutRow | MathLayoutElement): value is MathLayoutContainer {
   const { type } = value as MathLayoutContainer;
-  if (type === "fraction" || type === "root" || type === "under" || type === "over" || type === "sup" || type === "sub") {
+  if (
+    type === "fraction" ||
+    type === "root" ||
+    type === "under" ||
+    type === "over" ||
+    type === "sup" ||
+    type === "sub" ||
+    type === "text"
+  ) {
     return true;
   } else {
     typecheckIsNever(type);
@@ -110,8 +143,9 @@ export type MathLayoutTable = {
    * $\begin{matrix}a&b\\c&d\end{matrix}$
    */
   readonly type: "table";
-  readonly width: number;
+  readonly rowWidth: number;
   readonly values: MathLayoutRow[];
+  readonly width: number;
 };
 export function isMathLayoutTable(value: MathLayoutRow | MathLayoutElement): value is MathLayoutTable {
   const { type } = value as MathLayoutTable;
@@ -133,6 +167,7 @@ export type MathLayoutSymbol =
        */
       readonly type: "symbol";
       readonly value: string;
+      readonly width: number;
     }
   | {
       /**
@@ -142,40 +177,20 @@ export type MathLayoutSymbol =
        */
       readonly type: "bracket";
       readonly value: string;
-    };
-
-export function isMathLayoutSymbol(value: MathLayoutRow | MathLayoutElement): value is MathLayoutSymbol {
-  const { type } = value as MathLayoutSymbol;
-  if (type === "symbol" || type === "bracket") {
-    return true;
-  } else {
-    typecheckIsNever(type);
-    return false;
-  }
-}
-
-/**
- * Text without children, can be edited
- */
-export type MathLayoutText =
-  | {
-      /**
-       * A single bit of text.
-       * $\text{a}$
-       */
-      readonly type: "text";
-      readonly values: string;
+      readonly width: number;
     }
   | {
       /**
        * Error message, used whenever the parser encounters something it doesn't understand.
        */
       readonly type: "error";
-      readonly values: string;
+      readonly value: string;
+      readonly width: number;
     };
-export function isMathLayoutText(value: MathLayoutRow | MathLayoutElement): value is MathLayoutText {
-  const { type } = value as MathLayoutText;
-  if (type === "text" || type === "error") {
+
+export function isMathLayoutSymbol(value: MathLayoutRow | MathLayoutElement): value is MathLayoutSymbol {
+  const { type } = value as MathLayoutSymbol;
+  if (type === "symbol" || type === "bracket" || type === "error") {
     return true;
   } else {
     typecheckIsNever(type);

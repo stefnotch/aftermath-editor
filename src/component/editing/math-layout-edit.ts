@@ -24,7 +24,7 @@ export type MathLayoutSimpleEdit =
       /**
        * The value that was inserted.
        */
-      readonly value: MathLayoutElement | string;
+      readonly value: MathLayoutElement;
     }
   | {
       readonly type: "remove";
@@ -33,7 +33,7 @@ export type MathLayoutSimpleEdit =
       /**
        * The value that was removed, used for undo.
        */
-      readonly value: MathLayoutElement | string;
+      readonly value: MathLayoutElement;
     };
 
 export function applyEdit(
@@ -57,15 +57,7 @@ export function applyEdit(
 function applySimpleEdit(root: MathLayoutRowZipper, edit: MathLayoutSimpleEdit): MathLayoutRowZipper {
   if (edit.type === "insert") {
     const zipper = fromAncestorIndices(root, edit.zipper);
-    let result: ReturnType<typeof zipper["insert"]>;
-    if (typeof edit.value === "string") {
-      assert(zipper.type !== "row");
-      result = zipper.insert(edit.offset, edit.value);
-    } else {
-      assert(zipper.type === "row");
-      result = zipper.insert(edit.offset, edit.value);
-    }
-
+    const result = zipper.insert(edit.offset, edit.value);
     return result.newRoot;
   } else if (edit.type === "remove") {
     console.log(edit);
