@@ -1,11 +1,11 @@
 import { getAncestorIndices } from "../../math-layout/math-layout-zipper";
 import { assert } from "../../utils/assert";
-import { MathLayoutCaret } from "./math-layout-caret";
+import { MathLayoutPosition } from "./math-layout-caret";
 
 export class MathLayoutSelection {
   public readonly isCollapsed: boolean;
   public readonly isForwards: boolean;
-  constructor(public readonly start: MathLayoutCaret, public readonly end: MathLayoutCaret) {
+  constructor(public readonly start: MathLayoutPosition, public readonly end: MathLayoutPosition) {
     assert(start.zipper.root === end.zipper.root, "Selections must share a common parent");
     this.isCollapsed = this.start.equals(this.end);
     this.isForwards = isBeforeOrEqual(start, end);
@@ -20,7 +20,7 @@ export class MathLayoutSelection {
   }
 }
 
-function isBeforeOrEqual(start: MathLayoutCaret, end: MathLayoutCaret) {
+function isBeforeOrEqual(start: MathLayoutPosition, end: MathLayoutPosition) {
   const startAncestorIndices = getAncestorIndices(start.zipper).flat();
   const endAncestorIndices = getAncestorIndices(end.zipper).flat();
 

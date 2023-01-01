@@ -11,7 +11,7 @@ import mathEditorStyles from "./math-editor-styles.css?inline";
 import inputHandlerStyles from "./input-handler-style.css?inline";
 import { createCaret, CaretElement } from "./caret-element";
 import { createInputHandler, MathmlInputHandler } from "./input-handler-element";
-import { MathLayoutCaret, moveCaret } from "./editing/math-layout-caret";
+import { MathLayoutPosition, moveCaret } from "./editing/math-layout-caret";
 import { MathLayoutRowZipper } from "../math-layout/math-layout-zipper";
 import { tagIs } from "../utils/dom-utils";
 import { applyEdit, inverseEdit, MathLayoutEdit } from "./editing/math-layout-edit";
@@ -31,7 +31,7 @@ if (import.meta.env.DEV) {
 }
 
 export interface MathCaret {
-  caret: MathLayoutCaret;
+  caret: MathLayoutPosition;
   selection: MathLayoutSelection | null;
   element: CaretElement;
 }
@@ -65,7 +65,7 @@ class MathEditorCarets {
     this.carets.clear();
   }
 
-  updateCaret(caret: MathCaret, newCaret: MathLayoutCaret | null) {
+  updateCaret(caret: MathCaret, newCaret: MathLayoutPosition | null) {
     if (newCaret) {
       caret.caret = newCaret;
     }
@@ -93,7 +93,7 @@ class MathEditorCarets {
 
   private createCaret(zipper: MathLayoutRowZipper, offset: number) {
     return {
-      caret: new MathLayoutCaret(zipper, offset),
+      caret: new MathLayoutPosition(zipper, offset),
       selection: null,
       element: createCaret(this.containerElement),
     };
@@ -171,7 +171,7 @@ export class MathEditor extends HTMLElement {
       const newCaret = lastLayout.positionToCaret(e.target, { x: e.clientX, y: e.clientY }, this.mathAst);
       if (!newCaret) return;
 
-      caret.selection = new MathLayoutSelection(caret.caret, new MathLayoutCaret(newCaret.zipper, newCaret.offset));
+      caret.selection = new MathLayoutSelection(caret.caret, new MathLayoutPosition(newCaret.zipper, newCaret.offset));
       this.renderCarets();
     });
 
@@ -461,7 +461,7 @@ export class MathEditor extends HTMLElement {
   }
 
   recordEdit(edits: readonly CaretEdit[]): MathLayoutEdit {
-    const caretsBefore = this.carets.map((v) => MathLayoutCaret.serialize(v.caret.zipper, v.caret.offset));
+    const caretsBefore = this.carets.map((v) => MathLayoutPosition.serialize(v.caret.zipper, v.caret.offset));
 
     return {
       type: "multi",

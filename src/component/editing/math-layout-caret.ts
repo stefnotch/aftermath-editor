@@ -31,7 +31,7 @@ function moveVertical(
   direction: "up" | "down",
   desiredXPosition: ViewportValue,
   getCaretPosition: (zipper: MathLayoutRowZipper, offset: Offset) => [ViewportValue, ViewportValue]
-): MathLayoutCaret | null {
+): MathLayoutPosition | null {
   const parent = zipper.parent;
   if (parent === null) return null;
 
@@ -66,7 +66,7 @@ function moveVertical(
         return moveVerticalClosestPosition(newZipper, desiredXPosition, getCaretPosition);
       } else {
         const offset = direction == "up" ? newZipper.value.values.length : 0;
-        return new MathLayoutCaret(newZipper, offset);
+        return new MathLayoutPosition(newZipper, offset);
       }
     }
   } else if (parent.type == "sup" || parent.type == "sub") {
@@ -75,7 +75,7 @@ function moveVertical(
     if (grandParent == null) return null;
 
     if ((parent.type == "sup" && direction == "down") || (parent.type == "sub" && direction == "up")) {
-      return new MathLayoutCaret(grandParent, parent.indexInParent);
+      return new MathLayoutPosition(grandParent, parent.indexInParent);
     } else {
       return moveVertical(grandParent, direction, desiredXPosition, getCaretPosition);
     }
@@ -119,7 +119,7 @@ function moveVerticalClosestPosition(
       }
     }
   }
-  return new MathLayoutCaret(newZipper, offset);
+  return new MathLayoutPosition(newZipper, offset);
 }
 
 function offsetInBounds(zipper: MathLayoutRowZipper, offset: number) {
@@ -133,14 +133,14 @@ function offsetInBounds(zipper: MathLayoutRowZipper, offset: number) {
 function moveHorizontalBeyondEdge(
   zipper: MathLayoutRowZipper | MathLayoutContainerZipper | MathLayoutTableZipper,
   direction: "left" | "right"
-): MathLayoutCaret | null {
+): MathLayoutPosition | null {
   const parent = zipper.parent;
   if (!parent) return null;
 
   if (parent.type === "row") {
     // We're done once we've found a row as a parent
     const offset = zipper.indexInParent + (direction === "left" ? 0 : 1);
-    return new MathLayoutCaret(parent, offset);
+    return new MathLayoutPosition(parent, offset);
   } else if (zipper.type === "row") {
     // If we found a decent adjacent element, like in a fraction or a table, we can try moving to the next spot
     const adjacentIndex = zipper.indexInParent + (direction === "left" ? -1 : 1);
@@ -151,7 +151,7 @@ function moveHorizontalBeyondEdge(
       // We're in the middle of the table or fraction
       const adjacentZipper = parent.children[adjacentIndex];
       const offset = direction === "left" ? adjacentZipper.value.values.length : 0;
-      return new MathLayoutCaret(adjacentZipper, offset);
+      return new MathLayoutPosition(adjacentZipper, offset);
     }
   } else {
     // We're at the end, move up
@@ -166,7 +166,7 @@ function moveHorizontalInto(
   zipper: MathLayoutRowZipper,
   caretOffset: Offset,
   direction: "left" | "right"
-): MathLayoutCaret | null {
+): MathLayoutPosition | null {
   // Carets are always inbetween elements. Hence element[caretOffset] is the element to the right of the caret.
   const adjacentChild = zipper.children[caretOffset + (direction === "left" ? -1 : 0)];
 
@@ -185,7 +185,7 @@ function moveHorizontalInto(
     const adjacentRow =
       direction === "left" ? adjacentChild.children[adjacentChild.children.length - 1] : adjacentChild.children[0];
     const offset = direction === "left" ? adjacentRow.value.values.length : 0;
-    return new MathLayoutCaret(adjacentRow, offset);
+    return new MathLayoutPosition(adjacentRow, offset);
   } else {
     assertUnreachable(adjacentChild.type);
   }
@@ -194,10 +194,10 @@ function moveHorizontalInto(
 /**
  * TODO: Consider renaming to MathLayoutPosition
  */
-export class MathLayoutCaret {
+export class MathLayoutPosition {
   constructor(public readonly zipper: MathLayoutRowZipper, public readonly offset: Offset) {}
 
-  equals(other: MathLayoutCaret): boolean {
+  equals(other: MathLayoutPosition): boolean {
     return this.zipper.equals(other.zipper) && this.offset === other.offset;
   }
 
@@ -205,18 +205,18 @@ export class MathLayoutCaret {
     return { zipper: getAncestorIndices(zipper), offset: offset };
   }
 
-  static deserialize(root: MathLayoutRowZipper, serialized: SerializedCaret): MathLayoutCaret {
+  static deserialize(root: MathLayoutRowZipper, serialized: SerializedCaret): MathLayoutPosition {
     const zipper = fromAncestorIndices(root, serialized.zipper);
-    return new MathLayoutCaret(zipper, serialized.offset);
+    return new MathLayoutPosition(zipper, serialized.offset);
   }
 
   static toAbsoluteOffset(zipper: MathLayoutRowZipper, offset: Offset): Offset {
     return zipper.startAbsoluteOffset + offset;
   }
 
-  static fromAbsoluteOffset(root: MathLayoutRowZipper, absoluteOffset: Offset): MathLayoutCaret {
+  static fromAbsoluteOffset(root: MathLayoutRowZipper, absoluteOffset: Offset): MathLayoutPosition {
     const zipper = root.getZipperAtOffset(absoluteOffset);
-    return new MathLayoutCaret(zipper, absoluteOffset - zipper.startAbsoluteOffset);
+    return new MathLayoutPosition(zipper, absoluteOffset - zipper.startAbsoluteOffset);
   }
 
   /**
@@ -228,13 +228,13 @@ export class MathLayoutCaret {
     direction: Direction,
     caretPosition: [ViewportValue, ViewportValue],
     getCaretPosition: (zipper: MathLayoutRowZipper, offset: Offset) => [ViewportValue, ViewportValue]
-  ): MathLayoutCaret | null {
+  ): MathLayoutPosition | null {
     if (direction === "right" || direction === "left") {
       if (this.isTouchingEdge(direction)) {
         return moveHorizontalBeyondEdge(this.zipper, direction);
       } else {
         const moveIntoChildTree = moveHorizontalInto(this.zipper, this.offset, direction);
-        return moveIntoChildTree ?? new MathLayoutCaret(this.zipper, this.offset + (direction === "left" ? -1 : +1));
+        return moveIntoChildTree ?? new MathLayoutPosition(this.zipper, this.offset + (direction === "left" ? -1 : +1));
       }
     } else if (direction === "up" || direction === "down") {
       return moveVertical(this.zipper, direction, caretPosition[0], getCaretPosition);
@@ -255,10 +255,10 @@ export class MathLayoutCaret {
 }
 
 export function moveCaret(
-  caret: MathLayoutCaret,
+  caret: MathLayoutPosition,
   direction: "up" | "down" | "left" | "right",
   layout: MathmlLayout
-): MathLayoutCaret | null {
+): MathLayoutPosition | null {
   const position = layout.caretToPosition(caret.zipper, caret.offset);
 
   const newCaret = caret.move(direction, [position.x, position.y], (zipper, offset) => {

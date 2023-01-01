@@ -7,7 +7,7 @@ import {
 } from "../../math-layout/math-layout-zipper";
 import { MathmlLayout } from "../../mathml/rendering";
 import arrayUtils from "../../utils/array-utils";
-import { MathLayoutCaret, moveCaret, SerializedCaret } from "./math-layout-caret";
+import { MathLayoutPosition, moveCaret, SerializedCaret } from "./math-layout-caret";
 import { MathLayoutSimpleEdit } from "./math-layout-edit";
 
 export type CaretEdit = {
@@ -22,12 +22,12 @@ export type CaretEdit = {
 };
 
 // TODO: Caret + selection
-export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right", layout: MathmlLayout): CaretEdit {
+export function removeAtCaret(caret: MathLayoutPosition, direction: "left" | "right", layout: MathmlLayout): CaretEdit {
   // Nothing to delete, just move the caret
   const move = () => {
     const newCaret = moveCaret(caret, direction, layout) ?? caret;
     return {
-      caret: MathLayoutCaret.serialize(newCaret.zipper, newCaret.offset),
+      caret: MathLayoutPosition.serialize(newCaret.zipper, newCaret.offset),
       edits: [],
     };
   };
@@ -62,7 +62,7 @@ export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right
   if (atCaret === null) {
     // At the start or end of a row
     const { parent: parentZipper, indexInParent } = zipper;
-    if (parentZipper == null) return { caret: MathLayoutCaret.serialize(caret.zipper, caret.offset), edits: [] };
+    if (parentZipper == null) return { caret: MathLayoutPosition.serialize(caret.zipper, caret.offset), edits: [] };
     const parentValue = parentZipper.value;
     if (parentValue.type === "fraction") {
       if ((indexInParent === 0 && direction === "left") || (indexInParent === 1 && direction === "right")) {
@@ -74,7 +74,7 @@ export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right
 
         return {
           edits: actions,
-          caret: MathLayoutCaret.serialize(
+          caret: MathLayoutPosition.serialize(
             parentZipper.parent,
             parentZipper.indexInParent + parentValue.values[0].values.length
           ),
@@ -87,7 +87,7 @@ export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right
 
       return {
         edits: actions,
-        caret: MathLayoutCaret.serialize(parentZipper.parent, parentZipper.indexInParent),
+        caret: MathLayoutPosition.serialize(parentZipper.parent, parentZipper.indexInParent),
       };
     } else if (parentValue.type === "root") {
       if ((indexInParent === 0 && direction === "right") || (indexInParent === 1 && direction === "left")) {
@@ -97,7 +97,7 @@ export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right
 
         return {
           edits: actions,
-          caret: MathLayoutCaret.serialize(parentZipper.parent, parentZipper.indexInParent),
+          caret: MathLayoutPosition.serialize(parentZipper.parent, parentZipper.indexInParent),
         };
       } else {
         return move();
@@ -109,7 +109,7 @@ export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right
     const actions = [removeAction(atCaret)];
     return {
       edits: actions,
-      caret: MathLayoutCaret.serialize(zipper, caret.offset + (direction === "left" ? -1 : 0)),
+      caret: MathLayoutPosition.serialize(zipper, caret.offset + (direction === "left" ? -1 : 0)),
     };
   } else if ((atCaret.type === "sup" || atCaret.type === "sub") && direction === "right") {
     // Delete the superscript/subscript but keep its contents
@@ -119,7 +119,7 @@ export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right
 
     return {
       edits: actions,
-      caret: MathLayoutCaret.serialize(atCaret.parent, atCaret.indexInParent),
+      caret: MathLayoutPosition.serialize(atCaret.parent, atCaret.indexInParent),
     };
   } else {
     return move();
@@ -147,7 +147,7 @@ export type CaretInsertCommand =
 // Because when we hit backspace, it should change back and stuff like that.
 // So we should at least somehow keep track of what the currently inserted stuff is (and clear that when we click away with the caret or something)
 //
-export function insertAtCaret(caret: MathLayoutCaret, value: CaretInsertCommand, layout: MathmlLayout): CaretEdit {
+export function insertAtCaret(caret: MathLayoutPosition, value: CaretInsertCommand, layout: MathmlLayout): CaretEdit {
   return null as any;
 }
 
@@ -155,7 +155,7 @@ export function insertAtCaret(caret: MathLayoutCaret, value: CaretInsertCommand,
  * Gets the zipper of the element that the caret is touching
  */
 function getAdjacentZipper(
-  caret: MathLayoutCaret,
+  caret: MathLayoutPosition,
   direction: "left" | "right"
 ): MathLayoutContainerZipper | MathLayoutTableZipper | MathLayoutSymbolZipper | null {
   const index = caret.offset + (direction === "left" ? -1 : 0);
