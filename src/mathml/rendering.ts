@@ -9,7 +9,7 @@ import {
 import { endingBrackets, allBrackets, MathMLTags } from "./mathml-spec";
 import { TokenStream } from "../math-editor/token-stream";
 import { Offset } from "../math-layout/math-layout-offset";
-import { ViewportValue } from "../component/viewport-coordinate";
+import { ViewportRect, ViewportValue } from "../component/viewport-coordinate";
 import {
   AncestorIndices,
   fromAncestorIndices,
@@ -17,12 +17,14 @@ import {
   MathLayoutRowZipper,
 } from "../math-layout/math-layout-zipper";
 import { tagIs } from "../utils/dom-utils";
+import { MathLayoutPosition } from "../math-layout/math-layout-position";
 
 interface RowDomTranslator {
   readonly element: Element;
   readonly children: (MathContainerDomTranslator | MathTableDomTranslator | MathSymbolDomTranslator)[];
   readonly length: number;
   offsetToPosition(offset: Offset): { x: ViewportValue; y: ViewportValue; height: ViewportValue };
+  getBounds(): ViewportRect;
 }
 
 class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements RowDomTranslator {
@@ -64,6 +66,16 @@ class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements R
   startEndPosition(): { start: ViewportValue; end: ViewportValue } {
     return getElementLayoutStartEnd(this.element);
   }
+
+  getBounds(): ViewportRect {
+    const bounds = this.element.getBoundingClientRect();
+    return {
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+    };
+  }
 }
 
 class MathContainerDomTranslator<T extends MathLayoutContainer = MathLayoutContainer> {
@@ -97,6 +109,10 @@ class MathSymbolDomTranslator<T extends MathLayoutSymbol = MathLayoutSymbol> {
     // TODO: This should be a range
     public readonly index: number
   ) {}
+
+  get children() {
+    return [];
+  }
 
   startEndPosition(): { start: ViewportValue; end: ViewportValue } {
     return {
@@ -152,6 +168,16 @@ class MathTextRowDomTranslator<T extends MathLayoutContainer & { type: "text" } 
       end: this.offsetToPosition(this.value.values[0].values.length).x,
     };
   }
+
+  getBounds(): ViewportRect {
+    const bounds = getFullTextBoundingBox(this.textNode);
+    return {
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+    };
+  }
 }
 
 export class MathmlLayout {
@@ -167,30 +193,75 @@ export class MathmlLayout {
     return this.caretToDomTranslator(ancestorIndices).offsetToPosition(offset);
   }
 
-  positionToCaret(element: Element | Text, position: { x: ViewportValue; y: ViewportValue }, rootZipper: MathLayoutRowZipper) {
+  /**
+   * Given a DOM node and a position, find the closest offset in the row
+   */
+  elementPositionToCaret(
+    element: Element | Text,
+    position: { x: ViewportValue; y: ViewportValue },
+    rootZipper: MathLayoutRowZipper
+  ) {
     const domAncestors = getDomAncestors(element, this.domTranslator.element);
     if (domAncestors[0] !== this.domTranslator.element) {
       // We aren't querying an element inside the MathML
       return null;
     }
 
-    // We walk down the tree, each time attempting to find the correct node which has one of the DOM elements.
+    // get the relevant dom translator by looking at the dom
     const ancestorIndices = getAncestorIndicesFromDom(domAncestors, this.domTranslator);
     const domTranslator = this.caretToDomTranslator(ancestorIndices);
 
+    // get the closest offset
+    const offset = this.getClosestOffsetInRow(domTranslator, position);
+    return new MathLayoutPosition(fromAncestorIndices(rootZipper, ancestorIndices), offset);
+  }
+
+  private getClosestOffsetInRow(domTranslator: RowDomTranslator, position: { x: ViewportValue; y: ViewportValue }) {
     const length = domTranslator.length;
     let closestDistance = Infinity;
-    let closestIndex = 0;
+    let closestOffset = 0;
     for (let i = 0; i <= length; i++) {
       const { x, y } = domTranslator.offsetToPosition(i);
       const distance = Math.hypot(x - position.x, y - position.y);
       if (distance < closestDistance) {
         closestDistance = distance;
-        closestIndex = i;
+        closestOffset = i;
       }
     }
+    return closestOffset;
+  }
 
-    return { zipper: fromAncestorIndices(rootZipper, ancestorIndices), offset: closestIndex };
+  /**
+   * Given only a position, find the closest offset in a row
+   */
+  positionToCaret(position: { x: ViewportValue; y: ViewportValue }, rootZipper: MathLayoutRowZipper) {
+    let roots = [{ domTranslator: this.domTranslator, zipper: rootZipper } as const];
+    let closestPosition: MathLayoutPosition | null = null;
+    let closestDistance = Infinity;
+
+    while (roots.length > 0) {
+      const row = roots.pop();
+      assert(row !== undefined);
+
+      // Ignore definitely worse distances
+      if (distanceToRectangle(row.domTranslator.getBounds(), position) > closestDistance) {
+        continue;
+      }
+
+      const offset = this.getClosestOffsetInRow(row.domTranslator, position);
+      closestPosition = new MathLayoutPosition(row.zipper, offset);
+
+      row.domTranslator.children.forEach((containerChild, i) => {
+        const containerChildZipper = row.zipper.children[i];
+        containerChild.children.forEach((rowChild, j) => {
+          const rowChildZipper = containerChildZipper.children[j];
+          roots.push({ domTranslator: rowChild, zipper: rowChildZipper });
+        });
+      });
+    }
+
+    assert(closestPosition !== null);
+    return closestPosition;
   }
 
   private caretToDomTranslator(ancestorIndices: AncestorIndices) {
@@ -503,6 +574,12 @@ function getTextLayout(t: Text, index: number) {
   };
 }
 
+function getFullTextBoundingBox(t: Text) {
+  const range = document.createRange();
+  range.selectNodeContents(t);
+  return range.getBoundingClientRect();
+}
+
 function getTextBoundingBox(t: Text, index: number) {
   const range = document.createRange();
   range.setStart(t, index);
@@ -625,4 +702,26 @@ function getAncestorIndicesFromDom(domAncestorsArray: (Element | Text)[], domTra
 
 function createPlaceholder() {
   return document.createTextNode("⬚");
+}
+
+function boundsContains(bounds: ViewportRect, position: { x: ViewportValue; y: ViewportValue }) {
+  return (
+    position.x >= bounds.x &&
+    position.x < bounds.x + bounds.width &&
+    position.y >= bounds.y &&
+    position.y < bounds.y + bounds.height
+  );
+}
+
+/**
+ * Minimum distance from a point to a rectangle. Returns 0 if the point is inside the rectangle.
+ * Assumes the rectangle is axis-aligned.
+ */
+function distanceToRectangle(bounds: ViewportRect, position: { x: ViewportValue; y: ViewportValue }) {
+  // https://stackoverflow.com/q/30545052/3492994
+
+  const dx = Math.max(bounds.x - position.x, position.x - (bounds.x + bounds.width));
+  const dy = Math.max(bounds.y - position.y, position.y - (bounds.y + bounds.height));
+
+  return Math.sqrt(Math.max(0, dx) ** 2 + Math.max(0, dy) ** 2);
 }

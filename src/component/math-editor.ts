@@ -143,9 +143,7 @@ export class MathEditor extends HTMLElement {
     container.addEventListener("pointerdown", (e) => {
       const lastLayout = this.lastLayout;
       if (!lastLayout) return;
-      const isElementTarget = e.target instanceof Element || e.target instanceof Text;
-      if (!isElementTarget) return;
-      const newCaret = lastLayout.positionToCaret(e.target, { x: e.clientX, y: e.clientY }, this.mathAst);
+      const newCaret = lastLayout.positionToCaret({ x: e.clientX, y: e.clientY }, this.mathAst);
       if (!newCaret) return;
 
       this.carets.clearCarets();
@@ -166,9 +164,7 @@ export class MathEditor extends HTMLElement {
 
       const lastLayout = this.lastLayout;
       if (!lastLayout) return;
-      const isElementTarget = e.target instanceof Element || e.target instanceof Text;
-      if (!isElementTarget) return;
-      const newCaret = lastLayout.positionToCaret(e.target, { x: e.clientX, y: e.clientY }, this.mathAst);
+      const newCaret = lastLayout.positionToCaret({ x: e.clientX, y: e.clientY }, this.mathAst);
       if (!newCaret) return;
 
       caret.selection = new MathLayoutSelection(caret.caret, new MathLayoutPosition(newCaret.zipper, newCaret.offset));
