@@ -5,11 +5,17 @@
 # v0.0.6
 
 - Caret clicking on DOM node and resolving that location
+  - Now resolves the absolutely closest position instead of using the DOM node
 - Highlighting container at caret
 - Deleting elements
+  - Delete at caret
+  - Delete selected
 - Integrate [lil-gui](https://github.com/georgealways/lil-gui) for dev purposes
 - Add rows debug rendering, see #7
 - Implement undoing and redoing
+- Selecting math
+- Add ranges to data structure
+- Simplify text representation and thus simplify entire MathLayout
 
 # v0.0.3
 

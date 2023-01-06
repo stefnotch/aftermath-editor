@@ -211,7 +211,7 @@ class MathParseTrie {
     if (token.type == "table") {
       return `${token.type}-`;
     } else if (token.type == "symbol" || token.type == "bracket" || token.type == "text" || token.type == "error") {
-      return `${token.type}-${token.value}`;
+      return `${token.type}-${token.values}`;
     } else {
       return `${token.type}-`;
     }
@@ -503,4 +503,77 @@ function parseNumber(
 
 export function fromMathJson(mathJson: MathJson): MathLayout {
   throw new Error("Not implemented");
+}
+
+try {
+  console.log(
+    toMathJson(this.mathAst.value /** TODO: Use MathIR here */, [
+      {
+        bindingPower: [null, null],
+        tokens: [
+          {
+            type: "symbol",
+            value: "x",
+          },
+        ],
+        mathJson: () => ["Symbol", { sym: "x" }],
+      },
+      {
+        bindingPower: [null, null],
+        tokens: [
+          {
+            type: "symbol",
+            value: "y",
+          },
+        ],
+        mathJson: () => ["Symbol", { sym: "y" }],
+      },
+      {
+        bindingPower: [null, 9],
+        tokens: [
+          {
+            type: "symbol",
+            value: "-",
+          },
+        ],
+        // TODO: Negate?
+        mathJson: () => ["Symbol", { sym: "-" }],
+      },
+      {
+        bindingPower: [null, null],
+        tokens: [
+          {
+            type: "symbol",
+            value: "2",
+          },
+        ],
+        // TODO: 2
+        mathJson: () => ["Symbol", { sym: "2" }],
+      },
+      {
+        bindingPower: [5, 6],
+        tokens: [
+          {
+            type: "symbol",
+            value: "+",
+          },
+        ],
+        // TODO: Plus or Add?
+        mathJson: () => ["Symbol", { sym: "+" }],
+      },
+      {
+        bindingPower: [7, 8],
+        tokens: [
+          {
+            type: "symbol",
+            value: "*",
+          },
+        ],
+        // TODO: Multiply or Times?
+        mathJson: () => ["Symbol", { sym: "*" }],
+      },
+    ])
+  );
+} catch (e) {
+  console.log("couldn't parse ", e);
 }

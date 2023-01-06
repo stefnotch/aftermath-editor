@@ -1,6 +1,5 @@
 import { assert, assertUnreachable } from "../utils/assert";
 import {
-  MathLayoutText,
   MathLayoutRow,
   MathLayoutElement,
   MathLayoutSymbol,
@@ -10,38 +9,38 @@ import {
 import { endingBrackets, allBrackets, MathMLTags } from "./mathml-spec";
 import { TokenStream } from "../math-editor/token-stream";
 import { Offset } from "../math-layout/math-layout-offset";
-import { ViewportValue } from "../component/viewport-coordinate";
+import { ViewportRect, ViewportValue } from "../component/viewport-coordinate";
 import {
   AncestorIndices,
   fromAncestorIndices,
   getAncestorIndices,
   MathLayoutRowZipper,
-  MathLayoutTextZipper,
 } from "../math-layout/math-layout-zipper";
 import { tagIs } from "../utils/dom-utils";
+import { MathLayoutPosition } from "../math-layout/math-layout-position";
 
-// I am debating the usefulness of the generics here
-interface MathDomTranslator<T extends { readonly type: string }> {
-  readonly type: T["type"];
+interface RowDomTranslator {
+  readonly element: Element;
+  readonly children: (MathContainerDomTranslator | MathTableDomTranslator | MathSymbolDomTranslator)[];
+  readonly length: number;
+  /**
+   * Returns the position of the given offset in the row.
+   * x, y are at the baseline of the row.
+   * height is the height of the row, going up.
+   * TODO: Maybe add a depth? Or tweak the height to be the height of the row, going down?
+   */
+  offsetToPosition(offset: Offset): { x: ViewportValue; y: ViewportValue; height: ViewportValue };
+  getBounds(): ViewportRect;
 }
 
-class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements MathDomTranslator<T> {
+class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements RowDomTranslator {
   constructor(
     public readonly value: T,
     public readonly element: Element,
-    public readonly children: (
-      | MathContainerDomTranslator
-      | MathTableDomTranslator
-      | MathSymbolDomTranslator
-      | MathTextDomTranslator
-    )[],
+    public readonly children: (MathContainerDomTranslator | MathTableDomTranslator | MathSymbolDomTranslator)[],
     public readonly finalElement: Element
   ) {
     assert(children.length >= value.values.length);
-  }
-
-  get type(): T["type"] {
-    return this.value.type;
   }
 
   get length(): number {
@@ -73,15 +72,21 @@ class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements M
   startEndPosition(): { start: ViewportValue; end: ViewportValue } {
     return getElementLayoutStartEnd(this.element);
   }
+
+  getBounds(): ViewportRect {
+    const bounds = this.element.getBoundingClientRect();
+    return {
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+    };
+  }
 }
 
-class MathContainerDomTranslator<T extends MathLayoutContainer = MathLayoutContainer> implements MathDomTranslator<T> {
-  constructor(public readonly value: T, public readonly element: Element, public readonly children: MathRowDomTranslator[]) {
+class MathContainerDomTranslator<T extends MathLayoutContainer = MathLayoutContainer> {
+  constructor(public readonly value: T, public readonly element: Element, public readonly children: RowDomTranslator[]) {
     assert(children.length === value.values.length);
-  }
-
-  get type(): T["type"] {
-    return this.value.type;
   }
 
   startEndPosition(): { start: ViewportValue; end: ViewportValue } {
@@ -89,13 +94,9 @@ class MathContainerDomTranslator<T extends MathLayoutContainer = MathLayoutConta
   }
 }
 
-class MathTableDomTranslator<T extends MathLayoutTable = MathLayoutTable> implements MathDomTranslator<T> {
-  constructor(public readonly value: T, public readonly element: Element, public readonly children: MathRowDomTranslator[]) {
+class MathTableDomTranslator<T extends MathLayoutTable = MathLayoutTable> {
+  constructor(public readonly value: T, public readonly element: Element, public readonly children: RowDomTranslator[]) {
     assert(children.length === value.values.length);
-  }
-
-  get type(): T["type"] {
-    return this.value.type;
   }
 
   startEndPosition(): { start: ViewportValue; end: ViewportValue } {
@@ -103,9 +104,9 @@ class MathTableDomTranslator<T extends MathLayoutTable = MathLayoutTable> implem
   }
 }
 
-class MathSymbolDomTranslator<T extends MathLayoutSymbol = MathLayoutSymbol> implements MathDomTranslator<T> {
+class MathSymbolDomTranslator<T extends MathLayoutSymbol = MathLayoutSymbol> {
   constructor(
-    public readonly value: MathLayoutSymbol,
+    public readonly value: T,
     /**
      * The element that contains this symbol. Note that the element might be shared with another symbol.
      * Make sure to use the index to find the correct symbol.
@@ -115,8 +116,8 @@ class MathSymbolDomTranslator<T extends MathLayoutSymbol = MathLayoutSymbol> imp
     public readonly index: number
   ) {}
 
-  get type(): T["type"] {
-    return this.value.type;
+  get children() {
+    return [];
   }
 
   startEndPosition(): { start: ViewportValue; end: ViewportValue } {
@@ -127,17 +128,24 @@ class MathSymbolDomTranslator<T extends MathLayoutSymbol = MathLayoutSymbol> imp
   }
 }
 
-class MathTextDomTranslator<T extends MathLayoutText = MathLayoutText> implements MathDomTranslator<T> {
+/**
+ * It's a bit special, due to the mismatch between MathLayout and MathML when it comes to text
+ */
+class MathTextRowDomTranslator<T extends MathLayoutContainer & { type: "text" } = MathLayoutContainer & { type: "text" }>
+  implements RowDomTranslator
+{
   // For now I'll just count the characters that the Text has, but in later implementations we can have a function
   // (As in, a reference to a static function that takes the element and gives me the character at a given position or something)
-  constructor(public readonly value: T, public readonly element: Element, public readonly textNode: Text) {}
+  constructor(public readonly value: T, public readonly element: Element, public readonly textNode: Text) {
+    assert(value.values[0].values.every((v) => v.type === "symbol"));
+  }
 
-  get type(): T["type"] {
-    return this.value.type;
+  get children() {
+    return [];
   }
 
   get length(): number {
-    return this.value.value.length;
+    return this.value.values[0].values.length;
   }
 
   /**
@@ -148,7 +156,7 @@ class MathTextDomTranslator<T extends MathLayoutText = MathLayoutText> implement
 
     // This is a bit of a hack to get the nearest mrow so that we can get the baseline
     // See also https://github.com/w3c/mathml-core/issues/38
-    let parentRow = this.element.parentElement;
+    let parentRow = this.textNode.parentElement;
     while (parentRow !== null && !tagIs(parentRow, "mrow")) {
       parentRow = parentRow.parentElement;
     }
@@ -163,65 +171,126 @@ class MathTextDomTranslator<T extends MathLayoutText = MathLayoutText> implement
   startEndPosition(): { start: ViewportValue; end: ViewportValue } {
     return {
       start: this.offsetToPosition(0).x,
-      end: this.offsetToPosition(this.value.value.length).x,
+      end: this.offsetToPosition(this.value.values[0].values.length).x,
+    };
+  }
+
+  getBounds(): ViewportRect {
+    const bounds = getFullTextBoundingBox(this.textNode);
+    return {
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
     };
   }
 }
 
 export class MathmlLayout {
-  constructor(public readonly element: MathMLElement, public readonly domTranslator: MathRowDomTranslator) {}
+  constructor(public readonly element: MathMLElement, public readonly domTranslator: RowDomTranslator) {}
 
-  caretContainer(mathLayout: MathLayoutRowZipper | MathLayoutTextZipper): Element {
+  getCaretContainer(mathLayout: MathLayoutRowZipper): Element {
     const ancestorIndices = getAncestorIndices(mathLayout);
     return this.caretToDomTranslator(ancestorIndices).element;
   }
 
-  caretToPosition(mathLayout: MathLayoutRowZipper | MathLayoutTextZipper, offset: Offset) {
+  layoutToViewportPosition(mathLayout: MathLayoutRowZipper, offset: Offset) {
     const ancestorIndices = getAncestorIndices(mathLayout);
     return this.caretToDomTranslator(ancestorIndices).offsetToPosition(offset);
   }
 
-  positionToCaret(element: Element | Text, position: { x: ViewportValue; y: ViewportValue }, rootZipper: MathLayoutRowZipper) {
+  /**
+   * Given a DOM node and a position, find the closest offset in the row
+   */
+  elementToLayoutPosition(
+    element: Element | Text,
+    position: { x: ViewportValue; y: ViewportValue },
+    rootZipper: MathLayoutRowZipper
+  ) {
     const domAncestors = getDomAncestors(element, this.domTranslator.element);
     if (domAncestors[0] !== this.domTranslator.element) {
       // We aren't querying an element inside the MathML
       return null;
     }
 
-    // We walk down the tree, each time attempting to find the correct node which has one of the DOM elements.
+    // get the relevant dom translator by looking at the dom
     const ancestorIndices = getAncestorIndicesFromDom(domAncestors, this.domTranslator);
     const domTranslator = this.caretToDomTranslator(ancestorIndices);
-    console.log(domAncestors, ancestorIndices, domTranslator);
 
+    // get the closest offset
+    const offset = this.getClosestOffsetInRow(domTranslator, position);
+    return new MathLayoutPosition(fromAncestorIndices(rootZipper, ancestorIndices), offset);
+  }
+
+  private getClosestOffsetInRow(domTranslator: RowDomTranslator, position: { x: ViewportValue; y: ViewportValue }) {
     const length = domTranslator.length;
     let closestDistance = Infinity;
-    let closestIndex = 0;
+    let closestOffset = 0;
     for (let i = 0; i <= length; i++) {
       const { x, y } = domTranslator.offsetToPosition(i);
-      const distance = Math.hypot(x - position.x, y - position.y);
+      const distance = distanceToPoint(position, { x, y });
       if (distance < closestDistance) {
         closestDistance = distance;
-        closestIndex = i;
+        closestOffset = i;
       }
     }
+    return closestOffset;
+  }
 
-    return { zipper: fromAncestorIndices(rootZipper, ancestorIndices), offset: closestIndex };
+  /**
+   * Given only a position, find the closest offset in a row
+   */
+  viewportToLayoutPosition(position: { x: ViewportValue; y: ViewportValue }, rootZipper: MathLayoutRowZipper) {
+    let roots = [{ domTranslator: this.domTranslator, zipper: rootZipper } as const];
+    let closest: { readonly position: MathLayoutPosition | null; readonly distance: number } = {
+      position: null,
+      distance: Infinity,
+    };
+
+    while (roots.length > 0) {
+      const row = roots.pop();
+      assert(row !== undefined);
+
+      // Ignore definitely worse distances
+      if (distanceToRectangle(row.domTranslator.getBounds(), position) > closest.distance) {
+        continue;
+      }
+
+      const offset = this.getClosestOffsetInRow(row.domTranslator, position);
+      const viewportPosition = row.domTranslator.offsetToPosition(offset);
+      const newClosest = {
+        position: new MathLayoutPosition(row.zipper, offset),
+        distance: distanceToSegment(
+          position,
+          { x: viewportPosition.x, y: viewportPosition.y },
+          { x: viewportPosition.x, y: viewportPosition.y - viewportPosition.height }
+        ),
+      };
+
+      if (newClosest.distance < closest.distance) {
+        closest = newClosest;
+      }
+
+      row.domTranslator.children.forEach((containerChild, i) => {
+        const containerChildZipper = row.zipper.children[i];
+        containerChild.children.forEach((rowChild, j) => {
+          const rowChildZipper = containerChildZipper.children[j];
+          roots.push({ domTranslator: rowChild, zipper: rowChildZipper });
+        });
+      });
+    }
+
+    assert(closest.position !== null);
+    return closest.position;
   }
 
   private caretToDomTranslator(ancestorIndices: AncestorIndices) {
-    let current:
-      | MathRowDomTranslator
-      | MathContainerDomTranslator
-      | MathTableDomTranslator
-      | MathSymbolDomTranslator
-      | MathTextDomTranslator = this.domTranslator;
-    for (const ancestorIndex of ancestorIndices) {
-      assert("children" in current); // We could write better code, but this assertion will do for now
-      current = current.children[ancestorIndex];
+    let current = this.domTranslator;
+    for (const [containerChildIndex, rowChildIndex] of ancestorIndices) {
+      const containerChild = current.children[containerChildIndex];
+      assert("children" in containerChild);
+      current = containerChild.children[rowChildIndex];
     }
-
-    // We could write better code, but this assertion will do for now
-    assert(current instanceof MathRowDomTranslator || current instanceof MathTextDomTranslator);
     return current;
   }
 }
@@ -259,14 +328,15 @@ function fromMathLayoutElement<T extends MathLayoutElement>(
   mathIR: Exclude<T, { type: "sub" } | { type: "sup" } | { type: "symbol" }>
 ): {
   element: Element;
-  translator: MathContainerDomTranslator | MathTableDomTranslator | MathSymbolDomTranslator | MathTextDomTranslator;
+  translator: MathContainerDomTranslator | MathTableDomTranslator | MathSymbolDomTranslator;
 } {
   // this almost sort a feels like a monad hmmm
   // TODO: Ugly code duplication
   if (mathIR.type == "error") {
+    // This one is a bit of a hack, but it's fine for now
     const textNode = document.createTextNode(mathIR.value);
     const element = createMathElement("merror", [createMathElement("mtext", [textNode])]);
-    const translator = new MathTextDomTranslator(mathIR, element, textNode);
+    const translator = new MathSymbolDomTranslator(mathIR, textNode, 0);
     return { element, translator };
   } else if (mathIR.type == "fraction") {
     const childA = fromMathLayoutRow(mathIR.values[0]);
@@ -301,15 +371,25 @@ function fromMathLayoutElement<T extends MathLayoutElement>(
     element.setAttribute("stretchy", "false");
     const translator = new MathSymbolDomTranslator(mathIR, textNode, 0);
     return { element, translator };
-  } else if (mathIR.type == "text") {
-    const textNode = mathIR.value.length > 0 ? document.createTextNode(mathIR.value) : createPlaceholder();
+  } else if (mathIR.type === "text") {
+    // This approach was chosen, because we want the best possible MathML output
+    const childrenIR = mathIR.values[0].values;
+    let text = "";
+    for (const childIR of childrenIR) {
+      // TODO: We could support math-in-text in the future
+      assert(childIR.type === "symbol", "Unsupported text child type");
+      text += childIR.value;
+    }
+    const textNode = text.length > 0 ? document.createTextNode(text) : createPlaceholder();
     const element = createMathElement("mtext", [textNode]);
-    const translator = new MathTextDomTranslator(mathIR, element, textNode);
+    // TODO: I'm not certain if this is correct
+    const textRowTranslator = new MathTextRowDomTranslator(mathIR, element, textNode);
+    const translator = new MathContainerDomTranslator(mathIR, element, [textRowTranslator]);
     return { element, translator };
-  } else if (mathIR.type == "table") {
-    const width = mathIR.width;
+  } else if (mathIR.type === "table") {
+    const width = mathIR.rowWidth;
     const rows: MathLayoutRow[][] = [];
-    const childTranslators: MathRowDomTranslator[] = [];
+    const childTranslators: RowDomTranslator[] = [];
     // copy rows from mathIR.values into rows
     for (let i = 0; i < mathIR.values.length; i += width) {
       rows.push(mathIR.values.slice(i, i + width));
@@ -344,7 +424,7 @@ const isNumber = /^\p{Nd}+(\.\p{Nd}*)?$/gu;
  */
 function fromMathLayoutRowChildren(tokens: TokenStream<MathLayoutElement>): {
   elements: Element[];
-  translators: (MathContainerDomTranslator | MathTableDomTranslator | MathSymbolDomTranslator | MathTextDomTranslator)[];
+  translators: (MathContainerDomTranslator | MathTableDomTranslator | MathSymbolDomTranslator)[];
 } {
   // That parsing needs to
   // - Parse numbers <mn> numbers go brr
@@ -356,8 +436,7 @@ function fromMathLayoutRowChildren(tokens: TokenStream<MathLayoutElement>): {
   //   Instead we'll expose some "parser" API to the user and let them deal with fun like "wait, what e is that"
 
   const output: Element[] = [];
-  const translators: (MathContainerDomTranslator | MathTableDomTranslator | MathSymbolDomTranslator | MathTextDomTranslator)[] =
-    [];
+  const translators: (MathContainerDomTranslator | MathTableDomTranslator | MathSymbolDomTranslator)[] = [];
 
   while (true) {
     const { value: token } = tokens.nextWithIndex();
@@ -515,6 +594,12 @@ function getTextLayout(t: Text, index: number) {
   };
 }
 
+function getFullTextBoundingBox(t: Text) {
+  const range = document.createRange();
+  range.selectNodeContents(t);
+  return range.getBoundingClientRect();
+}
+
 function getTextBoundingBox(t: Text, index: number) {
   const range = document.createRange();
   range.setStart(t, index);
@@ -574,52 +659,62 @@ function getDomAncestors(element: Element | Text, root: Element) {
   return domAncestors;
 }
 
-/**
- * Walks down the DOM, and returns the ancestor indices up until a MathRowDomTranslator or a MathTextDomTranslator
- */
-function getAncestorIndicesFromDom(domAncestors: (Element | Text)[], domTranslator: MathRowDomTranslator) {
-  // TODO: Use satisfies here
-  let current = domTranslator as MathRowDomTranslator | MathContainerDomTranslator | MathTableDomTranslator;
-  let domAncestorsIndex = 0;
-  const ancestorIndices: number[] = [];
-  const nextAncestorIndices: number[] = [];
-  while (true) {
-    let childWithElement:
-      | MathRowDomTranslator
-      | MathContainerDomTranslator
-      | MathTableDomTranslator
-      | MathSymbolDomTranslator
-      | MathTextDomTranslator
-      | null = null;
+class SkipQueue<T> {
+  index = 0;
+  values: readonly T[];
+  constructor(values: readonly T[]) {
+    this.values = values;
+  }
 
-    for (let i = 0; i < current.children.length; i++) {
-      const child = current.children[i];
-      const indexOfElement = domAncestors.indexOf(child.element, domAncestorsIndex);
-      if (indexOfElement !== -1) {
-        domAncestorsIndex = indexOfElement + 1;
-        childWithElement = child;
-        nextAncestorIndices.push(i);
-        break;
+  popNext(value: T): T | null {
+    const nextIndex = this.values.indexOf(value, this.index);
+    if (nextIndex !== -1) {
+      this.index = nextIndex + 1;
+      return this.values[nextIndex];
+    }
+    return null;
+  }
+}
+
+/**
+ * Walks down the DOM, and returns the ancestor indices until a MathRowDomTranslator
+ */
+function getAncestorIndicesFromDom(domAncestorsArray: (Element | Text)[], domTranslator: RowDomTranslator): AncestorIndices {
+  const domAncestors = new SkipQueue(domAncestorsArray);
+  // Walks down the domAncestors to find the next relevant DOM to MathLayout translator
+  const getNextDeeperChild = <T extends RowDomTranslator | MathTableDomTranslator | MathContainerDomTranslator>(
+    rowDomTranslater: T
+  ) => {
+    for (let i = 0; i < rowDomTranslater.children.length; i++) {
+      const child: T["children"][number] = rowDomTranslater.children[i];
+      const element = domAncestors.popNext(child.element);
+      if (element !== null) {
+        return {
+          value: child,
+          indexInParent: i,
+        };
       }
     }
-
-    if (childWithElement === null) {
+    return null;
+  };
+  let current = domTranslator;
+  const ancestorIndices: [number, number][] = [];
+  while (true) {
+    const containerChild = getNextDeeperChild(current);
+    if (containerChild === null) {
       break;
-    } else if (childWithElement instanceof MathRowDomTranslator) {
-      ancestorIndices.push(...nextAncestorIndices);
-      nextAncestorIndices.length = 0;
-      current = childWithElement;
-    } else if (childWithElement instanceof MathTextDomTranslator) {
-      // We only care about rows or text
-      ancestorIndices.push(...nextAncestorIndices);
-      nextAncestorIndices.length = 0;
-      break;
-    } else if (childWithElement instanceof MathSymbolDomTranslator) {
+    }
+    if (containerChild.value instanceof MathSymbolDomTranslator) {
       // We don't want to walk down into the symbol
       break;
-    } else {
-      current = childWithElement;
     }
+
+    const rowChild = getNextDeeperChild(containerChild.value);
+    if (rowChild === null) {
+      break;
+    }
+
+    ancestorIndices.push([containerChild.indexInParent, rowChild.indexInParent]);
   }
 
   return ancestorIndices;
@@ -627,4 +722,37 @@ function getAncestorIndicesFromDom(domAncestors: (Element | Text)[], domTranslat
 
 function createPlaceholder() {
   return document.createTextNode("⬚");
+}
+
+type ViewportVector2 = { x: ViewportValue; y: ViewportValue };
+/**
+ * Minimum distance from a point to a rectangle. Returns 0 if the point is inside the rectangle.
+ * Assumes the rectangle is axis-aligned.
+ */
+function distanceToRectangle(bounds: ViewportRect, position: ViewportVector2) {
+  // https://stackoverflow.com/q/30545052/3492994
+
+  const dx = Math.max(bounds.x - position.x, position.x - (bounds.x + bounds.width));
+  const dy = Math.max(bounds.y - position.y, position.y - (bounds.y + bounds.height));
+
+  return Math.sqrt(Math.max(0, dx) ** 2 + Math.max(0, dy) ** 2);
+}
+
+function distanceToPoint(a: { x: ViewportValue; y: ViewportValue }, b: { x: ViewportValue; y: ViewportValue }) {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+function distanceToPointSquared(v: ViewportVector2, w: ViewportVector2) {
+  return (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
+}
+function distanceToSegmentSquared(position: ViewportVector2, v: ViewportVector2, w: ViewportVector2) {
+  // https://stackoverflow.com/a/1501725/3492994
+  const EPSILON = 0.000001;
+  const segmentLength = distanceToPointSquared(v, w);
+  if (segmentLength < EPSILON) return distanceToPointSquared(position, v);
+  let t = ((position.x - v.x) * (w.x - v.x) + (position.y - v.y) * (w.y - v.y)) / segmentLength;
+  t = Math.max(0, Math.min(1, t));
+  return distanceToPointSquared(position, { x: v.x + t * (w.x - v.x), y: v.y + t * (w.y - v.y) });
+}
+function distanceToSegment(position: ViewportVector2, v: ViewportVector2, w: ViewportVector2) {
+  return Math.sqrt(distanceToSegmentSquared(position, v, w));
 }

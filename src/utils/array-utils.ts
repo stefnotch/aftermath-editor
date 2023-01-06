@@ -48,4 +48,26 @@ export default {
       return false;
     }
   },
+  skipWhile: function <T>(array: readonly T[], predicate: (element: T, index: number) => boolean) {
+    const index = array.findIndex((a, i) => !predicate(a, i));
+    if (index >= 0) {
+      return array.slice(index);
+    } else {
+      return array.slice();
+    }
+  },
+  takeWhile: function <T>(array: readonly T[], predicate: (element: T, index: number) => boolean) {
+    const index = array.findIndex((a, i) => !predicate(a, i));
+    if (index >= 0) {
+      return array.slice(0, index);
+    } else {
+      return array.slice();
+    }
+  },
+  /**
+   * An exclusive range function
+   */
+  range: function (start: number, end: number) {
+    return Array.from(new Array(end - start), (_, i) => i + start);
+  },
 };
