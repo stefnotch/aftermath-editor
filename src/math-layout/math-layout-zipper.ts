@@ -337,10 +337,8 @@ export class MathLayoutSymbolZipper implements MathLayoutZipper<never> {
 }
 
 /**
- * Indices of a row or text in the tree.
- * The first index is where in the root one should go.
- * The second index is where in the first child one should go, etc.
- * The last index is where in the last child one should go to find the row or text.
+ * Indices of a row in the tree.
+ * Order is "-> container -> row"
  */
 export type AncestorIndices = readonly [indexOfContainer: number, indexOfRow: number][];
 
@@ -374,4 +372,22 @@ export function fromAncestorIndices(root: MathLayoutRowZipper, ancestorIndices: 
   }
 
   return current;
+}
+
+export function getSharedAncestorIndices(
+  ancestorIndicesA: AncestorIndices,
+  ancestorIndicesB: AncestorIndices
+): AncestorIndices {
+  const sharedAncestorIndices: [number, number][] = [];
+  for (let i = 0; i < ancestorIndicesA.length && i < ancestorIndicesB.length; i++) {
+    const a = ancestorIndicesA[i];
+    const b = ancestorIndicesB[i];
+    if (a[0] === b[0] && a[1] === b[1]) {
+      sharedAncestorIndices.push([a[0], a[1]]);
+    } else {
+      break;
+    }
+  }
+
+  return sharedAncestorIndices;
 }

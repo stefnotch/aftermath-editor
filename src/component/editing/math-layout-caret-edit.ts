@@ -1,5 +1,5 @@
 import { MathLayoutElement } from "../../math-layout/math-layout";
-import { MathLayoutPosition, SerializedCaret } from "../../math-layout/math-layout-position";
+import { MathLayoutPosition } from "../../math-layout/math-layout-position";
 import {
   MathLayoutContainerZipper,
   MathLayoutTableZipper,
@@ -8,7 +8,7 @@ import {
 } from "../../math-layout/math-layout-zipper";
 import { MathmlLayout } from "../../mathml/rendering";
 import arrayUtils from "../../utils/array-utils";
-import { moveCaret } from "./math-layout-caret";
+import { MathLayoutCaret, moveCaret, SerializedCaret } from "./math-layout-caret";
 import { MathLayoutSimpleEdit } from "./math-layout-edit";
 
 export type CaretEdit = {
@@ -23,12 +23,12 @@ export type CaretEdit = {
 };
 
 // TODO: Caret + selection
-export function removeAtCaret(caret: MathLayoutPosition, direction: "left" | "right", layout: MathmlLayout): CaretEdit {
+export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right", layout: MathmlLayout): CaretEdit {
   // Nothing to delete, just move the caret
   const move = () => {
     const newCaret = moveCaret(caret, direction, layout) ?? caret;
     return {
-      caret: MathLayoutPosition.serialize(newCaret.zipper, newCaret.offset),
+      caret: MathLayoutCaret.serialize(newCaret.zipper, newCaret.start, newCaret.end),
       edits: [],
     };
   };
@@ -63,7 +63,7 @@ export function removeAtCaret(caret: MathLayoutPosition, direction: "left" | "ri
   if (atCaret === null) {
     // At the start or end of a row
     const { parent: parentZipper, indexInParent } = zipper;
-    if (parentZipper == null) return { caret: MathLayoutPosition.serialize(caret.zipper, caret.offset), edits: [] };
+    if (parentZipper == null) return { caret: MathLayoutCaret.serialize(caret.zipper, caret.offset), edits: [] };
     const parentValue = parentZipper.value;
     if (parentValue.type === "fraction") {
       if ((indexInParent === 0 && direction === "left") || (indexInParent === 1 && direction === "right")) {

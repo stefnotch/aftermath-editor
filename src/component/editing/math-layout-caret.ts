@@ -3,8 +3,10 @@ import { Offset } from "../../math-layout/math-layout-offset";
 import { MathLayoutPosition } from "../../math-layout/math-layout-position";
 import { tableIndexToPosition, tablePositionToIndex } from "../../math-layout/math-layout-utils";
 import {
+  AncestorIndices,
   fromAncestorIndices,
   getAncestorIndices,
+  getSharedAncestorIndices,
   MathLayoutContainerZipper,
   MathLayoutRowZipper,
   MathLayoutTableZipper,
@@ -14,12 +16,109 @@ import { assert, assertUnreachable } from "../../utils/assert";
 import { ViewportValue } from "../viewport-coordinate";
 
 export type Direction = "left" | "right" | "up" | "down";
+export type SerializedCaret = { start: Offset; end: Offset; zipper: AncestorIndices };
 
 /**
  * Whether the editor attempts to keep the caret in the same-ish x-coordinate when moving up.
  * See https://github.com/stefnotch/mathml-editor/issues/13
  */
 const KeepXPosition = false;
+
+export class MathLayoutCaret {
+  public readonly isCollapsed: boolean;
+  public readonly isForwards: boolean;
+  constructor(public readonly zipper: MathLayoutRowZipper, public readonly start: Offset, public readonly end: Offset) {
+    assert(start >= 0 && start <= zipper.value.values.length, "Offset must be within the row");
+    assert(end >= 0 && end <= zipper.value.values.length, "Offset must be within the row");
+    this.isCollapsed = this.start === this.end;
+    this.isForwards = this.start <= this.end;
+  }
+
+  get leftOffset(): Offset {
+    return this.isForwards ? this.start : this.end;
+  }
+
+  get rightOffset(): Offset {
+    return this.isForwards ? this.end : this.start;
+  }
+
+  static serialize(zipper: MathLayoutRowZipper, start: Offset, end: Offset): SerializedCaret {
+    return { zipper: getAncestorIndices(zipper), start, end };
+  }
+
+  static deserialize(root: MathLayoutRowZipper, serialized: SerializedCaret): MathLayoutCaret {
+    const zipper = fromAncestorIndices(root, serialized.zipper);
+    return new MathLayoutCaret(zipper, serialized.start, serialized.end);
+  }
+
+  /**
+   * Gets a caret from two positions that might be in different rows.
+   */
+  static getSharedCaret(startPosition: MathLayoutPosition, endPosition: MathLayoutPosition): MathLayoutCaret {
+    const startAncestorIndices = getAncestorIndices(startPosition.zipper);
+    const endAncestorIndices = getAncestorIndices(endPosition.zipper);
+    const sharedParentPart = getSharedAncestorIndices(startAncestorIndices, endAncestorIndices);
+    const sharedParent = fromAncestorIndices(startPosition.zipper.root, sharedParentPart);
+
+    // Scale offsets and positions by two, so that we can have
+    // offset 0, position 1, offset 2, position 3, offset 4
+    // and then use sane integer arithmetic to find the caret direction
+    const startScaledOffset =
+      sharedParentPart.length < startAncestorIndices.length
+        ? // Scaled position in the parent
+          startAncestorIndices[sharedParentPart.length][0] * 2 + 1
+        : // Scaled offset in the parent
+          startPosition.offset * 2;
+
+    const endScaledOffset =
+      sharedParentPart.length < endAncestorIndices.length
+        ? // Scaled position in the parent
+          endAncestorIndices[sharedParentPart.length][0] * 2 + 1
+        : // Scaled offset in the parent
+          endPosition.offset * 2;
+
+    const isForwards = startScaledOffset <= endScaledOffset;
+
+    // And now that we know the direction, we can compute the actual start and end offsets
+    const startOffset =
+      sharedParentPart.length < startAncestorIndices.length
+        ? startAncestorIndices[sharedParentPart.length][0] + (isForwards ? 0 : 1)
+        : startPosition.offset;
+
+    const endOffset =
+      sharedParentPart.length < endAncestorIndices.length
+        ? endAncestorIndices[sharedParentPart.length][0] + (isForwards ? 1 : 0)
+        : endPosition.offset;
+
+    return new MathLayoutCaret(sharedParent, startOffset, endOffset);
+  }
+}
+
+export function moveCaret(
+  caret: MathLayoutCaret,
+  direction: "up" | "down" | "left" | "right",
+  layout: MathmlLayout
+): MathLayoutCaret | null {
+  const layoutPosition = new MathLayoutPosition(
+    caret.zipper,
+    direction === "left" || direction === "up" ? caret.leftOffset : caret.rightOffset
+  );
+  const viewportPosition = layout.layoutToViewportPosition(layoutPosition.zipper, layoutPosition.offset);
+
+  const newPosition = movePositionRecursive(
+    layoutPosition,
+    direction,
+    [viewportPosition.x, viewportPosition.y],
+    (zipper, offset) => {
+      const position = layout.layoutToViewportPosition(zipper, offset);
+      return [position.x, position.y];
+    }
+  );
+
+  if (newPosition === null) return null;
+
+  return new MathLayoutCaret(newPosition.zipper, newPosition.offset, newPosition.offset);
+}
 
 /**
  * Move up and down
@@ -189,29 +288,12 @@ function moveHorizontalInto(
   }
 }
 
-export function moveCaret(
-  caret: MathLayoutPosition,
-  direction: "up" | "down" | "left" | "right",
-  layout: MathmlLayout
-): MathLayoutPosition | null {
-  const position = layout.caretToPosition(caret.zipper, caret.offset);
-
-  const newCaret = moveCaretRecursive(caret, direction, [position.x, position.y], (zipper, offset) => {
-    const position = layout.caretToPosition(zipper, offset);
-    return [position.x, position.y];
-  });
-
-  if (newCaret === null) return null;
-
-  return newCaret;
-}
-
 /**
  * Returns a new caret that has been moved in a given direction. Returns null if the caret cannot be moved in that direction.
  *
  * Uses the caret position for vertical movement, to keep the caret in the same x position.
  */
-function moveCaretRecursive(
+function movePositionRecursive(
   caret: MathLayoutPosition,
   direction: Direction,
   caretPosition: [ViewportValue, ViewportValue],

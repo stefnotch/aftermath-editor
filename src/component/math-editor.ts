@@ -11,14 +11,12 @@ import mathEditorStyles from "./math-editor-styles.css?inline";
 import inputHandlerStyles from "./input-handler-style.css?inline";
 import { createCaret, CaretElement } from "./caret-element";
 import { createInputHandler, MathmlInputHandler } from "./input-handler-element";
-import { moveCaret } from "./editing/math-layout-caret";
+import { MathLayoutCaret, moveCaret } from "./editing/math-layout-caret";
 import { MathLayoutRowZipper } from "../math-layout/math-layout-zipper";
 import { tagIs } from "../utils/dom-utils";
 import { applyEdit, inverseEdit, MathLayoutEdit } from "./editing/math-layout-edit";
 import { UndoRedoManager } from "./editing/undo-redo-manager";
 import { CaretEdit, removeAtCaret } from "./editing/math-layout-caret-edit";
-import { MathLayoutSelection } from "./editing/math-layout-selection";
-import { selectionToRanges } from "../mathml/selection-to-ranges";
 import { MathLayoutPosition } from "../math-layout/math-layout-position";
 
 const debugSettings = {
@@ -33,8 +31,14 @@ if (import.meta.env.DEV) {
 }
 
 export interface MathCaret {
-  caret: MathLayoutPosition;
-  selection: MathLayoutSelection | null;
+  /**
+   * Where the user started the caret.
+   */
+  startPosition: MathLayoutPosition;
+  /**
+   * The current caret, which may be different from the start position if the user has selected a range.
+   */
+  caret: MathLayoutCaret;
   element: CaretElement;
 }
 
@@ -67,7 +71,7 @@ class MathEditorCarets {
     this.carets.clear();
   }
 
-  updateCaret(caret: MathCaret, newCaret: MathLayoutPosition | null) {
+  updateCaret(caret: MathCaret, newCaret: MathLayoutCaret | null) {
     if (newCaret) {
       caret.caret = newCaret;
     }
@@ -95,8 +99,8 @@ class MathEditorCarets {
 
   private createCaret(zipper: MathLayoutRowZipper, offset: number) {
     return {
-      caret: new MathLayoutPosition(zipper, offset),
-      selection: null,
+      startPosition: new MathLayoutPosition(zipper, offset),
+      caret: new MathLayoutCaret(zipper, offset, offset),
       element: createCaret(this.containerElement),
     };
   }
@@ -145,7 +149,7 @@ export class MathEditor extends HTMLElement {
     container.addEventListener("pointerdown", (e) => {
       const lastLayout = this.lastLayout;
       if (!lastLayout) return;
-      const newCaret = lastLayout.positionToCaret({ x: e.clientX, y: e.clientY }, this.mathAst);
+      const newCaret = lastLayout.viewportToLayoutPosition({ x: e.clientX, y: e.clientY }, this.mathAst);
       if (!newCaret) return;
 
       this.carets.clearCarets();
@@ -166,10 +170,10 @@ export class MathEditor extends HTMLElement {
 
       const lastLayout = this.lastLayout;
       if (!lastLayout) return;
-      const newCaret = lastLayout.positionToCaret({ x: e.clientX, y: e.clientY }, this.mathAst);
-      if (!newCaret) return;
+      const newPosition = lastLayout.viewportToLayoutPosition({ x: e.clientX, y: e.clientY }, this.mathAst);
+      if (!newPosition) return;
 
-      caret.selection = new MathLayoutSelection(caret.caret, new MathLayoutPosition(newCaret.zipper, newCaret.offset));
+      caret.caret = MathLayoutCaret.getSharedCaret(caret.startPosition, newPosition);
       this.renderCarets();
     });
 
@@ -293,20 +297,18 @@ export class MathEditor extends HTMLElement {
               domTranslator.element.classList.add("row-debug");
 
               domTranslator.children.forEach((child) => {
-                if (child.type === "text" || child.type === "error") {
-                  child.element.classList.add("text-debug");
-                } else if (child.type === "symbol" || child.type === "bracket") {
+                if (child.value.type === "text") {
                   // Do nothing
-                } else if (child.type === "table") {
-                  child.children.forEach((row) => debugRenderRow(row));
+                } else if (child.value.type === "symbol" || child.value.type === "bracket") {
+                  // Do nothing
                 } else if (
-                  child.type === "fraction" ||
-                  child.type === "root" ||
-                  child.type === "under" ||
-                  child.type === "over" ||
-                  child.type === "sup" ||
-                  child.type === "sub" ||
-                  child.type === "table"
+                  child.value.type === "fraction" ||
+                  child.value.type === "root" ||
+                  child.value.type === "under" ||
+                  child.value.type === "over" ||
+                  child.value.type === "sup" ||
+                  child.value.type === "sub" ||
+                  child.value.type === "table"
                 ) {
                   child.children.forEach((row) => debugRenderRow(row));
                 }
@@ -363,30 +365,26 @@ export class MathEditor extends HTMLElement {
     const lastLayout = this.lastLayout;
     if (!lastLayout) return;
 
-    const layout = lastLayout.caretToPosition(caret.caret.zipper, caret.caret.offset);
+    const layout = lastLayout.layoutToViewportPosition(caret.caret.zipper, caret.caret.end);
     caret.element.setPosition(layout.x, layout.y);
     caret.element.setHeight(layout.height);
 
-    const container = lastLayout.caretContainer(caret.caret.zipper);
+    const container = lastLayout.getCaretContainer(caret.caret.zipper);
     caret.element.setHighlightContainer(container);
 
     caret.element.clearSelections();
-    const selection = caret.selection;
-    if (selection !== null) {
-      const selectedRanges = selectionToRanges(selection);
-      selectedRanges.forEach((range) => {
-        const rangeLayoutStart = lastLayout.caretToPosition(range.zipper, range.startOffset);
-        const rangeLayoutEnd = lastLayout.caretToPosition(range.zipper, range.endOffset);
+    if (!caret.caret.isCollapsed) {
+      const rangeLayoutStart = lastLayout.layoutToViewportPosition(caret.caret.zipper, caret.caret.start);
+      const rangeLayoutEnd = lastLayout.layoutToViewportPosition(caret.caret.zipper, caret.caret.end);
 
-        const width = rangeLayoutEnd.x - rangeLayoutStart.x;
-        const height = rangeLayoutStart.height;
-        caret.element.addSelection(rangeLayoutStart.x, rangeLayoutStart.y, width, height);
-      });
+      const width = rangeLayoutEnd.x - rangeLayoutStart.x;
+      const height = rangeLayoutStart.height;
+      caret.element.addSelection(rangeLayoutStart.x, rangeLayoutStart.y, width, height);
     }
   }
 
   recordEdit(edits: readonly CaretEdit[]): MathLayoutEdit {
-    const caretsBefore = this.carets.map((v) => MathLayoutPosition.serialize(v.caret.zipper, v.caret.offset));
+    const caretsBefore = this.carets.map((v) => MathLayoutCaret.serialize(v.caret.zipper, v.caret.start, v.caret.end));
 
     return {
       type: "multi",

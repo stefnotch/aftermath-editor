@@ -1,8 +1,8 @@
 import { MathLayoutElement } from "../../math-layout/math-layout";
 import { Offset } from "../../math-layout/math-layout-offset";
-import { MathLayoutPosition, SerializedCaret } from "../../math-layout/math-layout-position";
 import { AncestorIndices, fromAncestorIndices, MathLayoutRowZipper } from "../../math-layout/math-layout-zipper";
 import { assert, assertUnreachable } from "../../utils/assert";
+import { MathLayoutCaret, SerializedCaret } from "./math-layout-caret";
 
 export type MathLayoutEdit = {
   readonly type: "multi";
@@ -39,7 +39,7 @@ export type MathLayoutSimpleEdit =
 export function applyEdit(
   root: MathLayoutRowZipper,
   edit: MathLayoutEdit
-): { root: MathLayoutRowZipper; carets: MathLayoutPosition[] } {
+): { root: MathLayoutRowZipper; carets: MathLayoutCaret[] } {
   if (edit.type === "multi") {
     let newRoot = root;
     for (const subEdit of edit.edits) {
@@ -47,7 +47,7 @@ export function applyEdit(
     }
     return {
       root: newRoot,
-      carets: edit.caretsAfter.map((v) => MathLayoutPosition.deserialize(newRoot, v)),
+      carets: edit.caretsAfter.map((v) => MathLayoutCaret.deserialize(newRoot, v)),
     };
   } else {
     assertUnreachable(edit.type);

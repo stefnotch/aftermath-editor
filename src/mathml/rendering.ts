@@ -183,12 +183,12 @@ class MathTextRowDomTranslator<T extends MathLayoutContainer & { type: "text" } 
 export class MathmlLayout {
   constructor(public readonly element: MathMLElement, public readonly domTranslator: RowDomTranslator) {}
 
-  caretContainer(mathLayout: MathLayoutRowZipper): Element {
+  getCaretContainer(mathLayout: MathLayoutRowZipper): Element {
     const ancestorIndices = getAncestorIndices(mathLayout);
     return this.caretToDomTranslator(ancestorIndices).element;
   }
 
-  caretToPosition(mathLayout: MathLayoutRowZipper, offset: Offset) {
+  layoutToViewportPosition(mathLayout: MathLayoutRowZipper, offset: Offset) {
     const ancestorIndices = getAncestorIndices(mathLayout);
     return this.caretToDomTranslator(ancestorIndices).offsetToPosition(offset);
   }
@@ -196,7 +196,7 @@ export class MathmlLayout {
   /**
    * Given a DOM node and a position, find the closest offset in the row
    */
-  elementPositionToCaret(
+  elementToLayoutPosition(
     element: Element | Text,
     position: { x: ViewportValue; y: ViewportValue },
     rootZipper: MathLayoutRowZipper
@@ -234,7 +234,7 @@ export class MathmlLayout {
   /**
    * Given only a position, find the closest offset in a row
    */
-  positionToCaret(position: { x: ViewportValue; y: ViewportValue }, rootZipper: MathLayoutRowZipper) {
+  viewportToLayoutPosition(position: { x: ViewportValue; y: ViewportValue }, rootZipper: MathLayoutRowZipper) {
     let roots = [{ domTranslator: this.domTranslator, zipper: rootZipper } as const];
     let closest: { readonly position: MathLayoutPosition | null; readonly distance: number } = {
       position: null,
