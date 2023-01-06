@@ -18,6 +18,7 @@ import { applyEdit, inverseEdit, MathLayoutEdit } from "./editing/math-layout-ed
 import { UndoRedoManager } from "./editing/undo-redo-manager";
 import { CaretEdit, removeAtCaret } from "./editing/math-layout-caret-edit";
 import { MathLayoutPosition } from "../math-layout/math-layout-position";
+import { Offset } from "../math-layout/math-layout-offset";
 
 const debugSettings = {
   debugRenderRows: true,
@@ -54,9 +55,8 @@ class MathEditorCarets {
 
   constructor(private containerElement: HTMLElement) {}
 
-  add(zipper: MathLayoutRowZipper, offset: number) {
-    const caret = this.createCaret(zipper, offset);
-    this.carets.add(caret);
+  add(layoutCaret: MathLayoutCaret) {
+    this.carets.add(this.createCaret(layoutCaret.zipper, layoutCaret.start, layoutCaret.end));
   }
 
   remove(caret: MathCaret) {
@@ -78,8 +78,7 @@ class MathEditorCarets {
   }
 
   addPointerDownCaret(pointerId: number, zipper: MathLayoutRowZipper, offset: number) {
-    const caret = this.createCaret(zipper, offset);
-    this.pointerDownCarets.set(pointerId, caret);
+    this.pointerDownCarets.set(pointerId, this.createCaret(zipper, offset, offset));
   }
 
   removePointerDownCaret(pointerId: number) {
@@ -97,10 +96,10 @@ class MathEditorCarets {
     return Array.from(this.carets).concat(Array.from(this.pointerDownCarets.values())).map(fn);
   }
 
-  private createCaret(zipper: MathLayoutRowZipper, offset: number) {
+  private createCaret(zipper: MathLayoutRowZipper, startOffset: Offset, endOffset: Offset) {
     return {
-      startPosition: new MathLayoutPosition(zipper, offset),
-      caret: new MathLayoutCaret(zipper, offset, offset),
+      startPosition: new MathLayoutPosition(zipper, startOffset),
+      caret: new MathLayoutCaret(zipper, startOffset, endOffset),
       element: createCaret(this.containerElement),
     };
   }
@@ -152,15 +151,19 @@ export class MathEditor extends HTMLElement {
       const newCaret = lastLayout.viewportToLayoutPosition({ x: e.clientX, y: e.clientY }, this.mathAst);
       if (!newCaret) return;
 
+      container.setPointerCapture(e.pointerId);
+
       this.carets.clearCarets();
       this.carets.addPointerDownCaret(e.pointerId, newCaret.zipper, newCaret.offset);
       this.renderCarets();
     });
     container.addEventListener("pointerup", (e) => {
+      container.releasePointerCapture(e.pointerId);
       this.carets.finishPointerDownCaret(e.pointerId);
       this.renderCarets();
     });
     container.addEventListener("pointercancel", (e) => {
+      container.releasePointerCapture(e.pointerId);
       this.carets.finishPointerDownCaret(e.pointerId);
       this.renderCarets();
     });
@@ -345,7 +348,7 @@ export class MathEditor extends HTMLElement {
 
       this.mathAst = new MathLayoutRowZipper(fromMathMLElement(mathMlElement), null, 0, 0);
       this.carets.clearCarets();
-      this.carets.add(this.mathAst, 0);
+      this.carets.add(new MathLayoutCaret(this.mathAst, 0, 0));
 
       console.log(this.mathAst);
       this.render();
@@ -374,12 +377,12 @@ export class MathEditor extends HTMLElement {
 
     caret.element.clearSelections();
     if (!caret.caret.isCollapsed) {
-      const rangeLayoutStart = lastLayout.layoutToViewportPosition(caret.caret.zipper, caret.caret.start);
-      const rangeLayoutEnd = lastLayout.layoutToViewportPosition(caret.caret.zipper, caret.caret.end);
+      const rangeLayoutLeft = lastLayout.layoutToViewportPosition(caret.caret.zipper, caret.caret.leftOffset);
+      const rangeLayoutRight = lastLayout.layoutToViewportPosition(caret.caret.zipper, caret.caret.rightOffset);
 
-      const width = rangeLayoutEnd.x - rangeLayoutStart.x;
-      const height = rangeLayoutStart.height;
-      caret.element.addSelection(rangeLayoutStart.x, rangeLayoutStart.y, width, height);
+      const width = rangeLayoutRight.x - rangeLayoutLeft.x;
+      const height = rangeLayoutLeft.height;
+      caret.element.addSelection(rangeLayoutLeft.x, rangeLayoutLeft.y, width, height);
     }
   }
 
@@ -408,9 +411,7 @@ export class MathEditor extends HTMLElement {
     this.mathAst = result.root;
 
     // TODO: Deduplicate carets
-    result.carets.forEach((v) => {
-      this.carets.add(v.zipper, v.offset);
-    });
+    result.carets.forEach((v) => this.carets.add(v));
 
     this.render();
   }

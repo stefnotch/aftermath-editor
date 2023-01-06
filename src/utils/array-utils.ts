@@ -64,4 +64,10 @@ export default {
       return array.slice();
     }
   },
+  /**
+   * An exclusive range function
+   */
+  range: function (start: number, end: number) {
+    return Array.from(new Array(end - start), (_, i) => i + start);
+  },
 };

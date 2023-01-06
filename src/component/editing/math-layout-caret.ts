@@ -60,24 +60,9 @@ export class MathLayoutCaret {
     const sharedParentPart = getSharedAncestorIndices(startAncestorIndices, endAncestorIndices);
     const sharedParent = fromAncestorIndices(startPosition.zipper.root, sharedParentPart);
 
-    // Scale offsets and positions by two, so that we can have
-    // offset 0, position 1, offset 2, position 3, offset 4
-    // and then use sane integer arithmetic to find the caret direction
-    const startScaledOffset =
-      sharedParentPart.length < startAncestorIndices.length
-        ? // Scaled position in the parent
-          startAncestorIndices[sharedParentPart.length][0] * 2 + 1
-        : // Scaled offset in the parent
-          startPosition.offset * 2;
-
-    const endScaledOffset =
-      sharedParentPart.length < endAncestorIndices.length
-        ? // Scaled position in the parent
-          endAncestorIndices[sharedParentPart.length][0] * 2 + 1
-        : // Scaled offset in the parent
-          endPosition.offset * 2;
-
-    const isForwards = startScaledOffset <= endScaledOffset;
+    // We need to know the direction of the selection to know whether the caret should be at the start or end of the row
+    // We also have to handle edge cases like first caret is at top of fraction and second caret is at bottom of fraction
+    const isForwards = MathLayoutPosition.isBeforeOrEqual(startPosition, endPosition);
 
     // And now that we know the direction, we can compute the actual start and end offsets
     const startOffset =

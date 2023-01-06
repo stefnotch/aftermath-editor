@@ -5,6 +5,7 @@ import {
   MathLayoutTableZipper,
   MathLayoutSymbolZipper,
   getAncestorIndices,
+  MathLayoutRowZipper,
 } from "../../math-layout/math-layout-zipper";
 import { MathmlLayout } from "../../mathml/rendering";
 import arrayUtils from "../../utils/array-utils";
@@ -22,10 +23,18 @@ export type CaretEdit = {
   caret: SerializedCaret;
 };
 
-// TODO: Caret + selection
 export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right", layout: MathmlLayout): CaretEdit {
+  if (caret.isCollapsed) {
+    return removeAtPosition(new MathLayoutPosition(caret.zipper, caret.start), direction, layout);
+  } else {
+    return removeRange(caret);
+  }
+}
+
+function removeAtPosition(position: MathLayoutPosition, direction: "left" | "right", layout: MathmlLayout): CaretEdit {
   // Nothing to delete, just move the caret
   const move = () => {
+    const caret = new MathLayoutCaret(position.zipper, position.offset, position.offset);
     const newCaret = moveCaret(caret, direction, layout) ?? caret;
     return {
       caret: MathLayoutCaret.serialize(newCaret.zipper, newCaret.start, newCaret.end),
@@ -57,15 +66,15 @@ export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right
       }))
     );
 
-  const zipper = caret.zipper;
+  const zipper = position.zipper;
   // Row deletion
-  const atCaret = getAdjacentZipper(caret, direction);
+  const atCaret = getAdjacentZipper(position, direction);
   if (atCaret === null) {
     // At the start or end of a row
     const { parent: parentZipper, indexInParent } = zipper;
-    if (parentZipper == null) return { caret: MathLayoutCaret.serialize(caret.zipper, caret.offset), edits: [] };
+    if (parentZipper == null) return { caret: serializeCollapsedCaret(position.zipper, position.offset), edits: [] };
     const parentValue = parentZipper.value;
-    if (parentValue.type === "fraction") {
+    if (parentValue.type === "fraction" || parentValue.type === "root") {
       if ((indexInParent === 0 && direction === "left") || (indexInParent === 1 && direction === "right")) {
         return move();
       } else {
@@ -75,10 +84,7 @@ export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right
 
         return {
           edits: actions,
-          caret: MathLayoutPosition.serialize(
-            parentZipper.parent,
-            parentZipper.indexInParent + parentValue.values[0].values.length
-          ),
+          caret: serializeCollapsedCaret(parentZipper.parent, parentZipper.indexInParent + parentValue.values[0].values.length),
         };
       }
     } else if ((parentValue.type === "sup" || parentValue.type === "sub") && direction === "left") {
@@ -88,21 +94,8 @@ export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right
 
       return {
         edits: actions,
-        caret: MathLayoutPosition.serialize(parentZipper.parent, parentZipper.indexInParent),
+        caret: serializeCollapsedCaret(parentZipper.parent, parentZipper.indexInParent),
       };
-    } else if (parentValue.type === "root") {
-      if ((indexInParent === 0 && direction === "right") || (indexInParent === 1 && direction === "left")) {
-        // Delete root but keep its contents
-        const parentContents = parentValue.values[1].values;
-        const actions = replaceActions(parentZipper, parentContents);
-
-        return {
-          edits: actions,
-          caret: MathLayoutPosition.serialize(parentZipper.parent, parentZipper.indexInParent),
-        };
-      } else {
-        return move();
-      }
     } else {
       return move();
     }
@@ -110,7 +103,7 @@ export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right
     const actions = [removeAction(atCaret)];
     return {
       edits: actions,
-      caret: MathLayoutPosition.serialize(zipper, caret.offset + (direction === "left" ? -1 : 0)),
+      caret: serializeCollapsedCaret(zipper, position.offset + (direction === "left" ? -1 : 0)),
     };
   } else if ((atCaret.type === "sup" || atCaret.type === "sub") && direction === "right") {
     // Delete the superscript/subscript but keep its contents
@@ -120,11 +113,30 @@ export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right
 
     return {
       edits: actions,
-      caret: MathLayoutPosition.serialize(atCaret.parent, atCaret.indexInParent),
+      caret: serializeCollapsedCaret(atCaret.parent, atCaret.indexInParent),
     };
   } else {
     return move();
   }
+}
+
+function removeRange(caret: MathLayoutCaret): CaretEdit {
+  const ancestorIndices = getAncestorIndices(caret.zipper);
+
+  return {
+    edits: arrayUtils.range(caret.leftOffset, caret.rightOffset).map((i) => ({
+      type: "remove" as const,
+      zipper: ancestorIndices,
+      // after a removal, the next element will be at the same index
+      index: caret.leftOffset,
+      value: caret.zipper.value.values[i],
+    })),
+    caret: serializeCollapsedCaret(caret.zipper, caret.start),
+  };
+}
+
+function serializeCollapsedCaret(zipper: MathLayoutRowZipper, offset: number): SerializedCaret {
+  return MathLayoutCaret.serialize(zipper, offset, offset);
 }
 
 export type CaretInsertCommand =
