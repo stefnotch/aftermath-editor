@@ -1,8 +1,8 @@
 # next
 
-- 
+-
 
-# v0.0.6
+# v0.0.7
 
 - Caret clicking on DOM node and resolving that location
   - Now resolves the absolutely closest position instead of using the DOM node

@@ -1,6 +1,6 @@
 {
   "name": "mathml-editor",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "source": "src/main.ts",
   "type": "module",
   "types": "dist/types.d.ts",
