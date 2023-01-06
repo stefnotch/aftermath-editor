@@ -16,6 +16,7 @@
 - Selecting math
 - Add ranges to data structure
 - Simplify text representation and thus simplify entire MathLayout
+- Added a useless note in math-layout-edit.ts
 
 # v0.0.3
 
