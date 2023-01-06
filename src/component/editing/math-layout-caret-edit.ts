@@ -1,4 +1,5 @@
 import { MathLayoutElement } from "../../math-layout/math-layout";
+import { MathLayoutPosition, SerializedCaret } from "../../math-layout/math-layout-position";
 import {
   MathLayoutContainerZipper,
   MathLayoutTableZipper,
@@ -7,7 +8,7 @@ import {
 } from "../../math-layout/math-layout-zipper";
 import { MathmlLayout } from "../../mathml/rendering";
 import arrayUtils from "../../utils/array-utils";
-import { MathLayoutPosition, moveCaret, SerializedCaret } from "./math-layout-caret";
+import { moveCaret } from "./math-layout-caret";
 import { MathLayoutSimpleEdit } from "./math-layout-edit";
 
 export type CaretEdit = {

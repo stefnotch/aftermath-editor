@@ -1,8 +1,8 @@
 import { MathLayoutElement } from "../../math-layout/math-layout";
 import { Offset } from "../../math-layout/math-layout-offset";
+import { MathLayoutPosition, SerializedCaret } from "../../math-layout/math-layout-position";
 import { AncestorIndices, fromAncestorIndices, MathLayoutRowZipper } from "../../math-layout/math-layout-zipper";
 import { assert, assertUnreachable } from "../../utils/assert";
-import { MathLayoutPosition, SerializedCaret } from "./math-layout-caret";
 
 export type MathLayoutEdit = {
   readonly type: "multi";

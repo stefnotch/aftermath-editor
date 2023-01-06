@@ -11,13 +11,15 @@ import mathEditorStyles from "./math-editor-styles.css?inline";
 import inputHandlerStyles from "./input-handler-style.css?inline";
 import { createCaret, CaretElement } from "./caret-element";
 import { createInputHandler, MathmlInputHandler } from "./input-handler-element";
-import { MathLayoutPosition, moveCaret } from "./editing/math-layout-caret";
+import { moveCaret } from "./editing/math-layout-caret";
 import { MathLayoutRowZipper } from "../math-layout/math-layout-zipper";
 import { tagIs } from "../utils/dom-utils";
 import { applyEdit, inverseEdit, MathLayoutEdit } from "./editing/math-layout-edit";
 import { UndoRedoManager } from "./editing/undo-redo-manager";
 import { CaretEdit, removeAtCaret } from "./editing/math-layout-caret-edit";
 import { MathLayoutSelection } from "./editing/math-layout-selection";
+import { selectionToRanges } from "../mathml/selection-to-ranges";
+import { MathLayoutPosition } from "../math-layout/math-layout-position";
 
 const debugSettings = {
   debugRenderRows: true,
@@ -281,79 +283,6 @@ export class MathEditor extends HTMLElement {
       this.setMathMl(newMathLayout.element);
       // Don't copy the attributes
 
-      try {
-        console.log(
-          toMathJson(this.mathAst.value /** TODO: Use MathIR here */, [
-            {
-              bindingPower: [null, null],
-              tokens: [
-                {
-                  type: "symbol",
-                  value: "x",
-                },
-              ],
-              mathJson: () => ["Symbol", { sym: "x" }],
-            },
-            {
-              bindingPower: [null, null],
-              tokens: [
-                {
-                  type: "symbol",
-                  value: "y",
-                },
-              ],
-              mathJson: () => ["Symbol", { sym: "y" }],
-            },
-            {
-              bindingPower: [null, 9],
-              tokens: [
-                {
-                  type: "symbol",
-                  value: "-",
-                },
-              ],
-              // TODO: Negate?
-              mathJson: () => ["Symbol", { sym: "-" }],
-            },
-            {
-              bindingPower: [null, null],
-              tokens: [
-                {
-                  type: "symbol",
-                  value: "2",
-                },
-              ],
-              // TODO: 2
-              mathJson: () => ["Symbol", { sym: "2" }],
-            },
-            {
-              bindingPower: [5, 6],
-              tokens: [
-                {
-                  type: "symbol",
-                  value: "+",
-                },
-              ],
-              // TODO: Plus or Add?
-              mathJson: () => ["Symbol", { sym: "+" }],
-            },
-            {
-              bindingPower: [7, 8],
-              tokens: [
-                {
-                  type: "symbol",
-                  value: "*",
-                },
-              ],
-              // TODO: Multiply or Times?
-              mathJson: () => ["Symbol", { sym: "*" }],
-            },
-          ])
-        );
-      } catch (e) {
-        console.log("couldn't parse ", e);
-      }
-
       this.renderCarets();
 
       if (import.meta.env.DEV) {
@@ -444,7 +373,7 @@ export class MathEditor extends HTMLElement {
     caret.element.clearSelections();
     const selection = caret.selection;
     if (selection !== null) {
-      const selectedRanges = selection.getRanges();
+      const selectedRanges = selectionToRanges(selection);
       selectedRanges.forEach((range) => {
         const rangeLayoutStart = lastLayout.caretToPosition(range.zipper, range.startOffset);
         const rangeLayoutEnd = lastLayout.caretToPosition(range.zipper, range.endOffset);

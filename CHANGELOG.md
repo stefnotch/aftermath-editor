@@ -1,6 +1,7 @@
 # next
 
 - Caret clicking on DOM node and resolving that location
+  - Now resolves the absolutely closest position instead of using the DOM node
 - Highlighting container at caret
 - Deleting elements
 - Integrate [lil-gui](https://github.com/georgealways/lil-gui) for dev purposes

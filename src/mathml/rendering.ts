@@ -131,7 +131,7 @@ class MathTextRowDomTranslator<T extends MathLayoutContainer & { type: "text" } 
   // For now I'll just count the characters that the Text has, but in later implementations we can have a function
   // (As in, a reference to a static function that takes the element and gives me the character at a given position or something)
   constructor(public readonly value: T, public readonly element: Element, public readonly textNode: Text) {
-    assert(value.values[0].values.every((v) => v.type === "text"));
+    assert(value.values[0].values.every((v) => v.type === "symbol"));
   }
 
   get children() {

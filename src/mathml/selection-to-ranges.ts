@@ -33,16 +33,18 @@ export function selectionToRanges(selection: MathLayoutSelection): MathRowRange[
   const ranges: MathRowRange[] = [];
 
   if (selection.isForwards) {
-    ranges.push(
-      ...getRanges(sharedParent, startAncestorIndices.slice(sharedParentPart.length), selection.start.offset, "left")
-    );
-    ranges.push(...getRanges(sharedParent, endAncestorIndices.slice(sharedParentPart.length), selection.end.offset, "right"));
+    ranges.push(...getRanges(sharedParent, startAncestorIndices.slice(sharedParentPart.length), "left"));
+    ranges.push(...getRanges(sharedParent, endAncestorIndices.slice(sharedParentPart.length), "right"));
   } else {
-    ranges.push(...getRanges(sharedParent, endAncestorIndices.slice(sharedParentPart.length), selection.end.offset, "left"));
-    ranges.push(
-      ...getRanges(sharedParent, startAncestorIndices.slice(sharedParentPart.length), selection.start.offset, "right")
-    );
+    ranges.push(...getRanges(sharedParent, endAncestorIndices.slice(sharedParentPart.length), "left"));
+    ranges.push(...getRanges(sharedParent, startAncestorIndices.slice(sharedParentPart.length), "right"));
   }
+
+  // Add the final range
+  const range = selection.isForwards
+    ? new MathRowRange(sharedParent, selection.start.offset, selection.end.offset)
+    : new MathRowRange(sharedParent, selection.end.offset, selection.start.offset);
+  ranges.push(range);
 
   return ranges;
 }
@@ -65,12 +67,7 @@ function getSharedParentPart(ancestorIndicesA: AncestorIndices, ancestorIndicesB
 /**
  * Goes top down and gets the ranges for the given direction
  */
-function getRanges(
-  parent: MathLayoutRowZipper,
-  ancestorIndices: AncestorIndices,
-  finalOffset: number,
-  direction: "right" | "left"
-) {
+function getRanges(parent: MathLayoutRowZipper, ancestorIndices: AncestorIndices, direction: "right" | "left") {
   const ranges: MathRowRange[] = [];
   for (let i = 0; i < ancestorIndices.length; i++) {
     const [containerIndex, rowIndex] = ancestorIndices[i];
@@ -84,13 +81,6 @@ function getRanges(
   }
   // Remove the first range, it's the shared parent
   ranges.shift();
-
-  // Add the final range
-  const range =
-    direction === "left"
-      ? new MathRowRange(parent, finalOffset, parent.children.length)
-      : new MathRowRange(parent, 0, finalOffset);
-  ranges.push(range);
 
   return ranges;
 }

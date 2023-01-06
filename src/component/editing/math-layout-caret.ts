@@ -1,8 +1,8 @@
 import { match } from "ts-pattern";
 import { Offset } from "../../math-layout/math-layout-offset";
+import { MathLayoutPosition } from "../../math-layout/math-layout-position";
 import { tableIndexToPosition, tablePositionToIndex } from "../../math-layout/math-layout-utils";
 import {
-  AncestorIndices,
   fromAncestorIndices,
   getAncestorIndices,
   MathLayoutContainerZipper,
@@ -14,8 +14,6 @@ import { assert, assertUnreachable } from "../../utils/assert";
 import { ViewportValue } from "../viewport-coordinate";
 
 export type Direction = "left" | "right" | "up" | "down";
-
-export type SerializedCaret = { offset: number; zipper: AncestorIndices };
 
 /**
  * Whether the editor attempts to keep the caret in the same-ish x-coordinate when moving up.
@@ -191,69 +189,6 @@ function moveHorizontalInto(
   }
 }
 
-/**
- * TODO: Consider renaming to MathLayoutPosition
- */
-export class MathLayoutPosition {
-  constructor(public readonly zipper: MathLayoutRowZipper, public readonly offset: Offset) {}
-
-  equals(other: MathLayoutPosition): boolean {
-    return this.zipper.equals(other.zipper) && this.offset === other.offset;
-  }
-
-  static serialize(zipper: MathLayoutRowZipper, offset: Offset) {
-    return { zipper: getAncestorIndices(zipper), offset: offset };
-  }
-
-  static deserialize(root: MathLayoutRowZipper, serialized: SerializedCaret): MathLayoutPosition {
-    const zipper = fromAncestorIndices(root, serialized.zipper);
-    return new MathLayoutPosition(zipper, serialized.offset);
-  }
-
-  static toAbsoluteOffset(zipper: MathLayoutRowZipper, offset: Offset): Offset {
-    return zipper.startAbsoluteOffset + offset;
-  }
-
-  static fromAbsoluteOffset(root: MathLayoutRowZipper, absoluteOffset: Offset): MathLayoutPosition {
-    const zipper = root.getZipperAtOffset(absoluteOffset);
-    return new MathLayoutPosition(zipper, absoluteOffset - zipper.startAbsoluteOffset);
-  }
-
-  /**
-   * Returns a new caret that has been moved in a given direction. Returns null if the caret cannot be moved in that direction.
-   *
-   * Uses the caret position for vertical movement, to keep the caret in the same x position.
-   */
-  move(
-    direction: Direction,
-    caretPosition: [ViewportValue, ViewportValue],
-    getCaretPosition: (zipper: MathLayoutRowZipper, offset: Offset) => [ViewportValue, ViewportValue]
-  ): MathLayoutPosition | null {
-    if (direction === "right" || direction === "left") {
-      if (this.isTouchingEdge(direction)) {
-        return moveHorizontalBeyondEdge(this.zipper, direction);
-      } else {
-        const moveIntoChildTree = moveHorizontalInto(this.zipper, this.offset, direction);
-        return moveIntoChildTree ?? new MathLayoutPosition(this.zipper, this.offset + (direction === "left" ? -1 : +1));
-      }
-    } else if (direction === "up" || direction === "down") {
-      return moveVertical(this.zipper, direction, caretPosition[0], getCaretPosition);
-    } else {
-      assertUnreachable(direction);
-    }
-  }
-
-  /**
-   * Checks if the caret is moving at the very edge of its container
-   */
-  private isTouchingEdge(direction: "left" | "right"): boolean {
-    return match(direction)
-      .with("left", () => this.offset <= 0)
-      .with("right", () => this.offset >= this.zipper.value.values.length)
-      .exhaustive();
-  }
-}
-
 export function moveCaret(
   caret: MathLayoutPosition,
   direction: "up" | "down" | "left" | "right",
@@ -261,7 +196,7 @@ export function moveCaret(
 ): MathLayoutPosition | null {
   const position = layout.caretToPosition(caret.zipper, caret.offset);
 
-  const newCaret = caret.move(direction, [position.x, position.y], (zipper, offset) => {
+  const newCaret = moveCaretRecursive(caret, direction, [position.x, position.y], (zipper, offset) => {
     const position = layout.caretToPosition(zipper, offset);
     return [position.x, position.y];
   });
@@ -269,4 +204,39 @@ export function moveCaret(
   if (newCaret === null) return null;
 
   return newCaret;
+}
+
+/**
+ * Returns a new caret that has been moved in a given direction. Returns null if the caret cannot be moved in that direction.
+ *
+ * Uses the caret position for vertical movement, to keep the caret in the same x position.
+ */
+function moveCaretRecursive(
+  caret: MathLayoutPosition,
+  direction: Direction,
+  caretPosition: [ViewportValue, ViewportValue],
+  getCaretPosition: (zipper: MathLayoutRowZipper, offset: Offset) => [ViewportValue, ViewportValue]
+): MathLayoutPosition | null {
+  if (direction === "right" || direction === "left") {
+    if (isTouchingEdge(caret, direction)) {
+      return moveHorizontalBeyondEdge(caret.zipper, direction);
+    } else {
+      const moveIntoChildTree = moveHorizontalInto(caret.zipper, caret.offset, direction);
+      return moveIntoChildTree ?? new MathLayoutPosition(caret.zipper, caret.offset + (direction === "left" ? -1 : +1));
+    }
+  } else if (direction === "up" || direction === "down") {
+    return moveVertical(caret.zipper, direction, caretPosition[0], getCaretPosition);
+  } else {
+    assertUnreachable(direction);
+  }
+}
+
+/**
+ * Checks if the caret is moving at the very edge of its container
+ */
+function isTouchingEdge(position: MathLayoutPosition, direction: "left" | "right"): boolean {
+  return match(direction)
+    .with("left", () => position.offset <= 0)
+    .with("right", () => position.offset >= position.zipper.value.values.length)
+    .exhaustive();
 }
