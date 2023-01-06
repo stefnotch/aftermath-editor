@@ -222,7 +222,7 @@ export class MathmlLayout {
     let closestOffset = 0;
     for (let i = 0; i <= length; i++) {
       const { x, y } = domTranslator.offsetToPosition(i);
-      const distance = Math.hypot(x - position.x, y - position.y);
+      const distance = distanceBetween(position, { x, y });
       if (distance < closestDistance) {
         closestDistance = distance;
         closestOffset = i;
@@ -236,20 +236,25 @@ export class MathmlLayout {
    */
   positionToCaret(position: { x: ViewportValue; y: ViewportValue }, rootZipper: MathLayoutRowZipper) {
     let roots = [{ domTranslator: this.domTranslator, zipper: rootZipper } as const];
-    let closestPosition: MathLayoutPosition | null = null;
-    let closestDistance = Infinity;
+    let closest: { readonly position: MathLayoutPosition | null; readonly distance: number } = {
+      position: null,
+      distance: Infinity,
+    };
 
     while (roots.length > 0) {
       const row = roots.pop();
       assert(row !== undefined);
 
       // Ignore definitely worse distances
-      if (distanceToRectangle(row.domTranslator.getBounds(), position) > closestDistance) {
+      if (distanceToRectangle(row.domTranslator.getBounds(), position) > closest.distance) {
         continue;
       }
 
       const offset = this.getClosestOffsetInRow(row.domTranslator, position);
-      closestPosition = new MathLayoutPosition(row.zipper, offset);
+      closest = {
+        position: new MathLayoutPosition(row.zipper, offset),
+        distance: distanceBetween(position, row.domTranslator.offsetToPosition(offset)),
+      };
 
       row.domTranslator.children.forEach((containerChild, i) => {
         const containerChildZipper = row.zipper.children[i];
@@ -260,8 +265,8 @@ export class MathmlLayout {
       });
     }
 
-    assert(closestPosition !== null);
-    return closestPosition;
+    assert(closest.position !== null);
+    return closest.position;
   }
 
   private caretToDomTranslator(ancestorIndices: AncestorIndices) {
@@ -273,6 +278,10 @@ export class MathmlLayout {
     }
     return current;
   }
+}
+
+function distanceBetween(a: { x: ViewportValue; y: ViewportValue }, b: { x: ViewportValue; y: ViewportValue }) {
+  return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
 /**
