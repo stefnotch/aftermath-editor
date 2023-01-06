@@ -131,7 +131,7 @@ function removeRange(caret: MathLayoutCaret): CaretEdit {
       index: caret.leftOffset,
       value: caret.zipper.value.values[i],
     })),
-    caret: serializeCollapsedCaret(caret.zipper, caret.start),
+    caret: serializeCollapsedCaret(caret.zipper, caret.leftOffset),
   };
 }
 

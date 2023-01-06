@@ -23,6 +23,12 @@ interface RowDomTranslator {
   readonly element: Element;
   readonly children: (MathContainerDomTranslator | MathTableDomTranslator | MathSymbolDomTranslator)[];
   readonly length: number;
+  /**
+   * Returns the position of the given offset in the row.
+   * x, y are at the baseline of the row.
+   * height is the height of the row, going up.
+   * TODO: Maybe add a depth? Or tweak the height to be the height of the row, going down?
+   */
   offsetToPosition(offset: Offset): { x: ViewportValue; y: ViewportValue; height: ViewportValue };
   getBounds(): ViewportRect;
 }
@@ -222,7 +228,7 @@ export class MathmlLayout {
     let closestOffset = 0;
     for (let i = 0; i <= length; i++) {
       const { x, y } = domTranslator.offsetToPosition(i);
-      const distance = distanceBetween(position, { x, y });
+      const distance = distanceToPoint(position, { x, y });
       if (distance < closestDistance) {
         closestDistance = distance;
         closestOffset = i;
@@ -251,10 +257,19 @@ export class MathmlLayout {
       }
 
       const offset = this.getClosestOffsetInRow(row.domTranslator, position);
-      closest = {
+      const viewportPosition = row.domTranslator.offsetToPosition(offset);
+      const newClosest = {
         position: new MathLayoutPosition(row.zipper, offset),
-        distance: distanceBetween(position, row.domTranslator.offsetToPosition(offset)),
+        distance: distanceToSegment(
+          position,
+          { x: viewportPosition.x, y: viewportPosition.y },
+          { x: viewportPosition.x, y: viewportPosition.y - viewportPosition.height }
+        ),
       };
+
+      if (newClosest.distance < closest.distance) {
+        closest = newClosest;
+      }
 
       row.domTranslator.children.forEach((containerChild, i) => {
         const containerChildZipper = row.zipper.children[i];
@@ -278,10 +293,6 @@ export class MathmlLayout {
     }
     return current;
   }
-}
-
-function distanceBetween(a: { x: ViewportValue; y: ViewportValue }, b: { x: ViewportValue; y: ViewportValue }) {
-  return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
 /**
@@ -713,24 +724,35 @@ function createPlaceholder() {
   return document.createTextNode("⬚");
 }
 
-function boundsContains(bounds: ViewportRect, position: { x: ViewportValue; y: ViewportValue }) {
-  return (
-    position.x >= bounds.x &&
-    position.x < bounds.x + bounds.width &&
-    position.y >= bounds.y &&
-    position.y < bounds.y + bounds.height
-  );
-}
-
+type ViewportVector2 = { x: ViewportValue; y: ViewportValue };
 /**
  * Minimum distance from a point to a rectangle. Returns 0 if the point is inside the rectangle.
  * Assumes the rectangle is axis-aligned.
  */
-function distanceToRectangle(bounds: ViewportRect, position: { x: ViewportValue; y: ViewportValue }) {
+function distanceToRectangle(bounds: ViewportRect, position: ViewportVector2) {
   // https://stackoverflow.com/q/30545052/3492994
 
   const dx = Math.max(bounds.x - position.x, position.x - (bounds.x + bounds.width));
   const dy = Math.max(bounds.y - position.y, position.y - (bounds.y + bounds.height));
 
   return Math.sqrt(Math.max(0, dx) ** 2 + Math.max(0, dy) ** 2);
+}
+
+function distanceToPoint(a: { x: ViewportValue; y: ViewportValue }, b: { x: ViewportValue; y: ViewportValue }) {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+function distanceToPointSquared(v: ViewportVector2, w: ViewportVector2) {
+  return (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
+}
+function distanceToSegmentSquared(position: ViewportVector2, v: ViewportVector2, w: ViewportVector2) {
+  // https://stackoverflow.com/a/1501725/3492994
+  const EPSILON = 0.000001;
+  const segmentLength = distanceToPointSquared(v, w);
+  if (segmentLength < EPSILON) return distanceToPointSquared(position, v);
+  let t = ((position.x - v.x) * (w.x - v.x) + (position.y - v.y) * (w.y - v.y)) / segmentLength;
+  t = Math.max(0, Math.min(1, t));
+  return distanceToPointSquared(position, { x: v.x + t * (w.x - v.x), y: v.y + t * (w.y - v.y) });
+}
+function distanceToSegment(position: ViewportVector2, v: ViewportVector2, w: ViewportVector2) {
+  return Math.sqrt(distanceToSegmentSquared(position, v, w));
 }
