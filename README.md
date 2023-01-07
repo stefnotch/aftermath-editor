@@ -63,9 +63,11 @@ Sources:
   - https://github.com/cortex-js/compute-engine/issues/13
 - Examples
   - https://fred-wang.github.io/TeXZilla/
+  - https://fred-wang.github.io/MathFonts/mozilla_mathml_test/
   - https://build-chromium.igalia.com/mathml/torture-test/mathml-torture-test.html
   - https://corpora.mathweb.org/corpus/arxmliv/tex%5Fto%5Fhtml/no_problem
   - https://fred-wang.github.io/TeXZilla/examples/customElement.html
+  - https://fred-wang.github.io/MathFonts/
 - [Mathml operator priority](https://github.com/w3c/mathml/issues/161) and [this](https://www.w3.org/TR/MathML3/appendixc.html)
 - [Mathml operators](https://w3c.github.io/mathml-core/#operator-tables)
 - https://en.wikipedia.org/wiki/Glossary_of_mathematical_symbols
