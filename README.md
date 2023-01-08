@@ -68,6 +68,8 @@ Sources:
   - https://corpora.mathweb.org/corpus/arxmliv/tex%5Fto%5Fhtml/no_problem
   - https://fred-wang.github.io/TeXZilla/examples/customElement.html
   - https://fred-wang.github.io/MathFonts/
+  - https://people.igalia.com/fwang/pell-bigint-mathml/
+  - http://eyeasme.com/Joe/MathML/MathML_browser_test.html
 - [Mathml operator priority](https://github.com/w3c/mathml/issues/161) and [this](https://www.w3.org/TR/MathML3/appendixc.html)
 - [Mathml operators](https://w3c.github.io/mathml-core/#operator-tables)
 - https://en.wikipedia.org/wiki/Glossary_of_mathematical_symbols
