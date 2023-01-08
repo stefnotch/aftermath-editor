@@ -2,6 +2,8 @@
 
 A prototype of a MathML editor. See it in action at https://stefnotch.github.io/mathml-editor
 
+Dang, I'll need a good name for this project. 
+
 ## History
 
 MathML is a lovely, but quite massive standard for _rendering_ mathematical formulas on the web.
