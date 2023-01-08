@@ -8,6 +8,21 @@ Explanation of what this is.
 
 Quick explanation of what MathMl is.
 
+MathML essentially lets you put `<math>` tags right into your HTML, and then the browser will display it as a pretty formula.
+```mathml
+<div>
+Oh look, it's a fraction
+<math>
+  <mn>3</mn>
+  <mo>+</mo>
+  <mfrac>
+    <mn>1</mn>
+    <mn>2</mn>
+  </mfrac>
+</math>
+</div>
+```
+
 ## History
 
 MathML is a lovely, but quite massive standard for _rendering_ mathematical formulas on the web.
