@@ -23,6 +23,13 @@ Oh look, it's a fraction
 </div>
 ```
 
+Why is that really nice?
+- Fast rendering, browsers are already optimized for taking a tree-structure and rendering it
+- Accessibility (MathML defines quite a lot of accessibility stuff)
+- Tooling (generating and parsing MathML is easier than generating/parsing LaTeX)
+
+https://news.ycombinator.com/item?id=34331225
+
 ## History
 
 MathML is a lovely, but quite massive standard for _rendering_ mathematical formulas on the web.
