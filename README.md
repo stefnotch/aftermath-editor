@@ -6,9 +6,9 @@
 
 This is currently a work-in-progress. See it in action at https://stefnotch.github.io/mathml-editor
 
+Compared to other editors out there, this editor cares about *what your formulas mean*. Since the computer understands the formulas, it becomes pratical to use this as a next-gen calculator frontend.
 
-
-
+TODO: 
 Explanation of what this is.
 
 Quick explanation of what MathMl is.
