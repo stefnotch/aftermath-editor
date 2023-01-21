@@ -1,8 +1,13 @@
 # mathml-editor
 
-A prototype of a MathML editor. See it in action at https://stefnotch.github.io/mathml-editor
+(Dang, I need a better name for this project.)
 
-Dang, I'll need a good name for this project. 
+> A user-first mathematics editor that understands your formulas
+
+This is currently a work-in-progress. See it in action at https://stefnotch.github.io/mathml-editor
+
+
+
 
 Explanation of what this is.
 
