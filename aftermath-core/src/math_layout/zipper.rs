@@ -1,31 +1,19 @@
 use super::{
-    element::{Element, MathElement, TableElement, TextElement},
+    element::{Element, MathElement},
     row::{Row, RowIndex},
 };
 
 // Not an enum. We might add an enum in the future to store different zipper types when needed.
-pub struct RowZipperValue<'a, T>
-where
-    T: Element,
-{
-    value: &'a mut Row<T>,
+pub struct RowZipper<'a> {
+    value: &'a mut Row,
     parent: Option<Box<RowZipper<'a>>>,
     index_in_parent: RowIndex,
 }
 
-pub enum RowZipper<'a> {
-    Math(RowZipperValue<'a, MathElement>),
-    Text(RowZipperValue<'a, TextElement>),
-    Table(RowZipperValue<'a, TableElement>),
-}
-
-impl<'a, T> RowZipperValue<'a, T>
-where
-    T: Element,
-{
+impl<'a> RowZipper<'a> {
     // Takes ownership of the parent
-    pub fn new(value: &mut Row<T>, parent: Option<RowZipper>, index_in_parent: RowIndex) -> Self {
-        RowZipperValue {
+    pub fn new(value: &mut Row, parent: Option<RowZipper>, index_in_parent: RowIndex) -> Self {
+        RowZipper {
             value,
             parent: parent.map(Box::new),
             index_in_parent,
@@ -58,7 +46,7 @@ where
     }
 }
 
-impl<'a> RowZipperValue<'a, MathElement> {
+impl<'a> RowZipper<'a> {
     /// consumes the zipper and returns the child zipper
     pub fn go_down(self, index: RowIndex) -> Option<RowZipper<'a>> {
         if index.0 >= self.value.values.len() {
@@ -73,24 +61,13 @@ impl<'a> RowZipperValue<'a, MathElement> {
             MathElement::Fraction(v)
             | MathElement::Root(v)
             | MathElement::Under(v)
-            | MathElement::Over(v) => Some(RowZipper::Math(RowZipperValue::new(
-                &mut v[index.1],
-                Some(RowZipper::Math(self)),
-                index,
-            ))),
-            MathElement::Sup(v) | MathElement::Sub(v) => Some(RowZipper::Math(
-                RowZipperValue::new(&mut v, Some(RowZipper::Math(self)), index),
-            )),
-            MathElement::Text(v) => Some(RowZipper::Text(RowZipperValue::new(
-                &mut v,
-                Some(RowZipper::Math(self)),
-                index,
-            ))),
-            MathElement::Table { cells, row_width } => Some(RowZipper::Table(RowZipperValue::new(
-                &mut cells,
-                Some(RowZipper::Math(self)),
-                index,
-            ))),
+            | MathElement::Over(v) => Some(RowZipper::new(&mut v[index.1], Some(self), index)),
+            MathElement::Sup(v) | MathElement::Sub(v) => {
+                Some(RowZipper::new(&mut v, Some(self), index))
+            }
+            MathElement::Table { cells, row_width } => {
+                Some(RowZipper::new(&mut cells[index.1], Some(self), index))
+            }
             MathElement::Symbol(v) => None,
             MathElement::Bracket(v) => None,
             MathElement::Error(v) => None,
@@ -106,45 +83,4 @@ impl<'a> RowZipperValue<'a, MathElement> {
         RowZipperValue::new(value, Some(RowZipper::Math(self)), index)
     }
      */
-}
-
-impl<'a> RowZipperValue<'a, TextElement> {
-    /// consumes the zipper and returns the child zipper
-    pub fn go_down(self, index: RowIndex) -> Option<RowZipper<'a>> {
-        if index.0 >= self.value.values.len() {
-            return None;
-        }
-        if index.1 >= self.value.values[index.0].len() {
-            return None;
-        }
-
-        match self.value.values[index.0] {
-            TextElement::Math(v) => Some(RowZipper::Math(RowZipperValue::new(
-                &mut v,
-                Some(RowZipper::Text(self)),
-                index,
-            ))),
-            TextElement::Character(v) => None,
-        }
-    }
-}
-
-impl<'a> RowZipperValue<'a, TableElement> {
-    /// consumes the zipper and returns the child zipper
-    pub fn go_down(self, index: RowIndex) -> Option<RowZipper<'a>> {
-        if index.0 >= self.value.values.len() {
-            return None;
-        }
-        if index.1 >= self.value.values[index.0].len() {
-            return None;
-        }
-
-        match self.value.values[index.0] {
-            TableElement::TableCell(v) => Some(RowZipper::Math(RowZipperValue::new(
-                &mut v,
-                Some(RowZipper::Table(self)),
-                index,
-            ))),
-        }
-    }
 }

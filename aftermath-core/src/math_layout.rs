@@ -1,6 +1,5 @@
 pub mod element;
 pub mod row;
-pub mod zipper;
 
 /*
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]

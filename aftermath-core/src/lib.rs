@@ -1,9 +1,7 @@
-//mod math_layout;
-//mod math_layout;
+mod math_layout;
 mod utils;
 
-use std::collections::HashMap;
-
+use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
@@ -19,6 +17,7 @@ extern "C" {
 
 #[wasm_bindgen]
 pub fn greet() {
+    set_panic_hook();
     alert("Hello, aftermath-core!");
     /*let layout = LayoutZipper::new();
     layout = layout.insert( symbol zipper);
@@ -52,46 +51,3 @@ pub fn greet() {
         None => alert("no parent"),
     }*/
 }
-
-/*
-trait Node: Sized {
-    type Child: Node;
-    type Value;
-    fn len(&self) -> usize;
-    fn child_at(&self, index: usize) -> Option<Self::Child>;
-    fn value(&self) -> Self::Value; // Table size for the table, character for the character, etc.
-
-    // new node with the child at index replaced with the result of f
-    fn with_child_at<F>(&self, index: usize, f: F) -> Option<Self>
-    where
-        F: FnOnce(&Self::Child) -> Self::Child;
-}
-
-struct Row {
-    values: Vec<Element>,
-}
-
-impl Node for Row {
-    type Child = Element;
-    type Value = ();
-    fn len(&self) -> usize {
-        self.values.len()
-    }
-    fn child_at(&self, index: usize) -> Option<Self::Child> {
-        self.values.get(index)
-    }
-    fn value(&self) -> Self::Value {}
-    fn with_child_at<F>(&self, index: usize, f: F) -> Option<Self>
-    where
-        F: FnOnce(&Self::Child) -> Self::Child,
-    {
-        let mut new_values = self.values.clone();
-        new_values[index] = f(&new_values[index]);
-        Some(Row { values: new_values })
-    }
-}
-
-struct Element {}
-
-impl Node for Element {}
- */
