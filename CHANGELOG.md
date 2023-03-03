@@ -1,5 +1,7 @@
 # next
 
+- Semantics parser written in Rust, compiled to WebAssembly
+- Text is no longer a first class concept, see https://github.com/stefnotch/mathml-editor/issues/21#issuecomment-1422725139
 -
 
 # v0.0.7
