@@ -68,9 +68,24 @@ Sources:
 - Roslyn archives https://github.com/KirillOsenkov/Bliki/wiki/Roslyn-Immutable-Trees
 - Rust Analyzer https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/syntax.md
 
-## Future plans
+## Structure
 
+- Display: display on screen, keeps references to the layout ranges for editing
+- Semantics: computed/parsed, keeps references to the layout ranges
+- Layout: core, for editing, user-input
+- Cosmetics: like colors or text annotations 
 
+```mermaid
+flowchart TD
+D[Display]
+S[Semantics]
+L[Layout]
+C[Cosmetics]  
+
+L -->|parsed into| S
+S -->|render ranges| D
+C -->|rendered| D
+```
 
 ### Type Theory
 
