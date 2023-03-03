@@ -149,7 +149,6 @@ export type CaretInsertCommand =
   | {
       type: "fraction";
     }
-  | { type: "text"; value: string } // Creates a new text element if there is none, " is the shortcut
   | { type: "symbol"; value: string };
 // TODO: This definitely needs access to the *parsed* stuff, not just the layout
 // (I don't think the removeAtCaret function needs it, but the insertAtCaret function does)

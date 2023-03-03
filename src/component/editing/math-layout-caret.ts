@@ -88,14 +88,14 @@ export function moveCaret(
     caret.zipper,
     direction === "left" || direction === "up" ? caret.leftOffset : caret.rightOffset
   );
-  const viewportPosition = layout.layoutToViewportPosition(layoutPosition.zipper, layoutPosition.offset);
+  const viewportPosition = layout.layoutToViewportPosition(layoutPosition);
 
   const newPosition = movePositionRecursive(
     layoutPosition,
     direction,
     [viewportPosition.x, viewportPosition.y],
-    (zipper, offset) => {
-      const position = layout.layoutToViewportPosition(zipper, offset);
+    (layoutPosition) => {
+      const position = layout.layoutToViewportPosition(layoutPosition);
       return [position.x, position.y];
     }
   );
@@ -112,7 +112,7 @@ function moveVertical(
   zipper: MathLayoutRowZipper,
   direction: "up" | "down",
   desiredXPosition: ViewportValue,
-  getCaretPosition: (zipper: MathLayoutRowZipper, offset: Offset) => [ViewportValue, ViewportValue]
+  getCaretPosition: (layoutPosition: MathLayoutPosition) => [ViewportValue, ViewportValue]
 ): MathLayoutPosition | null {
   const parent = zipper.parent;
   if (parent === null) return null;
@@ -122,8 +122,7 @@ function moveVertical(
     parent.type == "root" ||
     parent.type == "under" ||
     parent.type == "over" ||
-    parent.type === "table" ||
-    parent.type === "text"
+    parent.type === "table"
   ) {
     let newIndexInParent;
     if (parent.type === "table") {
@@ -172,17 +171,17 @@ function moveVertical(
 function moveVerticalClosestPosition(
   newZipper: MathLayoutRowZipper,
   desiredXPosition: number,
-  getCaretPosition: (zipper: MathLayoutRowZipper, offset: Offset) => [ViewportValue, ViewportValue]
+  getCaretPosition: (layoutPosition: MathLayoutPosition) => [ViewportValue, ViewportValue]
 ) {
   // TODO: Attempt to keep x-screen position. This is not trivial, especially with cases where the top fraction has some nested elements
   // Also do walk into nested elements if possible.
   let offset: Offset = 0;
   while (true) {
-    const caretX = getCaretPosition(newZipper, offset)[0];
+    const caretX = getCaretPosition(new MathLayoutPosition(newZipper, offset))[0];
     const newOffset: Offset = offset + (caretX < desiredXPosition ? 1 : -1);
     if (!offsetInBounds(newZipper, newOffset)) break;
 
-    const newCaretX = getCaretPosition(newZipper, newOffset)[0];
+    const newCaretX = getCaretPosition(new MathLayoutPosition(newZipper, newOffset))[0];
     const isBetter = Math.abs(newCaretX - desiredXPosition) < Math.abs(caretX - desiredXPosition);
 
     if (isBetter) {
@@ -261,8 +260,7 @@ function moveHorizontalInto(
     adjacentChild.type === "under" ||
     adjacentChild.type === "over" ||
     adjacentChild.type === "sup" ||
-    adjacentChild.type === "sub" ||
-    adjacentChild.type === "text"
+    adjacentChild.type === "sub"
   ) {
     const adjacentRow =
       direction === "left" ? adjacentChild.children[adjacentChild.children.length - 1] : adjacentChild.children[0];
@@ -282,7 +280,7 @@ function movePositionRecursive(
   caret: MathLayoutPosition,
   direction: Direction,
   caretPosition: [ViewportValue, ViewportValue],
-  getCaretPosition: (zipper: MathLayoutRowZipper, offset: Offset) => [ViewportValue, ViewportValue]
+  getCaretPosition: (layoutPosition: MathLayoutPosition) => [ViewportValue, ViewportValue]
 ): MathLayoutPosition | null {
   if (direction === "right" || direction === "left") {
     if (isTouchingEdge(caret, direction)) {

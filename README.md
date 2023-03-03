@@ -2,13 +2,14 @@
 
 A prototype of a MathML editor. See it in action at https://stefnotch.github.io/mathml-editor
 
-Dang, I'll need a good name for this project. 
+Dang, I'll need a good name for this project.
 
 Explanation of what this is.
 
 Quick explanation of what MathMl is.
 
 MathML essentially lets you put `<math>` tags right into your HTML, and then the browser will display it as a pretty formula.
+
 ```mathml
 <div>
 Oh look, it's a fraction
@@ -24,6 +25,7 @@ Oh look, it's a fraction
 ```
 
 Why is that really nice?
+
 - Fast rendering, browsers are already optimized for taking a tree-structure and rendering it
 - Accessibility (MathML defines quite a lot of accessibility stuff)
 - Tooling (generating and parsing MathML is easier than generating/parsing LaTeX)
@@ -46,6 +48,8 @@ Check out the roadmap https://github.com/users/stefnotch/projects/1/views/1
 - `src/math-editor` is a WIP
 - `src/math-editor` is a WIP
 
+- `aftermath-core` contains a Rust package that has to be built and then gets imported by the rest of the code
+
 ### Trees
 
 Similar to https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/syntax.md#design-goals
@@ -64,8 +68,6 @@ Sources:
 - Rust Analyzer https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/syntax.md
 
 ## Future plans
-
-
 
 ### Type Theory
 

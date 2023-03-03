@@ -105,28 +105,10 @@ export type MathLayoutContainer =
       readonly type: "sub";
       readonly values: readonly [MathLayoutRow];
       readonly width: number;
-    }
-  | {
-      /**
-       * A single bit of text.
-       * TODO: This can also end up containing fractions and stuff, so maybe rename to "text container" or otherwise un-curse it?
-       * $\text{a}$
-       */
-      readonly type: "text";
-      readonly values: readonly [MathLayoutRow];
-      readonly width: number;
     };
 export function isMathLayoutContainer(value: MathLayoutRow | MathLayoutElement): value is MathLayoutContainer {
   const { type } = value as MathLayoutContainer;
-  if (
-    type === "fraction" ||
-    type === "root" ||
-    type === "under" ||
-    type === "over" ||
-    type === "sup" ||
-    type === "sub" ||
-    type === "text"
-  ) {
+  if (type === "fraction" || type === "root" || type === "under" || type === "over" || type === "sup" || type === "sub") {
     return true;
   } else {
     typecheckIsNever(type);
@@ -141,6 +123,10 @@ export type MathLayoutTable = {
   /**
    * A rectangular table. Every cell is a row.
    * $\begin{matrix}a&b\\c&d\end{matrix}$
+   *
+   * When you select a part of table, you're actually selecting every single table cell!
+   * The selection joining part makes it behave as expected.
+   * And the rendering part makes it look like you're selecting the table.
    */
   readonly type: "table";
   readonly rowWidth: number;
@@ -163,7 +149,8 @@ export function isMathLayoutTable(value: MathLayoutRow | MathLayoutElement): val
 export type MathLayoutSymbol =
   | {
       /**
-       * A single symbol
+       * A single symbol.
+       * Can also be text, if we first have a quote symbol, then symbols, and then another quote symbol.
        */
       readonly type: "symbol";
       readonly value: string;
@@ -232,7 +219,7 @@ TODO:
 // {a|a in R}, so the bar's meaning depends on the context. But it gets a distinct "tag". And it doesn't have a closing bar.
 // does precedence matter? I don't think it does, but maybe there is some mean case where it does...
 
-// Oh no,
+// Tricky bit,
 // > right, so you're not parsing a string so much as you're parsing one tree representation into another one
 // > I think there's something like tree grammars but that's definitely more exotic
 
