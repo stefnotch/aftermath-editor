@@ -1,6 +1,8 @@
 mod math_layout;
 mod utils;
 
+use chumsky::{prelude::Simple, Parser};
+use math_layout::{element::MathElement, row::Row};
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
@@ -9,6 +11,46 @@ use wasm_bindgen::prelude::*;
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
+/// https://github.com/cortex-js/compute-engine/issues/25
+#[derive(Clone)]
+enum MathSemantic {
+    // +, *
+    // fraction
+    // function with args
+    // needs to keep the range info
+}
+
+#[derive(Debug)]
+enum Expr {
+    Num(f64),
+    Var(String),
+
+    Neg(Box<Expr>),
+    Add(Box<Expr>, Box<Expr>),
+    Sub(Box<Expr>, Box<Expr>),
+    Mul(Box<Expr>, Box<Expr>),
+    Div(Box<Expr>, Box<Expr>),
+
+    Call(String, Vec<Expr>),
+    Let {
+        name: String,
+        rhs: Box<Expr>,
+        then: Box<Expr>,
+    },
+    Fn {
+        name: String,
+        args: Vec<String>,
+        body: Box<Expr>,
+        then: Box<Expr>,
+    },
+}
+
+fn parser() -> impl Parser<char, Expr, Error = Simple<char>> {
+    chumsky::primitive::filter(|c: &char| c.is_ascii_digit())
+        .map_with_span(|c, s| Expr::Num(c.to_digit(10).unwrap() as f64))
+        .then_ignore(chumsky::primitive::end())
+}
 
 #[wasm_bindgen]
 extern "C" {
@@ -19,35 +61,14 @@ extern "C" {
 pub fn greet() {
     set_panic_hook();
     alert("Hello, aftermath-core!");
-    /*let layout = LayoutZipper::new();
-    layout = layout.insert( symbol zipper);
-    let symbolChild = match layout.child(0) {
-        Some(LeafZipper::Symbol(child)) => child,
-        None => None,
-    };
 
+    let x = parser();
 
-    LayoutRow::new(vec![
-        LayoutElement::Symbol("a".to_string()),
-        LayoutElement::Fraction([
-            LayoutRow::new(vec![LayoutElement::Symbol("b".to_string())]),
-            LayoutRow::new(vec![LayoutElement::Text([LayoutRow::new(vec![
-                LayoutTextElement::Character("n".to_string()),
-                LayoutTextElement::Character("e".to_string()),
-                LayoutTextElement::Character("k".to_string()),
-                LayoutTextElement::Character("o".to_string()),
-            ])])]),
+    let layout = Row::new(vec![
+        MathElement::Symbol("a".to_string()),
+        MathElement::Fraction([
+            Row::new(vec![MathElement::Symbol("b".to_string())]),
+            Row::new(vec![MathElement::Symbol("c".to_string())]),
         ]),
     ]);
-
-    let math = LayoutZipper::new(layout);
-    let _value = math.value();
-    let y = math.parent();
-    match y {
-        Some(parent) => {
-            let _grandparent = parent.parent();
-            let _value = parent.value();
-        }
-        None => alert("no parent"),
-    }*/
 }

@@ -1,4 +1,6 @@
 pub mod element;
+mod flat;
+pub mod indices;
 pub mod row;
 
 /*

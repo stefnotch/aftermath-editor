@@ -13,20 +13,17 @@ pub enum MathElement {
     // leaf
     Symbol(String),
     Bracket(String),
-
-    // TODO: We might replace the error type with something better
-    Error(String),
 }
 
 pub trait Element {
-    fn len(&self) -> usize;
+    fn child_row_count(&self) -> usize;
     /*fn row_at<T>(&self, index: usize) -> Option<Row<T>>
     where
         T: Into<T>;*/
 }
 
 impl Element for MathElement {
-    fn len(&self) -> usize {
+    fn child_row_count(&self) -> usize {
         match self {
             MathElement::Fraction(v)
             | MathElement::Root(v)
@@ -34,11 +31,10 @@ impl Element for MathElement {
             | MathElement::Over(v) => v.len(),
             MathElement::Sup(_) | MathElement::Sub(_) => 1,
             MathElement::Table {
-                cells: _,
+                cells,
                 row_width: _,
-            } => 1,
-            MathElement::Symbol(_v) | MathElement::Bracket(_v) => 1,
-            MathElement::Error(_v) => 1,
+            } => cells.len(),
+            MathElement::Symbol(_v) | MathElement::Bracket(_v) => 0,
         }
     }
 }
