@@ -1,8 +1,10 @@
+use serde::{Deserialize, Serialize};
+
 use super::element::MathElement;
 
 /// A row contains many elements
 /// An element is an enum of different types of elements
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Row {
     pub values: Vec<MathElement>,
 }

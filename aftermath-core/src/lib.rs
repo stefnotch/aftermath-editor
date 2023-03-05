@@ -2,8 +2,9 @@ mod math_layout;
 mod parser;
 mod utils;
 
-use chumsky::Parser;
 use math_layout::{element::MathElement, row::Row};
+use parser::{MathSemantic, ParseContext};
+use serde::Serialize;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
@@ -30,31 +31,17 @@ pub fn greet() {
             Row::new(vec![MathElement::Symbol("c".to_string())]),
         ]),
     ]);
-
-    let p = parser::parser();
-    let parsed = p.parse(&layout.values);
-    println!("{:?}", parsed);
 }
 
-// tests
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chumsky::Parser;
-    use math_layout::{element::MathElement, row::Row};
+#[wasm_bindgen]
+pub fn parse(layout_row: JsValue) -> Result<JsValue, JsValue> {
+    let layout: Row = serde_wasm_bindgen::from_value(layout_row)?;
 
-    #[test]
-    fn test_parser() {
-        let layout = Row::new(vec![
-            MathElement::Symbol("a".to_string()),
-            MathElement::Fraction([
-                Row::new(vec![MathElement::Symbol("b".to_string())]),
-                Row::new(vec![MathElement::Symbol("c".to_string())]),
-            ]),
-        ]);
+    let context = ParseContext::new();
+    let parsed = parser::parse(&layout, &context);
 
-        let p = parser::parser();
-        let parsed = p.parse(&layout.values);
-        println!("{:?}", parsed);
-    }
+    let serializer =
+        serde_wasm_bindgen::Serializer::new().serialize_large_number_types_as_bigints(true);
+    let serialized_result = parsed.serialize(&serializer)?;
+    Ok(serialized_result)
 }

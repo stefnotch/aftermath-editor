@@ -1,7 +1,8 @@
-use super::row::Row;
-use std::backtrace::Backtrace;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq)]
+use super::row::Row;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MathElement {
     // containers
     Fraction([Row; 2]),
@@ -14,27 +15,6 @@ pub enum MathElement {
     // leaf
     Symbol(String),
     Bracket(String),
-}
-
-impl Clone for MathElement {
-    fn clone(&self) -> Self {
-        let bt = Backtrace::capture();
-        println!("clone called at {}", bt);
-        match self {
-            Self::Fraction(arg0) => Self::Fraction(arg0.clone()),
-            Self::Root(arg0) => Self::Root(arg0.clone()),
-            Self::Under(arg0) => Self::Under(arg0.clone()),
-            Self::Over(arg0) => Self::Over(arg0.clone()),
-            Self::Sup(arg0) => Self::Sup(arg0.clone()),
-            Self::Sub(arg0) => Self::Sub(arg0.clone()),
-            Self::Table { cells, row_width } => Self::Table {
-                cells: cells.clone(),
-                row_width: row_width.clone(),
-            },
-            Self::Symbol(arg0) => Self::Symbol(arg0.clone()),
-            Self::Bracket(arg0) => Self::Bracket(arg0.clone()),
-        }
-    }
 }
 
 impl MathElement {
