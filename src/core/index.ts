@@ -10,12 +10,17 @@ init().then((aftermath_core) => {
         values: [
           {
             type: "symbol",
+            value: "-",
+            width: 0,
+          },
+          {
+            type: "symbol",
             value: "a",
             width: 0,
           },
           {
             type: "symbol",
-            value: "+",
+            value: "*",
             width: 0,
           },
           {

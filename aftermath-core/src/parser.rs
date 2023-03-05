@@ -39,6 +39,9 @@ impl<'a> Lexer<'a> {
     fn peek(&self) -> Option<&MathElement> {
         self.row.values.get(self.index)
     }
+    fn eof(&self) -> bool {
+        self.index >= self.row.values.len()
+    }
 }
 
 impl fmt::Display for MathSemantic {
@@ -58,21 +61,62 @@ impl fmt::Display for MathSemantic {
 pub fn parse(input: &Row, context: &ParseContext) -> MathSemantic {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     let mut lexer = Lexer::new(input);
-    parse_bp(&mut lexer, context, 0)
+    let parse_result = parse_bp(&mut lexer, context, 0);
+    assert!(lexer.eof(), "lexer not at end");
+    parse_result
 }
 
 fn parse_bp(lexer: &mut Lexer, context: &ParseContext, minimum_bp: u32) -> MathSemantic {
     // bp stands for binding power
     let mut left = match lexer.next() {
         Some(v) => match v {
-            MathElement::Symbol(s) => MathSemantic {
-                // TODO: put the "symbol" name into the parsing context
-                name: "symbol".to_string(),
-                args: vec![],
-                value: s.clone().into_bytes(),
-                // TODO: Range
+            MathElement::Symbol(s) => {
+                if let Some(definition) = context.binding_power(s, (false, false)) {
+                    // Defined symbol
+                    MathSemantic {
+                        // TODO: put the "symbol" name into the parsing context
+                        name: "symbol".to_string(),
+                        args: vec![],
+                        value: definition.name.clone().into_bytes(),
+                        // TODO: Range
+                        range: (0, 0),
+                    }
+                } else if let Some(definition) = context.binding_power(s, (false, true)) {
+                    // Prefix operator
+                    let right = parse_bp(lexer, context, definition.binding_power.1.unwrap());
+                    MathSemantic {
+                        name: "operator".to_string(),
+                        args: vec![right],
+                        value: definition.name.clone().into_bytes(),
+                        range: (0, 0),
+                    }
+                } else {
+                    // Undefined symbol
+                    MathSemantic {
+                        name: "symbol".to_string(),
+                        args: vec![],
+                        value: s.clone().into_bytes(),
+                        range: (0, 0),
+                    }
+                }
+            }
+            MathElement::Fraction([top, bottom]) => MathSemantic {
+                name: "fraction".to_string(),
+                args: vec![
+                    parse_bp(&mut Lexer::new(top), context, 0),
+                    parse_bp(&mut Lexer::new(bottom), context, 0),
+                ],
+                value: vec![],
                 range: (0, 0),
             },
+            MathElement::Bracket(_s) => {
+                // TODO: check if opening bracket
+                // quotes are like brackets hmm
+                let left = parse_bp(lexer, context, 0);
+                // TODO: Check for the correct closing bracket
+                assert_eq!(lexer.next(), Some(&MathElement::Bracket(")".to_string())));
+                left
+            }
             _ => panic!("unexpected element"),
         },
         None => MathSemantic {
@@ -89,34 +133,57 @@ fn parse_bp(lexer: &mut Lexer, context: &ParseContext, minimum_bp: u32) -> MathS
             None => break,
             Some(v) => match v {
                 MathElement::Symbol(s) => s,
-                _ => panic!("unexpected element"),
+                MathElement::Bracket(s) => s,
+                v => panic!("unexpected element {:?}", v),
             },
         };
 
-        let definition = match context.binding_power(operator, (true, true)) {
-            Some(v) => v,
-            None => panic!("unexpected operator {}", operator),
-        };
+        // Not sure yet what happens when we have a postfix operator with a low binding power
+        // Like how does a ! b get parsed, if ! is both a postfix operator and an infix operator
+        // What about a !! b
 
-        // Not super elegant, but it works
-        if definition.binding_power.0.unwrap() < minimum_bp {
+        if let Some(definition) = context.binding_power(operator, (true, false)) {
+            // Postfix operator (but what if it's also an infix operator?)
+            if definition.binding_power.0.unwrap() < minimum_bp {
+                break;
+            }
+            // Actually consume the operator
+            lexer.next();
+
+            // Combine the left operand into a new left operand
+            left = MathSemantic {
+                name: "operator".to_string(),
+                args: vec![left],
+                value: definition.name.clone().into_bytes(),
+                range: (0, 0),
+            };
+            continue;
+        } else if let Some(definition) = context.binding_power(operator, (true, true)) {
+            // Infix operator
+            // Not super elegant, but it works
+            if definition.binding_power.0.unwrap() < minimum_bp {
+                break;
+            }
+
+            // Actually consume the operator
+            lexer.next();
+
+            // Parse the right operand
+            let right = parse_bp(lexer, context, definition.binding_power.1.unwrap());
+
+            // Combine the left and right operand into a new left operand
+            left = MathSemantic {
+                name: "operator".to_string(),
+                args: vec![left, right],
+                value: definition.name.clone().into_bytes(),
+                range: (0, 0),
+            };
+            continue;
+        } else {
+            // Not an operator?
+            // TODO: Check closing brackets?
             break;
         }
-
-        // Actually consume the operator
-        let operator = operator.clone();
-        lexer.next();
-
-        // Parse the right operand
-        let right = parse_bp(lexer, context, definition.binding_power.1.unwrap());
-
-        // Combine the left and right operand into a new left operand
-        left = MathSemantic {
-            name: "operator".to_string(),
-            args: vec![left, right],
-            value: operator.into_bytes(),
-            range: (0, 0),
-        };
     }
 
     left
@@ -179,6 +246,14 @@ impl<'a> ParseContext<'a> {
                 TokenDefinition::new("Subtract".to_string(), (Some(100), Some(101))),
             ),
             (
+                "+".to_string(),
+                TokenDefinition::new("Add".to_string(), (None, Some(400))),
+            ),
+            (
+                "-".to_string(),
+                TokenDefinition::new("Subtract".to_string(), (None, Some(400))),
+            ),
+            (
                 "*".to_string(),
                 TokenDefinition::new("Multiply".to_string(), (Some(200), Some(201))),
             ),
@@ -190,6 +265,14 @@ impl<'a> ParseContext<'a> {
                 ".".to_string(),
                 TokenDefinition::new("Ring".to_string(), (Some(501), Some(500))),
             ),
+            (
+                "!".to_string(),
+                TokenDefinition::new("Ring".to_string(), (Some(600), None)),
+            ),
+            /*(
+                ")".to_string(),
+                TokenDefinition::new("Ring".to_string(), (Some(600), None)),
+            ),*/
         ])
     }
 }
@@ -248,8 +331,7 @@ mod tests {
     #[test]
     fn test_parser() {
         let layout = Row::new(vec![
-            MathElement::Symbol("a".to_string()),
-            MathElement::Symbol("+".to_string()),
+            MathElement::Symbol("-".to_string()),
             MathElement::Symbol("b".to_string()),
             MathElement::Symbol("*".to_string()),
             MathElement::Symbol("c".to_string()),
@@ -264,6 +346,45 @@ mod tests {
     #[test]
     fn test_parser_empty_input() {
         let layout = Row::new(vec![]);
+        let context = ParseContext::default();
+
+        let parsed = parse(&layout, &context);
+        println!("{:?}", parsed);
+    }
+
+    #[test]
+    fn test_parser_nested_brackets_and_postfix() {
+        let layout = Row::new(vec![
+            MathElement::Bracket("(".to_string()),
+            MathElement::Bracket("(".to_string()),
+            MathElement::Bracket("(".to_string()),
+            MathElement::Symbol("a".to_string()),
+            MathElement::Symbol("!".to_string()),
+            MathElement::Bracket(")".to_string()),
+            MathElement::Bracket(")".to_string()),
+            MathElement::Bracket(")".to_string()),
+        ]);
+        let context = ParseContext::default();
+
+        let parsed = parse(&layout, &context);
+        println!("{:?}", parsed);
+    }
+
+    #[test]
+    fn test_parser_symbol_and_close_bracket() {
+        let layout = Row::new(vec![
+            MathElement::Symbol("a".to_string()),
+            MathElement::Bracket(")".to_string()),
+        ]);
+        let context = ParseContext::default();
+
+        let parsed = parse(&layout, &context);
+        println!("{:?}", parsed);
+    }
+
+    #[test]
+    fn test_parser_close_bracket() {
+        let layout = Row::new(vec![MathElement::Bracket(")".to_string())]);
         let context = ParseContext::default();
 
         let parsed = parse(&layout, &context);
