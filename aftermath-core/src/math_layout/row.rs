@@ -13,6 +13,9 @@ impl Row {
     }
 }
 
+/// Points at a given row
+pub struct RowIndices(Vec<RowIndex>);
+
 /// We have a repeating row > element > ... hierarchy.
 /// So to get from one row to the next, we need two indices.
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
