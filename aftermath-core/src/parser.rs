@@ -1,4 +1,5 @@
 use core::fmt;
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -69,12 +70,17 @@ fn parse_bp(lexer: &mut Lexer, context: &ParseContext, minimum_bp: u32) -> MathS
                 name: "symbol".to_string(),
                 args: vec![],
                 value: s.clone().into_bytes(),
+                // TODO: Range
                 range: (0, 0),
             },
             _ => panic!("unexpected element"),
         },
-        // Well, an empty input is an immediate panic
-        None => panic!("unexpected end of input"),
+        None => MathSemantic {
+            name: "empty".to_string(),
+            args: vec![],
+            value: vec![],
+            range: (0, 0),
+        },
     };
 
     // Repeatedly and recursively consume operators with higher binding power
@@ -87,12 +93,13 @@ fn parse_bp(lexer: &mut Lexer, context: &ParseContext, minimum_bp: u32) -> MathS
             },
         };
 
-        let (left_bp, right_bp) = match context.binding_power(operator) {
+        let definition = match context.binding_power(operator, (true, true)) {
             Some(v) => v,
             None => panic!("unexpected operator {}", operator),
         };
 
-        if left_bp < minimum_bp {
+        // Not super elegant, but it works
+        if definition.binding_power.0.unwrap() < minimum_bp {
             break;
         }
 
@@ -101,7 +108,7 @@ fn parse_bp(lexer: &mut Lexer, context: &ParseContext, minimum_bp: u32) -> MathS
         lexer.next();
 
         // Parse the right operand
-        let right = parse_bp(lexer, context, right_bp);
+        let right = parse_bp(lexer, context, definition.binding_power.1.unwrap());
 
         // Combine the left and right operand into a new left operand
         left = MathSemantic {
@@ -118,26 +125,95 @@ fn parse_bp(lexer: &mut Lexer, context: &ParseContext, minimum_bp: u32) -> MathS
 pub struct ParseContext<'a> {
     // takes ownership of the parent context and gives it back afterwards
     parent_context: Option<&'a ParseContext<'a>>,
+    known_tokens: HashMap<TokenKey, TokenDefinition>,
     // TODO: operators
     // functions
     // ...
 }
 
 impl<'a> ParseContext<'a> {
-    pub fn new() -> ParseContext<'a> {
+    pub fn new(tokens: Vec<(String, TokenDefinition)>) -> ParseContext<'a> {
         ParseContext {
             parent_context: None,
+            known_tokens: tokens
+                .into_iter()
+                .map(|(k, v)| {
+                    (
+                        TokenKey {
+                            pattern: k,
+                            binding_power_pattern: (
+                                v.binding_power.0.is_some(),
+                                v.binding_power.1.is_some(),
+                            ),
+                        },
+                        v,
+                    )
+                })
+                .collect(),
         }
     }
 
-    fn binding_power(&self, operator: &str) -> Option<(u32, u32)> {
-        match operator {
-            "+" => Some((100, 101)),
-            "-" => Some((100, 101)),
-            "*" => Some((200, 201)),
-            "/" => Some((200, 201)),
-            "." => Some((501, 500)),
-            _ => self.parent_context.and_then(|v| v.binding_power(operator)),
+    fn binding_power(&self, operator: &str, bp_pattern: (bool, bool)) -> Option<&TokenDefinition> {
+        self.known_tokens
+            .get(&TokenKey {
+                // This does a copy, but it's fine
+                pattern: operator.to_string(),
+                binding_power_pattern: bp_pattern,
+            })
+            .or_else(|| {
+                self.parent_context
+                    .and_then(|v| v.binding_power(operator, bp_pattern))
+            })
+    }
+}
+
+impl<'a> ParseContext<'a> {
+    pub fn default() -> ParseContext<'a> {
+        ParseContext::new(vec![
+            (
+                "+".to_string(),
+                TokenDefinition::new("Add".to_string(), (Some(100), Some(101))),
+            ),
+            (
+                "-".to_string(),
+                TokenDefinition::new("Subtract".to_string(), (Some(100), Some(101))),
+            ),
+            (
+                "*".to_string(),
+                TokenDefinition::new("Multiply".to_string(), (Some(200), Some(201))),
+            ),
+            (
+                "/".to_string(),
+                TokenDefinition::new("Divide".to_string(), (Some(200), Some(201))),
+            ),
+            (
+                ".".to_string(),
+                TokenDefinition::new("Ring".to_string(), (Some(501), Some(500))),
+            ),
+        ])
+    }
+}
+
+#[derive(Hash, Eq, PartialEq)]
+struct TokenKey {
+    pattern: String,
+    /// a constant has no binding power
+    /// a prefix operator has a binding power on the right
+    /// a postfix operator has a binding power on the left
+    /// an infix operator has a binding power on the left and on the right
+    binding_power_pattern: (bool, bool),
+}
+
+pub struct TokenDefinition {
+    name: String,
+    binding_power: (Option<u32>, Option<u32>),
+}
+
+impl TokenDefinition {
+    pub fn new(name: String, binding_power: (Option<u32>, Option<u32>)) -> TokenDefinition {
+        TokenDefinition {
+            name,
+            binding_power,
         }
     }
 }
@@ -179,7 +255,7 @@ mod tests {
             MathElement::Symbol("c".to_string()),
         ]);
 
-        let context = ParseContext::new();
+        let context = ParseContext::default();
 
         let parsed = parse(&layout, &context);
         println!("{}", parsed);
@@ -188,7 +264,7 @@ mod tests {
     #[test]
     fn test_parser_empty_input() {
         let layout = Row::new(vec![]);
-        let context = ParseContext::new();
+        let context = ParseContext::default();
 
         let parsed = parse(&layout, &context);
         println!("{:?}", parsed);

@@ -28,7 +28,7 @@ fn main() {
 pub fn parse(layout_row: JsValue) -> Result<JsValue, JsValue> {
     let layout: Row = serde_wasm_bindgen::from_value(layout_row)?;
 
-    let context = ParseContext::new();
+    let context = ParseContext::default();
     let parsed = parser::parse(&layout, &context);
 
     let serializer =
