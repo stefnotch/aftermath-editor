@@ -20,6 +20,8 @@ import { CaretEdit, removeAtCaret } from "./editing/math-layout-caret-edit";
 import { MathLayoutPosition } from "../math-layout/math-layout-position";
 import { Offset } from "../math-layout/math-layout-offset";
 
+import "./../core";
+
 const debugSettings = {
   debugRenderRows: true,
 };

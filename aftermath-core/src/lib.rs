@@ -19,18 +19,9 @@ extern "C" {
     fn alert(s: &str);
 }
 
-#[wasm_bindgen]
-pub fn greet() {
+#[wasm_bindgen(start)]
+fn main() {
     set_panic_hook();
-    alert("Hello, aftermath-core!");
-
-    let layout = Row::new(vec![
-        MathElement::Symbol("a".to_string()),
-        MathElement::Fraction([
-            Row::new(vec![MathElement::Symbol("b".to_string())]),
-            Row::new(vec![MathElement::Symbol("c".to_string())]),
-        ]),
-    ]);
 }
 
 #[wasm_bindgen]
