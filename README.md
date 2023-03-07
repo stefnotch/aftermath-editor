@@ -14,6 +14,7 @@ Explanation of what this is.
 Quick explanation of what MathMl is.
 
 MathML essentially lets you put `<math>` tags right into your HTML, and then the browser will display it as a pretty formula.
+
 ```mathml
 <div>
 Oh look, it's a fraction
@@ -29,6 +30,7 @@ Oh look, it's a fraction
 ```
 
 Why is that really nice?
+
 - Fast rendering, browsers are already optimized for taking a tree-structure and rendering it
 - Accessibility (MathML defines quite a lot of accessibility stuff)
 - Tooling (generating and parsing MathML is easier than generating/parsing LaTeX)
@@ -50,6 +52,8 @@ Check out the roadmap https://github.com/users/stefnotch/projects/1/views/1
 - `src/math-layout` contains all the code for the representation of what a math formula _looks_ like
 - `src/math-editor` is a WIP
 - `src/math-editor` is a WIP
+
+- `aftermath-core` contains a Rust package that has to be built and then gets imported by the rest of the code
 
 ### Trees
 

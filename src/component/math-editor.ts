@@ -20,6 +20,8 @@ import { CaretEdit, removeAtCaret } from "./editing/math-layout-caret-edit";
 import { MathLayoutPosition } from "../math-layout/math-layout-position";
 import { Offset } from "../math-layout/math-layout-offset";
 
+import "./../core";
+
 const debugSettings = {
   debugRenderRows: true,
 };
@@ -136,6 +138,7 @@ export class MathEditor extends HTMLElement {
     const container = document.createElement("span");
     container.style.display = "inline-block"; // Needed for the resize observer
     container.style.userSelect = "none";
+    container.style.touchAction = "none"; // Dirty hack to disable pinch zoom on mobile, not ideal
     container.tabIndex = 0;
 
     // Click to focus
@@ -152,6 +155,7 @@ export class MathEditor extends HTMLElement {
       if (!newCaret) return;
 
       container.setPointerCapture(e.pointerId);
+      e.preventDefault();
 
       this.carets.clearCarets();
       this.carets.addPointerDownCaret(e.pointerId, newCaret.zipper, newCaret.offset);
@@ -300,9 +304,7 @@ export class MathEditor extends HTMLElement {
               domTranslator.element.classList.add("row-debug");
 
               domTranslator.children.forEach((child) => {
-                if (child.value.type === "text") {
-                  // Do nothing
-                } else if (child.value.type === "symbol" || child.value.type === "bracket") {
+                if (child.value.type === "symbol" || child.value.type === "bracket") {
                   // Do nothing
                 } else if (
                   child.value.type === "fraction" ||
@@ -340,7 +342,6 @@ export class MathEditor extends HTMLElement {
   }
 
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
-    console.log("Attribute changed", name, oldValue, newValue);
     if (name === "mathml") {
       const mathMlElement = createElementFromHtml(newValue || "<math></math>");
       assert(mathMlElement instanceof MathMLElement, "Mathml attribute must be a valid mathml element");
@@ -352,6 +353,8 @@ export class MathEditor extends HTMLElement {
 
       console.log(this.mathAst);
       this.render();
+    } else {
+      console.log("Attribute changed", name, oldValue, newValue);
     }
   }
 
@@ -368,7 +371,7 @@ export class MathEditor extends HTMLElement {
     const lastLayout = this.lastLayout;
     if (!lastLayout) return;
 
-    const layout = lastLayout.layoutToViewportPosition(caret.caret.zipper, caret.caret.end);
+    const layout = lastLayout.layoutToViewportPosition(new MathLayoutPosition(caret.caret.zipper, caret.caret.end));
     caret.element.setPosition(layout.x, layout.y);
     caret.element.setHeight(layout.height);
 
@@ -377,8 +380,12 @@ export class MathEditor extends HTMLElement {
 
     caret.element.clearSelections();
     if (!caret.caret.isCollapsed) {
-      const rangeLayoutLeft = lastLayout.layoutToViewportPosition(caret.caret.zipper, caret.caret.leftOffset);
-      const rangeLayoutRight = lastLayout.layoutToViewportPosition(caret.caret.zipper, caret.caret.rightOffset);
+      const rangeLayoutLeft = lastLayout.layoutToViewportPosition(
+        new MathLayoutPosition(caret.caret.zipper, caret.caret.leftOffset)
+      );
+      const rangeLayoutRight = lastLayout.layoutToViewportPosition(
+        new MathLayoutPosition(caret.caret.zipper, caret.caret.rightOffset)
+      );
 
       const width = rangeLayoutRight.x - rangeLayoutLeft.x;
       const height = rangeLayoutLeft.height;

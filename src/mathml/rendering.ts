@@ -33,9 +33,9 @@ interface RowDomTranslator {
   getBounds(): ViewportRect;
 }
 
-class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements RowDomTranslator {
+class MathRowDomTranslator implements RowDomTranslator {
   constructor(
-    public readonly value: T,
+    readonly value: MathLayoutRow,
     public readonly element: Element,
     public readonly children: (MathContainerDomTranslator | MathTableDomTranslator | MathSymbolDomTranslator)[],
     public readonly finalElement: Element
@@ -84,29 +84,32 @@ class MathRowDomTranslator<T extends MathLayoutRow = MathLayoutRow> implements R
   }
 }
 
-class MathContainerDomTranslator<T extends MathLayoutContainer = MathLayoutContainer> {
-  constructor(public readonly value: T, public readonly element: Element, public readonly children: RowDomTranslator[]) {
-    assert(children.length === value.values.length);
-  }
-
-  startEndPosition(): { start: ViewportValue; end: ViewportValue } {
-    return getElementLayoutStartEnd(this.element);
-  }
-}
-
-class MathTableDomTranslator<T extends MathLayoutTable = MathLayoutTable> {
-  constructor(public readonly value: T, public readonly element: Element, public readonly children: RowDomTranslator[]) {
-    assert(children.length === value.values.length);
-  }
-
-  startEndPosition(): { start: ViewportValue; end: ViewportValue } {
-    return getElementLayoutStartEnd(this.element);
-  }
-}
-
-class MathSymbolDomTranslator<T extends MathLayoutSymbol = MathLayoutSymbol> {
+class MathContainerDomTranslator {
   constructor(
-    public readonly value: T,
+    readonly value: MathLayoutContainer,
+    public readonly element: Element,
+    public readonly children: RowDomTranslator[]
+  ) {
+    assert(children.length === value.values.length);
+  }
+
+  startEndPosition(): { start: ViewportValue; end: ViewportValue } {
+    return getElementLayoutStartEnd(this.element);
+  }
+}
+class MathTableDomTranslator {
+  constructor(readonly value: MathLayoutTable, public readonly element: Element, public readonly children: RowDomTranslator[]) {
+    assert(children.length === value.values.length);
+  }
+
+  startEndPosition(): { start: ViewportValue; end: ViewportValue } {
+    return getElementLayoutStartEnd(this.element);
+  }
+}
+
+class MathSymbolDomTranslator {
+  constructor(
+    readonly value: MathLayoutSymbol,
     /**
      * The element that contains this symbol. Note that the element might be shared with another symbol.
      * Make sure to use the index to find the correct symbol.
@@ -130,13 +133,16 @@ class MathSymbolDomTranslator<T extends MathLayoutSymbol = MathLayoutSymbol> {
 
 /**
  * It's a bit special, due to the mismatch between MathLayout and MathML when it comes to text
+ * TODO: Fix this
  */
-class MathTextRowDomTranslator<T extends MathLayoutContainer & { type: "text" } = MathLayoutContainer & { type: "text" }>
-  implements RowDomTranslator
-{
+class MathTextRowDomTranslator implements RowDomTranslator {
   // For now I'll just count the characters that the Text has, but in later implementations we can have a function
   // (As in, a reference to a static function that takes the element and gives me the character at a given position or something)
-  constructor(public readonly value: T, public readonly element: Element, public readonly textNode: Text) {
+  constructor(
+    public readonly value: MathLayoutContainer & { type: "text" },
+    public readonly element: Element,
+    public readonly textNode: Text
+  ) {
     assert(value.values[0].values.every((v) => v.type === "symbol"));
   }
 
@@ -194,9 +200,12 @@ export class MathmlLayout {
     return this.caretToDomTranslator(ancestorIndices).element;
   }
 
-  layoutToViewportPosition(mathLayout: MathLayoutRowZipper, offset: Offset) {
-    const ancestorIndices = getAncestorIndices(mathLayout);
-    return this.caretToDomTranslator(ancestorIndices).offsetToPosition(offset);
+  /**
+   * Given a position in the layout, get the correct viewport position
+   */
+  layoutToViewportPosition(layoutPosition: MathLayoutPosition) {
+    const ancestorIndices = getAncestorIndices(layoutPosition.zipper);
+    return this.caretToDomTranslator(ancestorIndices).offsetToPosition(layoutPosition.offset);
   }
 
   /**
@@ -376,7 +385,6 @@ function fromMathLayoutElement<T extends MathLayoutElement>(
     const childrenIR = mathIR.values[0].values;
     let text = "";
     for (const childIR of childrenIR) {
-      // TODO: We could support math-in-text in the future
       assert(childIR.type === "symbol", "Unsupported text child type");
       text += childIR.value;
     }

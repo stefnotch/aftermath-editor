@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "build": "wasm-pack build --dev --target web",
+    "postinstall": "wasm-pack build --dev --target web"
+  },
+  "devDependencies": {
+    "wasm-pack": "^0.10.3"
+  }
+}

@@ -27,23 +27,25 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
   } else if (tagIs(element, "semantics") && children.length > 0) {
     return toMathLayout(children[0]);
   } else if (tagIs(element, "mtext", "ms")) {
-    return mathLayoutWithWidth({
-      type: "text",
-      values: [
+    return [
+      mathLayoutWithWidth({
+        type: "symbol",
+        value: '"',
+        width: 0,
+      }),
+      ...unicodeSplit(getText(element)).map((v) =>
         mathLayoutWithWidth({
-          type: "row",
-          values: unicodeSplit(getText(element)).map((v) =>
-            mathLayoutWithWidth({
-              type: "symbol",
-              value: v,
-              width: 0,
-            })
-          ),
+          type: "symbol",
+          value: v,
           width: 0,
-        }),
-      ],
-      width: 0,
-    });
+        })
+      ),
+      mathLayoutWithWidth({
+        type: "symbol",
+        value: '"',
+        width: 0,
+      }),
+    ];
   } else if (tagIs(element, "mi", "mn")) {
     return unicodeSplit(getText(element)).map((v) =>
       mathLayoutWithWidth({
