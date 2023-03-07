@@ -21,6 +21,60 @@ pub struct MathSemantic {
     pub range: (usize, usize),
 }
 
+/// Lets us delay parsing of arguments
+/// Split into two "stages" because of borrowing and ownership
+struct MathSemanticArgsContinuation {
+    math_semantic: MathSemantic,
+    parse_args: fn(&mut Lexer, &ParseContext, u32) -> Vec<MathSemantic>,
+    minimum_bp: u32,
+}
+
+/// Lets us delay parsing of arguments
+struct MathSemanticArgsSubRowsContinuation<'a> {
+    math_semantic: MathSemantic,
+    sub_rows: Vec<&'a Row>,
+    parse_args: fn(&mut Lexer, &ParseContext, u32) -> Vec<MathSemantic>,
+    minimum_bp: u32,
+}
+
+impl<'a> MathSemanticArgsSubRowsContinuation<'a> {
+    fn apply(self, context: &ParseContext) -> MathSemanticArgsContinuation {
+        let mut math_semantic = self.math_semantic;
+        math_semantic.args = self
+            .sub_rows
+            .iter()
+            .map(|v| parse_bp(&mut Lexer::new(v), context, 0))
+            .collect();
+        MathSemanticArgsContinuation {
+            math_semantic,
+            parse_args: self.parse_args,
+            minimum_bp: self.minimum_bp,
+        }
+    }
+}
+
+impl<'a> MathSemanticArgsContinuation {
+    fn apply(self, lexer: &mut Lexer, context: &ParseContext) -> MathSemantic {
+        let mut math_semantic = self.math_semantic;
+        math_semantic.args = (self.parse_args)(lexer, context, self.minimum_bp);
+        math_semantic
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ParseError {
+    pub error: ParseErrorType,
+    /// the range of this in the original math layout
+    pub range: (usize, usize),
+}
+
+#[derive(Debug, Clone)]
+pub enum ParseErrorType {
+    UnexpectedEndOfInput,
+    UnexpectedPostfixOperator,
+    Custom(String),
+}
+
 struct Lexer<'a> {
     row: &'a Row,
     index: usize,
@@ -38,6 +92,10 @@ impl<'a> Lexer<'a> {
     }
     fn peek(&self) -> Option<&MathElement> {
         self.row.values.get(self.index)
+    }
+    /// peek_n with an offset of zero does the same as peek
+    fn peek_n(&self, offset: usize) -> Option<&MathElement> {
+        self.row.values.get(self.index + offset)
     }
     fn eof(&self) -> bool {
         self.index >= self.row.values.len()
@@ -60,6 +118,7 @@ impl fmt::Display for MathSemantic {
 
 pub fn parse(input: &Row, context: &ParseContext) -> MathSemantic {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
+    // we have a LL(1) pratt parser, aka we can look one token ahead
     let mut lexer = Lexer::new(input);
     let parse_result = parse_bp(&mut lexer, context, 0);
     assert!(lexer.eof(), "lexer not at end");
@@ -68,64 +127,10 @@ pub fn parse(input: &Row, context: &ParseContext) -> MathSemantic {
 
 fn parse_bp(lexer: &mut Lexer, context: &ParseContext, minimum_bp: u32) -> MathSemantic {
     // bp stands for binding power
-    let mut left = match lexer.next() {
-        Some(v) => match v {
-            MathElement::Symbol(s) => {
-                if let Some(definition) = context.binding_power(s, (false, false)) {
-                    // Defined symbol
-                    MathSemantic {
-                        // TODO: put the "symbol" name into the parsing context
-                        name: "symbol".to_string(),
-                        args: vec![],
-                        value: definition.name.clone().into_bytes(),
-                        // TODO: Range
-                        range: (0, 0),
-                    }
-                } else if let Some(definition) = context.binding_power(s, (false, true)) {
-                    // Prefix operator
-                    let right = parse_bp(lexer, context, definition.binding_power.1.unwrap());
-                    MathSemantic {
-                        name: "operator".to_string(),
-                        args: vec![right],
-                        value: definition.name.clone().into_bytes(),
-                        range: (0, 0),
-                    }
-                } else {
-                    // Undefined symbol
-                    MathSemantic {
-                        name: "symbol".to_string(),
-                        args: vec![],
-                        value: s.clone().into_bytes(),
-                        range: (0, 0),
-                    }
-                }
-            }
-            MathElement::Fraction([top, bottom]) => MathSemantic {
-                name: "fraction".to_string(),
-                args: vec![
-                    parse_bp(&mut Lexer::new(top), context, 0),
-                    parse_bp(&mut Lexer::new(bottom), context, 0),
-                ],
-                value: vec![],
-                range: (0, 0),
-            },
-            MathElement::Bracket(_s) => {
-                // TODO: check if opening bracket
-                // quotes are like brackets hmm
-                let left = parse_bp(lexer, context, 0);
-                // TODO: Check for the correct closing bracket
-                assert_eq!(lexer.next(), Some(&MathElement::Bracket(")".to_string())));
-                left
-            }
-            _ => panic!("unexpected element"),
-        },
-        None => MathSemantic {
-            name: "empty".to_string(),
-            args: vec![],
-            value: vec![],
-            range: (0, 0),
-        },
-    };
+    let mut left = parse_bp_start(lexer.next(), context)
+        .unwrap()
+        .apply(context)
+        .apply(lexer, context);
 
     // Repeatedly and recursively consume operators with higher binding power
     loop {
@@ -139,11 +144,37 @@ fn parse_bp(lexer: &mut Lexer, context: &ParseContext, minimum_bp: u32) -> MathS
         };
 
         // Not sure yet what happens when we have a postfix operator with a low binding power
-        // Like how does a ! b get parsed, if ! is both a postfix operator and an infix operator
-        // What about a !! b
 
-        if let Some(definition) = context.binding_power(operator, (true, false)) {
-            // Postfix operator (but what if it's also an infix operator?)
+        if let Some(definition) = context.get_token_definition(operator, (true, true)) {
+            // Infix operators only get applied if there is something valid after them
+            // So we check if the next parsing step would be successful, while avoiding consuming the token
+            let symbol_comes_next = parse_bp_start(lexer.peek_n(1), context).is_ok();
+            if symbol_comes_next {
+                // Infix operator
+                // Not super elegant, but it works
+                if definition.binding_power.0.unwrap() < minimum_bp {
+                    break;
+                }
+
+                // Actually consume the operator
+                lexer.next();
+
+                // Parse the right operand
+                let right = parse_bp(lexer, context, definition.binding_power.1.unwrap());
+
+                // Combine the left and right operand into a new left operand
+                left = MathSemantic {
+                    name: "operator".to_string(),
+                    args: vec![left, right],
+                    value: definition.name.clone().into_bytes(),
+                    range: (0, 0),
+                };
+                continue;
+            }
+        }
+
+        if let Some(definition) = context.get_token_definition(operator, (true, false)) {
+            // Postfix operator
             if definition.binding_power.0.unwrap() < minimum_bp {
                 break;
             }
@@ -158,42 +189,108 @@ fn parse_bp(lexer: &mut Lexer, context: &ParseContext, minimum_bp: u32) -> MathS
                 range: (0, 0),
             };
             continue;
-        } else if let Some(definition) = context.binding_power(operator, (true, true)) {
-            // Infix operator
-            // Not super elegant, but it works
-            if definition.binding_power.0.unwrap() < minimum_bp {
-                break;
-            }
-
-            // Actually consume the operator
-            lexer.next();
-
-            // Parse the right operand
-            let right = parse_bp(lexer, context, definition.binding_power.1.unwrap());
-
-            // Combine the left and right operand into a new left operand
-            left = MathSemantic {
-                name: "operator".to_string(),
-                args: vec![left, right],
-                value: definition.name.clone().into_bytes(),
-                range: (0, 0),
-            };
-            continue;
-        } else {
-            // Not an operator?
-            // TODO: Check closing brackets?
-            break;
         }
+
+        // Not an operator?
+        // TODO: Check closing brackets?
+        break;
     }
 
     left
+}
+
+/// Expects a token or an opening bracket or a prefix operator
+fn parse_bp_start<'a, 'b>(
+    token: Option<&'a MathElement>,
+    context: &'b ParseContext,
+) -> Result<MathSemanticArgsSubRowsContinuation<'a>, ParseError> {
+    match token {
+        Some(v) => match v {
+            MathElement::Symbol(s) => {
+                if let Some(definition) = context.get_token_definition(s, (false, false)) {
+                    // Defined symbol
+                    Ok(MathSemanticArgsSubRowsContinuation {
+                        math_semantic: MathSemantic {
+                            // TODO: put the "symbol" name into the parsing context
+                            name: "symbol".to_string(),
+                            args: vec![],
+                            value: definition.name.clone().into_bytes(),
+                            // TODO: Range
+                            range: (0, 0),
+                        },
+                        parse_args: |_, _, _| vec![],
+                        minimum_bp: 0,
+                        sub_rows: vec![],
+                    })
+                } else if let Some(definition) = context.get_token_definition(s, (false, true)) {
+                    // Prefix operator
+                    Ok(MathSemanticArgsSubRowsContinuation {
+                        math_semantic: MathSemantic {
+                            name: "operator".to_string(),
+                            args: vec![],
+                            value: definition.name.clone().into_bytes(),
+                            range: (0, 0),
+                        },
+                        parse_args: |a, b, c| vec![parse_bp(a, b, c)],
+                        minimum_bp: definition.binding_power.1.unwrap(),
+                        sub_rows: vec![],
+                    })
+                } else {
+                    // Undefined symbol
+                    // TODO: What if that symbol is a postfix operator or an infix operator?
+                    Ok(MathSemanticArgsSubRowsContinuation {
+                        math_semantic: MathSemantic {
+                            name: "symbol".to_string(),
+                            args: vec![],
+                            value: s.clone().into_bytes(),
+                            // TODO: Range
+                            range: (0, 0),
+                        },
+                        parse_args: |_, _, _| vec![],
+                        minimum_bp: 0,
+                        sub_rows: vec![],
+                    })
+                }
+            }
+            MathElement::Fraction([top, bottom]) => Ok(MathSemanticArgsSubRowsContinuation {
+                math_semantic: MathSemantic {
+                    name: "fraction".to_string(),
+                    args: vec![],
+                    value: vec![],
+                    range: (0, 0),
+                },
+                parse_args: |_, _, _| vec![],
+                minimum_bp: 0,
+                sub_rows: vec![top, bottom],
+            }),
+            /*
+            MathElement::Bracket(_s) => {
+                // TODO: check if opening bracket
+                // quotes are like brackets hmm
+                let left = parse_bp(lexer, context, 0);
+                // TODO: Check for the correct closing bracket
+                assert_eq!(lexer.next(), Some(&MathElement::Bracket(")".to_string())));
+                Ok(left)
+
+            } */
+            MathElement::Sup(_) | MathElement::Sub(_) => Err(ParseError {
+                error: ParseErrorType::UnexpectedPostfixOperator,
+                range: (0, 0),
+            }),
+            _ => panic!("unexpected element"),
+        },
+        None => Err(ParseError {
+            error: ParseErrorType::UnexpectedEndOfInput,
+            range: (0, 0),
+        }),
+    }
 }
 
 pub struct ParseContext<'a> {
     // takes ownership of the parent context and gives it back afterwards
     parent_context: Option<&'a ParseContext<'a>>,
     known_tokens: HashMap<TokenKey, TokenDefinition>,
-    // TODO: operators
+    // TODO: brackets
     // functions
     // ...
 }
@@ -220,7 +317,11 @@ impl<'a> ParseContext<'a> {
         }
     }
 
-    fn binding_power(&self, operator: &str, bp_pattern: (bool, bool)) -> Option<&TokenDefinition> {
+    fn get_token_definition(
+        &self,
+        operator: &str,
+        bp_pattern: (bool, bool),
+    ) -> Option<&TokenDefinition> {
         self.known_tokens
             .get(&TokenKey {
                 // This does a copy, but it's fine
@@ -229,7 +330,7 @@ impl<'a> ParseContext<'a> {
             })
             .or_else(|| {
                 self.parent_context
-                    .and_then(|v| v.binding_power(operator, bp_pattern))
+                    .and_then(|v| v.get_token_definition(operator, bp_pattern))
             })
     }
 }
@@ -279,6 +380,16 @@ impl<'a> ParseContext<'a> {
 
 #[derive(Hash, Eq, PartialEq)]
 struct TokenKey {
+    // TODO: Turn into Trie?
+    // 1. binding power pattern
+    // 2. tricky
+    // - sin is 3 symbol tokens
+    // - Sum is a symbol token (with sub and sup afterwards, which end up behaving like postfix operators)
+    //   Sum is a prefix operator with a low binding power. Like sum_i (i^2)
+    // - d/dx is a fraction token, a symbol token, a symbol token, an unknown symbol token
+    //   d/dx is a prefix operator with a low binding power. Like d/dx (x^2)
+    // - d^n f / dx^n is a nasty notation
+    // - hat x is a over token with two symbol tokens. All fixed, which is nice
     pattern: String,
     /// a constant has no binding power
     /// a prefix operator has a binding power on the right
