@@ -4,7 +4,7 @@ import { fromElement as fromMathMLElement } from "../mathml/parsing";
 import { MathmlLayout, toElement as toMathMLElement } from "../mathml/rendering";
 import arrayUtils from "../utils/array-utils";
 import { endingBrackets, startingBrackets } from "../mathml/mathml-spec";
-import { findOtherBracket, mathLayoutWithWidth, wrapInRow } from "../math-layout/math-layout-utils";
+import { mathLayoutWithWidth, wrapInRow } from "../math-layout/math-layout-utils";
 import { MathJson, toMathJson } from "../math-editor/math-ir";
 import caretStyles from "./caret-styles.css?inline";
 import mathEditorStyles from "./math-editor-styles.css?inline";
@@ -304,7 +304,7 @@ export class MathEditor extends HTMLElement {
               domTranslator.element.classList.add("row-debug");
 
               domTranslator.children.forEach((child) => {
-                if (child.value.type === "symbol" || child.value.type === "bracket") {
+                if (child.value.type === "symbol") {
                   // Do nothing
                 } else if (
                   child.value.type === "fraction" ||

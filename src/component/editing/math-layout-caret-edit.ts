@@ -99,7 +99,7 @@ function removeAtPosition(position: MathLayoutPosition, direction: "left" | "rig
     } else {
       return move();
     }
-  } else if (atCaret.type === "symbol" || atCaret.type === "bracket" || atCaret.type === "error") {
+  } else if (atCaret.type === "symbol" || atCaret.type === "error") {
     const actions = [removeAction(atCaret)];
     return {
       edits: actions,

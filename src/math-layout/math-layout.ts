@@ -158,16 +158,6 @@ export type MathLayoutSymbol =
     }
   | {
       /**
-       * TODO: Maybe add info about "is opening" and "is closing" bracket.
-       * A bracket symbol, with special handling.
-       * Brackets are not containers, because that makes things like adding a closing bracket somewhere in a formula really awkward.
-       */
-      readonly type: "bracket";
-      readonly value: string;
-      readonly width: number;
-    }
-  | {
-      /**
        * Error message, used whenever the parser encounters something it doesn't understand.
        */
       readonly type: "error";
@@ -177,7 +167,7 @@ export type MathLayoutSymbol =
 
 export function isMathLayoutSymbol(value: MathLayoutRow | MathLayoutElement): value is MathLayoutSymbol {
   const { type } = value as MathLayoutSymbol;
-  if (type === "symbol" || type === "bracket" || type === "error") {
+  if (type === "symbol" || type === "error") {
     return true;
   } else {
     typecheckIsNever(type);

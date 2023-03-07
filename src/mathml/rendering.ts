@@ -374,13 +374,13 @@ function fromMathLayoutElement<T extends MathLayoutElement>(
     const element = createMathElement("mroot", [childB.element, childA.element]);
     const translator = new MathContainerDomTranslator(mathIR, element, [childA.translator, childB.translator]);
     return { element, translator };
-  } else if (mathIR.type == "bracket") {
+  } /*else if (mathIR.type == "bracket") {
     const textNode = document.createTextNode(mathIR.value);
     const element = createMathElement("mo", [textNode]);
     element.setAttribute("stretchy", "false");
     const translator = new MathSymbolDomTranslator(mathIR, textNode, 0);
     return { element, translator };
-  } else if (mathIR.type === "text") {
+  }*/ else if (mathIR.type === "text") {
     // This approach was chosen, because we want the best possible MathML output
     const childrenIR = mathIR.values[0].values;
     let text = "";
@@ -472,46 +472,6 @@ function fromMathLayoutRowChildren(tokens: TokenStream<MathLayoutElement>): {
         const translator = new MathSymbolDomTranslator(token, textNode, 0);
         output.push(element);
         translators.push(translator);
-      }
-    } else if (token.type == "bracket") {
-      if (endingBrackets.has(token.value) || true /*TODO: Remove || true and reimplement commented out code */) {
-        // No opening bracket
-        const parsed = fromMathLayoutElement(token);
-        output.push(parsed.element);
-        translators.push(parsed.translator);
-      } else {
-        /*
-        Commented out code:
-
-        // A starting bracket or an either bracket (funnily enough, the logic is almost the same for both)
-        const endingBracketIndex = startingBrackets.has(token.value)
-          ? findOtherBracket(tokens.value, tokens.offset - 1, "right")
-          : findEitherEndingBracket(tokens.value, tokens.offset - 1);
-        // TODO: maybe check if the ending bracket is actually the right type of bracket?
-        if (endingBracketIndex == null) {
-          pushOutput(fromMathLayoutElement(token)); // No closing bracket
-        } else {
-          const parsedChildren = fromMathLayoutRowChildren(
-            new TokenStream(tokens.value.slice(tokens.offset, endingBracketIndex), 0)
-          );
-          const endingBracket = tokens.value[endingBracketIndex];
-          assert(endingBracket.type == "bracket");
-          tokens.offset = endingBracketIndex + 1;
-          const startingBracketElement = createMathElement("mo", [document.createTextNode(token.value)]);
-          const endingBracketElement = createMathElement("mo", [document.createTextNode(endingBracket.value)]);
-          output.push(
-            createMathElement("mrow", [
-              startingBracketElement,
-              parsedChildren.elements.length == 1
-                ? parsedChildren.elements[0]
-                : createMathElement("mrow", parsedChildren.elements),
-              endingBracketElement,
-            ])
-          );
-          mathLayout.push(() => startingBracketElement.getBoundingClientRect());
-          mathLayout.push(...parsedChildren.mathLayout);
-          mathLayout.push(() => endingBracketElement.getBoundingClientRect());
-        }*/
       }
     } else if (token.type == "sub" || token.type == "sup") {
       let lastElement = output.pop();

@@ -191,7 +191,7 @@ function moveVerticalClosestPosition(
       // Try moving into a nested element: 0 is right, -1 is left
       const childZipper = newZipper.children[offset + (caretX < desiredXPosition ? 0 : -1)];
       assert(childZipper !== undefined);
-      if (childZipper.type === "bracket" || childZipper.type === "symbol") {
+      if (childZipper.type === "symbol") {
         break; // We can't go any further
       } else if (childZipper.type === "table") {
         // TODO: Implement
@@ -251,7 +251,7 @@ function moveHorizontalInto(
   // Carets are always inbetween elements. Hence element[caretOffset] is the element to the right of the caret.
   const adjacentChild = zipper.children[caretOffset + (direction === "left" ? -1 : 0)];
 
-  if (adjacentChild.type === "bracket" || adjacentChild.type === "symbol" || adjacentChild.type === "error") {
+  if (adjacentChild.type === "symbol" || adjacentChild.type === "error") {
     return null;
   } else if (
     adjacentChild.type === "table" ||

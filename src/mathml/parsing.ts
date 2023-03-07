@@ -56,19 +56,11 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
     );
   } else if (tagIs(element, "mo")) {
     return unicodeSplit(getText(element)).map((v) => {
-      if (element.getAttribute("stretchy") != "false" && allBrackets.has(v)) {
-        return mathLayoutWithWidth({
-          type: "bracket",
-          value: v,
-          width: 0,
-        });
-      } else {
-        return mathLayoutWithWidth({
-          type: "symbol",
-          value: v,
-          width: 0,
-        });
-      }
+      return mathLayoutWithWidth({
+        type: "symbol",
+        value: v,
+        width: 0,
+      });
     });
   } else if (tagIs(element, "mfrac")) {
     return (

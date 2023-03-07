@@ -132,7 +132,7 @@ class MathParseTrie {
   static #getTokenHash(token: MathLayoutElement | MathLayoutSymbol | MathLayoutText): string {
     if (token.type == "table") {
       return `${token.type}-`;
-    } else if (token.type == "symbol" || token.type == "bracket" || token.type == "error") {
+    } else if (token.type == "symbol" || token.type == "error") {
       return `${token.type}-${token.values}`;
     } else {
       return `${token.type}-`;
@@ -141,7 +141,6 @@ class MathParseTrie {
 
   #insert(definition: MathParseDefinition) {
     // TODO: Warn when definitions conflict
-    // TODO: Warn when a type: "bracket" is included in a definition
     let currentTrie: MathParseTrie = this;
 
     for (let i = 0; i < definition.tokens.length; i++) {

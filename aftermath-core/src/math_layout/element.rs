@@ -14,7 +14,6 @@ pub enum MathElement {
     Table { cells: Vec<Row>, row_width: usize },
     // leaf
     Symbol(String),
-    Bracket(String),
 }
 
 impl MathElement {
@@ -55,7 +54,7 @@ impl<'a> Iterator for MathElementIterator<'a> {
                 cells,
                 row_width: _,
             } => cells.get(index),
-            MathElement::Symbol(_) | MathElement::Bracket(_) => None,
+            MathElement::Symbol(_) => None,
         }
     }
 
@@ -70,7 +69,7 @@ impl<'a> Iterator for MathElementIterator<'a> {
                 cells,
                 row_width: _,
             } => (cells.len(), Some(cells.len())),
-            MathElement::Symbol(_) | MathElement::Bracket(_) => (0, Some(0)),
+            MathElement::Symbol(_) => (0, Some(0)),
         }
     }
 }

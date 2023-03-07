@@ -59,8 +59,6 @@ function toCore(row: MathLayoutRow): CoreRow {
         };
       } else if (v.type === "symbol") {
         return { Symbol: v.value };
-      } else if (v.type === "bracket") {
-        return { Bracket: v.value };
       } else {
         throw new Error("Unknown type", {
           cause: v,
