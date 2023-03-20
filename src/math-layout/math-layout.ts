@@ -9,19 +9,9 @@ export type MathLayout = MathLayoutRow | MathLayoutElement;
 // Could be wrapped with interfaces and stuff
 
 /**
- * A simple representation of what a math formula looks like. Immutable.
- * Optimized for editing, purposefully does not assign meaning to most characters.
- * For instance, if the formula contains "0xe", we just say it has the characters 0, x, e.
- * We don't parse it as a hexadecimal or 0*x*e or anything. That part is done later.
- *
- * One invariant here is: The parent-child order is always Row -> Element -> Row -> Element -> ....
- *
- * See also: Zipper
+ * See Rust for source.
  */
 export type MathLayoutRow = {
-  /**
-   * Rows have an arbitrary number of children
-   */
   readonly type: "row";
   readonly values: readonly MathLayoutElement[];
   /**
@@ -54,54 +44,33 @@ export function isMathLayoutElement(value: MathLayoutRow | MathLayoutElement): v
   }
 }
 
-/**
- * A container with a fixed number of children
- */
 export type MathLayoutContainer =
   | {
-      /**
-       * $\frac{a}{b}$
-       */
       readonly type: "fraction";
       readonly values: readonly [MathLayoutRow, MathLayoutRow];
       readonly width: number;
     }
   | {
-      /**
-       * $\sqrt[a]{b}$
-       */
       readonly type: "root";
       readonly values: readonly [MathLayoutRow, MathLayoutRow];
       readonly width: number;
     }
   | {
-      /**
-       * $\underset{b}{a}$
-       */
       readonly type: "under";
       readonly values: readonly [MathLayoutRow, MathLayoutRow];
       readonly width: number;
     }
   | {
-      /**
-       * $\overset{b}{a}$
-       */
       readonly type: "over";
       readonly values: readonly [MathLayoutRow, MathLayoutRow];
       readonly width: number;
     }
   | {
-      /**
-       * $^a$
-       */
       readonly type: "sup";
       readonly values: readonly [MathLayoutRow];
       readonly width: number;
     }
   | {
-      /**
-       * $_a$
-       */
       readonly type: "sub";
       readonly values: readonly [MathLayoutRow];
       readonly width: number;
@@ -116,18 +85,7 @@ export function isMathLayoutContainer(value: MathLayoutRow | MathLayoutElement):
   }
 }
 
-/**
- * A table with an arbitrary number of children
- */
 export type MathLayoutTable = {
-  /**
-   * A rectangular table. Every cell is a row.
-   * $\begin{matrix}a&b\\c&d\end{matrix}$
-   *
-   * When you select a part of table, you're actually selecting every single table cell!
-   * The selection joining part makes it behave as expected.
-   * And the rendering part makes it look like you're selecting the table.
-   */
   readonly type: "table";
   readonly rowWidth: number;
   readonly values: MathLayoutRow[];
@@ -143,23 +101,13 @@ export function isMathLayoutTable(value: MathLayoutRow | MathLayoutElement): val
   }
 }
 
-/**
- * Symbols without children
- */
 export type MathLayoutSymbol =
   | {
-      /**
-       * A single symbol.
-       * Can also be text, if we first have a quote symbol, then symbols, and then another quote symbol.
-       */
       readonly type: "symbol";
       readonly value: string;
       readonly width: number;
     }
   | {
-      /**
-       * Error message, used whenever the parser encounters something it doesn't understand.
-       */
       readonly type: "error";
       readonly value: string;
       readonly width: number;
@@ -183,7 +131,6 @@ TODO:
  */
 
 // TODO: Placeholder symbol: ⬚
-// TODO:Canoical symbol form (like when there are multiple unicode characters or when some HTML escape has been used &lt;)
 
 // Parsing maths 101
 // Info:

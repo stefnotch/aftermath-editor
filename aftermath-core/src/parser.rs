@@ -1,9 +1,15 @@
-use core::fmt;
-use std::collections::HashMap;
-
-use serde::{Deserialize, Serialize};
+mod grapheme_matcher;
+mod nfa_builder;
+mod token_matcher;
 
 use crate::math_layout::{element::MathElement, row::Row};
+use core::fmt;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+// TODO:
+// 1. Parser for variables (names)
+// 2. Parser for various types of tokens (numbers, strings, etc.)
 
 /// https://github.com/cortex-js/compute-engine/issues/25
 /// mimics the math layout tree
@@ -23,37 +29,43 @@ pub struct MathSemantic {
 
 /// Lets us delay parsing of arguments
 /// Split into two "stages" because of borrowing and ownership
-struct MathSemanticArgsContinuation {
+/// Typestate pattern go brr https://cliffle.com/blog/rust-typestate/
+struct MathSemanticContinuation<S: SemanticContinuationState> {
     math_semantic: MathSemantic,
     parse_args: fn(&mut Lexer, &ParseContext, u32) -> Vec<MathSemantic>,
     minimum_bp: u32,
+    extra: S,
 }
 
-/// Lets us delay parsing of arguments
-struct MathSemanticArgsSubRowsContinuation<'a> {
-    math_semantic: MathSemantic,
+struct SubRows<'a> {
     sub_rows: Vec<&'a Row>,
-    parse_args: fn(&mut Lexer, &ParseContext, u32) -> Vec<MathSemantic>,
-    minimum_bp: u32,
 }
 
-impl<'a> MathSemanticArgsSubRowsContinuation<'a> {
-    fn apply(self, context: &ParseContext) -> MathSemanticArgsContinuation {
+struct Finish;
+
+trait SemanticContinuationState {}
+impl<'a> SemanticContinuationState for SubRows<'a> {}
+impl<'a> SemanticContinuationState for Finish {}
+
+impl<'a> MathSemanticContinuation<SubRows<'a>> {
+    fn apply(self, context: &ParseContext) -> MathSemanticContinuation<Finish> {
         let mut math_semantic = self.math_semantic;
         math_semantic.args = self
+            .extra
             .sub_rows
             .iter()
             .map(|v| parse_bp(&mut Lexer::new(v), context, 0))
             .collect();
-        MathSemanticArgsContinuation {
+        MathSemanticContinuation {
             math_semantic,
             parse_args: self.parse_args,
             minimum_bp: self.minimum_bp,
+            extra: Finish,
         }
     }
 }
 
-impl<'a> MathSemanticArgsContinuation {
+impl<'a> MathSemanticContinuation<Finish> {
     fn apply(self, lexer: &mut Lexer, context: &ParseContext) -> MathSemantic {
         let mut math_semantic = self.math_semantic;
         math_semantic.args = (self.parse_args)(lexer, context, self.minimum_bp);
@@ -208,13 +220,13 @@ fn parse_bp_start<'a, 'b>(
     token: Option<&'a MathElement>,
     context: &'b ParseContext,
     // TODO: Use ParseResult here, so that you can report multiple errors, and always can return a value
-) -> Result<MathSemanticArgsSubRowsContinuation<'a>, ParseError> {
+) -> Result<MathSemanticContinuation<SubRows<'a>>, ParseError> {
     match token {
         Some(v) => match v {
             MathElement::Symbol(s) => {
                 if let Some(definition) = context.get_token_definition(s, (false, false)) {
                     // Defined symbol
-                    Ok(MathSemanticArgsSubRowsContinuation {
+                    Ok(MathSemanticContinuation {
                         math_semantic: MathSemantic {
                             // TODO: put the "symbol" name into the parsing context
                             name: "symbol".to_string(),
@@ -225,11 +237,11 @@ fn parse_bp_start<'a, 'b>(
                         },
                         parse_args: |_, _, _| vec![],
                         minimum_bp: 0,
-                        sub_rows: vec![],
+                        extra: SubRows { sub_rows: vec![] },
                     })
                 } else if let Some(definition) = context.get_token_definition(s, (false, true)) {
                     // Prefix operator
-                    Ok(MathSemanticArgsSubRowsContinuation {
+                    Ok(MathSemanticContinuation {
                         math_semantic: MathSemantic {
                             name: "operator".to_string(),
                             args: vec![],
@@ -238,7 +250,7 @@ fn parse_bp_start<'a, 'b>(
                         },
                         parse_args: |a, b, c| vec![parse_bp(a, b, c)],
                         minimum_bp: definition.binding_power.1.unwrap(),
-                        sub_rows: vec![],
+                        extra: SubRows { sub_rows: vec![] },
                     })
                 } else if let Some(definition) =
                     context.get_bracket_definition(s, BracketType::Opening)
@@ -246,7 +258,7 @@ fn parse_bp_start<'a, 'b>(
                     // Bracket opening
                     // TODO: quotes are like brackets
 
-                    Ok(MathSemanticArgsSubRowsContinuation {
+                    Ok(MathSemanticContinuation {
                         // This gives me one slightly redundant layer of nesting for brackets, but it's not a big deal
                         math_semantic: MathSemantic {
                             name: "bracket".to_string(),
@@ -260,12 +272,12 @@ fn parse_bp_start<'a, 'b>(
                             left
                         },
                         minimum_bp: 0,
-                        sub_rows: vec![],
+                        extra: SubRows { sub_rows: vec![] },
                     })
                 } else {
                     // Undefined symbol
                     // TODO: What if that symbol is a postfix operator or an infix operator?
-                    Ok(MathSemanticArgsSubRowsContinuation {
+                    Ok(MathSemanticContinuation {
                         math_semantic: MathSemantic {
                             name: "symbol".to_string(),
                             args: vec![],
@@ -275,11 +287,11 @@ fn parse_bp_start<'a, 'b>(
                         },
                         parse_args: |_, _, _| vec![],
                         minimum_bp: 0,
-                        sub_rows: vec![],
+                        extra: SubRows { sub_rows: vec![] },
                     })
                 }
             }
-            MathElement::Fraction([top, bottom]) => Ok(MathSemanticArgsSubRowsContinuation {
+            MathElement::Fraction([top, bottom]) => Ok(MathSemanticContinuation {
                 math_semantic: MathSemantic {
                     name: "fraction".to_string(),
                     args: vec![],
@@ -288,7 +300,9 @@ fn parse_bp_start<'a, 'b>(
                 },
                 parse_args: |_, _, _| vec![],
                 minimum_bp: 0,
-                sub_rows: vec![top, bottom],
+                extra: SubRows {
+                    sub_rows: vec![top, bottom],
+                },
             }),
             MathElement::Sup(_) | MathElement::Sub(_) => Err(ParseError {
                 error: ParseErrorType::UnexpectedPostfixOperator,
@@ -563,14 +577,14 @@ mod tests {
     #[test]
     fn test_parser_nested_brackets_and_postfix() {
         let layout = Row::new(vec![
-            MathElement::Bracket("(".to_string()),
-            MathElement::Bracket("(".to_string()),
-            MathElement::Bracket("(".to_string()),
+            MathElement::Symbol("(".to_string()),
+            MathElement::Symbol("(".to_string()),
+            MathElement::Symbol("(".to_string()),
             MathElement::Symbol("a".to_string()),
             MathElement::Symbol("!".to_string()),
-            MathElement::Bracket(")".to_string()),
-            MathElement::Bracket(")".to_string()),
-            MathElement::Bracket(")".to_string()),
+            MathElement::Symbol(")".to_string()),
+            MathElement::Symbol(")".to_string()),
+            MathElement::Symbol(")".to_string()),
         ]);
         let context = ParseContext::default();
 
@@ -582,7 +596,7 @@ mod tests {
     fn test_parser_symbol_and_close_bracket() {
         let layout = Row::new(vec![
             MathElement::Symbol("a".to_string()),
-            MathElement::Bracket(")".to_string()),
+            MathElement::Symbol(")".to_string()),
         ]);
         let context = ParseContext::default();
 
@@ -592,7 +606,7 @@ mod tests {
 
     #[test]
     fn test_parser_close_bracket() {
-        let layout = Row::new(vec![MathElement::Bracket(")".to_string())]);
+        let layout = Row::new(vec![MathElement::Symbol(")".to_string())]);
         let context = ParseContext::default();
 
         let parsed = parse(&layout, &context);
