@@ -7,6 +7,8 @@ use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use self::{nfa_builder::NFABuilder, token_matcher::NFA};
+
 // TODO:
 // 1. Parser for variables (names)
 // 2. Parser for various types of tokens (numbers, strings, etc.)
@@ -97,25 +99,50 @@ struct Lexer<'a> {
     index: usize,
 }
 
+struct LexerToken<'a> {
+    lexer: &'a mut Lexer<'a>,
+    index: usize,
+}
+
 impl<'a> Lexer<'a> {
     fn new(row: &Row) -> Lexer {
         Lexer { row, index: 0 }
     }
 
+    fn begin(&mut self) -> LexerToken {
+        LexerToken {
+            lexer: self,
+            index: self.index,
+        }
+    }
+
+    fn eof(&self) -> bool {
+        self.index >= self.row.values.len()
+    }
+}
+
+impl<'a> LexerToken<'a> {
     fn next(&mut self) -> Option<&MathElement> {
         let index = self.index;
         self.index += 1;
-        self.row.values.get(index)
+        self.lexer.row.values.get(index)
     }
     fn peek(&self) -> Option<&MathElement> {
-        self.row.values.get(self.index)
+        self.lexer.row.values.get(self.index)
     }
-    /// peek_n with an offset of zero does the same as peek
-    fn peek_n(&self, offset: usize) -> Option<&MathElement> {
-        self.row.values.get(self.index + offset)
+    fn consume(&mut self, count: usize) {
+        self.index += count;
     }
-    fn eof(&self) -> bool {
-        self.index >= self.row.values.len()
+    // TODO: https://doc.rust-lang.org/reference/attributes/diagnostics.html#the-must_use-attribute ?
+    fn end(self) {
+        assert!(self.index <= self.lexer.row.values.len());
+        self.lexer.index = self.index;
+    }
+
+    fn discard(self) {}
+
+    fn get_slice(&self) -> &[MathElement] {
+        &self.lexer.row.values[self.index..]
     }
 }
 
@@ -144,24 +171,18 @@ pub fn parse(input: &Row, context: &ParseContext) -> MathSemantic {
 
 fn parse_bp(lexer: &mut Lexer, context: &ParseContext, minimum_bp: u32) -> MathSemantic {
     // bp stands for binding power
-    let mut left = parse_bp_start(lexer.next(), context)
+    let mut left = parse_bp_start(lexer.begin(), context)
         .unwrap()
         .apply(context)
         .apply(lexer, context);
 
     // Repeatedly and recursively consume operators with higher binding power
     loop {
-        let operator = match lexer.peek() {
-            None => break,
-            Some(v) => match v {
-                MathElement::Symbol(s) => s,
-                v => panic!("unexpected element {:?}", v),
-            },
-        };
+        let operator = lexer.begin();
 
         // Not sure yet what happens when we have a postfix operator with a low binding power
 
-        if let Some(definition) = context.get_token_definition(operator, (true, true)) {
+        if let Some(definition) = context.get_token(&mut operator, (true, true)) {
             // Infix operators only get applied if there is something valid after them
             // So we check if the next parsing step would be successful, while avoiding consuming the token
             let symbol_comes_next = parse_bp_start(lexer.peek_n(1), context).is_ok();
@@ -173,7 +194,7 @@ fn parse_bp(lexer: &mut Lexer, context: &ParseContext, minimum_bp: u32) -> MathS
                 }
 
                 // Actually consume the operator
-                lexer.next();
+                operator.end();
 
                 // Parse the right operand
                 let right = parse_bp(lexer, context, definition.binding_power.1.unwrap());
@@ -187,15 +208,18 @@ fn parse_bp(lexer: &mut Lexer, context: &ParseContext, minimum_bp: u32) -> MathS
                 };
                 continue;
             }
+        } else {
+            operator.discard();
         }
 
-        if let Some(definition) = context.get_token_definition(operator, (true, false)) {
+        let operator = lexer.begin();
+        if let Some(definition) = context.get_token(&mut operator, (true, false)) {
             // Postfix operator
             if definition.binding_power.0.unwrap() < minimum_bp {
                 break;
             }
             // Actually consume the operator
-            lexer.next();
+            operator.end();
 
             // Combine the left operand into a new left operand
             left = MathSemantic {
@@ -205,6 +229,8 @@ fn parse_bp(lexer: &mut Lexer, context: &ParseContext, minimum_bp: u32) -> MathS
                 range: (0, 0),
             };
             continue;
+        } else {
+            operator.discard();
         }
 
         // Not an operator?
@@ -217,7 +243,7 @@ fn parse_bp(lexer: &mut Lexer, context: &ParseContext, minimum_bp: u32) -> MathS
 
 /// Expects a token or an opening bracket or a prefix operator
 fn parse_bp_start<'a, 'b>(
-    token: Option<&'a MathElement>,
+    token: LexerToken<'a>,
     context: &'b ParseContext,
     // TODO: Use ParseResult here, so that you can report multiple errors, and always can return a value
 ) -> Result<MathSemanticContinuation<SubRows<'a>>, ParseError> {
@@ -317,96 +343,107 @@ fn parse_bp_start<'a, 'b>(
     }
 }
 
+type BindingPowerPattern = (bool, bool);
+enum BracketType {
+    Opening,
+    Closing,
+}
+
 pub struct ParseContext<'a> {
     // takes ownership of the parent context and gives it back afterwards
     parent_context: Option<&'a ParseContext<'a>>,
     // TODO: Use a Hash Array Mapped Trie here (see issue #20)
-    known_tokens: HashMap<TokenKey, TokenDefinition>,
-    known_brackets: HashMap<BracketKey, BracketDefinition>,
+    known_tokens: HashMap<BindingPowerPattern, Vec<(TokenMatcher, TokenDefinition)>>,
+    known_brackets: Vec<(BracketMatcher, BracketDefinition)>,
     // functions
     // ...
 }
 
 impl<'a> ParseContext<'a> {
     pub fn new(
-        // TODO: Compute the string from the token definition
-        tokens: Vec<(String, TokenDefinition)>,
-        brackets: Vec<(String, BracketDefinition)>,
+        tokens: Vec<(TokenMatcher, TokenDefinition)>,
+        brackets: Vec<(BracketMatcher, BracketDefinition)>,
     ) -> ParseContext<'a> {
+        let known_tokens =
+            tokens
+                .into_iter()
+                .fold(HashMap::new(), |mut acc, (matcher, definition)| {
+                    let entry = acc
+                        .entry(definition.binding_power_pattern())
+                        .or_insert(vec![]);
+                    entry.push((matcher, definition));
+                    acc
+                });
+
         ParseContext {
             parent_context: None,
-            known_tokens: tokens
-                .into_iter()
-                .map(|(k, v)| {
-                    (
-                        TokenKey {
-                            pattern: k,
-                            binding_power_pattern: (
-                                v.binding_power.0.is_some(),
-                                v.binding_power.1.is_some(),
-                            ),
-                        },
-                        v,
-                    )
-                })
-                .collect(),
-            known_brackets: brackets
-                .into_iter()
-                .flat_map(|(k, v)| {
-                    vec![
-                        (
-                            BracketKey {
-                                pattern: k.clone(),
-                                bracket_type: BracketType::Opening,
-                            },
-                            // TODO: This is a copy
-                            v.clone(),
-                        ),
-                        (
-                            BracketKey {
-                                pattern: k,
-                                bracket_type: BracketType::Closing,
-                            },
-                            v,
-                        ),
-                    ]
-                })
-                .collect(),
+            known_tokens,
+            known_brackets: brackets,
         }
     }
 
-    fn get_token_definition(
+    fn get_token<'b>(
         &self,
-        operator: &str,
-        bp_pattern: (bool, bool),
+        token: &mut LexerToken<'b>,
+        bp_pattern: BindingPowerPattern,
     ) -> Option<&TokenDefinition> {
-        self.known_tokens
-            .get(&TokenKey {
-                // This does a copy, but it's fine
-                pattern: operator.to_string(),
-                binding_power_pattern: bp_pattern,
-            })
-            .or_else(|| {
-                self.parent_context
-                    .and_then(|v| v.get_token_definition(operator, bp_pattern))
-            })
+        let matches: Vec<_> = self
+            .known_tokens
+            .get(&bp_pattern)
+            .unwrap_or(&vec![])
+            .iter()
+            .map(|(matcher, definition)| (matcher.pattern.matches(token.get_slice()), definition))
+            .filter(|(match_length, _)| match_length > &0)
+            .collect();
+
+        if matches.len() > 1 {
+            // TODO: Better error
+            panic!("multiple matches for token");
+        } else if matches.len() == 1 {
+            let (match_length, definition) = matches[0];
+            token.consume(match_length);
+
+            Some(definition)
+        } else {
+            self.parent_context
+                .and_then(|v| v.get_token(token, bp_pattern))
+        }
     }
 
-    fn get_bracket_definition(
+    fn get_bracket<'b>(
         &self,
-        bracket: &str,
+        bracket: &mut LexerToken<'b>,
         bracket_type: BracketType,
     ) -> Option<&BracketDefinition> {
-        self.known_brackets
-            .get(&BracketKey {
-                // This does a copy, but it's fine
-                pattern: bracket.to_string(),
-                bracket_type,
+        let matches: Vec<_> = self
+            .known_brackets
+            .iter()
+            .map(|(matcher, definition)| match bracket_type {
+                BracketType::Opening => (
+                    matcher.opening_pattern.matches(bracket.get_slice()),
+                    definition,
+                ),
+                BracketType::Closing => (
+                    matcher.closing_pattern.matches(bracket.get_slice()),
+                    definition,
+                ),
             })
-            .or_else(|| {
-                self.parent_context
-                    .and_then(|v| v.get_bracket_definition(bracket, bracket_type))
-            })
+            .filter(|(match_length, _)| match_length > &0)
+            .collect();
+
+        if matches.len() > 1 {
+            // TODO: Better error
+            panic!("multiple matches for bracket");
+        } else if matches.len() == 1 {
+            let (match_length, definition) = matches[0];
+            bracket.consume(match_length);
+            bracket.end(); // TODO: Remove
+
+            Some(definition)
+        } else {
+            self.parent_context
+                .and_then(|v| v.get_bracket(bracket, bracket_type))
+        }
     }
 }
 
@@ -415,49 +452,44 @@ impl<'a> ParseContext<'a> {
         ParseContext::new(
             vec![
                 (
-                    "+".to_string(),
+                    "+".into(),
                     TokenDefinition::new("Add".to_string(), (Some(100), Some(101))),
                 ),
                 (
-                    "-".to_string(),
+                    "-".into(),
                     TokenDefinition::new("Subtract".to_string(), (Some(100), Some(101))),
                 ),
                 (
-                    "+".to_string(),
+                    "+".into(),
                     TokenDefinition::new("Add".to_string(), (None, Some(400))),
                 ),
                 (
-                    "-".to_string(),
+                    "-".into(),
                     TokenDefinition::new("Subtract".to_string(), (None, Some(400))),
                 ),
                 (
-                    "*".to_string(),
+                    "*".into(),
                     TokenDefinition::new("Multiply".to_string(), (Some(200), Some(201))),
                 ),
                 (
-                    "/".to_string(),
+                    "/".into(),
                     TokenDefinition::new("Divide".to_string(), (Some(200), Some(201))),
                 ),
                 (
-                    ".".to_string(),
+                    ".".into(),
                     TokenDefinition::new("Ring".to_string(), (Some(501), Some(500))),
                 ),
                 (
-                    "!".to_string(),
+                    "!".into(),
                     TokenDefinition::new("Ring".to_string(), (Some(600), None)),
                 ),
             ],
-            vec![(
-                "(".to_string(),
-                BracketDefinition::new("()".to_string(), "(".to_string(), ")".to_string()),
-            )],
+            vec![(("(", ")").into(), BracketDefinition::new("()".to_string()))],
         )
     }
 }
 
-#[derive(Hash, Eq, PartialEq)]
-struct TokenKey {
-    // TODO: Turn into Trie?
+struct TokenMatcher {
     // 1. binding power pattern
     // 2. tricky
     // - sin is 3 symbol tokens
@@ -467,59 +499,64 @@ struct TokenKey {
     //   d/dx is a prefix operator with a low binding power. Like d/dx (x^2)
     // - d^n f / dx^n is a nasty notation
     // - hat x is a over token with two symbol tokens. All fixed, which is nice
-    pattern: String,
-    /// a constant has no binding power
-    /// a prefix operator has a binding power on the right
-    /// a postfix operator has a binding power on the left
-    /// an infix operator has a binding power on the left and on the right
-    binding_power_pattern: (bool, bool),
+    pattern: NFA,
 }
 
-pub struct TokenDefinition {
-    name: String,
-    binding_power: (Option<u32>, Option<u32>),
-}
-
-impl TokenDefinition {
-    pub fn new(name: String, binding_power: (Option<u32>, Option<u32>)) -> TokenDefinition {
-        TokenDefinition {
-            name,
-            binding_power,
+impl From<&str> for TokenMatcher {
+    fn from(pattern: &str) -> TokenMatcher {
+        TokenMatcher {
+            pattern: NFABuilder::match_string(pattern).build(),
         }
     }
 }
 
-#[derive(Hash, Eq, PartialEq)]
-struct BracketKey {
-    pattern: String,
-    bracket_type: BracketType,
+pub struct TokenDefinition {
+    name: String,
+    /// a constant has no binding power
+    /// a prefix operator has a binding power on the right
+    /// a postfix operator has a binding power on the left
+    /// an infix operator has a binding power on the left and on the right
+    binding_power: (Option<u32>, Option<u32>),
 }
 
-#[derive(Hash, Eq, PartialEq, Clone, Copy)]
-enum BracketType {
-    Opening,
-    Closing,
+impl TokenDefinition {
+    pub fn new(name: String, binding_power: (Option<u32>, Option<u32>)) -> Self {
+        Self {
+            name,
+            binding_power,
+        }
+    }
+
+    fn binding_power_pattern(&self) -> (bool, bool) {
+        (
+            self.binding_power.0.is_some(),
+            self.binding_power.1.is_some(),
+        )
+    }
+}
+
+struct BracketMatcher {
+    opening_pattern: NFA,
+    closing_pattern: NFA,
+}
+
+impl From<(&str, &str)> for BracketMatcher {
+    fn from(pattern: (&str, &str)) -> Self {
+        Self {
+            opening_pattern: NFABuilder::match_string(pattern.0).build(),
+            closing_pattern: NFABuilder::match_string(pattern.1).build(),
+        }
+    }
 }
 
 #[derive(Clone)]
 pub struct BracketDefinition {
     name: String,
-    // TODO: Have a parser or something for this
-    opening_bracket: MathElement,
-    closing_bracket: MathElement,
 }
 
 impl BracketDefinition {
-    pub fn new(
-        name: String,
-        opening_bracket: String,
-        closing_bracket: String,
-    ) -> BracketDefinition {
-        BracketDefinition {
-            name,
-            opening_bracket: MathElement::Symbol(opening_bracket),
-            closing_bracket: MathElement::Symbol(closing_bracket),
-        }
+    pub fn new(name: String) -> BracketDefinition {
+        BracketDefinition { name }
     }
 }
 

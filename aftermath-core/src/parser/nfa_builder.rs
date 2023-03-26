@@ -4,6 +4,7 @@ use super::{
 };
 
 /// A builder for an NFA
+#[derive(Debug)]
 pub enum NFABuilder {
     GraphemeCluster(GraphemeClusterMatcher),
     Concat(Box<NFABuilder>, Box<NFABuilder>),
@@ -52,7 +53,15 @@ impl NFABuilder {
     }
 
     pub fn then_character(self, character: GraphemeClusterMatcher) -> NFABuilder {
-        self.concat(NFABuilder::GraphemeCluster(character))
+        self.concat(NFABuilder::match_character(character))
+    }
+
+    pub fn match_string(pattern: &str) -> NFABuilder {
+        todo!()
+    }
+
+    pub fn then_string(self, pattern: &str) -> NFABuilder {
+        self.concat(NFABuilder::match_string(pattern))
     }
 }
 
@@ -135,7 +144,7 @@ impl NFABuilder {
                 let loop_state = push_state(states, StateFragment::Split(a.start_state, 0));
                 set_end_states(states, a.end_states, loop_state);
 
-                let end_states = vec![NFABuilderEndState::SplitA(loop_state)];
+                let end_states = vec![NFABuilderEndState::SplitB(loop_state)];
                 NFABuilderFragment {
                     start_state: a.start_state,
                     end_states,
@@ -178,15 +187,6 @@ fn set_end_states(
                     _ => panic!("Expected a match state"),
                 }
             }
-            NFABuilderEndState::SplitA(state_id) => {
-                let state = &mut states[state_id];
-                match state {
-                    StateFragment::Split(a, _) => {
-                        *a = value;
-                    }
-                    _ => panic!("Expected a split state"),
-                }
-            }
             NFABuilderEndState::SplitB(state_id) => {
                 let state = &mut states[state_id];
                 match state {
@@ -207,7 +207,6 @@ struct NFABuilderFragment {
 
 enum NFABuilderEndState {
     Match(StateId),
-    SplitA(StateId),
     SplitB(StateId),
 }
 
@@ -229,8 +228,38 @@ mod tests {
             .concat(NFABuilder::match_character(('0'..='9').into()));
         let nfa = builder.build();
         assert_eq!(nfa.states.len(), 3);
-        assert!(matches!(nfa.states[0], StateFragment::Match(..)));
-        assert!(matches!(nfa.states[1], StateFragment::Match(..)));
-        assert!(matches!(nfa.states[2], StateFragment::Final));
+        assert!(matches!(
+            nfa.states[nfa.start_state],
+            StateFragment::Match(..)
+        ));
+    }
+
+    #[test]
+    fn test_build_nfa_or() {
+        let builder = NFABuilder::match_character(('a'..='z').into())
+            .or(NFABuilder::match_character(('0'..='9').into()));
+        let nfa = builder.build();
+        assert_eq!(nfa.states.len(), 4);
+        assert!(matches!(
+            nfa.states[nfa.start_state],
+            StateFragment::Split(..)
+        ));
+    }
+
+    #[test]
+    fn test_build_nfa_complex() {
+        let builder = NFABuilder::match_character(('a'..='z').into())
+            .one_or_more()
+            .or(NFABuilder::match_character(('0'..='9').into())
+                .one_or_more()
+                .then_character(('0'..='9').into()));
+        let nfa = builder.build();
+        assert_eq!(nfa.states.len(), 7);
+        assert!(matches!(
+            nfa.states[nfa.start_state],
+            StateFragment::Split(..)
+        ));
+
+        // Not sure how to test this
     }
 }

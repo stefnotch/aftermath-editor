@@ -1,6 +1,7 @@
 use std::ops::RangeInclusive;
 
 /// Matches a NFD-normalized grapheme cluster
+#[derive(Debug)]
 pub struct GraphemeClusterMatcher {
     codepoints: Vec<CodepointMatcher>,
 }
@@ -14,6 +15,7 @@ impl GraphemeClusterMatcher {
     }
 }
 
+#[derive(Debug)]
 pub enum CodepointMatcher {
     CharacterRange(RangeInclusive<char>),
 }

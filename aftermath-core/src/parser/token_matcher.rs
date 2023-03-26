@@ -16,12 +16,14 @@
 // TODO: Build a DFA
 // TODO: Have fast paths for some things (profile first)
 
+use std::fmt::{Debug, Formatter};
 use std::{collections::HashSet, ops::RangeInclusive};
 
 use crate::math_layout::element::MathElement;
 
 use super::grapheme_matcher::GraphemeClusterMatcher;
 
+// TODO: Error prone
 pub type StateId = usize;
 
 pub struct NFA {
@@ -29,6 +31,16 @@ pub struct NFA {
     pub start_state: StateId,
 }
 
+impl Debug for NFA {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NFA")
+            .field("states", &self.states)
+            .field("start_state", &self.start_state)
+            .finish()
+    }
+}
+
+#[derive(Debug)]
 pub enum StateFragment {
     /// A state, followed by a match arrow
     Match(MatchIf, StateId),
@@ -40,6 +52,7 @@ pub enum StateFragment {
     Final,
 }
 
+#[derive(Debug)]
 pub enum MatchIf {
     GraphemeCluster(GraphemeClusterMatcher),
     Container(Container),
@@ -48,25 +61,38 @@ impl MatchIf {
     // TODO: Return an error (expected ... but got ...)
     fn matches(&self, value: &MathElement) -> bool {
         match (self, value) {
-            (MatchIf::Container(Container::Fraction(matcher)), MathElement::Fraction(a)) => todo!(),
-            (MatchIf::Container(Container::Root(matcher)), MathElement::Root(a)) => todo!(),
-            (MatchIf::Container(Container::Under(matcher)), MathElement::Under(a)) => todo!(),
-            (MatchIf::Container(Container::Over(matcher)), MathElement::Over(a)) => todo!(),
-            (MatchIf::Container(Container::Sup(matcher)), MathElement::Sup(a)) => todo!(),
-            (MatchIf::Container(Container::Sub(matcher)), MathElement::Sub(a)) => todo!(),
+            (MatchIf::Container(Container::Fraction(matcher)), MathElement::Fraction(a))
+            | (MatchIf::Container(Container::Root(matcher)), MathElement::Root(a))
+            | (MatchIf::Container(Container::Under(matcher)), MathElement::Under(a))
+            | (MatchIf::Container(Container::Over(matcher)), MathElement::Over(a)) => matcher
+                .iter()
+                .zip(a)
+                .all(|(a, b)| a.matches(&b.values) == b.values.len()),
+
+            (MatchIf::Container(Container::Sup(a)), MathElement::Sup(b))
+            | (MatchIf::Container(Container::Sub(a)), MathElement::Sub(b)) => {
+                a.matches(&b.values) == b.values.len()
+            }
             (
-                MatchIf::Container(Container::Table { cells, row_width }),
+                MatchIf::Container(Container::Table {
+                    cells: matcher,
+                    row_width,
+                }),
                 MathElement::Table {
                     cells: a,
                     row_width: b,
                 },
-            ) => todo!(),
+            ) => matcher
+                .iter()
+                .zip(a)
+                .all(|(a, b)| a.matches(&b.values) == b.values.len()),
             (MatchIf::GraphemeCluster(matcher), MathElement::Symbol(a)) => matcher.matches(a),
             (_, _) => false,
         }
     }
 }
 
+#[derive(Debug)]
 pub enum Container {
     Fraction([NFA; 2]),
     Root([NFA; 2]),
@@ -152,7 +178,7 @@ impl NFA {
                 self.add_state(state_set, final_states, *b);
             }
             None => {
-                panic!("State {} does not exist", state);
+                panic!("State {:?} does not exist", state);
             }
         }
     }
@@ -196,6 +222,44 @@ mod tests {
                 MathElement::Symbol("0".into())
             ]),
             2
+        );
+    }
+
+    #[test]
+    fn test_matches_with_one_or_more() {
+        let nfa = NFABuilder::match_character(('0'..='9').into())
+            .one_or_more()
+            .then_character('a'.into())
+            .build();
+        assert_eq!(
+            nfa.matches(&[
+                MathElement::Symbol("9".into()),
+                MathElement::Symbol("3".into()),
+                MathElement::Symbol("0".into()),
+                MathElement::Symbol("a".into()),
+                MathElement::Symbol("a".into())
+            ]),
+            4
+        );
+    }
+
+    #[test]
+    fn test_matches_with_split() {
+        let nfa = NFABuilder::match_character('a'.into())
+            .one_or_more()
+            .or(NFABuilder::match_character('b'.into())
+                .one_or_more()
+                .then_character(('0'..='9').into()))
+            .build();
+        assert_eq!(
+            nfa.matches(&[
+                MathElement::Symbol("b".into()),
+                MathElement::Symbol("b".into()),
+                MathElement::Symbol("b".into()),
+                MathElement::Symbol("2".into()),
+                MathElement::Symbol("0".into())
+            ]),
+            4
         );
     }
 }
