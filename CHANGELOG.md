@@ -2,7 +2,9 @@
 
 - Semantics parser written in Rust, compiled to WebAssembly
 - Text is no longer a first class concept, see https://github.com/stefnotch/mathml-editor/issues/21#issuecomment-1422725139
--
+- Deal with Unicode segmentation
+- Add a custom written Regex engine
+- Add a custom written Pratt parser (hopefully will be replaced by chumsky)
 
 # v0.0.7
 

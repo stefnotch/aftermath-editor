@@ -7,6 +7,15 @@ pub struct GraphemeClusterMatcher {
 }
 
 impl GraphemeClusterMatcher {
+    pub fn new<T>(codepoints: T) -> Self
+    where
+        T: IntoIterator<Item = CodepointMatcher>,
+    {
+        Self {
+            codepoints: codepoints.into_iter().collect(),
+        }
+    }
+
     pub fn matches(&self, value: &str) -> bool {
         self.codepoints
             .iter()

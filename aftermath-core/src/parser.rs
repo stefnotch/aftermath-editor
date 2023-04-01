@@ -1,11 +1,13 @@
+mod capturing_group;
 mod grapheme_matcher;
+mod matcher_state;
 mod nfa_builder;
 mod token_matcher;
 
 use crate::math_layout::{element::MathElement, row::Row};
 use core::fmt;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::RangeInclusive};
 
 use self::{nfa_builder::NFABuilder, token_matcher::NFA};
 
@@ -26,12 +28,13 @@ pub struct MathSemantic {
     /// stored as bytes, and interpreted according to the name
     pub value: Vec<u8>,
     /// the range of this in the original math layout
-    pub range: (usize, usize),
+    pub range: RangeInclusive<usize>,
 }
 
 /// Lets us delay parsing of arguments
 /// Split into two "stages" because of borrowing and ownership
 /// Typestate pattern go brr https://cliffle.com/blog/rust-typestate/
+/*
 struct MathSemanticContinuation<S: SemanticContinuationState> {
     math_semantic: MathSemantic,
     parse_args: fn(&mut Lexer, &ParseContext, u32) -> Vec<MathSemantic>,
@@ -56,7 +59,7 @@ impl<'a> MathSemanticContinuation<SubRows<'a>> {
             .extra
             .sub_rows
             .iter()
-            .map(|v| parse_bp(&mut Lexer::new(v), context, 0))
+            .map(|v| parse_bp( Lexer::new(v), context, 0))
             .collect();
         MathSemanticContinuation {
             math_semantic,
@@ -73,7 +76,7 @@ impl<'a> MathSemanticContinuation<Finish> {
         math_semantic.args = (self.parse_args)(lexer, context, self.minimum_bp);
         math_semantic
     }
-}
+} */
 
 pub struct ParseResult<T> {
     pub value: T,
@@ -92,57 +95,60 @@ pub enum ParseErrorType {
     UnexpectedEndOfInput,
     UnexpectedPostfixOperator,
     Custom(String),
+    UnexpectedToken,
 }
 
+/// A lexer that can be nested
 struct Lexer<'a> {
+    parent: Option<Box<Lexer<'a>>>,
     row: &'a Row,
-    index: usize,
-}
-
-struct LexerToken<'a> {
-    lexer: &'a mut Lexer<'a>,
     index: usize,
 }
 
 impl<'a> Lexer<'a> {
     fn new(row: &Row) -> Lexer {
-        Lexer { row, index: 0 }
+        Lexer {
+            parent: None,
+            row,
+            index: 0,
+        }
     }
 
-    fn begin(&mut self) -> LexerToken {
-        LexerToken {
-            lexer: self,
-            index: self.index,
+    fn begin_token(self) -> Lexer<'a> {
+        let index = self.index;
+        let row = self.row;
+        Lexer {
+            parent: Some(Box::new(self)),
+            row,
+            index,
         }
+    }
+
+    fn consume_n(&mut self, count: usize) {
+        self.index += count;
+    }
+
+    // TODO: https://doc.rust-lang.org/reference/attributes/diagnostics.html#the-must_use-attribute ?
+    fn end_token(self) -> Option<Lexer<'a>> {
+        assert!(self.index <= self.row.values.len());
+        if let Some(mut parent) = self.parent {
+            parent.index = self.index;
+            Some(*parent)
+        } else {
+            None
+        }
+    }
+
+    fn discard_token(mut self) -> Option<Lexer<'a>> {
+        self.parent.take().map(|v| *v)
+    }
+
+    fn get_slice(&self) -> &[MathElement] {
+        &self.row.values[self.index..]
     }
 
     fn eof(&self) -> bool {
         self.index >= self.row.values.len()
-    }
-}
-
-impl<'a> LexerToken<'a> {
-    fn next(&mut self) -> Option<&MathElement> {
-        let index = self.index;
-        self.index += 1;
-        self.lexer.row.values.get(index)
-    }
-    fn peek(&self) -> Option<&MathElement> {
-        self.lexer.row.values.get(self.index)
-    }
-    fn consume(&mut self, count: usize) {
-        self.index += count;
-    }
-    // TODO: https://doc.rust-lang.org/reference/attributes/diagnostics.html#the-must_use-attribute ?
-    fn end(self) {
-        assert!(self.index <= self.lexer.row.values.len());
-        self.lexer.index = self.index;
-    }
-
-    fn discard(self) {}
-
-    fn get_slice(&self) -> &[MathElement] {
-        &self.lexer.row.values[self.index..]
     }
 }
 
@@ -163,74 +169,90 @@ impl fmt::Display for MathSemantic {
 pub fn parse(input: &Row, context: &ParseContext) -> MathSemantic {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     // we have a LL(1) pratt parser, aka we can look one token ahead
-    let mut lexer = Lexer::new(input);
-    let parse_result = parse_bp(&mut lexer, context, 0);
+    let lexer = Lexer::new(input);
+    let (parse_result, lexer) = parse_bp(lexer, context, 0);
+    assert!(
+        parse_result.range.end() == &(input.values.len() - 1),
+        "range not until end"
+    );
     assert!(lexer.eof(), "lexer not at end");
     parse_result
 }
 
-fn parse_bp(lexer: &mut Lexer, context: &ParseContext, minimum_bp: u32) -> MathSemantic {
+fn parse_bp<'a>(
+    mut lexer: Lexer<'a>,
+    context: &ParseContext,
+    minimum_bp: u32,
+) -> (MathSemantic, Lexer<'a>) {
     // bp stands for binding power
-    let mut left = parse_bp_start(lexer.begin(), context)
+    let mut starting_token = lexer.begin_token();
+    let mut left: MathSemantic = parse_bp_start(&mut starting_token, context)
         .unwrap()
-        .apply(context)
-        .apply(lexer, context);
+        .to_math_semantic(context);
+    lexer = starting_token.end_token().unwrap();
 
     // Repeatedly and recursively consume operators with higher binding power
     loop {
-        let operator = lexer.begin();
-
         // Not sure yet what happens when we have a postfix operator with a low binding power
 
+        let mut operator = lexer.begin_token();
         if let Some(definition) = context.get_token(&mut operator, (true, true)) {
             // Infix operators only get applied if there is something valid after them
             // So we check if the next parsing step would be successful, while avoiding consuming the token
-            let symbol_comes_next = parse_bp_start(lexer.peek_n(1), context).is_ok();
+            let mut next_token = operator.begin_token(); // TODO: Hmm, doesn't that consume the entire lexer?
+            let symbol_comes_next = parse_bp_start(&mut next_token, context).is_ok();
+            operator = next_token.discard_token().unwrap();
             if symbol_comes_next {
                 // Infix operator
                 // Not super elegant, but it works
                 if definition.binding_power.0.unwrap() < minimum_bp {
+                    lexer = operator.discard_token().unwrap();
                     break;
                 }
 
                 // Actually consume the operator
-                operator.end();
+                lexer = operator.end_token().unwrap();
 
                 // Parse the right operand
-                let right = parse_bp(lexer, context, definition.binding_power.1.unwrap());
+                let result = parse_bp(lexer, context, definition.binding_power.1.unwrap());
+                let right = result.0;
+                lexer = result.1;
 
                 // Combine the left and right operand into a new left operand
                 left = MathSemantic {
                     name: "operator".to_string(),
                     args: vec![left, right],
                     value: definition.name.clone().into_bytes(),
-                    range: (0, 0),
+                    range: (0..=0), // TODO: Range
                 };
                 continue;
+            } else {
+                lexer = operator.discard_token().unwrap();
             }
         } else {
-            operator.discard();
+            lexer = operator.discard_token().unwrap();
         }
 
-        let operator = lexer.begin();
+        let mut operator = lexer.begin_token();
         if let Some(definition) = context.get_token(&mut operator, (true, false)) {
             // Postfix operator
             if definition.binding_power.0.unwrap() < minimum_bp {
+                lexer = operator.discard_token().unwrap();
                 break;
             }
             // Actually consume the operator
-            operator.end();
+            lexer = operator.end_token().unwrap();
 
             // Combine the left operand into a new left operand
             left = MathSemantic {
                 name: "operator".to_string(),
                 args: vec![left],
                 value: definition.name.clone().into_bytes(),
-                range: (0, 0),
+                range: (0..=0), // TODO: Range
             };
             continue;
         } else {
-            operator.discard();
+            lexer = operator.discard_token().unwrap();
         }
 
         // Not an operator?
@@ -238,16 +260,61 @@ fn parse_bp(lexer: &mut Lexer, context: &ParseContext, minimum_bp: u32) -> MathS
         break;
     }
 
-    left
+    (left, lexer)
+}
+
+// TODO: Range
+enum ParseStartResult<'a> {
+    Token {
+        definition: &'a TokenDefinition,
+        minimum_bp: u32,
+    },
+    Bracket {
+        definition: &'a BracketDefinition,
+    },
+}
+impl<'a> ParseStartResult<'a> {
+    fn to_math_semantic(self, context: &ParseContext) -> MathSemantic {
+        todo!()
+    }
 }
 
 /// Expects a token or an opening bracket or a prefix operator
 fn parse_bp_start<'a, 'b>(
-    token: LexerToken<'a>,
+    token: &mut Lexer<'a>,
     context: &'b ParseContext,
     // TODO: Use ParseResult here, so that you can report multiple errors, and always can return a value
-) -> Result<MathSemanticContinuation<SubRows<'a>>, ParseError> {
-    match token {
+) -> Result<ParseStartResult<'b>, ParseError> {
+    if token.eof() {
+        Err(ParseError {
+            error: ParseErrorType::UnexpectedEndOfInput,
+            // TODO: Range
+            range: (0, 0),
+        })
+    } else if let Some(definition) = context.get_token(token, (false, false)) {
+        // Defined symbol
+        Ok(ParseStartResult::Token {
+            definition,
+            minimum_bp: definition.binding_power.0.unwrap(),
+        })
+    } else if let Some(definition) = context.get_token(token, (false, true)) {
+        // Prefix operator
+        Ok(ParseStartResult::Token {
+            definition,
+            minimum_bp: definition.binding_power.1.unwrap(),
+        })
+    } else if let Some(definition) = context.get_bracket(token, BracketType::Opening) {
+        // Bracket opening
+        // TODO: quotes are like brackets
+        Ok(ParseStartResult::Bracket { definition })
+    } else {
+        Err(ParseError {
+            error: ParseErrorType::UnexpectedToken,
+            // TODO: Range
+            range: (0, 0),
+        })
+    }
+    /*match token {
         Some(v) => match v {
             MathElement::Symbol(s) => {
                 if let Some(definition) = context.get_token_definition(s, (false, false)) {
@@ -330,17 +397,11 @@ fn parse_bp_start<'a, 'b>(
                     sub_rows: vec![top, bottom],
                 },
             }),
-            MathElement::Sup(_) | MathElement::Sub(_) => Err(ParseError {
-                error: ParseErrorType::UnexpectedPostfixOperator,
-                range: (0, 0),
-            }),
+
             _ => panic!("unexpected element"),
         },
-        None => Err(ParseError {
-            error: ParseErrorType::UnexpectedEndOfInput,
-            range: (0, 0),
-        }),
-    }
+
+    }*/
 }
 
 type BindingPowerPattern = (bool, bool);
@@ -384,24 +445,23 @@ impl<'a> ParseContext<'a> {
 
     fn get_token<'b>(
         &self,
-        token: &mut LexerToken<'b>,
+        token: &mut Lexer<'b>,
         bp_pattern: BindingPowerPattern,
     ) -> Option<&TokenDefinition> {
         let matches: Vec<_> = self
             .known_tokens
-            .get(&bp_pattern)
-            .unwrap_or(&vec![])
+            .get(&bp_pattern)?
             .iter()
             .map(|(matcher, definition)| (matcher.pattern.matches(token.get_slice()), definition))
-            .filter(|(match_length, _)| match_length > &0)
+            .filter_map(|(match_result, definition)| match_result.ok().map(|v| (v, definition)))
             .collect();
 
         if matches.len() > 1 {
             // TODO: Better error
             panic!("multiple matches for token");
         } else if matches.len() == 1 {
-            let (match_length, definition) = matches[0];
-            token.consume(match_length);
+            let (match_result, definition) = matches.get(0).unwrap();
+            token.consume_n(match_result.get_length());
 
             Some(definition)
         } else {
@@ -412,7 +472,7 @@ impl<'a> ParseContext<'a> {
 
     fn get_bracket<'b>(
         &self,
-        bracket: &mut LexerToken<'b>,
+        bracket: &mut Lexer<'b>,
         bracket_type: BracketType,
     ) -> Option<&BracketDefinition> {
         let matches: Vec<_> = self
@@ -428,16 +488,15 @@ impl<'a> ParseContext<'a> {
                     definition,
                 ),
             })
-            .filter(|(match_length, _)| match_length > &0)
+            .filter_map(|(match_result, definition)| match_result.ok().map(|v| (v, definition)))
             .collect();
 
         if matches.len() > 1 {
             // TODO: Better error
             panic!("multiple matches for bracket");
         } else if matches.len() == 1 {
-            let (match_length, definition) = matches[0];
-            bracket.consume(match_length);
-            bracket.end(); // TODO: Remove
+            let (match_result, definition) = matches.get(0).unwrap();
+            bracket.consume_n(match_result.get_length());
 
             Some(definition)
         } else {
@@ -489,7 +548,7 @@ impl<'a> ParseContext<'a> {
     }
 }
 
-struct TokenMatcher {
+pub struct TokenMatcher {
     // 1. binding power pattern
     // 2. tricky
     // - sin is 3 symbol tokens
@@ -535,7 +594,7 @@ impl TokenDefinition {
     }
 }
 
-struct BracketMatcher {
+pub struct BracketMatcher {
     opening_pattern: NFA,
     closing_pattern: NFA,
 }
@@ -576,17 +635,25 @@ mod tests {
         ]);
 
         let mut lexer = Lexer::new(&layout);
-        assert_eq!(lexer.next(), Some(&MathElement::Symbol("a".to_string())));
+        let mut token = lexer.begin_token();
         assert_eq!(
-            lexer.next(),
+            token.get_slice().get(0),
+            Some(&MathElement::Symbol("a".to_string()))
+        );
+        token.consume_n(1);
+        lexer = token.end_token().unwrap();
+        assert_eq!(
+            lexer.get_slice().get(0),
             Some(&MathElement::Fraction([
                 Row::new(vec![MathElement::Symbol("b".to_string())]),
                 Row::new(vec![MathElement::Symbol("c".to_string())]),
             ]))
         );
-        assert_eq!(lexer.next(), None);
+        lexer.consume_n(1);
+        assert_eq!(lexer.get_slice().get(0), None);
     }
 
+    // TODO: Fix those tests to actually do something instead of printing stuff
     #[test]
     fn test_parser() {
         let layout = Row::new(vec![
