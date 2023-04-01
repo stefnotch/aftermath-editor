@@ -77,7 +77,7 @@ impl<'a> Iterator for MathElementIterator<'a> {
             | MathElement::Root(v)
             | MathElement::Under(v)
             | MathElement::Over(v) => (v.len(), Some(v.len())),
-            MathElement::Sup(v) | MathElement::Sub(v) => (1, Some(1)),
+            MathElement::Sup(_v) | MathElement::Sub(_v) => (1, Some(1)),
             MathElement::Table {
                 cells,
                 row_width: _,

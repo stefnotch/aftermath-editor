@@ -1,6 +1,6 @@
 use std::{collections::HashMap, ops::RangeInclusive};
 
-use super::{capturing_group::CapturingGroupId, token_matcher::StateId};
+use super::{capturing_group::CapturingGroupId, StateId};
 
 #[derive(Debug, Clone)]
 pub struct NFAMatches {

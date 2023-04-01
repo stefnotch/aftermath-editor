@@ -2,8 +2,8 @@ mod math_layout;
 mod parser;
 mod utils;
 
-use math_layout::{element::MathElement, row::Row};
-use parser::{MathSemantic, ParseContext};
+use math_layout::row::Row;
+use parser::ParseContext;
 use serde::Serialize;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
@@ -33,6 +33,8 @@ pub fn parse(layout_row: JsValue) -> Result<JsValue, JsValue> {
 
     let serializer =
         serde_wasm_bindgen::Serializer::new().serialize_large_number_types_as_bigints(true);
-    let serialized_result = parsed.serialize(&serializer)?;
+
+    // TODO: Also serialize errors
+    let serialized_result = parsed.value.serialize(&serializer)?;
     Ok(serialized_result)
 }

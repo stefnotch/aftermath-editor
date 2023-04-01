@@ -1,35 +1,22 @@
-mod capturing_group;
 mod grapheme_matcher;
-mod matcher_state;
+mod math_semantic;
 mod nfa_builder;
+mod parse_result;
 mod token_matcher;
 
 use crate::math_layout::{element::MathElement, row::Row};
-use core::fmt;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, ops::RangeInclusive};
+use std::{collections::HashMap, ops::Range};
 
-use self::{nfa_builder::NFABuilder, token_matcher::NFA};
+use self::{
+    math_semantic::MathSemantic,
+    nfa_builder::NFABuilder,
+    parse_result::{ParseError, ParseErrorType, ParseResult},
+    token_matcher::NFA,
+};
 
 // TODO:
 // 1. Parser for variables (names)
 // 2. Parser for various types of tokens (numbers, strings, etc.)
-
-/// https://github.com/cortex-js/compute-engine/issues/25
-/// mimics the math layout tree
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MathSemantic {
-    /// name of the function or constant
-    pub name: String,
-    /// arguments of the function
-    /// if the function is a constant, this is empty
-    pub args: Vec<MathSemantic>,
-    /// value, especially for constants
-    /// stored as bytes, and interpreted according to the name
-    pub value: Vec<u8>,
-    /// the range of this in the original math layout
-    pub range: RangeInclusive<usize>,
-}
 
 /// Lets us delay parsing of arguments
 /// Split into two "stages" because of borrowing and ownership
@@ -77,26 +64,6 @@ impl<'a> MathSemanticContinuation<Finish> {
         math_semantic
     }
 } */
-
-pub struct ParseResult<T> {
-    pub value: T,
-    pub errors: Vec<ParseError>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ParseError {
-    pub error: ParseErrorType,
-    /// the range of this in the original math layout
-    pub range: (usize, usize),
-}
-
-#[derive(Debug, Clone)]
-pub enum ParseErrorType {
-    UnexpectedEndOfInput,
-    UnexpectedPostfixOperator,
-    Custom(String),
-    UnexpectedToken,
-}
 
 /// A lexer that can be nested
 struct Lexer<'a> {
@@ -152,31 +119,20 @@ impl<'a> Lexer<'a> {
     }
 }
 
-impl fmt::Display for MathSemantic {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // S-expression
-        // S here sadly doesn't stand for Stef
-        write!(f, "({} ", self.name)?;
-        if !self.args.is_empty() {
-            for arg in &self.args {
-                write!(f, " {}", arg)?;
-            }
-        }
-        write!(f, ")")
-    }
-}
-
-pub fn parse(input: &Row, context: &ParseContext) -> MathSemantic {
+pub fn parse(input: &Row, context: &ParseContext) -> ParseResult<MathSemantic> {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     // we have a LL(1) pratt parser, aka we can look one token ahead
     let lexer = Lexer::new(input);
     let (parse_result, lexer) = parse_bp(lexer, context, 0);
     assert!(
-        parse_result.range.end() == &(input.values.len() - 1),
+        parse_result.range.end == input.values.len(),
         "range not until end"
     );
     assert!(lexer.eof(), "lexer not at end");
-    parse_result
+    ParseResult {
+        value: parse_result,
+        errors: Vec::new(),
+    }
 }
 
 fn parse_bp<'a>(
@@ -223,7 +179,7 @@ fn parse_bp<'a>(
                     name: "operator".to_string(),
                     args: vec![left, right],
                     value: definition.name.clone().into_bytes(),
-                    range: (0..=0), // TODO: Range
+                    range: (0..0), // TODO: Range
                 };
                 continue;
             } else {
@@ -248,7 +204,7 @@ fn parse_bp<'a>(
                 name: "operator".to_string(),
                 args: vec![left],
                 value: definition.name.clone().into_bytes(),
-                range: (0..=0), // TODO: Range
+                range: (0..0), // TODO: Range
             };
             continue;
         } else {
@@ -666,7 +622,7 @@ mod tests {
         let context = ParseContext::default();
 
         let parsed = parse(&layout, &context);
-        println!("{}", parsed);
+        println!("{}", parsed.value);
     }
 
     #[test]

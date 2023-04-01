@@ -18,15 +18,19 @@
 // TODO: Build a DFA
 // TODO: Have fast paths for some things (profile first)
 
-use std::collections::HashMap;
+mod capturing_group;
+mod matcher_state;
+
 use std::fmt::{Debug, Formatter};
-use std::{collections::HashSet, ops::RangeInclusive};
 
 use crate::math_layout::element::MathElement;
 
-use super::capturing_group::{CapturingGroupId, CapturingGroups};
 use super::grapheme_matcher::GraphemeClusterMatcher;
-use super::matcher_state::{MatchError, MatchInfo, MatchResult, NFAMatches};
+use super::token_matcher::capturing_group::CapturingGroupId;
+use super::token_matcher::matcher_state::{MatchError, MatchInfo, MatchResult, NFAMatches};
+
+pub use super::token_matcher::capturing_group::CapturingGroupName;
+pub(super) use super::token_matcher::capturing_group::CapturingGroups;
 
 // TODO: Error prone
 pub type StateId = usize;
@@ -66,7 +70,6 @@ pub enum MatchIf {
     Container(Container),
 }
 
-/// TODO: Even if we have this, we should still have the option of running the whole parser over one of those matches
 #[derive(Debug)]
 pub enum Container {
     Fraction([NFA; 2]),
@@ -86,7 +89,6 @@ impl MatchIf {
         }
     }
 
-    // TODO: Return an error (expected ... but got ...)
     fn matches(&self, value: &MathElement) -> bool {
         match (self, value) {
             (MatchIf::Container(Container::Fraction(matcher)), MathElement::Fraction(a))
@@ -227,10 +229,10 @@ impl NFA {
     }
 }
 
+#[cfg(test)]
 mod tests {
-    use crate::parser::nfa_builder::*;
-
     use super::*;
+    use crate::parser::nfa_builder::*;
 
     #[test]
     fn test_matches() {

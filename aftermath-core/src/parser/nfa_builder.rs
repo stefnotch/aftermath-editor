@@ -2,9 +2,10 @@ use unicode_normalization::UnicodeNormalization;
 use unicode_segmentation::UnicodeSegmentation;
 
 use super::{
-    capturing_group::{CapturingGroupName, CapturingGroups},
     grapheme_matcher::GraphemeClusterMatcher,
-    token_matcher::{Container, MatchIf, StateFragment, StateId, NFA},
+    token_matcher::{
+        CapturingGroupName, CapturingGroups, Container, MatchIf, StateFragment, StateId, NFA,
+    },
 };
 
 /// A builder for an NFA
@@ -259,6 +260,7 @@ enum NFABuilderEndState {
     CaptureEnd(StateId),
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
