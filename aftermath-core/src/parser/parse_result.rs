@@ -1,11 +1,10 @@
 use core::fmt;
-
-use serde::Serialize;
+use std::ops::Range;
 
 #[derive(Debug)]
 pub struct ParseResult<T>
 where
-    T: Serialize + fmt::Debug + fmt::Display,
+    T: fmt::Debug,
 {
     /// always returns a value, even if there are errors
     pub value: T,
@@ -17,7 +16,7 @@ where
 pub struct ParseError {
     pub error: ParseErrorType,
     /// the range of this in the original math layout
-    pub range: (usize, usize),
+    pub range: Range<usize>,
 }
 
 #[derive(Debug, Clone)]

@@ -1,131 +1,31 @@
 mod grapheme_matcher;
+mod lexer;
 mod math_semantic;
 mod nfa_builder;
 mod parse_result;
 mod token_matcher;
 
-use crate::math_layout::{element::MathElement, row::Row};
+use crate::{
+    math_layout::{element::MathElement, row::Row},
+    parser::lexer::Lexer,
+};
 use std::{collections::HashMap, ops::Range};
 
 use self::{
     math_semantic::MathSemantic,
     nfa_builder::NFABuilder,
     parse_result::{ParseError, ParseErrorType, ParseResult},
-    token_matcher::NFA,
+    token_matcher::{MatchResult, NFA},
 };
-
-// TODO:
-// 1. Parser for variables (names)
-// 2. Parser for various types of tokens (numbers, strings, etc.)
-
-/// Lets us delay parsing of arguments
-/// Split into two "stages" because of borrowing and ownership
-/// Typestate pattern go brr https://cliffle.com/blog/rust-typestate/
-/*
-struct MathSemanticContinuation<S: SemanticContinuationState> {
-    math_semantic: MathSemantic,
-    parse_args: fn(&mut Lexer, &ParseContext, u32) -> Vec<MathSemantic>,
-    minimum_bp: u32,
-    extra: S,
-}
-
-struct SubRows<'a> {
-    sub_rows: Vec<&'a Row>,
-}
-
-struct Finish;
-
-trait SemanticContinuationState {}
-impl<'a> SemanticContinuationState for SubRows<'a> {}
-impl<'a> SemanticContinuationState for Finish {}
-
-impl<'a> MathSemanticContinuation<SubRows<'a>> {
-    fn apply(self, context: &ParseContext) -> MathSemanticContinuation<Finish> {
-        let mut math_semantic = self.math_semantic;
-        math_semantic.args = self
-            .extra
-            .sub_rows
-            .iter()
-            .map(|v| parse_bp( Lexer::new(v), context, 0))
-            .collect();
-        MathSemanticContinuation {
-            math_semantic,
-            parse_args: self.parse_args,
-            minimum_bp: self.minimum_bp,
-            extra: Finish,
-        }
-    }
-}
-
-impl<'a> MathSemanticContinuation<Finish> {
-    fn apply(self, lexer: &mut Lexer, context: &ParseContext) -> MathSemantic {
-        let mut math_semantic = self.math_semantic;
-        math_semantic.args = (self.parse_args)(lexer, context, self.minimum_bp);
-        math_semantic
-    }
-} */
-
-/// A lexer that can be nested
-struct Lexer<'a> {
-    parent: Option<Box<Lexer<'a>>>,
-    row: &'a Row,
-    index: usize,
-}
-
-impl<'a> Lexer<'a> {
-    fn new(row: &Row) -> Lexer {
-        Lexer {
-            parent: None,
-            row,
-            index: 0,
-        }
-    }
-
-    fn begin_token(self) -> Lexer<'a> {
-        let index = self.index;
-        let row = self.row;
-        Lexer {
-            parent: Some(Box::new(self)),
-            row,
-            index,
-        }
-    }
-
-    fn consume_n(&mut self, count: usize) {
-        self.index += count;
-    }
-
-    // TODO: https://doc.rust-lang.org/reference/attributes/diagnostics.html#the-must_use-attribute ?
-    fn end_token(self) -> Option<Lexer<'a>> {
-        assert!(self.index <= self.row.values.len());
-        if let Some(mut parent) = self.parent {
-            parent.index = self.index;
-            Some(*parent)
-        } else {
-            None
-        }
-    }
-
-    fn discard_token(mut self) -> Option<Lexer<'a>> {
-        self.parent.take().map(|v| *v)
-    }
-
-    fn get_slice(&self) -> &[MathElement] {
-        &self.row.values[self.index..]
-    }
-
-    fn eof(&self) -> bool {
-        self.index >= self.row.values.len()
-    }
-}
 
 pub fn parse(input: &Row, context: &ParseContext) -> ParseResult<MathSemantic> {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     // we have a LL(1) pratt parser, aka we can look one token ahead
     let lexer = Lexer::new(input);
     let (parse_result, lexer) = parse_bp(lexer, context, 0);
-    assert!(
-        parse_result.range.end == input.values.len(),
+    assert_eq!(
+        parse_result.range.end,
+        input.values.len(),
         "range not until end"
     );
     assert!(lexer.eof(), "lexer not at end");
@@ -141,21 +41,25 @@ fn parse_bp<'a>(
     minimum_bp: u32,
 ) -> (MathSemantic, Lexer<'a>) {
     // bp stands for binding power
-    let mut starting_token = lexer.begin_token();
-    let mut left: MathSemantic = parse_bp_start(&mut starting_token, context)
-        .unwrap()
-        .to_math_semantic(context);
-    lexer = starting_token.end_token().unwrap();
+    let mut left = {
+        let mut starting_token = lexer.begin_token();
+        let parse_start = parse_bp_start(&mut starting_token, context).unwrap();
+        let token_slice = starting_token.get_slice();
+        lexer = starting_token.end_token().unwrap();
+        let parse_result = parse_start.to_math_semantic(token_slice, lexer, context);
+        lexer = parse_result.1;
+        parse_result.0
+    };
 
     // Repeatedly and recursively consume operators with higher binding power
     loop {
         // Not sure yet what happens when we have a postfix operator with a low binding power
 
         let mut operator = lexer.begin_token();
-        if let Some(definition) = context.get_token(&mut operator, (true, true)) {
+        if let Some((definition, _)) = context.get_token(&mut operator, (true, true)) {
             // Infix operators only get applied if there is something valid after them
             // So we check if the next parsing step would be successful, while avoiding consuming the token
-            let mut next_token = operator.begin_token(); // TODO: Hmm, doesn't that consume the entire lexer?
+            let mut next_token = operator.begin_token();
             let symbol_comes_next = parse_bp_start(&mut next_token, context).is_ok();
             operator = next_token.discard_token().unwrap();
             if symbol_comes_next {
@@ -176,7 +80,7 @@ fn parse_bp<'a>(
 
                 // Combine the left and right operand into a new left operand
                 left = MathSemantic {
-                    name: "operator".to_string(),
+                    name: definition.name.clone(),
                     args: vec![left, right],
                     value: definition.name.clone().into_bytes(),
                     range: (0..0), // TODO: Range
@@ -190,7 +94,7 @@ fn parse_bp<'a>(
         }
 
         let mut operator = lexer.begin_token();
-        if let Some(definition) = context.get_token(&mut operator, (true, false)) {
+        if let Some((definition, _)) = context.get_token(&mut operator, (true, false)) {
             // Postfix operator
             if definition.binding_power.0.unwrap() < minimum_bp {
                 lexer = operator.discard_token().unwrap();
@@ -201,7 +105,7 @@ fn parse_bp<'a>(
 
             // Combine the left operand into a new left operand
             left = MathSemantic {
-                name: "operator".to_string(),
+                name: definition.name.clone(),
                 args: vec![left],
                 value: definition.name.clone().into_bytes(),
                 range: (0..0), // TODO: Range
@@ -211,153 +115,133 @@ fn parse_bp<'a>(
             lexer = operator.discard_token().unwrap();
         }
 
-        // Not an operator?
-        // TODO: Check closing brackets?
+        // Not an expected operator
+        // This can happen when
+        // - the minimum binding power is too high, in which case we should return to the caller
+        // - there's a closing bracket, in which case we should return to the caller
+        // - there's an actual error, which we'll have to handle sometime
         break;
     }
 
     (left, lexer)
 }
 
-// TODO: Range
-enum ParseStartResult<'a> {
+#[derive(Debug)]
+pub enum ParseStartResult<'definition> {
     Token {
-        definition: &'a TokenDefinition,
+        definition: &'definition TokenDefinition,
+        match_result: MatchResult,
         minimum_bp: u32,
+        range: Range<usize>,
     },
     Bracket {
-        definition: &'a BracketDefinition,
+        definition: &'definition BracketDefinition,
+        match_result: MatchResult,
+        range: Range<usize>,
     },
 }
-impl<'a> ParseStartResult<'a> {
-    fn to_math_semantic(self, context: &ParseContext) -> MathSemantic {
-        todo!()
+impl<'definition> ParseStartResult<'definition> {
+    fn to_math_semantic<'input, 'lexer>(
+        self,
+        input: &'input [MathElement],
+        lexer: Lexer<'lexer>,
+        context: &ParseContext,
+    ) -> (MathSemantic, Lexer<'lexer>) {
+        let (args, lexer) = match self {
+            ParseStartResult::Token { definition, .. } => {
+                (definition.arguments_parser)(lexer, context, &self)
+            }
+            ParseStartResult::Bracket { .. } => (vec![], lexer),
+        };
+        let value = match self {
+            ParseStartResult::Token {
+                definition,
+                ref match_result,
+                ..
+            } => (definition.value_parser)(input, match_result),
+            ParseStartResult::Bracket { .. } => vec![],
+        };
+
+        match self {
+            ParseStartResult::Token {
+                definition,
+                match_result: _,
+                minimum_bp: _,
+                range,
+            } => (
+                MathSemantic {
+                    name: definition.name.clone(),
+                    args,
+                    value,
+                    range,
+                },
+                lexer,
+            ),
+            ParseStartResult::Bracket {
+                definition,
+                match_result: _,
+                range,
+            } => (
+                MathSemantic {
+                    name: definition.name.clone(),
+                    args,
+                    value,
+                    range,
+                },
+                lexer,
+            ),
+        }
     }
 }
 
 /// Expects a token or an opening bracket or a prefix operator
-fn parse_bp_start<'a, 'b>(
-    token: &mut Lexer<'a>,
-    context: &'b ParseContext,
-    // TODO: Use ParseResult here, so that you can report multiple errors, and always can return a value
-) -> Result<ParseStartResult<'b>, ParseError> {
+fn parse_bp_start<'input, 'definition>(
+    token: &mut Lexer<'input>,
+    context: &'definition ParseContext,
+) -> Result<ParseStartResult<'definition>, ParseError> {
+    let start_index = token.get_index();
+    let get_range = |length: usize| start_index..(start_index + length);
     if token.eof() {
         Err(ParseError {
             error: ParseErrorType::UnexpectedEndOfInput,
-            // TODO: Range
-            range: (0, 0),
+            range: get_range(0),
         })
-    } else if let Some(definition) = context.get_token(token, (false, false)) {
+    } else if let Some((definition, match_result)) = context.get_token(token, (false, false)) {
         // Defined symbol
+        let range = get_range(match_result.get_length());
         Ok(ParseStartResult::Token {
             definition,
+            match_result,
             minimum_bp: definition.binding_power.0.unwrap(),
+            range,
         })
-    } else if let Some(definition) = context.get_token(token, (false, true)) {
+    } else if let Some((definition, match_result)) = context.get_token(token, (false, true)) {
         // Prefix operator
+        let range = get_range(match_result.get_length());
         Ok(ParseStartResult::Token {
             definition,
+            match_result,
             minimum_bp: definition.binding_power.1.unwrap(),
+            range,
         })
-    } else if let Some(definition) = context.get_bracket(token, BracketType::Opening) {
+    } else if let Some((definition, match_result)) =
+        context.get_bracket(token, BracketType::Opening)
+    {
         // Bracket opening
         // TODO: quotes are like brackets
-        Ok(ParseStartResult::Bracket { definition })
+        let range = get_range(match_result.get_length());
+        Ok(ParseStartResult::Bracket {
+            definition,
+            match_result,
+            range,
+        })
     } else {
         Err(ParseError {
             error: ParseErrorType::UnexpectedToken,
-            // TODO: Range
-            range: (0, 0),
+            // TODO: Better range for error reporting
+            range: get_range(0),
         })
     }
-    /*match token {
-        Some(v) => match v {
-            MathElement::Symbol(s) => {
-                if let Some(definition) = context.get_token_definition(s, (false, false)) {
-                    // Defined symbol
-                    Ok(MathSemanticContinuation {
-                        math_semantic: MathSemantic {
-                            // TODO: put the "symbol" name into the parsing context
-                            name: "symbol".to_string(),
-                            args: vec![],
-                            value: definition.name.clone().into_bytes(),
-                            // TODO: Range
-                            range: (0, 0),
-                        },
-                        parse_args: |_, _, _| vec![],
-                        minimum_bp: 0,
-                        extra: SubRows { sub_rows: vec![] },
-                    })
-                } else if let Some(definition) = context.get_token_definition(s, (false, true)) {
-                    // Prefix operator
-                    Ok(MathSemanticContinuation {
-                        math_semantic: MathSemantic {
-                            name: "operator".to_string(),
-                            args: vec![],
-                            value: definition.name.clone().into_bytes(),
-                            range: (0, 0),
-                        },
-                        parse_args: |a, b, c| vec![parse_bp(a, b, c)],
-                        minimum_bp: definition.binding_power.1.unwrap(),
-                        extra: SubRows { sub_rows: vec![] },
-                    })
-                } else if let Some(definition) =
-                    context.get_bracket_definition(s, BracketType::Opening)
-                {
-                    // Bracket opening
-                    // TODO: quotes are like brackets
-
-                    Ok(MathSemanticContinuation {
-                        // This gives me one slightly redundant layer of nesting for brackets, but it's not a big deal
-                        math_semantic: MathSemantic {
-                            name: "bracket".to_string(),
-                            args: vec![],
-                            value: definition.name.clone().into_bytes(),
-                            range: (0, 0),
-                        },
-                        parse_args: |a, b, c| {
-                            let left = vec![parse_bp(a, b, c)];
-                            a.next(); // TODO: Do this instead: assert_eq!(a.next(), Some(&definition.closing_bracket));
-                            left
-                        },
-                        minimum_bp: 0,
-                        extra: SubRows { sub_rows: vec![] },
-                    })
-                } else {
-                    // Undefined symbol
-                    // TODO: What if that symbol is a postfix operator or an infix operator?
-                    Ok(MathSemanticContinuation {
-                        math_semantic: MathSemantic {
-                            name: "symbol".to_string(),
-                            args: vec![],
-                            value: s.clone().into_bytes(),
-                            // TODO: Range
-                            range: (0, 0),
-                        },
-                        parse_args: |_, _, _| vec![],
-                        minimum_bp: 0,
-                        extra: SubRows { sub_rows: vec![] },
-                    })
-                }
-            }
-            MathElement::Fraction([top, bottom]) => Ok(MathSemanticContinuation {
-                math_semantic: MathSemantic {
-                    name: "fraction".to_string(),
-                    args: vec![],
-                    value: vec![],
-                    range: (0, 0),
-                },
-                parse_args: |_, _, _| vec![],
-                minimum_bp: 0,
-                extra: SubRows {
-                    sub_rows: vec![top, bottom],
-                },
-            }),
-
-            _ => panic!("unexpected element"),
-        },
-
-    }*/
 }
 
 type BindingPowerPattern = (bool, bool);
@@ -399,11 +283,11 @@ impl<'a> ParseContext<'a> {
         }
     }
 
-    fn get_token<'b>(
+    fn get_token<'input>(
         &self,
-        token: &mut Lexer<'b>,
+        token: &mut Lexer<'input>,
         bp_pattern: BindingPowerPattern,
-    ) -> Option<&TokenDefinition> {
+    ) -> Option<(&TokenDefinition, MatchResult)> {
         let matches: Vec<_> = self
             .known_tokens
             .get(&bp_pattern)?
@@ -416,21 +300,21 @@ impl<'a> ParseContext<'a> {
             // TODO: Better error
             panic!("multiple matches for token");
         } else if matches.len() == 1 {
-            let (match_result, definition) = matches.get(0).unwrap();
+            let (match_result, definition) = matches.into_iter().next().unwrap();
             token.consume_n(match_result.get_length());
 
-            Some(definition)
+            Some((definition, match_result))
         } else {
             self.parent_context
                 .and_then(|v| v.get_token(token, bp_pattern))
         }
     }
 
-    fn get_bracket<'b>(
+    fn get_bracket<'input>(
         &self,
-        bracket: &mut Lexer<'b>,
+        bracket: &mut Lexer<'input>,
         bracket_type: BracketType,
-    ) -> Option<&BracketDefinition> {
+    ) -> Option<(&BracketDefinition, MatchResult)> {
         let matches: Vec<_> = self
             .known_brackets
             .iter()
@@ -451,10 +335,10 @@ impl<'a> ParseContext<'a> {
             // TODO: Better error
             panic!("multiple matches for bracket");
         } else if matches.len() == 1 {
-            let (match_result, definition) = matches.get(0).unwrap();
+            let (match_result, definition) = matches.into_iter().next().unwrap();
             bracket.consume_n(match_result.get_length());
 
-            Some(definition)
+            Some((definition, match_result))
         } else {
             self.parent_context
                 .and_then(|v| v.get_bracket(bracket, bracket_type))
@@ -464,6 +348,11 @@ impl<'a> ParseContext<'a> {
 
 impl<'a> ParseContext<'a> {
     pub fn default() -> ParseContext<'a> {
+        // TODO:
+        // 1. Parser for variables (names)
+        // 2. Parser for various types of tokens (numbers, strings, etc.)
+        // 3. Parser for functions
+
         ParseContext::new(
             vec![
                 (
@@ -525,6 +414,7 @@ impl From<&str> for TokenMatcher {
     }
 }
 
+#[derive(Debug)]
 pub struct TokenDefinition {
     name: String,
     /// a constant has no binding power
@@ -532,13 +422,69 @@ pub struct TokenDefinition {
     /// a postfix operator has a binding power on the left
     /// an infix operator has a binding power on the left and on the right
     binding_power: (Option<u32>, Option<u32>),
+
+    arguments_parser: TokenDefinitionArgumentParser,
+    value_parser: TokenDefinitionValueParser,
+}
+
+pub type TokenDefinitionArgumentParser =
+    for<'a> fn(Lexer<'a>, &ParseContext, &ParseStartResult) -> (Vec<MathSemantic>, Lexer<'a>);
+
+pub type TokenDefinitionValueParser =
+    for<'input> fn(input: &'input [MathElement], match_result: &MatchResult) -> Vec<u8>;
+
+// TODO: Maybe this is a useless design?
+fn no_arguments_parser<'a>(
+    lexer: Lexer<'a>,
+    context: &ParseContext,
+    _: &ParseStartResult,
+) -> (Vec<MathSemantic>, Lexer<'a>) {
+    (vec![], lexer)
+}
+
+fn prefix_arguments_parser<'a>(
+    lexer: Lexer<'a>,
+    context: &ParseContext,
+    start: &ParseStartResult,
+) -> (Vec<MathSemantic>, Lexer<'a>) {
+    let (argument, lexer) = parse_bp(
+        lexer,
+        context,
+        match start {
+            ParseStartResult::Token { minimum_bp, .. } => *minimum_bp,
+            ParseStartResult::Bracket { .. } => todo!(),
+        },
+    );
+    (vec![argument], lexer)
+}
+
+fn no_value_parser<'input>(input: &'input [MathElement], match_result: &MatchResult) -> Vec<u8> {
+    vec![]
 }
 
 impl TokenDefinition {
     pub fn new(name: String, binding_power: (Option<u32>, Option<u32>)) -> Self {
+        let arguments_parser = match binding_power {
+            (Some(_), Some(_)) => no_arguments_parser,
+            (Some(_), None) => prefix_arguments_parser,
+            (None, Some(_)) => no_arguments_parser,
+            (None, None) => no_arguments_parser,
+        };
+
+        Self::new_with_parsers(name, binding_power, arguments_parser, no_value_parser)
+    }
+
+    pub fn new_with_parsers(
+        name: String,
+        binding_power: (Option<u32>, Option<u32>),
+        arguments_parser: TokenDefinitionArgumentParser,
+        value_parser: TokenDefinitionValueParser,
+    ) -> Self {
         Self {
             name,
             binding_power,
+            arguments_parser,
+            value_parser,
         }
     }
 
@@ -564,7 +510,7 @@ impl From<(&str, &str)> for BracketMatcher {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct BracketDefinition {
     name: String,
 }

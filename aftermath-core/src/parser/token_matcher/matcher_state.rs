@@ -56,7 +56,10 @@ impl MatchResult {
     pub fn get_length(&self) -> usize {
         self.length
     }
-    pub fn get_capture_group(&self, group: CapturingGroupId) -> Option<&RangeInclusive<usize>> {
+    pub fn get_capture_group_range(
+        &self,
+        group: CapturingGroupId,
+    ) -> Option<&RangeInclusive<usize>> {
         self.capture_ranges.get(group.get())
     }
 }

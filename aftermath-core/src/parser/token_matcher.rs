@@ -27,10 +27,11 @@ use crate::math_layout::element::MathElement;
 
 use super::grapheme_matcher::GraphemeClusterMatcher;
 use super::token_matcher::capturing_group::CapturingGroupId;
-use super::token_matcher::matcher_state::{MatchError, MatchInfo, MatchResult, NFAMatches};
+use super::token_matcher::matcher_state::{MatchInfo, NFAMatches};
 
 pub use super::token_matcher::capturing_group::CapturingGroupName;
 pub(super) use super::token_matcher::capturing_group::CapturingGroups;
+pub(super) use super::token_matcher::matcher_state::{MatchError, MatchResult};
 
 // TODO: Error prone
 pub type StateId = usize;
@@ -135,7 +136,7 @@ impl NFA {
         }
     }
 
-    pub fn matches(&self, input: &[MathElement]) -> Result<MatchResult, MatchError> {
+    pub fn matches<'input>(&self, input: &'input [MathElement]) -> Result<MatchResult, MatchError> {
         let mut current_states = NFAMatches::new(0);
         let mut best_final_states = NFAMatches::new(0);
         {
