@@ -136,7 +136,10 @@ impl NFA {
         }
     }
 
-    pub fn matches<'input>(&self, input: &'input [MathElement]) -> Result<MatchResult, MatchError> {
+    pub fn matches<'input>(
+        &self,
+        input: &'input [MathElement],
+    ) -> Result<MatchResult<'input, MathElement>, MatchError> {
         let mut current_states = NFAMatches::new(0);
         let mut best_final_states = NFAMatches::new(0);
         {
@@ -191,7 +194,7 @@ impl NFA {
             }
         }
 
-        return best_final_states.get_match_result();
+        return best_final_states.get_match_result(&(input[0..input.len()]));
     }
 
     fn add_state(

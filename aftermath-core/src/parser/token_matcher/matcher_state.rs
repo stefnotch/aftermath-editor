@@ -29,7 +29,10 @@ impl NFAMatches {
         self.states.len() > 0
     }
 
-    pub fn get_match_result(&self) -> Result<MatchResult, MatchError> {
+    pub fn get_match_result<'input, Input>(
+        &self,
+        input: &'input [Input],
+    ) -> Result<MatchResult<'input, Input>, MatchError> {
         if self.input_length == 0 {
             Err(MatchError::NoMatch)
         } else if self.states.len() == 0 {
@@ -41,26 +44,36 @@ impl NFAMatches {
             Ok(MatchResult {
                 length: self.input_length,
                 capture_ranges: match_info.capture_ranges.clone(),
+                input,
             })
         }
     }
 }
 
 #[derive(Debug)]
-pub struct MatchResult {
+pub struct MatchResult<'input, Input> {
     length: usize,
     capture_ranges: Vec<RangeInclusive<usize>>,
+    input: &'input [Input],
 }
 
-impl MatchResult {
+impl<'input, Input> MatchResult<'input, Input> {
     pub fn get_length(&self) -> usize {
         self.length
+    }
+    pub fn get_input(&self) -> &'input [Input] {
+        self.input
     }
     pub fn get_capture_group_range(
         &self,
         group: CapturingGroupId,
     ) -> Option<&RangeInclusive<usize>> {
         self.capture_ranges.get(group.get())
+    }
+    pub fn get_capture_group(&self, group: CapturingGroupId) -> Option<&'input [Input]> {
+        self.capture_ranges
+            .get(group.get())
+            .map(|range| &self.input[range.clone()])
     }
 }
 

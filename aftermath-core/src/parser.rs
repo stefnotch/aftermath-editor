@@ -44,9 +44,8 @@ fn parse_bp<'a>(
     let mut left = {
         let mut starting_token = lexer.begin_token();
         let parse_start = parse_bp_start(&mut starting_token, context).unwrap();
-        let token_slice = starting_token.get_slice();
         lexer = starting_token.end_token().unwrap();
-        let parse_result = parse_start.to_math_semantic(token_slice, lexer, context);
+        let parse_result = parse_start.to_math_semantic(lexer, context);
         lexer = parse_result.1;
         parse_result.0
     };
@@ -127,23 +126,22 @@ fn parse_bp<'a>(
 }
 
 #[derive(Debug)]
-pub enum ParseStartResult<'definition> {
+pub enum ParseStartResult<'input, 'definition> {
     Token {
         definition: &'definition TokenDefinition,
-        match_result: MatchResult,
+        match_result: MatchResult<'input, MathElement>,
         minimum_bp: u32,
         range: Range<usize>,
     },
     Bracket {
         definition: &'definition BracketDefinition,
-        match_result: MatchResult,
+        match_result: MatchResult<'input, MathElement>,
         range: Range<usize>,
     },
 }
-impl<'definition> ParseStartResult<'definition> {
-    fn to_math_semantic<'input, 'lexer>(
+impl<'input, 'definition> ParseStartResult<'input, 'definition> {
+    fn to_math_semantic<'lexer>(
         self,
-        input: &'input [MathElement],
         lexer: Lexer<'lexer>,
         context: &ParseContext,
     ) -> (MathSemantic, Lexer<'lexer>) {
@@ -158,7 +156,7 @@ impl<'definition> ParseStartResult<'definition> {
                 definition,
                 ref match_result,
                 ..
-            } => (definition.value_parser)(input, match_result),
+            } => (definition.value_parser)(match_result),
             ParseStartResult::Bracket { .. } => vec![],
         };
 
@@ -198,7 +196,7 @@ impl<'definition> ParseStartResult<'definition> {
 fn parse_bp_start<'input, 'definition>(
     token: &mut Lexer<'input>,
     context: &'definition ParseContext,
-) -> Result<ParseStartResult<'definition>, ParseError> {
+) -> Result<ParseStartResult<'input, 'definition>, ParseError> {
     let start_index = token.get_index();
     let get_range = |length: usize| start_index..(start_index + length);
     if token.eof() {
@@ -287,7 +285,7 @@ impl<'a> ParseContext<'a> {
         &self,
         token: &mut Lexer<'input>,
         bp_pattern: BindingPowerPattern,
-    ) -> Option<(&TokenDefinition, MatchResult)> {
+    ) -> Option<(&TokenDefinition, MatchResult<'input, MathElement>)> {
         let matches: Vec<_> = self
             .known_tokens
             .get(&bp_pattern)?
@@ -314,7 +312,7 @@ impl<'a> ParseContext<'a> {
         &self,
         bracket: &mut Lexer<'input>,
         bracket_type: BracketType,
-    ) -> Option<(&BracketDefinition, MatchResult)> {
+    ) -> Option<(&BracketDefinition, MatchResult<'input, MathElement>)> {
         let matches: Vec<_> = self
             .known_brackets
             .iter()
@@ -431,7 +429,7 @@ pub type TokenDefinitionArgumentParser =
     for<'a> fn(Lexer<'a>, &ParseContext, &ParseStartResult) -> (Vec<MathSemantic>, Lexer<'a>);
 
 pub type TokenDefinitionValueParser =
-    for<'input> fn(input: &'input [MathElement], match_result: &MatchResult) -> Vec<u8>;
+    for<'input> fn(match_result: &MatchResult<'input, MathElement>) -> Vec<u8>;
 
 // TODO: Maybe this is a useless design?
 fn no_arguments_parser<'a>(
@@ -458,7 +456,7 @@ fn prefix_arguments_parser<'a>(
     (vec![argument], lexer)
 }
 
-fn no_value_parser<'input>(input: &'input [MathElement], match_result: &MatchResult) -> Vec<u8> {
+fn no_value_parser<'input>(match_result: &MatchResult<'input, MathElement>) -> Vec<u8> {
     vec![]
 }
 
