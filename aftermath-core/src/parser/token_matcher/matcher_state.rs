@@ -29,10 +29,16 @@ impl NFAMatches {
         self.states.len() > 0
     }
 
+    pub fn input_length(&self) -> usize {
+        self.input_length
+    }
+
     pub fn get_match_result<'input, Input>(
         &self,
         input: &'input [Input],
     ) -> Result<MatchResult<'input, Input>, MatchError> {
+        assert_eq!(input.len(), self.input_length);
+
         if self.input_length == 0 {
             Err(MatchError::NoMatch)
         } else if self.states.len() == 0 {
@@ -63,12 +69,6 @@ impl<'input, Input> MatchResult<'input, Input> {
     }
     pub fn get_input(&self) -> &'input [Input] {
         self.input
-    }
-    pub fn get_capture_group_range(
-        &self,
-        group: CapturingGroupId,
-    ) -> Option<&RangeInclusive<usize>> {
-        self.capture_ranges.get(group.get())
     }
     pub fn get_capture_group(&self, group: CapturingGroupId) -> Option<&'input [Input]> {
         self.capture_ranges

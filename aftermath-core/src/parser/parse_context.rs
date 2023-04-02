@@ -1,0 +1,338 @@
+use std::collections::HashMap;
+
+use crate::math_layout::element::MathElement;
+
+use super::{
+    lexer::Lexer,
+    math_semantic::MathSemantic,
+    nfa_builder::NFABuilder,
+    token_matcher::{MatchResult, NFA},
+    ParseStartResult,
+};
+
+pub type BindingPowerPattern = (bool, bool);
+pub enum BracketType {
+    Opening,
+    Closing,
+}
+pub struct ParseContext<'a> {
+    // takes ownership of the parent context and gives it back afterwards
+    parent_context: Option<&'a ParseContext<'a>>,
+    // TODO: Use a Hash Array Mapped Trie here (see issue #20)
+    known_tokens: HashMap<BindingPowerPattern, Vec<(TokenMatcher, TokenDefinition)>>,
+    known_brackets: Vec<(BracketMatcher, BracketDefinition)>,
+    // functions
+    // ...
+}
+
+impl<'a> ParseContext<'a> {
+    pub fn new(
+        tokens: Vec<(TokenMatcher, TokenDefinition)>,
+        brackets: Vec<(BracketMatcher, BracketDefinition)>,
+    ) -> ParseContext<'a> {
+        let known_tokens =
+            tokens
+                .into_iter()
+                .fold(HashMap::new(), |mut acc, (matcher, definition)| {
+                    let entry = acc
+                        .entry(definition.binding_power_pattern())
+                        .or_insert(vec![]);
+                    entry.push((matcher, definition));
+                    acc
+                });
+
+        ParseContext {
+            parent_context: None,
+            known_tokens,
+            known_brackets: brackets,
+        }
+    }
+
+    pub fn get_token<'input>(
+        &self,
+        token: &mut Lexer<'input>,
+        bp_pattern: BindingPowerPattern,
+    ) -> Option<(&TokenDefinition, MatchResult<'input, MathElement>)> {
+        let matches: Vec<_> = self
+            .known_tokens
+            .get(&bp_pattern)?
+            .iter()
+            .map(|(matcher, definition)| (matcher.pattern.matches(token.get_slice()), definition))
+            .filter_map(|(match_result, definition)| match_result.ok().map(|v| (v, definition)))
+            .collect();
+
+        if matches.len() > 1 {
+            // TODO: Better error
+            panic!("multiple matches for token");
+        } else if matches.len() == 1 {
+            let (match_result, definition) = matches.into_iter().next().unwrap();
+            token.consume_n(match_result.get_length());
+
+            Some((definition, match_result))
+        } else {
+            self.parent_context
+                .and_then(|v| v.get_token(token, bp_pattern))
+        }
+    }
+
+    pub fn get_bracket<'input>(
+        &self,
+        bracket: &mut Lexer<'input>,
+        bracket_type: BracketType,
+    ) -> Option<(&BracketDefinition, MatchResult<'input, MathElement>)> {
+        let matches: Vec<_> = self
+            .known_brackets
+            .iter()
+            .map(|(matcher, definition)| match bracket_type {
+                BracketType::Opening => (
+                    matcher.opening_pattern.matches(bracket.get_slice()),
+                    definition,
+                ),
+                BracketType::Closing => (
+                    matcher.closing_pattern.matches(bracket.get_slice()),
+                    definition,
+                ),
+            })
+            .filter_map(|(match_result, definition)| match_result.ok().map(|v| (v, definition)))
+            .collect();
+
+        if matches.len() > 1 {
+            // TODO: Better error
+            panic!("multiple matches for bracket");
+        } else if matches.len() == 1 {
+            let (match_result, definition) = matches.into_iter().next().unwrap();
+            bracket.consume_n(match_result.get_length());
+
+            Some((definition, match_result))
+        } else {
+            self.parent_context
+                .and_then(|v| v.get_bracket(bracket, bracket_type))
+        }
+    }
+}
+
+impl<'a> ParseContext<'a> {
+    pub fn default() -> ParseContext<'a> {
+        // TODO: Add more default tokens
+        // 2. Parser for various types of tokens (numbers, strings, etc.)
+        // 3. Parser for functions
+
+        ParseContext::new(
+            vec![
+                (
+                    TokenMatcher {
+                        pattern: NFABuilder::match_character(('a'..='z').into())
+                            .or(NFABuilder::match_character(('A'..='Z').into()))
+                            .one_or_more()
+                            .build(),
+                    },
+                    TokenDefinition::new_with_parsers(
+                        "Variable".to_string(),
+                        (None, None),
+                        no_arguments_parser,
+                        |v| {
+                            v.get_input()
+                                .iter()
+                                .map(|v| match v {
+                                    MathElement::Symbol(v) => v.clone(),
+                                    _ => panic!("expected variable"),
+                                })
+                                .collect::<String>()
+                                .into()
+                        },
+                    ),
+                ),
+                (
+                    TokenMatcher {
+                        pattern: NFABuilder::match_character(('0'..='9').into())
+                            .one_or_more()
+                            .then(
+                                NFABuilder::match_character('.'.into())
+                                    .then(
+                                        NFABuilder::match_character(('0'..='9').into())
+                                            .one_or_more(),
+                                    )
+                                    .optional(),
+                            )
+                            .build(),
+                    },
+                    TokenDefinition::new_with_parsers(
+                        "Number".to_string(),
+                        (None, None),
+                        no_arguments_parser,
+                        |v| {
+                            v.get_input()
+                                .iter()
+                                .map(|v| match v {
+                                    MathElement::Symbol(v) => v.clone(),
+                                    _ => panic!("expected variable"),
+                                })
+                                .collect::<String>()
+                                .into()
+                        },
+                    ),
+                ),
+                (
+                    "+".into(),
+                    TokenDefinition::new("Add".to_string(), (Some(100), Some(101))),
+                ),
+                (
+                    "-".into(),
+                    TokenDefinition::new("Subtract".to_string(), (Some(100), Some(101))),
+                ),
+                (
+                    "+".into(),
+                    TokenDefinition::new("Add".to_string(), (None, Some(400))),
+                ),
+                (
+                    "-".into(),
+                    TokenDefinition::new("Subtract".to_string(), (None, Some(400))),
+                ),
+                (
+                    "*".into(),
+                    TokenDefinition::new("Multiply".to_string(), (Some(200), Some(201))),
+                ),
+                (
+                    "/".into(),
+                    TokenDefinition::new("Divide".to_string(), (Some(200), Some(201))),
+                ),
+                (
+                    ".".into(),
+                    TokenDefinition::new("Ring".to_string(), (Some(501), Some(500))),
+                ),
+                (
+                    "!".into(),
+                    TokenDefinition::new("Ring".to_string(), (Some(600), None)),
+                ),
+            ],
+            vec![(("(", ")").into(), BracketDefinition::new("()".to_string()))],
+        )
+    }
+}
+
+pub struct TokenMatcher {
+    // 1. binding power pattern
+    // 2. tricky
+    // - sin is 3 symbol tokens
+    // - Sum is a symbol token (with sub and sup afterwards, which end up behaving like postfix operators)
+    //   Sum is a prefix operator with a low binding power. Like sum_i (i^2)
+    // - d/dx is a fraction token, a symbol token, a symbol token, an unknown symbol token
+    //   d/dx is a prefix operator with a low binding power. Like d/dx (x^2)
+    // - d^n f / dx^n is a nasty notation
+    // - hat x is a over token with two symbol tokens. All fixed, which is nice
+    pattern: NFA,
+}
+
+impl From<&str> for TokenMatcher {
+    fn from(pattern: &str) -> TokenMatcher {
+        TokenMatcher {
+            pattern: NFABuilder::match_string(pattern).build(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct TokenDefinition {
+    pub name: String,
+    /// a constant has no binding power
+    /// a prefix operator has a binding power on the right
+    /// a postfix operator has a binding power on the left
+    /// an infix operator has a binding power on the left and on the right
+    pub binding_power: (Option<u32>, Option<u32>),
+
+    pub arguments_parser: TokenDefinitionArgumentParser,
+    pub value_parser: TokenDefinitionValueParser,
+}
+
+pub type TokenDefinitionArgumentParser =
+    for<'a> fn(Lexer<'a>, &ParseContext, &ParseStartResult) -> (Vec<MathSemantic>, Lexer<'a>);
+
+pub type TokenDefinitionValueParser =
+    for<'input> fn(match_result: &MatchResult<'input, MathElement>) -> Vec<u8>;
+
+// TODO: Maybe this is a useless design?
+fn no_arguments_parser<'a>(
+    lexer: Lexer<'a>,
+    _: &ParseContext,
+    _: &ParseStartResult,
+) -> (Vec<MathSemantic>, Lexer<'a>) {
+    (vec![], lexer)
+}
+
+fn prefix_arguments_parser<'a>(
+    lexer: Lexer<'a>,
+    context: &ParseContext,
+    start: &ParseStartResult,
+) -> (Vec<MathSemantic>, Lexer<'a>) {
+    let (argument, lexer) = context.parse_bp(
+        lexer,
+        match start {
+            ParseStartResult::Token { minimum_bp, .. } => *minimum_bp,
+            ParseStartResult::Bracket { .. } => todo!(),
+        },
+    );
+    (vec![argument], lexer)
+}
+
+fn no_value_parser<'input>(_match_result: &MatchResult<'input, MathElement>) -> Vec<u8> {
+    vec![]
+}
+
+impl TokenDefinition {
+    pub fn new(name: String, binding_power: (Option<u32>, Option<u32>)) -> Self {
+        let arguments_parser = match binding_power {
+            (Some(_), Some(_)) => no_arguments_parser,
+            (Some(_), None) => no_arguments_parser,
+            (None, Some(_)) => prefix_arguments_parser,
+            (None, None) => no_arguments_parser,
+        };
+
+        Self::new_with_parsers(name, binding_power, arguments_parser, no_value_parser)
+    }
+
+    pub fn new_with_parsers(
+        name: String,
+        binding_power: (Option<u32>, Option<u32>),
+        arguments_parser: TokenDefinitionArgumentParser,
+        value_parser: TokenDefinitionValueParser,
+    ) -> Self {
+        Self {
+            name,
+            binding_power,
+            arguments_parser,
+            value_parser,
+        }
+    }
+
+    fn binding_power_pattern(&self) -> (bool, bool) {
+        (
+            self.binding_power.0.is_some(),
+            self.binding_power.1.is_some(),
+        )
+    }
+}
+
+pub struct BracketMatcher {
+    opening_pattern: NFA,
+    closing_pattern: NFA,
+}
+
+impl From<(&str, &str)> for BracketMatcher {
+    fn from(pattern: (&str, &str)) -> Self {
+        Self {
+            opening_pattern: NFABuilder::match_string(pattern.0).build(),
+            closing_pattern: NFABuilder::match_string(pattern.1).build(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BracketDefinition {
+    pub name: String,
+}
+
+impl BracketDefinition {
+    pub fn new(name: String) -> BracketDefinition {
+        BracketDefinition { name }
+    }
+}

@@ -23,8 +23,20 @@ impl fmt::Display for MathSemantic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // S-expression
         // S here sadly doesn't stand for Stef
-        write!(f, "({} ", self.name)?;
+        write!(f, "({}", self.name)?;
+
+        // Always print the value
+        write!(f, " (")?;
+        if !self.value.is_empty() {
+            for byte in &self.value {
+                write!(f, "{:02x}", byte)?;
+            }
+        }
+        write!(f, ")")?;
+
+        // Optionally print the arguments
         if !self.args.is_empty() {
+            write!(f, " ")?;
             for arg in &self.args {
                 write!(f, " {}", arg)?;
             }

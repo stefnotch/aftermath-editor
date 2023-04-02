@@ -3,7 +3,7 @@ mod parser;
 mod utils;
 
 use math_layout::row::Row;
-use parser::ParseContext;
+use parser::parse_context::ParseContext;
 use serde::Serialize;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;

@@ -194,7 +194,7 @@ impl NFA {
             }
         }
 
-        return best_final_states.get_match_result(&(input[0..input.len()]));
+        return best_final_states.get_match_result(&(input[0..best_final_states.input_length()]));
     }
 
     fn add_state(

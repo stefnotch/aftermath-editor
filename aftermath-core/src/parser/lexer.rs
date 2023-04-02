@@ -1,9 +1,12 @@
+use std::ops::Range;
+
 use crate::math_layout::{element::MathElement, row::Row};
 
 /// A lexer that can be nested
 pub struct Lexer<'input> {
     parent: Option<Box<Lexer<'input>>>,
     row: &'input Row,
+    /// the index of the *next* element to be consumed
     index: usize,
 }
 
@@ -31,6 +34,11 @@ impl<'input> Lexer<'input> {
         assert!(self.index <= self.row.values.len());
     }
 
+    pub fn get_range(&self) -> Range<usize> {
+        let parent_index = self.parent.as_ref().map(|v| v.index).unwrap_or(0);
+        parent_index..self.index
+    }
+
     // TODO: https://doc.rust-lang.org/reference/attributes/diagnostics.html#the-must_use-attribute ?
     pub fn end_token(self) -> Option<Lexer<'input>> {
         assert!(self.index <= self.row.values.len());
@@ -53,8 +61,39 @@ impl<'input> Lexer<'input> {
     pub fn eof(&self) -> bool {
         self.index >= self.row.values.len()
     }
+}
 
-    pub fn get_index(&self) -> usize {
-        self.index
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::math_layout::{element::MathElement, row::Row};
+
+    #[test]
+    fn test_lexer() {
+        let layout = Row::new(vec![
+            MathElement::Symbol("a".to_string()),
+            MathElement::Fraction([
+                Row::new(vec![MathElement::Symbol("b".to_string())]),
+                Row::new(vec![MathElement::Symbol("c".to_string())]),
+            ]),
+        ]);
+
+        let mut lexer = Lexer::new(&layout);
+        let mut token = lexer.begin_token();
+        assert_eq!(
+            token.get_slice().get(0),
+            Some(&MathElement::Symbol("a".to_string()))
+        );
+        token.consume_n(1);
+        lexer = token.end_token().unwrap();
+        assert_eq!(
+            lexer.get_slice().get(0),
+            Some(&MathElement::Fraction([
+                Row::new(vec![MathElement::Symbol("b".to_string())]),
+                Row::new(vec![MathElement::Symbol("c".to_string())]),
+            ]))
+        );
+        lexer.consume_n(1);
+        assert_eq!(lexer.get_slice().get(0), None);
     }
 }
