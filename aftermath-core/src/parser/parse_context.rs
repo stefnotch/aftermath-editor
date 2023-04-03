@@ -11,22 +11,18 @@ use super::{
 };
 
 pub type BindingPowerPattern = (bool, bool);
-pub enum BracketType {
-    Opening,
-    Closing,
-}
 pub struct ParseContext<'a> {
     // takes the parent context and gives it back afterwards
     parent_context: Option<&'a ParseContext<'a>>,
     known_tokens: HashMap<BindingPowerPattern, Vec<(TokenMatcher, TokenDefinition)>>,
-    known_brackets: Vec<(BracketMatcher, BracketDefinition)>,
+    known_brackets: Vec<(BracketOpeningMatcher, BracketDefinition)>,
 }
 
 impl<'a> ParseContext<'a> {
     pub fn new(
         parent_context: Option<&'a ParseContext<'a>>,
         tokens: Vec<(TokenMatcher, TokenDefinition)>,
-        brackets: Vec<(BracketMatcher, BracketDefinition)>,
+        brackets: Vec<(BracketOpeningMatcher, BracketDefinition)>,
     ) -> Self {
         let known_tokens =
             tokens
@@ -73,24 +69,14 @@ impl<'a> ParseContext<'a> {
         }
     }
 
-    pub fn get_bracket<'input>(
+    pub fn get_opening_bracket<'input>(
         &self,
         bracket: &mut Lexer<'input>,
-        bracket_type: BracketType,
     ) -> Option<(&BracketDefinition, MatchResult<'input, MathElement>)> {
         let matches: Vec<_> = self
             .known_brackets
             .iter()
-            .map(|(matcher, definition)| match bracket_type {
-                BracketType::Opening => (
-                    matcher.opening_pattern.matches(bracket.get_slice()),
-                    definition,
-                ),
-                BracketType::Closing => (
-                    matcher.closing_pattern.matches(bracket.get_slice()),
-                    definition,
-                ),
-            })
+            .map(|(matcher, definition)| (matcher.pattern.matches(bracket.get_slice()), definition))
             .filter_map(|(match_result, definition)| match_result.ok().map(|v| (v, definition)))
             .collect();
 
@@ -104,8 +90,24 @@ impl<'a> ParseContext<'a> {
             Some((definition, match_result))
         } else {
             self.parent_context
-                .and_then(|v| v.get_bracket(bracket, bracket_type))
+                .and_then(|v| v.get_opening_bracket(bracket))
         }
+    }
+
+    pub fn get_closing_bracket<'input, 'definition>(
+        &self,
+        bracket: &mut Lexer<'input>,
+        definition: &'definition BracketDefinition,
+    ) -> Option<(
+        &'definition BracketDefinition,
+        MatchResult<'input, MathElement>,
+    )> {
+        let match_result = definition
+            .closing_pattern
+            .matches(bracket.get_slice())
+            .ok()?;
+        bracket.consume_n(match_result.get_length());
+        Some((definition, match_result))
     }
 }
 
@@ -115,6 +117,7 @@ impl<'a> ParseContext<'a> {
         // 2. Parser for various types of tokens (numbers, strings, etc.)
         // 3. Parser for functions
         // 4. Parser for whitespace
+        // 5. Parser for quotes (brackets or entire tokens?)
 
         ParseContext::new(
             None,
@@ -214,7 +217,10 @@ impl<'a> ParseContext<'a> {
                 // Unit brackets
                 ("()".into(), TokenDefinition::new("()".into(), (None, None))),
             ],
-            vec![(("(", ")").into(), BracketDefinition::new("()".into()))],
+            vec![(
+                "(".into(),
+                BracketDefinition::new("()".into(), NFABuilder::match_string(")").build()),
+            )],
         )
     }
 }
@@ -292,13 +298,44 @@ fn prefix_arguments_parser<'a>(
     context: &ParseContext,
     start: &ParseStartResult,
 ) -> (Vec<MathSemantic>, Lexer<'a>) {
-    let (argument, lexer) = context.parse_bp(
-        lexer,
+    let argument_lexer = lexer.begin_token();
+    let (argument, argument_lexer) = context.parse_bp(
+        argument_lexer,
         match start {
             ParseStartResult::Token { minimum_bp, .. } => *minimum_bp,
             ParseStartResult::Bracket { .. } => todo!(),
         },
     );
+    (vec![argument], argument_lexer.end_token().unwrap())
+}
+
+fn bracket_arguments_parser<'a>(
+    lexer: Lexer<'a>,
+    context: &ParseContext,
+    start: &ParseStartResult,
+) -> (Vec<MathSemantic>, Lexer<'a>) {
+    let argument_lexer = lexer.begin_token();
+    let (argument, argument_lexer) = context.parse_bp(
+        argument_lexer,
+        match start {
+            ParseStartResult::Token { .. } => todo!(),
+            ParseStartResult::Bracket { .. } => 0,
+        },
+    );
+    let lexer = argument_lexer.end_token().unwrap();
+    let bracket_definition = match start {
+        &ParseStartResult::Token { .. } => todo!(),
+        &ParseStartResult::Bracket { definition, .. } => definition,
+    };
+
+    let mut closing_bracket = lexer.begin_token();
+    if let Some((_, _)) = context.get_closing_bracket(&mut closing_bracket, bracket_definition) {
+        // Yay
+    } else {
+        // TODO: Better error message
+        panic!("expected closing bracket");
+    }
+    let lexer = closing_bracket.end_token().unwrap();
     (vec![argument], lexer)
 }
 
@@ -344,28 +381,32 @@ impl TokenDefinition {
     }
 }
 
-pub struct BracketMatcher {
-    opening_pattern: NFA,
-    closing_pattern: NFA,
+pub struct BracketOpeningMatcher {
+    pattern: NFA,
 }
 
-impl From<(&str, &str)> for BracketMatcher {
-    fn from(pattern: (&str, &str)) -> Self {
+impl From<&str> for BracketOpeningMatcher {
+    fn from(pattern: &str) -> Self {
         Self {
-            opening_pattern: NFABuilder::match_string(pattern.0).build(),
-            closing_pattern: NFABuilder::match_string(pattern.1).build(),
+            pattern: NFABuilder::match_string(pattern).build(),
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct BracketDefinition {
     pub name: TokenIdentifier,
+    pub arguments_parser: TokenDefinitionArgumentParser,
+    pub closing_pattern: NFA,
 }
 
 impl BracketDefinition {
-    pub fn new(name: TokenIdentifier) -> BracketDefinition {
-        BracketDefinition { name }
+    pub fn new(name: TokenIdentifier, closing_pattern: NFA) -> BracketDefinition {
+        BracketDefinition {
+            name,
+            arguments_parser: bracket_arguments_parser,
+            closing_pattern,
+        }
     }
     pub fn name(&self) -> String {
         (&self.name).into()

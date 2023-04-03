@@ -36,7 +36,6 @@ impl fmt::Display for MathSemantic {
 
         // Optionally print the arguments
         if !self.args.is_empty() {
-            write!(f, " ")?;
             for arg in &self.args {
                 write!(f, " {}", arg)?;
             }

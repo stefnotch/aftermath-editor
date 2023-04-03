@@ -14,7 +14,7 @@ use std::ops::Range;
 
 use self::{
     math_semantic::MathSemantic,
-    parse_context::{BracketDefinition, BracketType, ParseContext, TokenDefinition},
+    parse_context::{BracketDefinition, ParseContext, TokenDefinition},
     parse_result::{ParseError, ParseErrorType, ParseResult},
     token_matcher::MatchResult,
 };
@@ -82,9 +82,10 @@ impl<'a> ParseContext<'a> {
                     lexer = operator.end_token().unwrap();
 
                     // Parse the right operand
-                    let result = self.parse_bp(lexer, definition.binding_power.1.unwrap());
+                    let right_lexer = lexer.begin_token();
+                    let result = self.parse_bp(right_lexer, definition.binding_power.1.unwrap());
                     let right = result.0;
-                    lexer = result.1;
+                    lexer = result.1.end_token().unwrap();
 
                     combined_range = combine_ranges(&combined_range, &right.range);
                     // Combine the left and right operand into a new left operand
@@ -167,7 +168,9 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
             ParseStartResult::Token { definition, .. } => {
                 (definition.arguments_parser)(lexer, context, &self)
             }
-            ParseStartResult::Bracket { .. } => (vec![], lexer),
+            ParseStartResult::Bracket { definition, .. } => {
+                (definition.arguments_parser)(lexer, context, &self)
+            }
         };
         let value = match self {
             ParseStartResult::Token {
@@ -184,28 +187,34 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
                 match_result: _,
                 minimum_bp: _,
                 range,
-            } => (
-                MathSemantic {
-                    name: definition.name(),
-                    args,
-                    value,
-                    range,
-                },
-                lexer,
-            ),
+            } => {
+                assert_eq!(lexer.get_range().start, range.start);
+                (
+                    MathSemantic {
+                        name: definition.name(),
+                        args,
+                        value,
+                        range: lexer.get_range(),
+                    },
+                    lexer,
+                )
+            }
             ParseStartResult::Bracket {
                 definition,
                 match_result: _,
                 range,
-            } => (
-                MathSemantic {
-                    name: definition.name(),
-                    args,
-                    value,
-                    range,
-                },
-                lexer,
-            ),
+            } => {
+                assert_eq!(lexer.get_range().start, range.start);
+                (
+                    MathSemantic {
+                        name: definition.name(),
+                        args,
+                        value,
+                        range: lexer.get_range(),
+                    },
+                    lexer,
+                )
+            }
         }
     }
 }
@@ -238,11 +247,8 @@ fn parse_bp_start<'input, 'definition>(
             minimum_bp: definition.binding_power.1.unwrap(),
             range,
         })
-    } else if let Some((definition, match_result)) =
-        context.get_bracket(token, BracketType::Opening)
-    {
+    } else if let Some((definition, match_result)) = context.get_opening_bracket(token) {
         // Bracket opening
-        // TODO: quotes are like brackets
         let range = token.get_range();
         Ok(ParseStartResult::Bracket {
             definition,
@@ -266,7 +272,6 @@ mod tests {
         parser::parse_context::ParseContext,
     };
 
-    // TODO: Fix those tests to actually do something instead of printing stuff
     #[test]
     fn test_parser() {
         let layout = Row::new(vec![
@@ -281,18 +286,9 @@ mod tests {
         let parsed = parse(&layout, &context);
         assert_eq!(
             parsed.value.to_string(),
-            "(Multiply ()  (Subtract ()  (Variable (62))) (Variable (43)))"
+            "(Multiply () (Subtract () (Variable (62))) (Variable (43)))"
         );
         assert_eq!(parsed.errors.len(), 0);
-    }
-
-    #[test]
-    fn test_parser_empty_input() {
-        let layout = Row::new(vec![]);
-        let context = ParseContext::default();
-
-        let parsed = parse(&layout, &context);
-        println!("{:?}", parsed);
     }
 
     #[test]
@@ -310,6 +306,22 @@ mod tests {
         let context = ParseContext::default();
 
         let parsed = parse(&layout, &context);
+        assert_eq!(
+            parsed.value.to_string(),
+            "(() () (() () (() () (Factorial () (Variable (61))))))"
+        );
+        assert_eq!(parsed.errors.len(), 0);
+    }
+
+    // TODO: Fix those tests to actually do something instead of printing stuff
+    #[test]
+    fn test_parser_empty_input() {
+        let layout = Row::new(vec![]);
+        let context = ParseContext::default();
+
+        let parsed = parse(&layout, &context);
+        assert_eq!(parsed.errors.len(), 1);
+
         println!("{:?}", parsed);
     }
 
