@@ -15,21 +15,23 @@ pub enum BracketType {
     Opening,
     Closing,
 }
-pub struct ParseContext<'a> {
-    // takes ownership of the parent context and gives it back afterwards
-    parent_context: Option<&'a ParseContext<'a>>,
-    // TODO: Use a Hash Array Mapped Trie here (see issue #20)
-    known_tokens: HashMap<BindingPowerPattern, Vec<(TokenMatcher, TokenDefinition)>>,
-    known_brackets: Vec<(BracketMatcher, BracketDefinition)>,
-    // functions
-    // ...
+pub struct ParseContext {
+    minimal_definitions: MinimalDefinitions,
 }
 
-impl<'a> ParseContext<'a> {
+pub struct ParseSubContext<'a> {
+    // takes the parent context and gives it back afterwards
+    parent_context: Option<&'a ParseSubContext<'a>>,
+    known_tokens: HashMap<BindingPowerPattern, Vec<(TokenMatcher, TokenDefinition)>>,
+    known_brackets: Vec<(BracketMatcher, BracketDefinition)>,
+}
+
+impl<'a> ParseSubContext<'a> {
     pub fn new(
+        parent_context: Option<&'a ParseSubContext<'a>>,
         tokens: Vec<(TokenMatcher, TokenDefinition)>,
         brackets: Vec<(BracketMatcher, BracketDefinition)>,
-    ) -> ParseContext<'a> {
+    ) -> Self {
         let known_tokens =
             tokens
                 .into_iter()
@@ -41,8 +43,8 @@ impl<'a> ParseContext<'a> {
                     acc
                 });
 
-        ParseContext {
-            parent_context: None,
+        Self {
+            parent_context,
             known_tokens,
             known_brackets: brackets,
         }
@@ -111,101 +113,135 @@ impl<'a> ParseContext<'a> {
     }
 }
 
-impl<'a> ParseContext<'a> {
-    pub fn default() -> ParseContext<'a> {
+pub struct MinimalDefinitions {
+    empty: TokenIdentifier,
+}
+
+impl MinimalDefinitions {
+    fn new() -> MinimalDefinitions {
+        MinimalDefinitions {
+            empty: "Empty".into(),
+        }
+    }
+
+    pub fn empty(&self) -> &TokenIdentifier {
+        &self.empty
+    }
+    pub fn is_empty(&self, definition: &TokenIdentifier) -> bool {
+        definition == &self.empty
+    }
+}
+
+impl ParseContext {
+    pub fn default<'a>() -> (ParseContext, ParseSubContext<'a>) {
         // TODO: Add more default tokens
         // 2. Parser for various types of tokens (numbers, strings, etc.)
         // 3. Parser for functions
+        // 4. Parser for whitespace
+        let minimal_definitions = MinimalDefinitions::new();
 
-        ParseContext::new(
-            vec![
-                (
-                    TokenMatcher {
-                        pattern: NFABuilder::match_character(('a'..='z').into())
-                            .or(NFABuilder::match_character(('A'..='Z').into()))
-                            .one_or_more()
-                            .build(),
-                    },
-                    TokenDefinition::new_with_parsers(
-                        "Variable".to_string(),
-                        (None, None),
-                        no_arguments_parser,
-                        |v| {
-                            v.get_input()
-                                .iter()
-                                .map(|v| match v {
-                                    MathElement::Symbol(v) => v.clone(),
-                                    _ => panic!("expected variable"),
-                                })
-                                .collect::<String>()
-                                .into()
+        (
+            ParseContext {
+                minimal_definitions,
+            },
+            ParseSubContext::new(
+                None,
+                vec![
+                    // TODO: Good whitespace handling
+                    /*(
+                        TokenMatcher {
+                            pattern: NFABuilder::match_character((' ').into()).build(),
                         },
-                    ),
-                ),
-                (
-                    TokenMatcher {
-                        pattern: NFABuilder::match_character(('0'..='9').into())
-                            .one_or_more()
-                            .then(
-                                NFABuilder::match_character('.'.into())
-                                    .then(
-                                        NFABuilder::match_character(('0'..='9').into())
-                                            .one_or_more(),
-                                    )
-                                    .optional(),
-                            )
-                            .build(),
-                    },
-                    TokenDefinition::new_with_parsers(
-                        "Number".to_string(),
-                        (None, None),
-                        no_arguments_parser,
-                        |v| {
-                            v.get_input()
-                                .iter()
-                                .map(|v| match v {
-                                    MathElement::Symbol(v) => v.clone(),
-                                    _ => panic!("expected variable"),
-                                })
-                                .collect::<String>()
-                                .into()
+                        TokenDefinition::new(minimal_definitions.empty.clone(), (None, None)),
+                    ),*/
+                    (
+                        TokenMatcher {
+                            pattern: NFABuilder::match_character(('a'..='z').into())
+                                .or(NFABuilder::match_character(('A'..='Z').into()))
+                                .one_or_more()
+                                .build(),
                         },
+                        TokenDefinition::new_with_parsers(
+                            "Variable".into(),
+                            (None, None),
+                            no_arguments_parser,
+                            |v| {
+                                v.get_input()
+                                    .iter()
+                                    .map(|v| match v {
+                                        MathElement::Symbol(v) => v.clone(),
+                                        _ => panic!("expected variable"),
+                                    })
+                                    .collect::<String>()
+                                    .into()
+                            },
+                        ),
                     ),
-                ),
-                (
-                    "+".into(),
-                    TokenDefinition::new("Add".to_string(), (Some(100), Some(101))),
-                ),
-                (
-                    "-".into(),
-                    TokenDefinition::new("Subtract".to_string(), (Some(100), Some(101))),
-                ),
-                (
-                    "+".into(),
-                    TokenDefinition::new("Add".to_string(), (None, Some(400))),
-                ),
-                (
-                    "-".into(),
-                    TokenDefinition::new("Subtract".to_string(), (None, Some(400))),
-                ),
-                (
-                    "*".into(),
-                    TokenDefinition::new("Multiply".to_string(), (Some(200), Some(201))),
-                ),
-                (
-                    "/".into(),
-                    TokenDefinition::new("Divide".to_string(), (Some(200), Some(201))),
-                ),
-                (
-                    ".".into(),
-                    TokenDefinition::new("Ring".to_string(), (Some(501), Some(500))),
-                ),
-                (
-                    "!".into(),
-                    TokenDefinition::new("Ring".to_string(), (Some(600), None)),
-                ),
-            ],
-            vec![(("(", ")").into(), BracketDefinition::new("()".to_string()))],
+                    (
+                        TokenMatcher {
+                            pattern: NFABuilder::match_character(('0'..='9').into())
+                                .one_or_more()
+                                .then(
+                                    NFABuilder::match_character('.'.into())
+                                        .then(
+                                            NFABuilder::match_character(('0'..='9').into())
+                                                .one_or_more(),
+                                        )
+                                        .optional(),
+                                )
+                                .build(),
+                        },
+                        TokenDefinition::new_with_parsers(
+                            "Number".into(),
+                            (None, None),
+                            no_arguments_parser,
+                            |v| {
+                                v.get_input()
+                                    .iter()
+                                    .map(|v| match v {
+                                        MathElement::Symbol(v) => v.clone(),
+                                        _ => panic!("expected variable"),
+                                    })
+                                    .collect::<String>()
+                                    .into()
+                            },
+                        ),
+                    ),
+                    (
+                        "+".into(),
+                        TokenDefinition::new("Add".into(), (Some(100), Some(101))),
+                    ),
+                    (
+                        "-".into(),
+                        TokenDefinition::new("Subtract".into(), (Some(100), Some(101))),
+                    ),
+                    (
+                        "+".into(),
+                        TokenDefinition::new("Add".into(), (None, Some(400))),
+                    ),
+                    (
+                        "-".into(),
+                        TokenDefinition::new("Subtract".into(), (None, Some(400))),
+                    ),
+                    (
+                        "*".into(),
+                        TokenDefinition::new("Multiply".into(), (Some(200), Some(201))),
+                    ),
+                    (
+                        "/".into(),
+                        TokenDefinition::new("Divide".into(), (Some(200), Some(201))),
+                    ),
+                    (
+                        ".".into(),
+                        TokenDefinition::new("Ring".into(), (Some(501), Some(500))),
+                    ),
+                    (
+                        "!".into(),
+                        TokenDefinition::new("Factorial".into(), (Some(600), None)),
+                    ),
+                ],
+                vec![(("(", ")").into(), BracketDefinition::new("()".into()))],
+            ),
         )
     }
 }
@@ -231,9 +267,28 @@ impl From<&str> for TokenMatcher {
     }
 }
 
-#[derive(Debug)]
-pub struct TokenDefinition {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TokenIdentifier {
     pub name: String,
+}
+
+impl From<&str> for TokenIdentifier {
+    fn from(name: &str) -> TokenIdentifier {
+        TokenIdentifier {
+            name: name.to_string(),
+        }
+    }
+}
+
+impl From<&TokenIdentifier> for String {
+    fn from(name: &TokenIdentifier) -> String {
+        name.name.clone()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TokenDefinition {
+    pub name: TokenIdentifier,
     /// a constant has no binding power
     /// a prefix operator has a binding power on the right
     /// a postfix operator has a binding power on the left
@@ -245,7 +300,7 @@ pub struct TokenDefinition {
 }
 
 pub type TokenDefinitionArgumentParser =
-    for<'a> fn(Lexer<'a>, &ParseContext, &ParseStartResult) -> (Vec<MathSemantic>, Lexer<'a>);
+    for<'a> fn(Lexer<'a>, &ParseSubContext, &ParseStartResult) -> (Vec<MathSemantic>, Lexer<'a>);
 
 pub type TokenDefinitionValueParser =
     for<'input> fn(match_result: &MatchResult<'input, MathElement>) -> Vec<u8>;
@@ -253,7 +308,7 @@ pub type TokenDefinitionValueParser =
 // TODO: Maybe this is a useless design?
 fn no_arguments_parser<'a>(
     lexer: Lexer<'a>,
-    _: &ParseContext,
+    _: &ParseSubContext,
     _: &ParseStartResult,
 ) -> (Vec<MathSemantic>, Lexer<'a>) {
     (vec![], lexer)
@@ -261,7 +316,7 @@ fn no_arguments_parser<'a>(
 
 fn prefix_arguments_parser<'a>(
     lexer: Lexer<'a>,
-    context: &ParseContext,
+    context: &ParseSubContext,
     start: &ParseStartResult,
 ) -> (Vec<MathSemantic>, Lexer<'a>) {
     let (argument, lexer) = context.parse_bp(
@@ -279,7 +334,7 @@ fn no_value_parser<'input>(_match_result: &MatchResult<'input, MathElement>) -> 
 }
 
 impl TokenDefinition {
-    pub fn new(name: String, binding_power: (Option<u32>, Option<u32>)) -> Self {
+    pub fn new(name: TokenIdentifier, binding_power: (Option<u32>, Option<u32>)) -> Self {
         let arguments_parser = match binding_power {
             (Some(_), Some(_)) => no_arguments_parser,
             (Some(_), None) => no_arguments_parser,
@@ -291,7 +346,7 @@ impl TokenDefinition {
     }
 
     pub fn new_with_parsers(
-        name: String,
+        name: TokenIdentifier,
         binding_power: (Option<u32>, Option<u32>),
         arguments_parser: TokenDefinitionArgumentParser,
         value_parser: TokenDefinitionValueParser,
@@ -309,6 +364,10 @@ impl TokenDefinition {
             self.binding_power.0.is_some(),
             self.binding_power.1.is_some(),
         )
+    }
+
+    pub fn name(&self) -> String {
+        (&self.name).into()
     }
 }
 
@@ -328,11 +387,14 @@ impl From<(&str, &str)> for BracketMatcher {
 
 #[derive(Debug, Clone)]
 pub struct BracketDefinition {
-    pub name: String,
+    pub name: TokenIdentifier,
 }
 
 impl BracketDefinition {
-    pub fn new(name: String) -> BracketDefinition {
+    pub fn new(name: TokenIdentifier) -> BracketDefinition {
         BracketDefinition { name }
+    }
+    pub fn name(&self) -> String {
+        (&self.name).into()
     }
 }

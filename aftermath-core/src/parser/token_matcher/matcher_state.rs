@@ -64,6 +64,14 @@ pub struct MatchResult<'input, Input> {
 }
 
 impl<'input, Input> MatchResult<'input, Input> {
+    pub fn empty() -> Self {
+        Self {
+            length: 0,
+            capture_ranges: Vec::new(),
+            input: &[],
+        }
+    }
+
     pub fn get_length(&self) -> usize {
         self.length
     }

@@ -14,12 +14,12 @@ use std::ops::Range;
 
 use self::{
     math_semantic::MathSemantic,
-    parse_context::{BracketDefinition, BracketType, ParseContext, TokenDefinition},
+    parse_context::{BracketDefinition, BracketType, ParseSubContext, TokenDefinition},
     parse_result::{ParseError, ParseErrorType, ParseResult},
     token_matcher::MatchResult,
 };
 
-pub fn parse(input: &Row, context: &ParseContext) -> ParseResult<MathSemantic> {
+pub fn parse(input: &Row, context: &ParseSubContext) -> ParseResult<MathSemantic> {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     // we have a LL(1) pratt parser, aka we can look one token ahead
     let lexer = Lexer::new(input);
@@ -37,7 +37,7 @@ pub fn parse(input: &Row, context: &ParseContext) -> ParseResult<MathSemantic> {
     }
 }
 
-impl<'a> ParseContext<'a> {
+impl<'a> ParseSubContext<'a> {
     fn parse_bp<'input>(
         &self,
         mut lexer: Lexer<'input>,
@@ -89,7 +89,7 @@ impl<'a> ParseContext<'a> {
                     combined_range = combine_ranges(&combined_range, &right.range);
                     // Combine the left and right operand into a new left operand
                     left = MathSemantic {
-                        name: definition.name.clone(),
+                        name: definition.name(),
                         args: vec![left, right],
                         value: (definition.value_parser)(&match_result),
                         range: combined_range,
@@ -113,10 +113,9 @@ impl<'a> ParseContext<'a> {
                 let combined_range = combine_ranges(&left.range, &operator.get_range());
                 // Actually consume the operator
                 lexer = operator.end_token().unwrap();
-
                 // Combine the left operand into a new left operand
                 left = MathSemantic {
-                    name: definition.name.clone(),
+                    name: definition.name(),
                     args: vec![left],
                     value: (definition.value_parser)(&match_result),
                     range: combined_range,
@@ -162,7 +161,7 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
     fn to_math_semantic<'lexer>(
         self,
         lexer: Lexer<'lexer>,
-        context: &ParseContext,
+        context: &ParseSubContext,
     ) -> (MathSemantic, Lexer<'lexer>) {
         let (args, lexer) = match self {
             ParseStartResult::Token { definition, .. } => {
@@ -187,7 +186,7 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
                 range,
             } => (
                 MathSemantic {
-                    name: definition.name.clone(),
+                    name: definition.name(),
                     args,
                     value,
                     range,
@@ -200,7 +199,7 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
                 range,
             } => (
                 MathSemantic {
-                    name: definition.name.clone(),
+                    name: definition.name(),
                     args,
                     value,
                     range,
@@ -214,7 +213,7 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
 /// Expects a token or an opening bracket or a prefix operator
 fn parse_bp_start<'input, 'definition>(
     token: &mut Lexer<'input>,
-    context: &'definition ParseContext,
+    context: &'definition ParseSubContext,
 ) -> Result<ParseStartResult<'input, 'definition>, ParseError> {
     if token.eof() {
         Err(ParseError {
@@ -262,7 +261,10 @@ fn parse_bp_start<'input, 'definition>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math_layout::{element::MathElement, row::Row};
+    use crate::{
+        math_layout::{element::MathElement, row::Row},
+        parser::parse_context::ParseContext,
+    };
 
     // TODO: Fix those tests to actually do something instead of printing stuff
     #[test]
@@ -274,9 +276,9 @@ mod tests {
             MathElement::Symbol("C".to_string()),
         ]);
 
-        let context = ParseContext::default();
+        let (_context, sub_context) = ParseContext::default();
 
-        let parsed = parse(&layout, &context);
+        let parsed = parse(&layout, &sub_context);
         assert_eq!(
             parsed.value.to_string(),
             "(Multiply ()  (Subtract ()  (Variable (62))) (Variable (43)))"
@@ -287,9 +289,9 @@ mod tests {
     #[test]
     fn test_parser_empty_input() {
         let layout = Row::new(vec![]);
-        let context = ParseContext::default();
+        let (_context, sub_context) = ParseContext::default();
 
-        let parsed = parse(&layout, &context);
+        let parsed = parse(&layout, &sub_context);
         println!("{:?}", parsed);
     }
 
@@ -305,9 +307,9 @@ mod tests {
             MathElement::Symbol(")".to_string()),
             MathElement::Symbol(")".to_string()),
         ]);
-        let context = ParseContext::default();
+        let (_context, sub_context) = ParseContext::default();
 
-        let parsed = parse(&layout, &context);
+        let parsed = parse(&layout, &sub_context);
         println!("{:?}", parsed);
     }
 
@@ -317,18 +319,18 @@ mod tests {
             MathElement::Symbol("a".to_string()),
             MathElement::Symbol(")".to_string()),
         ]);
-        let context = ParseContext::default();
+        let (_context, sub_context) = ParseContext::default();
 
-        let parsed = parse(&layout, &context);
+        let parsed = parse(&layout, &sub_context);
         println!("{:?}", parsed);
     }
 
     #[test]
     fn test_parser_close_bracket() {
         let layout = Row::new(vec![MathElement::Symbol(")".to_string())]);
-        let context = ParseContext::default();
+        let (_context, sub_context) = ParseContext::default();
 
-        let parsed = parse(&layout, &context);
+        let parsed = parse(&layout, &sub_context);
         println!("{:?}", parsed);
     }
 }
