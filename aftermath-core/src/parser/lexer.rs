@@ -2,6 +2,7 @@ use std::ops::Range;
 
 use crate::math_layout::{element::MathElement, row::Row};
 
+// TODO: I bet there's a better design for this
 /// A lexer that can be nested
 pub struct Lexer<'input> {
     parent: Option<Box<Lexer<'input>>>,

@@ -114,10 +114,8 @@ impl<'a> ParseContext<'a> {
 impl<'a> ParseContext<'a> {
     pub fn default() -> ParseContext<'a> {
         // TODO: Add more default tokens
-        // 2. Parser for various types of tokens (numbers, strings, etc.)
         // 3. Parser for functions
         // 4. Parser for whitespace
-        // 5. Parser for quotes (brackets or entire tokens?)
 
         ParseContext::new(
             None,
@@ -168,6 +166,44 @@ impl<'a> ParseContext<'a> {
                     },
                     TokenDefinition::new_with_parsers(
                         "Number".into(),
+                        (None, None),
+                        no_arguments_parser,
+                        |v| {
+                            v.get_input()
+                                .iter()
+                                .map(|v| match v {
+                                    MathElement::Symbol(v) => v.clone(),
+                                    _ => panic!("expected variable"),
+                                })
+                                .collect::<String>()
+                                .into()
+                        },
+                    ),
+                ),
+                (
+                    TokenMatcher {
+                        // https://stackoverflow.com/questions/249791/regex-for-quoted-string-with-escaping-quotes
+                        pattern: NFABuilder::match_character(('"').into())
+                            .then(
+                                // Skip quote
+                                NFABuilder::match_character(('\0'..='!').into())
+                                    .or(
+                                        // Skip backslash
+                                        NFABuilder::match_character(('#'..='[').into()),
+                                    )
+                                    .or(
+                                        // Rest of ASCII characters
+                                        NFABuilder::match_character((']'..='~').into()),
+                                    )
+                                    .or(NFABuilder::match_character('\\'.into())
+                                        .then_character(('\0'..='~').into()))
+                                    .zero_or_more(),
+                            )
+                            .then_character('"'.into())
+                            .build(),
+                    },
+                    TokenDefinition::new_with_parsers(
+                        "String".into(),
                         (None, None),
                         no_arguments_parser,
                         |v| {

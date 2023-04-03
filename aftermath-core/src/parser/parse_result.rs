@@ -1,6 +1,8 @@
 use core::fmt;
 use std::ops::Range;
 
+use serde::Serialize;
+
 #[derive(Debug)]
 pub struct ParseResult<T>
 where
@@ -12,14 +14,14 @@ where
     pub errors: Vec<ParseError>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ParseError {
     pub error: ParseErrorType,
     /// the range of this in the original math layout
     pub range: Range<usize>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum ParseErrorType {
     UnexpectedEndOfInput,
     UnexpectedPostfixOperator,

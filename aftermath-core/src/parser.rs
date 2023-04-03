@@ -13,11 +13,12 @@ use crate::{
 use std::ops::Range;
 
 use self::{
-    math_semantic::MathSemantic,
     parse_context::{BracketDefinition, ParseContext, TokenDefinition},
-    parse_result::{ParseError, ParseErrorType, ParseResult},
     token_matcher::MatchResult,
 };
+
+pub use self::math_semantic::MathSemantic;
+pub use self::parse_result::{ParseError, ParseErrorType, ParseResult};
 
 pub fn parse(input: &Row, context: &ParseContext) -> ParseResult<MathSemantic> {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
