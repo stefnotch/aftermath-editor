@@ -146,14 +146,10 @@ fn combine_ranges(range_1: &Range<usize>, range_2: &Range<usize>) -> Range<usize
 }
 
 #[derive(Debug)]
-pub enum ParseStartResult<'input, 'definition> {
-    // TODO: cleanup (no longer an enum, no minimum_bp)
-    Token {
-        definition: &'definition TokenDefinition,
-        match_result: MatchResult<'input, MathElement>,
-        minimum_bp: u32,
-        range: Range<usize>,
-    },
+pub struct ParseStartResult<'input, 'definition> {
+    definition: &'definition TokenDefinition,
+    match_result: MatchResult<'input, MathElement>,
+    range: Range<usize>,
 }
 impl<'input, 'definition> ParseStartResult<'input, 'definition> {
     fn to_math_semantic<'lexer>(
@@ -161,38 +157,19 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
         lexer: Lexer<'lexer>,
         context: &ParseContext,
     ) -> (MathSemantic, Lexer<'lexer>) {
-        let (args, lexer) = match self {
-            ParseStartResult::Token { definition, .. } => {
-                definition.parse_arguments(lexer, context, &self)
-            }
-        };
-        let value = match self {
-            ParseStartResult::Token {
-                definition,
-                ref match_result,
-                ..
-            } => (definition.value_parser)(match_result),
-        };
+        let (args, lexer) = self.definition.parse_arguments(lexer, context, &self);
+        let value = (self.definition.value_parser)(&self.match_result);
 
-        match self {
-            ParseStartResult::Token {
-                definition,
-                match_result: _,
-                minimum_bp: _,
-                range,
-            } => {
-                assert_eq!(lexer.get_range().start, range.start);
-                (
-                    MathSemantic {
-                        name: definition.name(),
-                        args,
-                        value,
-                        range: lexer.get_range(),
-                    },
-                    lexer,
-                )
-            }
-        }
+        assert_eq!(lexer.get_range().start, self.range.start);
+        (
+            MathSemantic {
+                name: self.definition.name(),
+                args,
+                value,
+                range: lexer.get_range(),
+            },
+            lexer,
+        )
     }
 }
 
@@ -209,19 +186,17 @@ fn parse_bp_start<'input, 'definition>(
     } else if let Some((definition, match_result)) = context.get_token(token, (false, false)) {
         // Defined symbol
         let range = token.get_range();
-        Ok(ParseStartResult::Token {
+        Ok(ParseStartResult {
             definition,
             match_result,
-            minimum_bp: 0,
             range,
         })
     } else if let Some((definition, match_result)) = context.get_token(token, (false, true)) {
         // Prefix operator
         let range = token.get_range();
-        Ok(ParseStartResult::Token {
+        Ok(ParseStartResult {
             definition,
             match_result,
-            minimum_bp: definition.binding_power.1.unwrap(),
             range,
         })
     } else {

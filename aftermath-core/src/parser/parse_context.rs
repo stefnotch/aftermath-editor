@@ -341,9 +341,7 @@ impl TokenArgumentParser {
                 let range = closing_bracket.get_range();
                 let lexer = closing_bracket.end_token().unwrap();
                 let semantic = MathSemantic {
-                    name: match start {
-                        ParseStartResult::Token { definition, .. } => definition.name(),
-                    },
+                    name: start.definition.name(),
                     args: vec![],
                     value: vec![],
                     range,
@@ -354,19 +352,12 @@ impl TokenArgumentParser {
                 group_id,
                 argument_index,
             } => {
-                let semantic = match start {
-                    ParseStartResult::Token {
-                        definition,
-                        match_result,
-                        minimum_bp,
-                        range,
-                    } => {
-                        let values = match_result.get_capture_group(group_id).unwrap();
-                        let lexer = Lexer::new(values);
-                        let (math_semantic, lexer) = context.parse_bp(lexer, 0);
-                        assert!(lexer.eof());
-                        math_semantic
-                    }
+                let semantic = {
+                    let values = start.match_result.get_capture_group(group_id).unwrap();
+                    let lexer = Lexer::new(values);
+                    let (math_semantic, lexer) = context.parse_bp(lexer, 0);
+                    assert!(lexer.eof());
+                    math_semantic
                 };
                 (*argument_index, semantic, lexer)
             }

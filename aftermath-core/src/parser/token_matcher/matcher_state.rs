@@ -64,14 +64,6 @@ pub struct MatchResult<'input, Input> {
 }
 
 impl<'input, Input> MatchResult<'input, Input> {
-    pub fn empty() -> Self {
-        Self {
-            length: 0,
-            capture_ranges: Vec::new(),
-            input: &[],
-        }
-    }
-
     pub fn get_length(&self) -> usize {
         self.length
     }
@@ -97,14 +89,6 @@ impl MatchInfo {
             // empty ranges
             capture_ranges: vec![1..=0; capture_group_count],
         }
-    }
-
-    pub fn set_capture_group_range(
-        &mut self,
-        capture_group: CapturingGroupId,
-        range: RangeInclusive<usize>,
-    ) {
-        self.capture_ranges[capture_group.get()] = range;
     }
 
     pub fn start_capture(&mut self, group: &CapturingGroupId, index: usize) {

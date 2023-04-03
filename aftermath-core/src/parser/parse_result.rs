@@ -24,7 +24,5 @@ pub struct ParseError {
 #[derive(Debug, Clone, Serialize)]
 pub enum ParseErrorType {
     UnexpectedEndOfInput,
-    UnexpectedPostfixOperator,
-    Custom(String),
     UnexpectedToken,
 }
