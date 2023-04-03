@@ -4,7 +4,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use super::{
     grapheme_matcher::GraphemeClusterMatcher,
     token_matcher::{
-        CapturingGroupName, CapturingGroups, Container, MatchIf, StateFragment, StateId, NFA,
+        CapturingGroupId, CapturingGroups, Container, MatchIf, StateFragment, StateId, NFA,
     },
 };
 
@@ -17,7 +17,7 @@ pub enum NFABuilder {
     ZeroOrOne(Box<NFABuilder>),
     ZeroOrMore(Box<NFABuilder>),
     OneOrMore(Box<NFABuilder>),
-    Capture(Box<NFABuilder>, CapturingGroupName),
+    Capture(Box<NFABuilder>, CapturingGroupId),
     Container(Container),
 }
 
@@ -62,11 +62,8 @@ impl NFABuilder {
         self.concat(NFABuilder::match_character(character))
     }
 
-    pub fn capturing_group<T>(self, name: T) -> NFABuilder
-    where
-        T: Into<CapturingGroupName>,
-    {
-        NFABuilder::Capture(Box::new(self), name.into())
+    pub fn capturing_group<T>(self, id: CapturingGroupId) -> NFABuilder {
+        NFABuilder::Capture(Box::new(self), id)
     }
 
     /// Matches a string and does Unicode handling (splitting into grapheme clusters followed by NFD-normalizing)

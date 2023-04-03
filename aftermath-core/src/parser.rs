@@ -13,7 +13,7 @@ use crate::{
 use std::ops::Range;
 
 use self::{
-    parse_context::{BracketDefinition, ParseContext, TokenDefinition},
+    parse_context::{ParseContext, TokenDefinition},
     token_matcher::MatchResult,
 };
 
@@ -23,7 +23,7 @@ pub use self::parse_result::{ParseError, ParseErrorType, ParseResult};
 pub fn parse(input: &Row, context: &ParseContext) -> ParseResult<MathSemantic> {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     // we have a LL(1) pratt parser, aka we can look one token ahead
-    let lexer = Lexer::new(input);
+    let lexer = Lexer::new(&input.values);
     let (parse_result, lexer) = context.parse_bp(lexer, 0);
     println!("parse result: {:?}", parse_result);
     assert_eq!(
@@ -147,15 +147,11 @@ fn combine_ranges(range_1: &Range<usize>, range_2: &Range<usize>) -> Range<usize
 
 #[derive(Debug)]
 pub enum ParseStartResult<'input, 'definition> {
+    // TODO: cleanup (no longer an enum, no minimum_bp)
     Token {
         definition: &'definition TokenDefinition,
         match_result: MatchResult<'input, MathElement>,
         minimum_bp: u32,
-        range: Range<usize>,
-    },
-    Bracket {
-        definition: &'definition BracketDefinition,
-        match_result: MatchResult<'input, MathElement>,
         range: Range<usize>,
     },
 }
@@ -167,10 +163,7 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
     ) -> (MathSemantic, Lexer<'lexer>) {
         let (args, lexer) = match self {
             ParseStartResult::Token { definition, .. } => {
-                (definition.arguments_parser)(lexer, context, &self)
-            }
-            ParseStartResult::Bracket { definition, .. } => {
-                (definition.arguments_parser)(lexer, context, &self)
+                definition.parse_arguments(lexer, context, &self)
             }
         };
         let value = match self {
@@ -179,7 +172,6 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
                 ref match_result,
                 ..
             } => (definition.value_parser)(match_result),
-            ParseStartResult::Bracket { .. } => vec![],
         };
 
         match self {
@@ -187,22 +179,6 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
                 definition,
                 match_result: _,
                 minimum_bp: _,
-                range,
-            } => {
-                assert_eq!(lexer.get_range().start, range.start);
-                (
-                    MathSemantic {
-                        name: definition.name(),
-                        args,
-                        value,
-                        range: lexer.get_range(),
-                    },
-                    lexer,
-                )
-            }
-            ParseStartResult::Bracket {
-                definition,
-                match_result: _,
                 range,
             } => {
                 assert_eq!(lexer.get_range().start, range.start);
@@ -246,14 +222,6 @@ fn parse_bp_start<'input, 'definition>(
             definition,
             match_result,
             minimum_bp: definition.binding_power.1.unwrap(),
-            range,
-        })
-    } else if let Some((definition, match_result)) = context.get_opening_bracket(token) {
-        // Bracket opening
-        let range = token.get_range();
-        Ok(ParseStartResult::Bracket {
-            definition,
-            match_result,
             range,
         })
     } else {

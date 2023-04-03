@@ -26,10 +26,9 @@ use std::fmt::{Debug, Formatter};
 use crate::math_layout::element::MathElement;
 
 use super::grapheme_matcher::GraphemeClusterMatcher;
-use super::token_matcher::capturing_group::CapturingGroupId;
 use super::token_matcher::matcher_state::{MatchInfo, NFAMatches};
 
-pub use super::token_matcher::capturing_group::CapturingGroupName;
+pub(super) use super::token_matcher::capturing_group::CapturingGroupId;
 pub(super) use super::token_matcher::capturing_group::CapturingGroups;
 pub(super) use super::token_matcher::matcher_state::{MatchError, MatchResult};
 

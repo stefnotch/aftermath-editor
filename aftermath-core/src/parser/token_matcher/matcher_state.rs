@@ -78,7 +78,7 @@ impl<'input, Input> MatchResult<'input, Input> {
     pub fn get_input(&self) -> &'input [Input] {
         self.input
     }
-    pub fn get_capture_group(&self, group: CapturingGroupId) -> Option<&'input [Input]> {
+    pub fn get_capture_group(&self, group: &CapturingGroupId) -> Option<&'input [Input]> {
         self.capture_ranges
             .get(group.get())
             .map(|range| &self.input[range.clone()])

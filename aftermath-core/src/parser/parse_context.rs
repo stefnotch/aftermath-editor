@@ -6,7 +6,7 @@ use super::{
     lexer::Lexer,
     math_semantic::MathSemantic,
     nfa_builder::NFABuilder,
-    token_matcher::{MatchResult, NFA},
+    token_matcher::{CapturingGroupId, MatchResult, NFA},
     ParseStartResult,
 };
 
@@ -15,14 +15,12 @@ pub struct ParseContext<'a> {
     // takes the parent context and gives it back afterwards
     parent_context: Option<&'a ParseContext<'a>>,
     known_tokens: HashMap<BindingPowerPattern, Vec<(TokenMatcher, TokenDefinition)>>,
-    known_brackets: Vec<(BracketOpeningMatcher, BracketDefinition)>,
 }
 
 impl<'a> ParseContext<'a> {
     pub fn new(
         parent_context: Option<&'a ParseContext<'a>>,
         tokens: Vec<(TokenMatcher, TokenDefinition)>,
-        brackets: Vec<(BracketOpeningMatcher, BracketDefinition)>,
     ) -> Self {
         let known_tokens =
             tokens
@@ -38,7 +36,6 @@ impl<'a> ParseContext<'a> {
         Self {
             parent_context,
             known_tokens,
-            known_brackets: brackets,
         }
     }
 
@@ -69,45 +66,14 @@ impl<'a> ParseContext<'a> {
         }
     }
 
-    pub fn get_opening_bracket<'input>(
+    pub fn get_symbol<'input>(
         &self,
-        bracket: &mut Lexer<'input>,
-    ) -> Option<(&BracketDefinition, MatchResult<'input, MathElement>)> {
-        let matches: Vec<_> = self
-            .known_brackets
-            .iter()
-            .map(|(matcher, definition)| (matcher.pattern.matches(bracket.get_slice()), definition))
-            .filter_map(|(match_result, definition)| match_result.ok().map(|v| (v, definition)))
-            .collect();
-
-        if matches.len() > 1 {
-            // TODO: Better error
-            panic!("multiple matches for bracket");
-        } else if matches.len() == 1 {
-            let (match_result, definition) = matches.into_iter().next().unwrap();
-            bracket.consume_n(match_result.get_length());
-
-            Some((definition, match_result))
-        } else {
-            self.parent_context
-                .and_then(|v| v.get_opening_bracket(bracket))
-        }
-    }
-
-    pub fn get_closing_bracket<'input, 'definition>(
-        &self,
-        bracket: &mut Lexer<'input>,
-        definition: &'definition BracketDefinition,
-    ) -> Option<(
-        &'definition BracketDefinition,
-        MatchResult<'input, MathElement>,
-    )> {
-        let match_result = definition
-            .closing_pattern
-            .matches(bracket.get_slice())
-            .ok()?;
-        bracket.consume_n(match_result.get_length());
-        Some((definition, match_result))
+        lexer: &mut Lexer<'input>,
+        symbol: &NFA,
+    ) -> Option<MatchResult<'input, MathElement>> {
+        let match_result = symbol.matches(lexer.get_slice()).ok()?;
+        lexer.consume_n(match_result.get_length());
+        Some(match_result)
     }
 }
 
@@ -134,21 +100,16 @@ impl<'a> ParseContext<'a> {
                             .one_or_more()
                             .build(),
                     },
-                    TokenDefinition::new_with_parsers(
-                        "Variable".into(),
-                        (None, None),
-                        no_arguments_parser,
-                        |v| {
-                            v.get_input()
-                                .iter()
-                                .map(|v| match v {
-                                    MathElement::Symbol(v) => v.clone(),
-                                    _ => panic!("expected variable"),
-                                })
-                                .collect::<String>()
-                                .into()
-                        },
-                    ),
+                    TokenDefinition::new("Variable".into(), (None, None)).with_value_parser(|v| {
+                        v.get_input()
+                            .iter()
+                            .map(|v| match v {
+                                MathElement::Symbol(v) => v.clone(),
+                                _ => panic!("expected variable"),
+                            })
+                            .collect::<String>()
+                            .into()
+                    }),
                 ),
                 (
                     TokenMatcher {
@@ -164,21 +125,16 @@ impl<'a> ParseContext<'a> {
                             )
                             .build(),
                     },
-                    TokenDefinition::new_with_parsers(
-                        "Number".into(),
-                        (None, None),
-                        no_arguments_parser,
-                        |v| {
-                            v.get_input()
-                                .iter()
-                                .map(|v| match v {
-                                    MathElement::Symbol(v) => v.clone(),
-                                    _ => panic!("expected variable"),
-                                })
-                                .collect::<String>()
-                                .into()
-                        },
-                    ),
+                    TokenDefinition::new("Number".into(), (None, None)).with_value_parser(|v| {
+                        v.get_input()
+                            .iter()
+                            .map(|v| match v {
+                                MathElement::Symbol(v) => v.clone(),
+                                _ => panic!("expected variable"),
+                            })
+                            .collect::<String>()
+                            .into()
+                    }),
                 ),
                 (
                     TokenMatcher {
@@ -202,21 +158,16 @@ impl<'a> ParseContext<'a> {
                             .then_character('"'.into())
                             .build(),
                     },
-                    TokenDefinition::new_with_parsers(
-                        "String".into(),
-                        (None, None),
-                        no_arguments_parser,
-                        |v| {
-                            v.get_input()
-                                .iter()
-                                .map(|v| match v {
-                                    MathElement::Symbol(v) => v.clone(),
-                                    _ => panic!("expected variable"),
-                                })
-                                .collect::<String>()
-                                .into()
-                        },
-                    ),
+                    TokenDefinition::new("String".into(), (None, None)).with_value_parser(|v| {
+                        v.get_input()
+                            .iter()
+                            .map(|v| match v {
+                                MathElement::Symbol(v) => v.clone(),
+                                _ => panic!("expected variable"),
+                            })
+                            .collect::<String>()
+                            .into()
+                    }),
                 ),
                 (
                     "+".into(),
@@ -250,17 +201,31 @@ impl<'a> ParseContext<'a> {
                     "!".into(),
                     TokenDefinition::new("Factorial".into(), (Some(600), None)),
                 ),
-                // Unit brackets
+                // Brackets
                 ("()".into(), TokenDefinition::new("()".into(), (None, None))),
+                (
+                    "(".into(),
+                    TokenDefinition::new_with_parsers(
+                        "()".into(),
+                        (None, None),
+                        vec![
+                            TokenArgumentParser::Next {
+                                minimum_binding_power: 0,
+                                argument_index: Some(0),
+                            },
+                            TokenArgumentParser::NextSymbol {
+                                symbol: NFABuilder::match_string(")").build(),
+                                argument_index: None,
+                            },
+                        ],
+                    ),
+                ),
             ],
-            vec![(
-                "(".into(),
-                BracketDefinition::new("()".into(), NFABuilder::match_string(")").build()),
-            )],
         )
     }
 }
 
+/// Matches the starting pattern of a given token, including brackets
 pub struct TokenMatcher {
     // 1. binding power pattern
     // 2. tricky
@@ -301,7 +266,7 @@ impl From<&TokenIdentifier> for String {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TokenDefinition {
     pub name: TokenIdentifier,
     /// a constant has no binding power
@@ -310,70 +275,107 @@ pub struct TokenDefinition {
     /// an infix operator has a binding power on the left and on the right
     pub binding_power: (Option<u32>, Option<u32>),
 
-    pub arguments_parser: TokenDefinitionArgumentParser,
+    pub arguments_parsers: Vec<TokenArgumentParser>,
+    argument_count: usize,
     pub value_parser: TokenDefinitionValueParser,
 }
 
-pub type TokenDefinitionArgumentParser =
-    for<'a> fn(Lexer<'a>, &ParseContext, &ParseStartResult) -> (Vec<MathSemantic>, Lexer<'a>);
+#[derive(Debug)]
+pub enum TokenArgumentParser {
+    // Can parse
+    // - next token for prefix operators
+    // - next token for infix operators
+    // - nothing for tokens
+    // - stuff in brackets for brackets, and then the closing bracket
+    // - bottom part of lim
+
+    // Does not parse
+    // - sup and sub that come after a sum, because those are postfix operators
+    Next {
+        minimum_binding_power: u32,
+        argument_index: Option<usize>,
+    },
+    NextSymbol {
+        symbol: NFA,
+        argument_index: Option<usize>,
+    },
+    CapturingGroup {
+        group_id: CapturingGroupId,
+        argument_index: Option<usize>,
+    },
+}
+
+impl TokenArgumentParser {
+    fn parse<'input>(
+        &self,
+        lexer: Lexer<'input>,
+        context: &ParseContext,
+        // TODO: Don't rely on ParseStartResult
+        start: &ParseStartResult,
+    ) -> (Option<usize>, MathSemantic, Lexer<'input>) {
+        match self {
+            TokenArgumentParser::Next {
+                minimum_binding_power,
+                argument_index,
+            } => {
+                let argument_lexer = lexer.begin_token();
+                let (argument, argument_lexer) =
+                    context.parse_bp(argument_lexer, *minimum_binding_power);
+                (
+                    *argument_index,
+                    argument,
+                    argument_lexer.end_token().unwrap(),
+                )
+            }
+            TokenArgumentParser::NextSymbol {
+                symbol,
+                argument_index,
+            } => {
+                let mut closing_bracket = lexer.begin_token();
+                if let Some(_match_result) = context.get_symbol(&mut closing_bracket, symbol) {
+                    // Yay
+                } else {
+                    // TODO: Better error message
+                    panic!("expected closing bracket");
+                }
+                let range = closing_bracket.get_range();
+                let lexer = closing_bracket.end_token().unwrap();
+                let semantic = MathSemantic {
+                    name: match start {
+                        ParseStartResult::Token { definition, .. } => definition.name(),
+                    },
+                    args: vec![],
+                    value: vec![],
+                    range,
+                };
+                (*argument_index, semantic, lexer)
+            }
+            TokenArgumentParser::CapturingGroup {
+                group_id,
+                argument_index,
+            } => {
+                let semantic = match start {
+                    ParseStartResult::Token {
+                        definition,
+                        match_result,
+                        minimum_bp,
+                        range,
+                    } => {
+                        let values = match_result.get_capture_group(group_id).unwrap();
+                        let lexer = Lexer::new(values);
+                        let (math_semantic, lexer) = context.parse_bp(lexer, 0);
+                        assert!(lexer.eof());
+                        math_semantic
+                    }
+                };
+                (*argument_index, semantic, lexer)
+            }
+        }
+    }
+}
 
 pub type TokenDefinitionValueParser =
     for<'input> fn(match_result: &MatchResult<'input, MathElement>) -> Vec<u8>;
-
-// TODO: Maybe this is a useless design?
-fn no_arguments_parser<'a>(
-    lexer: Lexer<'a>,
-    _: &ParseContext,
-    _: &ParseStartResult,
-) -> (Vec<MathSemantic>, Lexer<'a>) {
-    (vec![], lexer)
-}
-
-fn prefix_arguments_parser<'a>(
-    lexer: Lexer<'a>,
-    context: &ParseContext,
-    start: &ParseStartResult,
-) -> (Vec<MathSemantic>, Lexer<'a>) {
-    let argument_lexer = lexer.begin_token();
-    let (argument, argument_lexer) = context.parse_bp(
-        argument_lexer,
-        match start {
-            ParseStartResult::Token { minimum_bp, .. } => *minimum_bp,
-            ParseStartResult::Bracket { .. } => todo!(),
-        },
-    );
-    (vec![argument], argument_lexer.end_token().unwrap())
-}
-
-fn bracket_arguments_parser<'a>(
-    lexer: Lexer<'a>,
-    context: &ParseContext,
-    start: &ParseStartResult,
-) -> (Vec<MathSemantic>, Lexer<'a>) {
-    let argument_lexer = lexer.begin_token();
-    let (argument, argument_lexer) = context.parse_bp(
-        argument_lexer,
-        match start {
-            ParseStartResult::Token { .. } => todo!(),
-            ParseStartResult::Bracket { .. } => 0,
-        },
-    );
-    let lexer = argument_lexer.end_token().unwrap();
-    let bracket_definition = match start {
-        &ParseStartResult::Token { .. } => todo!(),
-        &ParseStartResult::Bracket { definition, .. } => definition,
-    };
-
-    let mut closing_bracket = lexer.begin_token();
-    if let Some((_, _)) = context.get_closing_bracket(&mut closing_bracket, bracket_definition) {
-        // Yay
-    } else {
-        // TODO: Better error message
-        panic!("expected closing bracket");
-    }
-    let lexer = closing_bracket.end_token().unwrap();
-    (vec![argument], lexer)
-}
 
 fn no_value_parser<'input>(_match_result: &MatchResult<'input, MathElement>) -> Vec<u8> {
     vec![]
@@ -382,26 +384,54 @@ fn no_value_parser<'input>(_match_result: &MatchResult<'input, MathElement>) -> 
 impl TokenDefinition {
     pub fn new(name: TokenIdentifier, binding_power: (Option<u32>, Option<u32>)) -> Self {
         let arguments_parser = match binding_power {
-            (Some(_), Some(_)) => no_arguments_parser,
-            (Some(_), None) => no_arguments_parser,
-            (None, Some(_)) => prefix_arguments_parser,
-            (None, None) => no_arguments_parser,
+            (Some(_), Some(minimum_binding_power)) => vec![TokenArgumentParser::Next {
+                minimum_binding_power,
+                argument_index: Some(0),
+            }],
+            (Some(_), None) => vec![],
+            (None, Some(minimum_binding_power)) => vec![TokenArgumentParser::Next {
+                minimum_binding_power,
+                argument_index: Some(0),
+            }],
+            (None, None) => vec![],
         };
 
-        Self::new_with_parsers(name, binding_power, arguments_parser, no_value_parser)
+        Self::new_with_parsers(name, binding_power, arguments_parser)
     }
 
     pub fn new_with_parsers(
         name: TokenIdentifier,
         binding_power: (Option<u32>, Option<u32>),
-        arguments_parser: TokenDefinitionArgumentParser,
-        value_parser: TokenDefinitionValueParser,
+        arguments_parsers: Vec<TokenArgumentParser>,
     ) -> Self {
+        let mut argument_indices: Vec<_> = arguments_parsers
+            .iter()
+            .filter_map(|v| match v {
+                TokenArgumentParser::Next { argument_index, .. } => *argument_index,
+                TokenArgumentParser::NextSymbol { argument_index, .. } => *argument_index,
+                TokenArgumentParser::CapturingGroup { argument_index, .. } => *argument_index,
+            })
+            .collect();
+
+        argument_indices.sort();
+        assert_eq!(
+            argument_indices,
+            (0..argument_indices.len()).collect::<Vec<_>>()
+        );
+
         Self {
             name,
             binding_power,
-            arguments_parser,
+            arguments_parsers,
+            argument_count: argument_indices.len(),
+            value_parser: no_value_parser,
+        }
+    }
+
+    pub fn with_value_parser(self, value_parser: TokenDefinitionValueParser) -> Self {
+        Self {
             value_parser,
+            ..self
         }
     }
 
@@ -415,36 +445,24 @@ impl TokenDefinition {
     pub fn name(&self) -> String {
         (&self.name).into()
     }
-}
 
-pub struct BracketOpeningMatcher {
-    pattern: NFA,
-}
-
-impl From<&str> for BracketOpeningMatcher {
-    fn from(pattern: &str) -> Self {
-        Self {
-            pattern: NFABuilder::match_string(pattern).build(),
+    pub fn parse_arguments<'input>(
+        &self,
+        mut lexer: Lexer<'input>,
+        context: &ParseContext,
+        arg: &ParseStartResult,
+    ) -> (Vec<MathSemantic>, Lexer<'input>) {
+        let mut semantics = std::iter::repeat_with(|| None)
+            .take(self.argument_count)
+            .collect::<Vec<_>>();
+        for parser in &self.arguments_parsers {
+            let (argument_index, semantic, new_lexer) = parser.parse(lexer, context, arg);
+            lexer = new_lexer;
+            if let Some(argument_index) = argument_index {
+                semantics[argument_index] = Some(semantic);
+            }
         }
-    }
-}
 
-#[derive(Debug)]
-pub struct BracketDefinition {
-    pub name: TokenIdentifier,
-    pub arguments_parser: TokenDefinitionArgumentParser,
-    pub closing_pattern: NFA,
-}
-
-impl BracketDefinition {
-    pub fn new(name: TokenIdentifier, closing_pattern: NFA) -> BracketDefinition {
-        BracketDefinition {
-            name,
-            arguments_parser: bracket_arguments_parser,
-            closing_pattern,
-        }
-    }
-    pub fn name(&self) -> String {
-        (&self.name).into()
+        (semantics.into_iter().filter_map(|v| v).collect(), lexer)
     }
 }

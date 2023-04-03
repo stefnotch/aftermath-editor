@@ -1,38 +1,38 @@
 use std::ops::Range;
 
-use crate::math_layout::{element::MathElement, row::Row};
+use crate::math_layout::element::MathElement;
 
 // TODO: I bet there's a better design for this
 /// A lexer that can be nested
 pub struct Lexer<'input> {
     parent: Option<Box<Lexer<'input>>>,
-    row: &'input Row,
+    values: &'input [MathElement],
     /// the index of the *next* element to be consumed
     index: usize,
 }
 
 impl<'input> Lexer<'input> {
-    pub fn new(row: &Row) -> Lexer {
+    pub fn new(row: &[MathElement]) -> Lexer {
         Lexer {
             parent: None,
-            row,
+            values: row,
             index: 0,
         }
     }
 
     pub fn begin_token(self) -> Lexer<'input> {
         let index = self.index;
-        let row = self.row;
+        let row = self.values;
         Lexer {
             parent: Some(Box::new(self)),
-            row,
+            values: row,
             index,
         }
     }
 
     pub fn consume_n(&mut self, count: usize) {
         self.index += count;
-        assert!(self.index <= self.row.values.len());
+        assert!(self.index <= self.values.len());
     }
 
     pub fn get_range(&self) -> Range<usize> {
@@ -42,7 +42,7 @@ impl<'input> Lexer<'input> {
 
     // TODO: https://doc.rust-lang.org/reference/attributes/diagnostics.html#the-must_use-attribute ?
     pub fn end_token(self) -> Option<Lexer<'input>> {
-        assert!(self.index <= self.row.values.len());
+        assert!(self.index <= self.values.len());
         if let Some(mut parent) = self.parent {
             parent.index = self.index;
             Some(*parent)
@@ -56,11 +56,11 @@ impl<'input> Lexer<'input> {
     }
 
     pub fn get_slice(&self) -> &'input [MathElement] {
-        &self.row.values[self.index..]
+        &self.values[self.index..]
     }
 
     pub fn eof(&self) -> bool {
-        self.index >= self.row.values.len()
+        self.index >= self.values.len()
     }
 }
 
@@ -79,7 +79,7 @@ mod tests {
             ]),
         ]);
 
-        let mut lexer = Lexer::new(&layout);
+        let mut lexer = Lexer::new(&layout.values);
         let mut token = lexer.begin_token();
         assert_eq!(
             token.get_slice().get(0),
