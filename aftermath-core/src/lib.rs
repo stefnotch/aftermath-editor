@@ -28,8 +28,8 @@ fn main() {
 pub fn parse(layout_row: JsValue) -> Result<JsValue, JsValue> {
     let layout: Row = serde_wasm_bindgen::from_value(layout_row)?;
 
-    let (context, sub_context) = ParseContext::default();
-    let parsed = parser::parse(&layout, &sub_context);
+    let context = ParseContext::default();
+    let parsed = parser::parse(&layout, &context);
 
     let serializer =
         serde_wasm_bindgen::Serializer::new().serialize_large_number_types_as_bigints(true);

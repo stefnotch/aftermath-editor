@@ -15,20 +15,16 @@ pub enum BracketType {
     Opening,
     Closing,
 }
-pub struct ParseContext {
-    minimal_definitions: MinimalDefinitions,
-}
-
-pub struct ParseSubContext<'a> {
+pub struct ParseContext<'a> {
     // takes the parent context and gives it back afterwards
-    parent_context: Option<&'a ParseSubContext<'a>>,
+    parent_context: Option<&'a ParseContext<'a>>,
     known_tokens: HashMap<BindingPowerPattern, Vec<(TokenMatcher, TokenDefinition)>>,
     known_brackets: Vec<(BracketMatcher, BracketDefinition)>,
 }
 
-impl<'a> ParseSubContext<'a> {
+impl<'a> ParseContext<'a> {
     pub fn new(
-        parent_context: Option<&'a ParseSubContext<'a>>,
+        parent_context: Option<&'a ParseContext<'a>>,
         tokens: Vec<(TokenMatcher, TokenDefinition)>,
         brackets: Vec<(BracketMatcher, BracketDefinition)>,
     ) -> Self {
@@ -113,135 +109,112 @@ impl<'a> ParseSubContext<'a> {
     }
 }
 
-pub struct MinimalDefinitions {
-    empty: TokenIdentifier,
-}
-
-impl MinimalDefinitions {
-    fn new() -> MinimalDefinitions {
-        MinimalDefinitions {
-            empty: "Empty".into(),
-        }
-    }
-
-    pub fn empty(&self) -> &TokenIdentifier {
-        &self.empty
-    }
-    pub fn is_empty(&self, definition: &TokenIdentifier) -> bool {
-        definition == &self.empty
-    }
-}
-
-impl ParseContext {
-    pub fn default<'a>() -> (ParseContext, ParseSubContext<'a>) {
+impl<'a> ParseContext<'a> {
+    pub fn default() -> ParseContext<'a> {
         // TODO: Add more default tokens
         // 2. Parser for various types of tokens (numbers, strings, etc.)
         // 3. Parser for functions
         // 4. Parser for whitespace
-        let minimal_definitions = MinimalDefinitions::new();
 
-        (
-            ParseContext {
-                minimal_definitions,
-            },
-            ParseSubContext::new(
-                None,
-                vec![
-                    // TODO: Good whitespace handling
-                    /*(
-                        TokenMatcher {
-                            pattern: NFABuilder::match_character((' ').into()).build(),
+        ParseContext::new(
+            None,
+            vec![
+                // TODO: Good whitespace handling
+                /*(
+                    TokenMatcher {
+                        pattern: NFABuilder::match_character((' ').into()).build(),
+                    },
+                    TokenDefinition::new(minimal_definitions.empty.clone(), (None, None)),
+                ),*/
+                (
+                    TokenMatcher {
+                        pattern: NFABuilder::match_character(('a'..='z').into())
+                            .or(NFABuilder::match_character(('A'..='Z').into()))
+                            .one_or_more()
+                            .build(),
+                    },
+                    TokenDefinition::new_with_parsers(
+                        "Variable".into(),
+                        (None, None),
+                        no_arguments_parser,
+                        |v| {
+                            v.get_input()
+                                .iter()
+                                .map(|v| match v {
+                                    MathElement::Symbol(v) => v.clone(),
+                                    _ => panic!("expected variable"),
+                                })
+                                .collect::<String>()
+                                .into()
                         },
-                        TokenDefinition::new(minimal_definitions.empty.clone(), (None, None)),
-                    ),*/
-                    (
-                        TokenMatcher {
-                            pattern: NFABuilder::match_character(('a'..='z').into())
-                                .or(NFABuilder::match_character(('A'..='Z').into()))
-                                .one_or_more()
-                                .build(),
+                    ),
+                ),
+                (
+                    TokenMatcher {
+                        pattern: NFABuilder::match_character(('0'..='9').into())
+                            .one_or_more()
+                            .then(
+                                NFABuilder::match_character('.'.into())
+                                    .then(
+                                        NFABuilder::match_character(('0'..='9').into())
+                                            .one_or_more(),
+                                    )
+                                    .optional(),
+                            )
+                            .build(),
+                    },
+                    TokenDefinition::new_with_parsers(
+                        "Number".into(),
+                        (None, None),
+                        no_arguments_parser,
+                        |v| {
+                            v.get_input()
+                                .iter()
+                                .map(|v| match v {
+                                    MathElement::Symbol(v) => v.clone(),
+                                    _ => panic!("expected variable"),
+                                })
+                                .collect::<String>()
+                                .into()
                         },
-                        TokenDefinition::new_with_parsers(
-                            "Variable".into(),
-                            (None, None),
-                            no_arguments_parser,
-                            |v| {
-                                v.get_input()
-                                    .iter()
-                                    .map(|v| match v {
-                                        MathElement::Symbol(v) => v.clone(),
-                                        _ => panic!("expected variable"),
-                                    })
-                                    .collect::<String>()
-                                    .into()
-                            },
-                        ),
                     ),
-                    (
-                        TokenMatcher {
-                            pattern: NFABuilder::match_character(('0'..='9').into())
-                                .one_or_more()
-                                .then(
-                                    NFABuilder::match_character('.'.into())
-                                        .then(
-                                            NFABuilder::match_character(('0'..='9').into())
-                                                .one_or_more(),
-                                        )
-                                        .optional(),
-                                )
-                                .build(),
-                        },
-                        TokenDefinition::new_with_parsers(
-                            "Number".into(),
-                            (None, None),
-                            no_arguments_parser,
-                            |v| {
-                                v.get_input()
-                                    .iter()
-                                    .map(|v| match v {
-                                        MathElement::Symbol(v) => v.clone(),
-                                        _ => panic!("expected variable"),
-                                    })
-                                    .collect::<String>()
-                                    .into()
-                            },
-                        ),
-                    ),
-                    (
-                        "+".into(),
-                        TokenDefinition::new("Add".into(), (Some(100), Some(101))),
-                    ),
-                    (
-                        "-".into(),
-                        TokenDefinition::new("Subtract".into(), (Some(100), Some(101))),
-                    ),
-                    (
-                        "+".into(),
-                        TokenDefinition::new("Add".into(), (None, Some(400))),
-                    ),
-                    (
-                        "-".into(),
-                        TokenDefinition::new("Subtract".into(), (None, Some(400))),
-                    ),
-                    (
-                        "*".into(),
-                        TokenDefinition::new("Multiply".into(), (Some(200), Some(201))),
-                    ),
-                    (
-                        "/".into(),
-                        TokenDefinition::new("Divide".into(), (Some(200), Some(201))),
-                    ),
-                    (
-                        ".".into(),
-                        TokenDefinition::new("Ring".into(), (Some(501), Some(500))),
-                    ),
-                    (
-                        "!".into(),
-                        TokenDefinition::new("Factorial".into(), (Some(600), None)),
-                    ),
-                ],
-                vec![(("(", ")").into(), BracketDefinition::new("()".into()))],
-            ),
+                ),
+                (
+                    "+".into(),
+                    TokenDefinition::new("Add".into(), (Some(100), Some(101))),
+                ),
+                (
+                    "-".into(),
+                    TokenDefinition::new("Subtract".into(), (Some(100), Some(101))),
+                ),
+                (
+                    "+".into(),
+                    TokenDefinition::new("Add".into(), (None, Some(400))),
+                ),
+                (
+                    "-".into(),
+                    TokenDefinition::new("Subtract".into(), (None, Some(400))),
+                ),
+                (
+                    "*".into(),
+                    TokenDefinition::new("Multiply".into(), (Some(200), Some(201))),
+                ),
+                (
+                    "/".into(),
+                    TokenDefinition::new("Divide".into(), (Some(200), Some(201))),
+                ),
+                (
+                    ".".into(),
+                    TokenDefinition::new("Ring".into(), (Some(501), Some(500))),
+                ),
+                (
+                    "!".into(),
+                    TokenDefinition::new("Factorial".into(), (Some(600), None)),
+                ),
+                // Unit brackets
+                ("()".into(), TokenDefinition::new("()".into(), (None, None))),
+            ],
+            vec![(("(", ")").into(), BracketDefinition::new("()".into()))],
         )
     }
 }
@@ -300,7 +273,7 @@ pub struct TokenDefinition {
 }
 
 pub type TokenDefinitionArgumentParser =
-    for<'a> fn(Lexer<'a>, &ParseSubContext, &ParseStartResult) -> (Vec<MathSemantic>, Lexer<'a>);
+    for<'a> fn(Lexer<'a>, &ParseContext, &ParseStartResult) -> (Vec<MathSemantic>, Lexer<'a>);
 
 pub type TokenDefinitionValueParser =
     for<'input> fn(match_result: &MatchResult<'input, MathElement>) -> Vec<u8>;
@@ -308,7 +281,7 @@ pub type TokenDefinitionValueParser =
 // TODO: Maybe this is a useless design?
 fn no_arguments_parser<'a>(
     lexer: Lexer<'a>,
-    _: &ParseSubContext,
+    _: &ParseContext,
     _: &ParseStartResult,
 ) -> (Vec<MathSemantic>, Lexer<'a>) {
     (vec![], lexer)
@@ -316,7 +289,7 @@ fn no_arguments_parser<'a>(
 
 fn prefix_arguments_parser<'a>(
     lexer: Lexer<'a>,
-    context: &ParseSubContext,
+    context: &ParseContext,
     start: &ParseStartResult,
 ) -> (Vec<MathSemantic>, Lexer<'a>) {
     let (argument, lexer) = context.parse_bp(
