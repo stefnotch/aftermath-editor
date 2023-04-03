@@ -201,6 +201,7 @@ impl<'a> ParseContext<'a> {
                     "!".into(),
                     TokenDefinition::new("Factorial".into(), (Some(600), None)),
                 ),
+                // Amusingly, if someone defines the closing bracket as a postfix operator, it'll break the brackets
                 // Brackets
                 ("()".into(), TokenDefinition::new("()".into(), (None, None))),
                 (

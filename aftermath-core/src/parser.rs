@@ -257,6 +257,49 @@ mod tests {
         assert_eq!(parsed.errors.len(), 0);
     }
 
+    #[test]
+    fn test_parser_tuple() {
+        let layout = Row::new(vec![
+            MathElement::Symbol("(".to_string()),
+            MathElement::Symbol("a".to_string()),
+            MathElement::Symbol(",".to_string()),
+            MathElement::Symbol("b".to_string()),
+            MathElement::Symbol(",".to_string()),
+            MathElement::Symbol("c".to_string()),
+            MathElement::Symbol(")".to_string()),
+        ]);
+
+        let context = ParseContext::default();
+
+        let parsed = parse(&layout, &context);
+        assert_eq!(
+            parsed.value.to_string(),
+            "(Tuple () (Variable (61)) (Variable (62)) (Variable (63)))"
+        );
+        assert_eq!(parsed.errors.len(), 0);
+    }
+
+    #[test]
+    fn test_parser_function_call() {
+        let layout = Row::new(vec![
+            MathElement::Symbol("f".to_string()),
+            MathElement::Symbol("(".to_string()),
+            MathElement::Symbol("a".to_string()),
+            MathElement::Symbol(",".to_string()),
+            MathElement::Symbol("b".to_string()),
+            MathElement::Symbol(")".to_string()),
+        ]);
+
+        let context = ParseContext::default();
+
+        let parsed = parse(&layout, &context);
+        assert_eq!(
+            parsed.value.to_string(),
+            "TODO: (FunctionCall (f) (Variable (61)) (Variable (62)))"
+        );
+        assert_eq!(parsed.errors.len(), 0);
+    }
+
     // TODO: Fix those tests to actually do something instead of printing stuff
     #[test]
     fn test_parser_empty_input() {
