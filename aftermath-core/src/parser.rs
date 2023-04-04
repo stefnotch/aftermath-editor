@@ -63,7 +63,7 @@ impl<'a> ParseContext<'a> {
         // Repeatedly and recursively consume operators with higher binding power
         loop {
             // Not sure yet what happens when we have a postfix operator with a low binding power
-
+            // Also not sure what happens when there's a right associative and a left associative operator with the same binding powers
             let mut operator = lexer.begin_token();
             if let Some((definition, match_result)) = self.get_token(&mut operator, (true, true)) {
                 // Infix operators only get applied if there is something valid after them
@@ -78,23 +78,24 @@ impl<'a> ParseContext<'a> {
                         lexer = operator.discard_token().unwrap();
                         break;
                     }
-                    let mut combined_range = combine_ranges(&left.range, &operator.get_range());
                     // Actually consume the operator
                     lexer = operator.end_token().unwrap();
 
-                    // Parse the right operand
-                    let right_lexer = lexer.begin_token();
-                    let result = self.parse_bp(right_lexer, definition.binding_power.1.unwrap());
-                    let right = result.0;
-                    lexer = result.1.end_token().unwrap();
+                    let left_range = left.range.clone();
 
-                    combined_range = combine_ranges(&combined_range, &right.range);
+                    // Parse the right operand
+                    let args;
+                    (args, lexer) =
+                        definition.parse_arguments(lexer, self, &match_result, Some(left));
+
+                    let range = combine_ranges(&left_range, &lexer.get_range());
+
                     // Combine the left and right operand into a new left operand
                     left = MathSemantic {
                         name: definition.name(),
-                        args: vec![left, right],
+                        args,
                         value: (definition.value_parser)(&match_result),
-                        range: combined_range,
+                        range,
                     };
                     continue;
                 } else {
@@ -112,15 +113,22 @@ impl<'a> ParseContext<'a> {
                     break;
                 }
 
-                let combined_range = combine_ranges(&left.range, &operator.get_range());
                 // Actually consume the operator
                 lexer = operator.end_token().unwrap();
+
+                let left_range = left.range.clone();
+
+                let args;
+                (args, lexer) = definition.parse_arguments(lexer, self, &match_result, Some(left));
+
+                let range = combine_ranges(&left_range, &lexer.get_range());
+
                 // Combine the left operand into a new left operand
                 left = MathSemantic {
                     name: definition.name(),
-                    args: vec![left],
+                    args,
                     value: (definition.value_parser)(&match_result),
-                    range: combined_range,
+                    range,
                 };
                 continue;
             } else {
@@ -146,7 +154,7 @@ fn combine_ranges(range_1: &Range<usize>, range_2: &Range<usize>) -> Range<usize
 }
 
 #[derive(Debug)]
-pub struct ParseStartResult<'input, 'definition> {
+struct ParseStartResult<'input, 'definition> {
     definition: &'definition TokenDefinition,
     match_result: MatchResult<'input, MathElement>,
     range: Range<usize>,
@@ -157,7 +165,9 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
         lexer: Lexer<'lexer>,
         context: &ParseContext,
     ) -> (MathSemantic, Lexer<'lexer>) {
-        let (args, lexer) = self.definition.parse_arguments(lexer, context, &self);
+        let (args, lexer) =
+            self.definition
+                .parse_arguments(lexer, context, &self.match_result, None);
         let value = (self.definition.value_parser)(&self.match_result);
 
         assert_eq!(lexer.get_range().start, self.range.start);
@@ -231,6 +241,25 @@ mod tests {
         assert_eq!(
             parsed.value.to_string(),
             "(Multiply () (Subtract () (Variable (62))) (Variable (43)))"
+        );
+        assert_eq!(parsed.errors.len(), 0);
+    }
+
+    #[test]
+    fn test_postfix() {
+        let layout = Row::new(vec![
+            MathElement::Symbol("c".to_string()),
+            MathElement::Symbol("+".to_string()),
+            MathElement::Symbol("a".to_string()),
+            MathElement::Symbol("!".to_string()),
+        ]);
+
+        let context = ParseContext::default();
+
+        let parsed = parse(&layout, &context);
+        assert_eq!(
+            parsed.value.to_string(),
+            "(Add () (Variable (63)) (Factorial () (Variable (61))))"
         );
         assert_eq!(parsed.errors.len(), 0);
     }

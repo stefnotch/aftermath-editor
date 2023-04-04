@@ -7,10 +7,10 @@ use super::{
     math_semantic::MathSemantic,
     nfa_builder::NFABuilder,
     token_matcher::{CapturingGroupId, MatchResult, NFA},
-    ParseStartResult,
 };
 
 pub type BindingPowerPattern = (bool, bool);
+// TODO: Display tokens in a flattened, sorted way (for debugging)
 pub struct ParseContext<'a> {
     // takes the parent context and gives it back afterwards
     parent_context: Option<&'a ParseContext<'a>>,
@@ -82,6 +82,7 @@ impl<'a> ParseContext<'a> {
         // TODO: Add more default tokens
         // 3. Parser for functions
         // 4. Parser for whitespace
+        // 5. Parser for chains of < <=, which could be treated as a "domain restriction"
 
         ParseContext::new(
             None,
@@ -170,6 +171,10 @@ impl<'a> ParseContext<'a> {
                     }),
                 ),
                 (
+                    ",".into(),
+                    TokenDefinition::new("Tuple".into(), (Some(50), Some(51))),
+                ),
+                (
                     "+".into(),
                     TokenDefinition::new("Add".into(), (Some(100), Some(101))),
                 ),
@@ -215,6 +220,28 @@ impl<'a> ParseContext<'a> {
                                 argument_index: Some(0),
                             },
                             TokenArgumentParser::NextSymbol {
+                                name: "".into(),
+                                symbol: NFABuilder::match_string(")").build(),
+                                argument_index: None,
+                            },
+                        ],
+                    ),
+                ),
+                (
+                    "(".into(),
+                    TokenDefinition::new_with_parsers(
+                        "FunctionApplication".into(),
+                        (Some(800), None),
+                        vec![
+                            TokenArgumentParser::Previous {
+                                argument_index: Some(0),
+                            },
+                            TokenArgumentParser::Next {
+                                minimum_binding_power: 0,
+                                argument_index: Some(1),
+                            },
+                            TokenArgumentParser::NextSymbol {
+                                name: "".into(),
                                 symbol: NFABuilder::match_string(")").build(),
                                 argument_index: None,
                             },
@@ -289,31 +316,45 @@ pub enum TokenArgumentParser {
     // - nothing for tokens
     // - stuff in brackets for brackets, and then the closing bracket
     // - bottom part of lim
+    // - infix and postfix operators using the previous token
 
     // Does not parse
     // - sup and sub that come after a sum, because those are postfix operators
+    Previous {
+        argument_index: Option<usize>,
+    },
     Next {
         minimum_binding_power: u32,
         argument_index: Option<usize>,
     },
     NextSymbol {
+        name: String,
         symbol: NFA,
         argument_index: Option<usize>,
     },
+    /// For capturing groups that are a part of the token itself.
+    /// In the case of a (None, None) token, it's obvious what that means.
+    /// In the case of an operator token, it refers to the capturing groups that are a part of the operator.
     CapturingGroup {
         group_id: CapturingGroupId,
         argument_index: Option<usize>,
     },
 }
 
+struct TokenArgumentParseResult<'lexer> {
+    argument_index: Option<usize>,
+    argument: MathSemantic,
+    lexer: Lexer<'lexer>,
+}
+
 impl TokenArgumentParser {
-    fn parse<'input>(
+    fn parse<'lexer, 'input>(
         &self,
-        lexer: Lexer<'input>,
+        lexer: Lexer<'lexer>,
         context: &ParseContext,
-        // TODO: Don't rely on ParseStartResult
-        start: &ParseStartResult,
-    ) -> (Option<usize>, MathSemantic, Lexer<'input>) {
+        token_match_results: &MatchResult<'input, MathElement>,
+        previous_token: &mut Option<MathSemantic>,
+    ) -> TokenArgumentParseResult<'lexer> {
         match self {
             TokenArgumentParser::Next {
                 minimum_binding_power,
@@ -322,13 +363,14 @@ impl TokenArgumentParser {
                 let argument_lexer = lexer.begin_token();
                 let (argument, argument_lexer) =
                     context.parse_bp(argument_lexer, *minimum_binding_power);
-                (
-                    *argument_index,
+                TokenArgumentParseResult {
+                    argument_index: *argument_index,
                     argument,
-                    argument_lexer.end_token().unwrap(),
-                )
+                    lexer: argument_lexer.end_token().unwrap(),
+                }
             }
             TokenArgumentParser::NextSymbol {
+                name,
                 symbol,
                 argument_index,
             } => {
@@ -341,26 +383,43 @@ impl TokenArgumentParser {
                 }
                 let range = closing_bracket.get_range();
                 let lexer = closing_bracket.end_token().unwrap();
-                let semantic = MathSemantic {
-                    name: start.definition.name(),
+                let argument = MathSemantic {
+                    name: name.clone(),
                     args: vec![],
                     value: vec![],
                     range,
                 };
-                (*argument_index, semantic, lexer)
+                TokenArgumentParseResult {
+                    argument_index: *argument_index,
+                    argument,
+                    lexer,
+                }
             }
             TokenArgumentParser::CapturingGroup {
                 group_id,
                 argument_index,
             } => {
-                let semantic = {
-                    let values = start.match_result.get_capture_group(group_id).unwrap();
+                let argument = {
+                    let values = token_match_results.get_capture_group(group_id).unwrap();
                     let lexer = Lexer::new(values);
                     let (math_semantic, lexer) = context.parse_bp(lexer, 0);
                     assert!(lexer.eof());
                     math_semantic
                 };
-                (*argument_index, semantic, lexer)
+
+                TokenArgumentParseResult {
+                    argument_index: *argument_index,
+                    argument,
+                    lexer,
+                }
+            }
+            TokenArgumentParser::Previous { argument_index } => {
+                let argument = previous_token.take().unwrap();
+                TokenArgumentParseResult {
+                    argument_index: *argument_index,
+                    argument,
+                    lexer,
+                }
             }
         }
     }
@@ -376,11 +435,18 @@ fn no_value_parser<'input>(_match_result: &MatchResult<'input, MathElement>) -> 
 impl TokenDefinition {
     pub fn new(name: TokenIdentifier, binding_power: (Option<u32>, Option<u32>)) -> Self {
         let arguments_parser = match binding_power {
-            (Some(_), Some(minimum_binding_power)) => vec![TokenArgumentParser::Next {
-                minimum_binding_power,
+            (Some(_), Some(minimum_binding_power)) => vec![
+                TokenArgumentParser::Previous {
+                    argument_index: Some(0),
+                },
+                TokenArgumentParser::Next {
+                    minimum_binding_power,
+                    argument_index: Some(1),
+                },
+            ],
+            (Some(_), None) => vec![TokenArgumentParser::Previous {
                 argument_index: Some(0),
             }],
-            (Some(_), None) => vec![],
             (None, Some(minimum_binding_power)) => vec![TokenArgumentParser::Next {
                 minimum_binding_power,
                 argument_index: Some(0),
@@ -402,6 +468,7 @@ impl TokenDefinition {
                 TokenArgumentParser::Next { argument_index, .. } => *argument_index,
                 TokenArgumentParser::NextSymbol { argument_index, .. } => *argument_index,
                 TokenArgumentParser::CapturingGroup { argument_index, .. } => *argument_index,
+                TokenArgumentParser::Previous { argument_index } => *argument_index,
             })
             .collect();
 
@@ -438,20 +505,25 @@ impl TokenDefinition {
         (&self.name).into()
     }
 
-    pub fn parse_arguments<'input>(
+    pub fn parse_arguments<'lexer, 'input>(
         &self,
-        mut lexer: Lexer<'input>,
+        mut lexer: Lexer<'lexer>,
         context: &ParseContext,
-        arg: &ParseStartResult,
-    ) -> (Vec<MathSemantic>, Lexer<'input>) {
+        token_match_results: &MatchResult<'input, MathElement>,
+        mut previous_token: Option<MathSemantic>,
+    ) -> (Vec<MathSemantic>, Lexer<'lexer>) {
         let mut semantics = std::iter::repeat_with(|| None)
             .take(self.argument_count)
             .collect::<Vec<_>>();
         for parser in &self.arguments_parsers {
-            let (argument_index, semantic, new_lexer) = parser.parse(lexer, context, arg);
-            lexer = new_lexer;
-            if let Some(argument_index) = argument_index {
-                semantics[argument_index] = Some(semantic);
+            let parse_result =
+                parser.parse(lexer, context, token_match_results, &mut previous_token);
+
+            lexer = parse_result.lexer;
+            // Could be done more efficiently by computing the "inverse permutation" and storing it in the TokenDefinition
+            // The inverse permutation would tell you where to read from for each argument
+            if let Some(argument_index) = parse_result.argument_index {
+                semantics[argument_index] = Some(parse_result.argument);
             }
         }
 
