@@ -3,7 +3,10 @@ mod parser;
 mod utils;
 
 use math_layout::row::Row;
-use parser::{parse_context::ParseContext, MathSemantic, ParseError, ParseResult};
+use parser::{
+    ast_transformer::AstTransformer, parse_context::ParseContext, MathSemantic, ParseError,
+    ParseResult,
+};
 use serde::Serialize;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
@@ -35,7 +38,9 @@ pub fn parse(layout_row: JsValue) -> Result<JsValue, JsValue> {
     let layout: Row = serde_wasm_bindgen::from_value(layout_row)?;
 
     let context = ParseContext::default();
-    let parsed: MathParseResult = parser::parse(&layout, &context).into();
+    let transformer = AstTransformer::new();
+    let mut parsed: MathParseResult = parser::parse(&layout, &context).into();
+    parsed.value = transformer.transform(parsed.value);
 
     let serializer =
         serde_wasm_bindgen::Serializer::new().serialize_large_number_types_as_bigints(true);

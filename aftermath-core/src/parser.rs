@@ -1,3 +1,4 @@
+pub mod ast_transformer;
 mod grapheme_matcher;
 mod lexer;
 mod math_semantic;
@@ -13,6 +14,7 @@ use crate::{
 use std::ops::Range;
 
 use self::{
+    ast_transformer::AstTransformer,
     parse_context::{ParseContext, TokenDefinition},
     token_matcher::MatchResult,
 };
@@ -32,6 +34,7 @@ pub fn parse(input: &Row, context: &ParseContext) -> ParseResult<MathSemantic> {
         "range not until end"
     );
     assert!(lexer.eof(), "lexer not at end");
+
     ParseResult {
         value: parse_result,
         errors: Vec::new(),
@@ -55,6 +58,7 @@ impl<'a> ParseContext<'a> {
             let mut starting_token = lexer.begin_token();
             let parse_start = parse_bp_start(&mut starting_token, self).unwrap();
             lexer = starting_token.end_token().unwrap();
+
             let parse_result = parse_start.to_math_semantic(lexer, self);
             lexer = parse_result.1;
             parse_result.0
@@ -289,6 +293,24 @@ mod tests {
     #[test]
     fn test_parser_tuple() {
         let layout = Row::new(vec![
+            MathElement::Symbol("a".to_string()),
+            MathElement::Symbol(",".to_string()),
+            MathElement::Symbol("b".to_string()),
+        ]);
+
+        let context = ParseContext::default();
+
+        let parsed = parse(&layout, &context);
+        assert_eq!(
+            parsed.value.to_string(),
+            "(Tuple () (Variable (61)) (Variable (62)))"
+        );
+        assert_eq!(parsed.errors.len(), 0);
+    }
+
+    #[test]
+    fn test_parser_tuple_advanced() {
+        let layout = Row::new(vec![
             MathElement::Symbol("(".to_string()),
             MathElement::Symbol("a".to_string()),
             MathElement::Symbol(",".to_string()),
@@ -301,9 +323,10 @@ mod tests {
         let context = ParseContext::default();
 
         let parsed = parse(&layout, &context);
+        // Not entirely satisfactory, but eh
         assert_eq!(
             parsed.value.to_string(),
-            "(Tuple () (Variable (61)) (Variable (62)) (Variable (63)))"
+            "(() () (Tuple () (Tuple () (Variable (61)) (Variable (62))) (Variable (63))))"
         );
         assert_eq!(parsed.errors.len(), 0);
     }
@@ -322,9 +345,11 @@ mod tests {
         let context = ParseContext::default();
 
         let parsed = parse(&layout, &context);
+        // TODO: Document that the first argument is the function name
+        // and the second argument is a tuple of arguments
         assert_eq!(
             parsed.value.to_string(),
-            "TODO: (FunctionCall (f) (Variable (61)) (Variable (62)))"
+            "(FunctionApplication () (Variable (66)) (Tuple () (Variable (61)) (Variable (62))))"
         );
         assert_eq!(parsed.errors.len(), 0);
     }
