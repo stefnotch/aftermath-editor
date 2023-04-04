@@ -48,7 +48,7 @@ class MathRowDomTranslator implements RowDomTranslator {
   }
 
   offsetToPosition(offset: Offset): { x: ViewportValue; y: ViewportValue; height: ViewportValue } {
-    // https://github.com/stefnotch/mathml-editor/issues/15#issuecomment-1305718639
+    // https://github.com/stefnotch/aftermath-editor/issues/15#issuecomment-1305718639
 
     // Special case for the end of the row
     // Also elegantly deals with empty rows

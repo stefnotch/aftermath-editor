@@ -20,7 +20,7 @@ export type SerializedCaret = { start: Offset; end: Offset; zipper: AncestorIndi
 
 /**
  * Whether the editor attempts to keep the caret in the same-ish x-coordinate when moving up.
- * See https://github.com/stefnotch/mathml-editor/issues/13
+ * See https://github.com/stefnotch/aftermath-editor/issues/13
  */
 const KeepXPosition = false;
 

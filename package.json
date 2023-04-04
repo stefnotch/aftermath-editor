@@ -1,5 +1,5 @@
 {
-  "name": "mathml-editor",
+  "name": "aftermath-editor",
   "version": "0.0.7",
   "source": "src/main.ts",
   "type": "module",
@@ -10,7 +10,7 @@
     "dev": "vite --open",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "deploy": "vite build --base=/mathml-editor/ && node utils/publish.js",
+    "deploy": "vite build --base=/aftermath-editor/ && node utils/publish.js",
     "preinstall": "cd aftermath-core && npm i"
   },
   "devDependencies": {

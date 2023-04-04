@@ -1,7 +1,7 @@
 # next
 
 - Semantics parser written in Rust, compiled to WebAssembly
-- Text is no longer a first class concept, see https://github.com/stefnotch/mathml-editor/issues/21#issuecomment-1422725139
+- Text is no longer a first class concept, see https://github.com/stefnotch/aftermath-editor/issues/21#issuecomment-1422725139
 - Deal with Unicode segmentation
 - Add a custom written Regex engine
 - Add a custom written Pratt parser (hopefully will be replaced by chumsky)
@@ -28,6 +28,6 @@
 - Updated tooling, removed Vue and now it's sleeker
 - Refactored existing stuff to use a web component, which is nice because it finally does the cleanup stuff automatically, no longer creates random stuff right in the document.body, I can actually use CSS and setting the attribute is no longer a dirty hack
 - Caret refactoring to use a zipper/red-green tree, also involved making the datastructure immutable and rewriting the movement logic
-- https://github.com/stefnotch/mathml-editor/issues/13#issuecomment-1301177394
+- https://github.com/stefnotch/aftermath-editor/issues/13#issuecomment-1301177394
 - Added table to test site
 - Lots of refactors, like moving around files

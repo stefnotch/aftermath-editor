@@ -1,14 +1,12 @@
-# mathml-editor
-
-(Dang, I need a better name for this project.)
+# Aftermath Editor
 
 > A user-first mathematics editor that understands your formulas
 
-This is currently a work-in-progress. See it in action at https://stefnotch.github.io/mathml-editor
+This is currently a work-in-progress. See it in action at https://stefnotch.github.io/aftermath-editor
 
-Compared to other editors out there, this editor cares about *what your formulas mean*. Since the computer then understands the formulas, it becomes pratical to use this as a next-gen calculator frontend.
+Compared to other editors out there, this editor cares about _what your formulas mean_. Since the computer then understands the formulas, it becomes pratical to use this as a next-gen calculator frontend.
 
-TODO: 
+TODO:
 Explanation of what this is.
 
 Quick explanation of what MathMl is.
@@ -77,14 +75,14 @@ Sources:
 - Display: display on screen, keeps references to the layout ranges for editing
 - Semantics: computed/parsed, keeps references to the layout ranges
 - Layout: core, for editing, user-input
-- Cosmetics: like colors or text annotations 
+- Cosmetics: like colors or text annotations
 
 ```mermaid
 flowchart TD
 D[Display]
 S[Semantics]
 L[Layout]
-C[Cosmetics]  
+C[Cosmetics]
 
 L -->|parsed into| S
 S -->|render ranges| D
