@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::math_layout::element::MathElement;
+use math_layout::element::MathElement;
 
 // TODO: I bet there's a better design for this
 /// A lexer that can be nested
@@ -67,7 +67,7 @@ impl<'input> Lexer<'input> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math_layout::{element::MathElement, row::Row};
+    use math_layout::{element::MathElement, row::Row};
 
     #[test]
     fn test_lexer() {

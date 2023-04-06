@@ -23,7 +23,7 @@ mod matcher_state;
 
 use std::fmt::{Debug, Formatter};
 
-use crate::math_layout::element::MathElement;
+use math_layout::element::MathElement;
 
 use super::grapheme_matcher::GraphemeClusterMatcher;
 use super::token_matcher::matcher_state::{MatchInfo, NFAMatches};
@@ -235,7 +235,7 @@ impl NFA {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::nfa_builder::*;
+    use crate::nfa_builder::*;
 
     #[test]
     fn test_matches() {

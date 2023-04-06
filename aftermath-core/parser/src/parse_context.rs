@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::math_layout::element::MathElement;
+use math_layout::element::MathElement;
 
 use super::{
     lexer::Lexer,
@@ -208,11 +208,14 @@ impl<'a> ParseContext<'a> {
                 ),
                 // Amusingly, if someone defines the closing bracket as a postfix operator, it'll break the brackets
                 // Brackets
-                ("()".into(), TokenDefinition::new("()".into(), (None, None))),
+                (
+                    "RoundBrackets".into(),
+                    TokenDefinition::new("()".into(), (None, None)),
+                ),
                 (
                     "(".into(),
                     TokenDefinition::new_with_parsers(
-                        "()".into(),
+                        "RoundBrackets".into(),
                         (None, None),
                         vec![
                             TokenArgumentParser::Next {
@@ -387,6 +390,7 @@ impl TokenArgumentParser {
                     name: name.clone(),
                     args: vec![],
                     value: vec![],
+                    row_index: None,
                     range,
                 };
                 TokenArgumentParseResult {

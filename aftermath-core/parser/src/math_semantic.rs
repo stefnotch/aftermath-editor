@@ -3,6 +3,8 @@ use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
 
+use math_layout::row::RowIndex;
+
 /// https://github.com/cortex-js/compute-engine/issues/25
 /// mimics the math layout tree
 #[derive(Debug, Serialize, Deserialize)]
@@ -12,6 +14,8 @@ pub struct MathSemantic {
     /// arguments of the function
     /// if the function is a constant, this is empty
     pub args: Vec<MathSemantic>,
+    /// Mapping back to the original math layout
+    pub row_index: Option<RowIndex>,
     /// value, especially for constants
     /// stored as bytes, and interpreted according to the name
     pub value: Vec<u8>,

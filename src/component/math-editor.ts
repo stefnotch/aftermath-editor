@@ -180,6 +180,7 @@ export class MathEditor extends HTMLElement {
       const newPosition = lastLayout.viewportToLayoutPosition({ x: e.clientX, y: e.clientY }, this.mathAst);
       if (!newPosition) return;
 
+      // TODO: Table selections
       caret.caret = MathLayoutCaret.getSharedCaret(caret.startPosition, newPosition);
       this.renderCarets();
     });
@@ -200,11 +201,6 @@ export class MathEditor extends HTMLElement {
     // https://d-toybox.com/studio/lib/input_event_viewer.html
     // https://w3c.github.io/uievents/tools/key-event-viewer.html
     // https://tkainrad.dev/posts/why-keyboard-shortcuts-dont-work-on-non-us-keyboard-layouts-and-how-to-fix-it/
-
-    // TODO: Parsing
-    // - 1. MathLayout
-    // - 2. Bracket pairs
-    // - 3. A general enough recursive descent (or pratt) parser that can handle tokens
 
     // Register keyboard handlers
     // TODO:
@@ -275,6 +271,8 @@ export class MathEditor extends HTMLElement {
         }
         this.render();
       } else if (ev.inputType === "historyUndo") {
+        // TODO: https://stackoverflow.com/questions/27027833/is-it-possible-to-edit-a-text-input-with-javascript-and-add-to-the-undo-stack
+        // ^ Fix it using this slightly dirty hack
         // Doesn't reliably fire, ugh
         // I might be able to hack around this by firing keyboard events such that the browser has something to undo
         // Or I could just wait for the Keyboard API to get implemented

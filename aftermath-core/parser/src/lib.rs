@@ -7,14 +7,13 @@ pub mod parse_context;
 mod parse_result;
 mod token_matcher;
 
-use crate::{
-    math_layout::{element::MathElement, row::Row},
-    parser::lexer::Lexer,
-};
 use std::ops::Range;
 
+use math_layout::{element::MathElement, row::Row};
+
+use crate::lexer::Lexer;
+
 use self::{
-    ast_transformer::AstTransformer,
     parse_context::{ParseContext, TokenDefinition},
     token_matcher::MatchResult,
 };
@@ -99,6 +98,7 @@ impl<'a> ParseContext<'a> {
                         name: definition.name(),
                         args,
                         value: (definition.value_parser)(&match_result),
+                        row_index: None,
                         range,
                     };
                     continue;
@@ -132,6 +132,7 @@ impl<'a> ParseContext<'a> {
                     name: definition.name(),
                     args,
                     value: (definition.value_parser)(&match_result),
+                    row_index: None,
                     range,
                 };
                 continue;
@@ -180,6 +181,7 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
                 name: self.definition.name(),
                 args,
                 value,
+                row_index: None,
                 range: lexer.get_range(),
             },
             lexer,
@@ -219,171 +221,5 @@ fn parse_bp_start<'input, 'definition>(
             // TODO: Better range for error reporting
             range: token.get_range(),
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{
-        math_layout::{element::MathElement, row::Row},
-        parser::parse_context::ParseContext,
-    };
-
-    #[test]
-    fn test_parser() {
-        let layout = Row::new(vec![
-            MathElement::Symbol("-".to_string()),
-            MathElement::Symbol("b".to_string()),
-            MathElement::Symbol("*".to_string()),
-            MathElement::Symbol("C".to_string()),
-        ]);
-
-        let context = ParseContext::default();
-
-        let parsed = parse(&layout, &context);
-        assert_eq!(
-            parsed.value.to_string(),
-            "(Multiply () (Subtract () (Variable (62))) (Variable (43)))"
-        );
-        assert_eq!(parsed.errors.len(), 0);
-    }
-
-    #[test]
-    fn test_postfix() {
-        let layout = Row::new(vec![
-            MathElement::Symbol("c".to_string()),
-            MathElement::Symbol("+".to_string()),
-            MathElement::Symbol("a".to_string()),
-            MathElement::Symbol("!".to_string()),
-        ]);
-
-        let context = ParseContext::default();
-
-        let parsed = parse(&layout, &context);
-        assert_eq!(
-            parsed.value.to_string(),
-            "(Add () (Variable (63)) (Factorial () (Variable (61))))"
-        );
-        assert_eq!(parsed.errors.len(), 0);
-    }
-
-    #[test]
-    fn test_parser_nested_brackets_and_postfix() {
-        let layout = Row::new(vec![
-            MathElement::Symbol("(".to_string()),
-            MathElement::Symbol("(".to_string()),
-            MathElement::Symbol("(".to_string()),
-            MathElement::Symbol("a".to_string()),
-            MathElement::Symbol("!".to_string()),
-            MathElement::Symbol(")".to_string()),
-            MathElement::Symbol(")".to_string()),
-            MathElement::Symbol(")".to_string()),
-        ]);
-        let context = ParseContext::default();
-
-        let parsed = parse(&layout, &context);
-        assert_eq!(
-            parsed.value.to_string(),
-            "(() () (() () (() () (Factorial () (Variable (61))))))"
-        );
-        assert_eq!(parsed.errors.len(), 0);
-    }
-
-    #[test]
-    fn test_parser_tuple() {
-        let layout = Row::new(vec![
-            MathElement::Symbol("a".to_string()),
-            MathElement::Symbol(",".to_string()),
-            MathElement::Symbol("b".to_string()),
-        ]);
-
-        let context = ParseContext::default();
-
-        let parsed = parse(&layout, &context);
-        assert_eq!(
-            parsed.value.to_string(),
-            "(Tuple () (Variable (61)) (Variable (62)))"
-        );
-        assert_eq!(parsed.errors.len(), 0);
-    }
-
-    #[test]
-    fn test_parser_tuple_advanced() {
-        let layout = Row::new(vec![
-            MathElement::Symbol("(".to_string()),
-            MathElement::Symbol("a".to_string()),
-            MathElement::Symbol(",".to_string()),
-            MathElement::Symbol("b".to_string()),
-            MathElement::Symbol(",".to_string()),
-            MathElement::Symbol("c".to_string()),
-            MathElement::Symbol(")".to_string()),
-        ]);
-
-        let context = ParseContext::default();
-
-        let parsed = parse(&layout, &context);
-        // Not entirely satisfactory, but eh
-        assert_eq!(
-            parsed.value.to_string(),
-            "(() () (Tuple () (Tuple () (Variable (61)) (Variable (62))) (Variable (63))))"
-        );
-        assert_eq!(parsed.errors.len(), 0);
-    }
-
-    #[test]
-    fn test_parser_function_call() {
-        let layout = Row::new(vec![
-            MathElement::Symbol("f".to_string()),
-            MathElement::Symbol("(".to_string()),
-            MathElement::Symbol("a".to_string()),
-            MathElement::Symbol(",".to_string()),
-            MathElement::Symbol("b".to_string()),
-            MathElement::Symbol(")".to_string()),
-        ]);
-
-        let context = ParseContext::default();
-
-        let parsed = parse(&layout, &context);
-        // TODO: Document that the first argument is the function name
-        // and the second argument is a tuple of arguments
-        assert_eq!(
-            parsed.value.to_string(),
-            "(FunctionApplication () (Variable (66)) (Tuple () (Variable (61)) (Variable (62))))"
-        );
-        assert_eq!(parsed.errors.len(), 0);
-    }
-
-    // TODO: Fix those tests to actually do something instead of printing stuff
-    #[test]
-    fn test_parser_empty_input() {
-        let layout = Row::new(vec![]);
-        let context = ParseContext::default();
-
-        let parsed = parse(&layout, &context);
-        assert_eq!(parsed.errors.len(), 1);
-
-        println!("{:?}", parsed);
-    }
-
-    #[test]
-    fn test_parser_symbol_and_close_bracket() {
-        let layout = Row::new(vec![
-            MathElement::Symbol("a".to_string()),
-            MathElement::Symbol(")".to_string()),
-        ]);
-        let context = ParseContext::default();
-
-        let parsed = parse(&layout, &context);
-        println!("{:?}", parsed);
-    }
-
-    #[test]
-    fn test_parser_close_bracket() {
-        let layout = Row::new(vec![MathElement::Symbol(")".to_string())]);
-        let context = ParseContext::default();
-
-        let parsed = parse(&layout, &context);
-        println!("{:?}", parsed);
     }
 }

@@ -4,7 +4,9 @@
 - Text is no longer a first class concept, see https://github.com/stefnotch/aftermath-editor/issues/21#issuecomment-1422725139
 - Deal with Unicode segmentation
 - Add a custom written Regex engine
-- Add a custom written Pratt parser (hopefully will be replaced by chumsky)
+- Add a custom written Pratt parser
+  - Hopefully will be replaced by chumsky
+  - Outputs semantic information, including ranges for where the info applies
 
 # v0.0.7
 

@@ -1,5 +1,3 @@
-mod math_layout;
-mod parser;
 mod utils;
 
 use math_layout::row::Row;
@@ -45,7 +43,7 @@ pub fn parse(layout_row: JsValue) -> Result<JsValue, JsValue> {
     let serializer =
         serde_wasm_bindgen::Serializer::new().serialize_large_number_types_as_bigints(true);
 
-    let serialized_result = parsed.value.serialize(&serializer)?;
+    let serialized_result = parsed.serialize(&serializer)?;
     Ok(serialized_result)
 }
 
