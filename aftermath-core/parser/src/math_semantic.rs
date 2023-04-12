@@ -47,3 +47,15 @@ impl fmt::Display for MathSemantic {
         write!(f, ")")
     }
 }
+
+impl Default for MathSemantic {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            args: Vec::new(),
+            row_index: None,
+            value: Vec::new(),
+            range: 0..0,
+        }
+    }
+}

@@ -16,7 +16,7 @@
 // https://swtch.com/~rsc/regexp/regexp2.html
 // https://swtch.com/~rsc/regexp/regexp3.html
 // TODO: Build a DFA
-// TODO: Have fast paths for some things (profile first)
+// TODO: Have fast path (trie) for some things (profile first)
 
 mod capturing_group;
 mod matcher_state;
@@ -25,7 +25,7 @@ use std::fmt::{Debug, Formatter};
 
 use math_layout::element::MathElement;
 
-use super::grapheme_matcher::GraphemeClusterMatcher;
+use super::grapheme_matcher::GraphemeMatcher;
 use super::token_matcher::matcher_state::{MatchInfo, NFAMatches};
 
 pub(super) use super::token_matcher::capturing_group::CapturingGroupId;
@@ -66,19 +66,8 @@ pub enum StateFragment {
 
 #[derive(Debug)]
 pub enum MatchIf {
-    GraphemeCluster(GraphemeClusterMatcher),
-    Container(Container),
-}
-
-#[derive(Debug)]
-pub enum Container {
-    Fraction([NFA; 2]),
-    Root([NFA; 2]),
-    Under([NFA; 2]),
-    Over([NFA; 2]),
-    Sup(NFA),
-    Sub(NFA),
-    Table { cells: Vec<NFA>, row_width: usize },
+    GraphemeCluster(GraphemeMatcher),
+    Any,
 }
 
 impl MatchIf {
@@ -91,32 +80,8 @@ impl MatchIf {
 
     fn matches(&self, value: &MathElement) -> bool {
         match (self, value) {
-            (MatchIf::Container(Container::Fraction(matcher)), MathElement::Fraction(a))
-            | (MatchIf::Container(Container::Root(matcher)), MathElement::Root(a))
-            | (MatchIf::Container(Container::Under(matcher)), MathElement::Under(a))
-            | (MatchIf::Container(Container::Over(matcher)), MathElement::Over(a)) => matcher
-                .iter()
-                .zip(a)
-                .all(|(a, b)| Self::matches_all(a, &b.values)),
-
-            (MatchIf::Container(Container::Sup(a)), MathElement::Sup(b))
-            | (MatchIf::Container(Container::Sub(a)), MathElement::Sub(b)) => {
-                Self::matches_all(a, &b.values)
-            }
-            (
-                MatchIf::Container(Container::Table {
-                    cells: matcher,
-                    row_width: _,
-                }),
-                MathElement::Table {
-                    cells: a,
-                    row_width: _,
-                },
-            ) => matcher
-                .iter()
-                .zip(a)
-                .all(|(a, b)| Self::matches_all(a, &b.values)),
             (MatchIf::GraphemeCluster(matcher), MathElement::Symbol(a)) => matcher.matches(a),
+            (MatchIf::Any, _) => true,
             (_, _) => false,
         }
     }

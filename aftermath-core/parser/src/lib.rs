@@ -55,7 +55,8 @@ impl<'a> ParseContext<'a> {
         // bp stands for binding power
         let mut left = {
             let mut starting_token = lexer.begin_token();
-            let parse_start = parse_bp_start(&mut starting_token, self).unwrap();
+            let parse_start =
+                parse_bp_start(&mut starting_token, self).expect("parse start failed");
             lexer = starting_token.end_token().unwrap();
 
             let parse_result = parse_start.to_math_semantic(lexer, self);
@@ -146,6 +147,7 @@ impl<'a> ParseContext<'a> {
             // - the minimum binding power is too high, in which case we should return to the caller
             // - there's a closing bracket, in which case we should return to the caller
             // - there's an actual error, which we'll have to handle sometime
+            // - an infix operator is missing its right operand
             break;
         }
 
@@ -194,6 +196,7 @@ fn parse_bp_start<'input, 'definition>(
     token: &mut Lexer<'input>,
     context: &'definition ParseContext,
 ) -> Result<ParseStartResult<'input, 'definition>, ParseError> {
+    println!("parse_bp_start at {:?}", token.get_slice());
     if token.eof() {
         Err(ParseError {
             error: ParseErrorType::UnexpectedEndOfInput,

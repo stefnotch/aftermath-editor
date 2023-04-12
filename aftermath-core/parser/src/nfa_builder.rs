@@ -1,33 +1,24 @@
-use unicode_normalization::UnicodeNormalization;
-use unicode_segmentation::UnicodeSegmentation;
-
 use super::{
-    grapheme_matcher::GraphemeClusterMatcher,
-    token_matcher::{
-        CapturingGroupId, CapturingGroups, Container, MatchIf, StateFragment, StateId, NFA,
-    },
+    grapheme_matcher::GraphemeMatcher,
+    token_matcher::{CapturingGroupId, CapturingGroups, MatchIf, StateFragment, StateId, NFA},
 };
 
 /// A builder for an NFA
 #[derive(Debug)]
 pub enum NFABuilder {
-    GraphemeCluster(GraphemeClusterMatcher),
+    Grapheme(GraphemeMatcher),
     Concat(Box<NFABuilder>, Box<NFABuilder>),
     Or(Box<NFABuilder>, Box<NFABuilder>),
     ZeroOrOne(Box<NFABuilder>),
     ZeroOrMore(Box<NFABuilder>),
     OneOrMore(Box<NFABuilder>),
     Capture(Box<NFABuilder>, CapturingGroupId),
-    Container(Container),
+    Any,
 }
 
 impl NFABuilder {
-    pub fn match_container(container: Container) -> NFABuilder {
-        NFABuilder::Container(container)
-    }
-
-    pub fn match_character(character: GraphemeClusterMatcher) -> NFABuilder {
-        NFABuilder::GraphemeCluster(character)
+    pub fn match_character(character: GraphemeMatcher) -> NFABuilder {
+        NFABuilder::Grapheme(character)
     }
 
     pub fn concat(self, right: NFABuilder) -> NFABuilder {
@@ -36,6 +27,10 @@ impl NFABuilder {
 
     pub fn or(self, right: NFABuilder) -> NFABuilder {
         NFABuilder::Or(Box::new(self), Box::new(right))
+    }
+
+    pub fn any() -> NFABuilder {
+        NFABuilder::Any
     }
 
     pub fn optional(self) -> NFABuilder {
@@ -54,30 +49,12 @@ impl NFABuilder {
         self.concat(right)
     }
 
-    pub fn then_container(self, container: Container) -> NFABuilder {
-        self.concat(NFABuilder::Container(container))
-    }
-
-    pub fn then_character(self, character: GraphemeClusterMatcher) -> NFABuilder {
+    pub fn then_character(self, character: GraphemeMatcher) -> NFABuilder {
         self.concat(NFABuilder::match_character(character))
     }
 
-    pub fn capturing_group<T>(self, id: CapturingGroupId) -> NFABuilder {
+    pub fn capturing_group(self, id: CapturingGroupId) -> NFABuilder {
         NFABuilder::Capture(Box::new(self), id)
-    }
-
-    /// Matches a string and does Unicode handling (splitting into grapheme clusters followed by NFD-normalizing)
-    pub fn match_string(pattern: &str) -> NFABuilder {
-        let grapheme_matchers = pattern
-            .graphemes(true)
-            .map(|c| GraphemeClusterMatcher::new(c.nfd().map(|c| c.into())))
-            .map(|c| NFABuilder::match_character(c));
-
-        grapheme_matchers.reduce(|a, b| a.concat(b)).unwrap()
-    }
-
-    pub fn then_string(self, pattern: &str) -> NFABuilder {
-        self.concat(NFABuilder::match_string(pattern))
     }
 }
 
@@ -100,11 +77,18 @@ impl NFABuilder {
         capturing_groups: &mut CapturingGroups,
     ) -> NFABuilderFragment {
         match self {
-            NFABuilder::GraphemeCluster(character) => {
+            NFABuilder::Grapheme(character) => {
                 let start_state = push_state(
                     states,
                     StateFragment::Match(MatchIf::GraphemeCluster(character), 0),
                 );
+                NFABuilderFragment {
+                    start_state,
+                    end_states: vec![NFABuilderEndState::Match(start_state)],
+                }
+            }
+            NFABuilder::Any => {
+                let start_state = push_state(states, StateFragment::Match(MatchIf::Any, 0));
                 NFABuilderFragment {
                     start_state,
                     end_states: vec![NFABuilderEndState::Match(start_state)],
@@ -171,19 +155,9 @@ impl NFABuilder {
                     end_states,
                 }
             }
-            NFABuilder::Container(container) => {
-                let start_state = push_state(
-                    states,
-                    StateFragment::Match(MatchIf::Container(container), 0),
-                );
-                NFABuilderFragment {
-                    start_state,
-                    end_states: vec![NFABuilderEndState::Match(start_state)],
-                }
-            }
-            NFABuilder::Capture(a, group_name) => {
+            NFABuilder::Capture(a, group_id) => {
                 let a = a.build_nfa(states, capturing_groups);
-                let group_id = capturing_groups.get_or_add_group(group_name.clone());
+                let group_id = capturing_groups.add_group(group_id.clone());
                 let group_start_state = push_state(
                     states,
                     StateFragment::CaptureStart(a.start_state, group_id.clone()),

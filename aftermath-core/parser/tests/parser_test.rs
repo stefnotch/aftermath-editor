@@ -97,7 +97,7 @@ fn test_parser_tuple_advanced() {
     // Not entirely satisfactory, but eh
     assert_eq!(
         parsed.value.to_string(),
-        "(() () (Tuple () (Tuple () (Variable (61)) (Variable (62))) (Variable (63))))"
+        "(RoundBrackets () (Tuple () (Tuple () (Variable (61)) (Variable (62))) (Variable (63))))"
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -126,6 +126,26 @@ fn test_parser_function_call() {
 }
 
 #[test]
+fn test_parser_brackets_with_addition() {
+    let layout = Row::new(vec![
+        MathElement::Symbol("(".to_string()),
+        MathElement::Symbol("a".to_string()),
+        MathElement::Symbol("+".to_string()),
+        MathElement::Symbol("b".to_string()),
+        MathElement::Symbol(")".to_string()),
+    ]);
+
+    let context = ParseContext::default();
+    let parsed = parse(&layout, &context);
+
+    assert_eq!(
+        parsed.value.to_string(),
+        "(RoundBrackets () (Add () (Variable (61)) (Variable (62))))"
+    );
+    assert_eq!(parsed.errors.len(), 0);
+}
+
+#[test]
 fn test_parser_fraction() {
     let layout = Row::new(vec![
         MathElement::Symbol("(".to_string()),
@@ -140,6 +160,12 @@ fn test_parser_fraction() {
 
     let context = ParseContext::default();
     let parsed = parse(&layout, &context);
+
+    assert_eq!(
+        parsed.value.to_string(),
+        "(RoundBrackets () (Add () (Variable (61)) (Fraction () (Variable (62)) (Variable (63)))))"
+    );
+    assert_eq!(parsed.errors.len(), 0);
 }
 
 // TODO: Fix those tests to actually do something instead of printing stuff

@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use math_layout::element::MathElement;
 
+use crate::{grapheme_matcher::GraphemeMatcher, token_matcher::MatchError};
+
 use super::{
     lexer::Lexer,
     math_semantic::MathSemantic,
@@ -48,7 +50,7 @@ impl<'a> ParseContext<'a> {
             .known_tokens
             .get(&bp_pattern)?
             .iter()
-            .map(|(matcher, definition)| (matcher.pattern.matches(token.get_slice()), definition))
+            .map(|(matcher, definition)| (matcher.matches(token.get_slice()), definition))
             .filter_map(|(match_result, definition)| match_result.ok().map(|v| (v, definition)))
             .collect();
 
@@ -89,18 +91,19 @@ impl<'a> ParseContext<'a> {
             vec![
                 // TODO: Good whitespace handling
                 /*(
-                    TokenMatcher {
-                        pattern: NFABuilder::match_character((' ').into()).build(),
-                    },
+                    TokenMatcher::Pattern( NFABuilder::match_character((' ').into()).build(),
+                ),
                     TokenDefinition::new(minimal_definitions.empty.clone(), (None, None)),
                 ),*/
                 (
-                    TokenMatcher {
-                        pattern: NFABuilder::match_character(('a'..='z').into())
-                            .or(NFABuilder::match_character(('A'..='Z').into()))
-                            .one_or_more()
+                    TokenMatcher::Pattern(
+                        NFABuilder::match_character(GraphemeMatcher::IdentifierStart)
+                            .then(
+                                NFABuilder::match_character(GraphemeMatcher::IdentifierContinue)
+                                    .zero_or_more(),
+                            )
                             .build(),
-                    },
+                    ),
                     TokenDefinition::new("Variable".into(), (None, None)).with_value_parser(|v| {
                         v.get_input()
                             .iter()
@@ -113,8 +116,8 @@ impl<'a> ParseContext<'a> {
                     }),
                 ),
                 (
-                    TokenMatcher {
-                        pattern: NFABuilder::match_character(('0'..='9').into())
+                    TokenMatcher::Pattern(
+                        NFABuilder::match_character(('0'..='9').into())
                             .one_or_more()
                             .then(
                                 NFABuilder::match_character('.'.into())
@@ -125,7 +128,7 @@ impl<'a> ParseContext<'a> {
                                     .optional(),
                             )
                             .build(),
-                    },
+                    ),
                     TokenDefinition::new("Number".into(), (None, None)).with_value_parser(|v| {
                         v.get_input()
                             .iter()
@@ -138,9 +141,19 @@ impl<'a> ParseContext<'a> {
                     }),
                 ),
                 (
-                    TokenMatcher {
-                        // https://stackoverflow.com/questions/249791/regex-for-quoted-string-with-escaping-quotes
-                        pattern: NFABuilder::match_character(('"').into())
+                    // https://stackoverflow.com/questions/249791/regex-for-quoted-string-with-escaping-quotes
+                    /*
+                    flowchart LR
+                        A(Quote &quot) --> B(Epsilon)
+                        B --> C(Backslash \)
+                        C --> D(Any)
+                        D -->B
+                        B -->F(Final Quote &quot)
+                        B -->G(Other)
+                        G -->B
+                        */
+                    TokenMatcher::Pattern(
+                        NFABuilder::match_character(('"').into())
                             .then(
                                 // Skip quote
                                 NFABuilder::match_character(('\0'..='!').into())
@@ -149,16 +162,16 @@ impl<'a> ParseContext<'a> {
                                         NFABuilder::match_character(('#'..='[').into()),
                                     )
                                     .or(
-                                        // Rest of ASCII characters
-                                        NFABuilder::match_character((']'..='~').into()),
+                                        // Rest of Unicode characters
+                                        NFABuilder::match_character((']'..=char::MAX).into()),
                                     )
                                     .or(NFABuilder::match_character('\\'.into())
-                                        .then_character(('\0'..='~').into()))
+                                        .then_character(('\0'..=char::MAX).into()))
                                     .zero_or_more(),
                             )
                             .then_character('"'.into())
                             .build(),
-                    },
+                    ),
                     TokenDefinition::new("String".into(), (None, None)).with_value_parser(|v| {
                         v.get_input()
                             .iter()
@@ -171,49 +184,54 @@ impl<'a> ParseContext<'a> {
                     }),
                 ),
                 (
-                    ",".into(),
+                    ','.into(),
                     TokenDefinition::new("Tuple".into(), (Some(50), Some(51))),
                 ),
                 (
-                    "+".into(),
+                    '+'.into(),
                     TokenDefinition::new("Add".into(), (Some(100), Some(101))),
                 ),
                 (
-                    "-".into(),
+                    '-'.into(),
                     TokenDefinition::new("Subtract".into(), (Some(100), Some(101))),
                 ),
                 (
-                    "+".into(),
+                    '+'.into(),
                     TokenDefinition::new("Add".into(), (None, Some(400))),
                 ),
                 (
-                    "-".into(),
+                    '-'.into(),
                     TokenDefinition::new("Subtract".into(), (None, Some(400))),
                 ),
                 (
-                    "*".into(),
+                    '*'.into(),
                     TokenDefinition::new("Multiply".into(), (Some(200), Some(201))),
                 ),
                 (
-                    "/".into(),
+                    '/'.into(),
                     TokenDefinition::new("Divide".into(), (Some(200), Some(201))),
                 ),
                 (
-                    ".".into(),
+                    '.'.into(),
                     TokenDefinition::new("Ring".into(), (Some(501), Some(500))),
                 ),
                 (
-                    "!".into(),
+                    '!'.into(),
                     TokenDefinition::new("Factorial".into(), (Some(600), None)),
+                ),
+                (
+                    TokenMatcher::Container(ContainerType::Fraction),
+                    TokenDefinition::new("Fraction".into(), (None, None)).with_is_container(),
                 ),
                 // Amusingly, if someone defines the closing bracket as a postfix operator, it'll break the brackets
                 // Brackets
                 (
-                    "RoundBrackets".into(),
-                    TokenDefinition::new("()".into(), (None, None)),
+                    // Unit tuple
+                    ['(', ')'][..].into(),
+                    TokenDefinition::new("RoundBrackets".into(), (None, None)),
                 ),
                 (
-                    "(".into(),
+                    '('.into(),
                     TokenDefinition::new_with_parsers(
                         "RoundBrackets".into(),
                         (None, None),
@@ -224,14 +242,14 @@ impl<'a> ParseContext<'a> {
                             },
                             TokenArgumentParser::NextSymbol {
                                 name: "".into(),
-                                symbol: NFABuilder::match_string(")").build(),
+                                symbol: NFABuilder::match_character(')'.into()).build(),
                                 argument_index: None,
                             },
                         ],
                     ),
                 ),
                 (
-                    "(".into(),
+                    ['('][..].into(),
                     TokenDefinition::new_with_parsers(
                         "FunctionApplication".into(),
                         (Some(800), None),
@@ -245,7 +263,7 @@ impl<'a> ParseContext<'a> {
                             },
                             TokenArgumentParser::NextSymbol {
                                 name: "".into(),
-                                symbol: NFABuilder::match_string(")").build(),
+                                symbol: NFABuilder::match_character(')'.into()).build(),
                                 argument_index: None,
                             },
                         ],
@@ -257,7 +275,7 @@ impl<'a> ParseContext<'a> {
 }
 
 /// Matches the starting pattern of a given token, including brackets
-pub struct TokenMatcher {
+pub enum TokenMatcher {
     // 1. binding power pattern
     // 2. tricky
     // - sin is 3 symbol tokens
@@ -267,14 +285,51 @@ pub struct TokenMatcher {
     //   d/dx is a prefix operator with a low binding power. Like d/dx (x^2)
     // - d^n f / dx^n is a nasty notation
     // - hat x is a over token with two symbol tokens. All fixed, which is nice
-    pattern: NFA,
+    Pattern(NFA),
+    Container(ContainerType),
+}
+impl TokenMatcher {
+    fn matches<'input>(
+        &self,
+        input: &'input [MathElement],
+    ) -> Result<MatchResult<'input, MathElement>, MatchError> {
+        match self {
+            TokenMatcher::Pattern(pattern) => pattern.matches(input),
+            TokenMatcher::Container(container_type) => {
+                let token = input.get(0).ok_or(MatchError::NoMatch)?;
+                match (container_type, token) {
+                    (ContainerType::Fraction, MathElement::Fraction(_))
+                    | (ContainerType::Root, MathElement::Root(_))
+                    | (ContainerType::Under, MathElement::Under(_))
+                    | (ContainerType::Over, MathElement::Over(_))
+                    | (ContainerType::Sup, MathElement::Sup(_))
+                    | (ContainerType::Sub, MathElement::Sub(_))
+                    | (ContainerType::Table, MathElement::Table { .. }) => {
+                        Ok(MatchResult::new(&input[0..1], vec![]))
+                    }
+                    _ => Err(MatchError::NoMatch),
+                }
+            }
+        }
+    }
 }
 
-impl From<&str> for TokenMatcher {
-    fn from(pattern: &str) -> TokenMatcher {
-        TokenMatcher {
-            pattern: NFABuilder::match_string(pattern).build(),
-        }
+impl From<&[char]> for TokenMatcher {
+    fn from(pattern: &[char]) -> TokenMatcher {
+        TokenMatcher::Pattern(
+            pattern
+                .iter()
+                .map(|c| NFABuilder::match_character((*c).into()))
+                .reduce(|a, b| a.concat(b))
+                .unwrap()
+                .build(),
+        )
+    }
+}
+
+impl From<char> for TokenMatcher {
+    fn from(pattern: char) -> TokenMatcher {
+        TokenMatcher::Pattern(NFABuilder::match_character(pattern.into()).build())
     }
 }
 
@@ -305,7 +360,8 @@ pub struct TokenDefinition {
     /// a postfix operator has a binding power on the left
     /// an infix operator has a binding power on the left and on the right
     pub binding_power: (Option<u32>, Option<u32>),
-
+    // Not the most elegant design, but hey
+    is_container: bool,
     pub arguments_parsers: Vec<TokenArgumentParser>,
     argument_count: usize,
     pub value_parser: TokenDefinitionValueParser,
@@ -344,6 +400,17 @@ pub enum TokenArgumentParser {
     },
 }
 
+#[derive(Debug)]
+pub enum ContainerType {
+    Fraction,
+    Root,
+    Under,
+    Over,
+    Sup,
+    Sub,
+    Table,
+}
+
 struct TokenArgumentParseResult<'lexer> {
     argument_index: Option<usize>,
     argument: MathSemantic,
@@ -377,15 +444,15 @@ impl TokenArgumentParser {
                 symbol,
                 argument_index,
             } => {
-                let mut closing_bracket = lexer.begin_token();
-                if let Some(_match_result) = context.get_symbol(&mut closing_bracket, symbol) {
+                let mut lexer = lexer.begin_token();
+                if let Some(_match_result) = context.get_symbol(&mut lexer, symbol) {
                     // Yay
                 } else {
                     // TODO: Better error message
                     panic!("expected closing bracket");
                 }
-                let range = closing_bracket.get_range();
-                let lexer = closing_bracket.end_token().unwrap();
+                let range = lexer.get_range();
+                let lexer = lexer.end_token().unwrap();
                 let argument = MathSemantic {
                     name: name.clone(),
                     args: vec![],
@@ -487,7 +554,16 @@ impl TokenDefinition {
             binding_power,
             arguments_parsers,
             argument_count: argument_indices.len(),
+            is_container: false,
             value_parser: no_value_parser,
+        }
+    }
+
+    pub fn with_is_container(self) -> Self {
+        assert!(self.arguments_parsers.len() == 0);
+        Self {
+            is_container: true,
+            ..self
         }
     }
 
@@ -516,21 +592,38 @@ impl TokenDefinition {
         token_match_results: &MatchResult<'input, MathElement>,
         mut previous_token: Option<MathSemantic>,
     ) -> (Vec<MathSemantic>, Lexer<'lexer>) {
-        let mut semantics = std::iter::repeat_with(|| None)
-            .take(self.argument_count)
-            .collect::<Vec<_>>();
-        for parser in &self.arguments_parsers {
-            let parse_result =
-                parser.parse(lexer, context, token_match_results, &mut previous_token);
+        if self.is_container {
+            let token = match token_match_results.get_input() {
+                [MathElement::Symbol(_)] => panic!("expected container token"),
+                [token] => token,
+                _ => panic!("expected single token"),
+            };
+            let arguments: Vec<_> = token
+                .rows()
+                .iter()
+                .map(|row| {
+                    let lexer = Lexer::new(&row.values);
+                    let (math_semantic, lexer) = context.parse_bp(lexer, 0);
+                    assert!(lexer.eof());
+                    math_semantic
+                })
+                .collect();
+            (arguments, lexer)
+        } else {
+            let mut arguments = std::iter::repeat_with(|| MathSemantic::default())
+                .take(self.argument_count)
+                .collect::<Vec<_>>();
+            for parser in &self.arguments_parsers {
+                let parse_result =
+                    parser.parse(lexer, context, token_match_results, &mut previous_token);
 
-            lexer = parse_result.lexer;
-            // Could be done more efficiently by computing the "inverse permutation" and storing it in the TokenDefinition
-            // The inverse permutation would tell you where to read from for each argument
-            if let Some(argument_index) = parse_result.argument_index {
-                semantics[argument_index] = Some(parse_result.argument);
+                lexer = parse_result.lexer;
+                if let Some(argument_index) = parse_result.argument_index {
+                    arguments[argument_index] = parse_result.argument;
+                }
             }
-        }
 
-        (semantics.into_iter().filter_map(|v| v).collect(), lexer)
+            (arguments, lexer)
+        }
     }
 }

@@ -47,25 +47,27 @@ impl NFAMatches {
             Err(MatchError::MultipleMatches)
         } else {
             let (_, match_info) = self.states.iter().next().unwrap();
-            Ok(MatchResult {
-                length: self.input_length,
-                capture_ranges: match_info.capture_ranges.clone(),
-                input,
-            })
+            Ok(MatchResult::new(input, match_info.capture_ranges.clone()))
         }
     }
 }
 
 #[derive(Debug)]
 pub struct MatchResult<'input, Input> {
-    length: usize,
-    capture_ranges: Vec<RangeInclusive<usize>>,
     input: &'input [Input],
+    capture_ranges: Vec<RangeInclusive<usize>>,
 }
 
 impl<'input, Input> MatchResult<'input, Input> {
+    pub fn new(input: &'input [Input], capture_ranges: Vec<RangeInclusive<usize>>) -> Self {
+        Self {
+            input,
+            capture_ranges,
+        }
+    }
+
     pub fn get_length(&self) -> usize {
-        self.length
+        self.input.len()
     }
     pub fn get_input(&self) -> &'input [Input] {
         self.input
