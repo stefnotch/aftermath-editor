@@ -209,7 +209,8 @@ export class MathmlLayout {
   }
 
   /**
-   * Given a DOM node and a position, find the closest offset in the row
+   * Given a DOM node and a position, find the closest offset in the row.
+   * This is an unused optimisation
    */
   elementToLayoutPosition(
     element: Element | Text,

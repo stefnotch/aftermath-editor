@@ -2,6 +2,7 @@
 
 members = [
     "web",
+    "mathml_renderer",
     "parser",
     "math_layout",
 ]
