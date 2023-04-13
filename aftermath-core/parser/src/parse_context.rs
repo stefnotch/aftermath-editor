@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use math_layout::element::MathElement;
+use math_layout::{element::MathElement, row::RowIndex};
 
 use crate::{grapheme_matcher::GraphemeMatcher, token_matcher::MatchError};
 
@@ -598,12 +598,20 @@ impl TokenDefinition {
                 [token] => token,
                 _ => panic!("expected single token"),
             };
+            let token_index = {
+                let lexer_end = lexer.get_range().end;
+                assert!(lexer_end > 0);
+                lexer_end - 1
+            };
+
             let arguments: Vec<_> = token
                 .rows()
                 .iter()
-                .map(|row| {
+                .enumerate()
+                .map(|(row_index, row)| {
                     let lexer = Lexer::new(&row.values);
-                    let (math_semantic, lexer) = context.parse_bp(lexer, 0);
+                    let (mut math_semantic, lexer) = context.parse_bp(lexer, 0);
+                    math_semantic.row_index = Some(RowIndex(token_index, row_index));
                     assert!(lexer.eof());
                     math_semantic
                 })

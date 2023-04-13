@@ -27,5 +27,6 @@ pub struct RowIndices(Vec<RowIndex>);
 
 /// We have a repeating row > element > ... hierarchy.
 /// So to get from one row to the next, we need two indices.
+/// One to tell us how to get to the element, and another to tell us how to get to the child row.
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct RowIndex(pub usize, pub usize);
