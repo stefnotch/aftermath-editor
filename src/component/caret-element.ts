@@ -1,4 +1,4 @@
-import { ViewportValue } from "./viewport-coordinate";
+import { ViewportValue } from "../rendering/viewport-coordinate";
 
 export interface CaretElement {
   setPosition(x: number, y: number): void;

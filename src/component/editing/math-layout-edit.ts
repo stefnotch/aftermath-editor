@@ -1,6 +1,6 @@
 import { MathLayoutElement } from "../../math-layout/math-layout";
 import { Offset } from "../../math-layout/math-layout-offset";
-import { AncestorIndices, fromAncestorIndices, MathLayoutRowZipper } from "../../math-layout/math-layout-zipper";
+import { RowIndices, fromRowIndices, MathLayoutRowZipper } from "../../math-layout/math-layout-zipper";
 import { assert, assertUnreachable } from "../../utils/assert";
 import { MathLayoutCaret, SerializedCaret } from "./math-layout-caret";
 
@@ -19,7 +19,7 @@ export type MathLayoutEdit = {
 export type MathLayoutSimpleEdit =
   | {
       readonly type: "insert";
-      readonly zipper: AncestorIndices;
+      readonly zipper: RowIndices;
       readonly offset: Offset;
       /**
        * The value that was inserted.
@@ -28,7 +28,7 @@ export type MathLayoutSimpleEdit =
     }
   | {
       readonly type: "remove";
-      readonly zipper: AncestorIndices;
+      readonly zipper: RowIndices;
       readonly index: number;
       /**
        * The value that was removed, used for undo.
@@ -56,13 +56,13 @@ export function applyEdit(
 
 function applySimpleEdit(root: MathLayoutRowZipper, edit: MathLayoutSimpleEdit): MathLayoutRowZipper {
   if (edit.type === "insert") {
-    const zipper = fromAncestorIndices(root, edit.zipper);
+    const zipper = fromRowIndices(root, edit.zipper);
     const result = zipper.insert(edit.offset, edit.value);
     return result.newRoot;
   } else if (edit.type === "remove") {
     console.log(edit);
 
-    const zipper = fromAncestorIndices(root, edit.zipper);
+    const zipper = fromRowIndices(root, edit.zipper);
     const result = zipper.remove(edit.index);
 
     return result.newRoot;

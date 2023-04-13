@@ -3,20 +3,20 @@ import { Offset } from "../../math-layout/math-layout-offset";
 import { MathLayoutPosition } from "../../math-layout/math-layout-position";
 import { tableIndexToPosition, tablePositionToIndex } from "../../math-layout/math-layout-utils";
 import {
-  AncestorIndices,
-  fromAncestorIndices,
-  getAncestorIndices,
-  getSharedAncestorIndices,
+  RowIndices,
+  fromRowIndices,
+  getRowIndices,
+  getSharedRowIndices,
   MathLayoutContainerZipper,
   MathLayoutRowZipper,
   MathLayoutTableZipper,
 } from "../../math-layout/math-layout-zipper";
 import { MathmlLayout } from "../../mathml/rendering";
 import { assert, assertUnreachable } from "../../utils/assert";
-import { ViewportValue } from "../viewport-coordinate";
+import { ViewportValue } from "../../rendering/viewport-coordinate";
 
 export type Direction = "left" | "right" | "up" | "down";
-export type SerializedCaret = { start: Offset; end: Offset; zipper: AncestorIndices };
+export type SerializedCaret = { start: Offset; end: Offset; zipper: RowIndices };
 
 /**
  * Whether the editor attempts to keep the caret in the same-ish x-coordinate when moving up.
@@ -43,11 +43,11 @@ export class MathLayoutCaret {
   }
 
   static serialize(zipper: MathLayoutRowZipper, start: Offset, end: Offset): SerializedCaret {
-    return { zipper: getAncestorIndices(zipper), start, end };
+    return { zipper: getRowIndices(zipper), start, end };
   }
 
   static deserialize(root: MathLayoutRowZipper, serialized: SerializedCaret): MathLayoutCaret {
-    const zipper = fromAncestorIndices(root, serialized.zipper);
+    const zipper = fromRowIndices(root, serialized.zipper);
     return new MathLayoutCaret(zipper, serialized.start, serialized.end);
   }
 
@@ -55,10 +55,10 @@ export class MathLayoutCaret {
    * Gets a caret from two positions that might be in different rows.
    */
   static getSharedCaret(startPosition: MathLayoutPosition, endPosition: MathLayoutPosition): MathLayoutCaret {
-    const startAncestorIndices = getAncestorIndices(startPosition.zipper);
-    const endAncestorIndices = getAncestorIndices(endPosition.zipper);
-    const sharedParentPart = getSharedAncestorIndices(startAncestorIndices, endAncestorIndices);
-    const sharedParent = fromAncestorIndices(startPosition.zipper.root, sharedParentPart);
+    const startAncestorIndices = getRowIndices(startPosition.zipper);
+    const endAncestorIndices = getRowIndices(endPosition.zipper);
+    const sharedParentPart = getSharedRowIndices(startAncestorIndices, endAncestorIndices);
+    const sharedParent = fromRowIndices(startPosition.zipper.root, sharedParentPart);
 
     // We need to know the direction of the selection to know whether the caret should be at the start or end of the row
     // We also have to handle edge cases like first caret is at top of fraction and second caret is at bottom of fraction

@@ -58,6 +58,7 @@ function toCore(row: MathLayoutRow): CoreRow {
           },
         };
       } else if (v.type === "symbol") {
+        // TODO: NFD normalization? Or should that be done in the Rust code?
         return { Symbol: v.value };
       } else {
         throw new Error("Unknown type", {
@@ -78,5 +79,4 @@ type CoreElement =
   | { Sup: CoreRow }
   | { Sub: CoreRow }
   | { Table: { cells: CoreRow[]; row_width: number } }
-  | { Symbol: string }
-  | { Bracket: string };
+  | { Symbol: string };

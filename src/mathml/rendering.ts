@@ -9,13 +9,8 @@ import {
 import { endingBrackets, allBrackets, MathMLTags } from "./mathml-spec";
 import { TokenStream } from "../math-editor/token-stream";
 import { Offset } from "../math-layout/math-layout-offset";
-import { ViewportRect, ViewportValue } from "../component/viewport-coordinate";
-import {
-  AncestorIndices,
-  fromAncestorIndices,
-  getAncestorIndices,
-  MathLayoutRowZipper,
-} from "../math-layout/math-layout-zipper";
+import { ViewportRect, ViewportValue } from "../rendering/viewport-coordinate";
+import { RowIndices, fromRowIndices, getRowIndices, MathLayoutRowZipper } from "../math-layout/math-layout-zipper";
 import { tagIs } from "../utils/dom-utils";
 import { MathLayoutPosition } from "../math-layout/math-layout-position";
 
@@ -196,7 +191,7 @@ export class MathmlLayout {
   constructor(public readonly element: MathMLElement, public readonly domTranslator: RowDomTranslator) {}
 
   getCaretContainer(mathLayout: MathLayoutRowZipper): Element {
-    const ancestorIndices = getAncestorIndices(mathLayout);
+    const ancestorIndices = getRowIndices(mathLayout);
     return this.caretToDomTranslator(ancestorIndices).element;
   }
 
@@ -204,7 +199,7 @@ export class MathmlLayout {
    * Given a position in the layout, get the correct viewport position
    */
   layoutToViewportPosition(layoutPosition: MathLayoutPosition) {
-    const ancestorIndices = getAncestorIndices(layoutPosition.zipper);
+    const ancestorIndices = getRowIndices(layoutPosition.zipper);
     return this.caretToDomTranslator(ancestorIndices).offsetToPosition(layoutPosition.offset);
   }
 
@@ -229,7 +224,7 @@ export class MathmlLayout {
 
     // get the closest offset
     const offset = this.getClosestOffsetInRow(domTranslator, position);
-    return new MathLayoutPosition(fromAncestorIndices(rootZipper, ancestorIndices), offset);
+    return new MathLayoutPosition(fromRowIndices(rootZipper, ancestorIndices), offset);
   }
 
   private getClosestOffsetInRow(domTranslator: RowDomTranslator, position: { x: ViewportValue; y: ViewportValue }) {
@@ -294,7 +289,7 @@ export class MathmlLayout {
     return closest.position;
   }
 
-  private caretToDomTranslator(ancestorIndices: AncestorIndices) {
+  private caretToDomTranslator(ancestorIndices: RowIndices) {
     let current = this.domTranslator;
     for (const [containerChildIndex, rowChildIndex] of ancestorIndices) {
       const containerChild = current.children[containerChildIndex];
@@ -648,7 +643,7 @@ class SkipQueue<T> {
 /**
  * Walks down the DOM, and returns the ancestor indices until a MathRowDomTranslator
  */
-function getAncestorIndicesFromDom(domAncestorsArray: (Element | Text)[], domTranslator: RowDomTranslator): AncestorIndices {
+function getAncestorIndicesFromDom(domAncestorsArray: (Element | Text)[], domTranslator: RowDomTranslator): RowIndices {
   const domAncestors = new SkipQueue(domAncestorsArray);
   // Walks down the domAncestors to find the next relevant DOM to MathLayout translator
   const getNextDeeperChild = <T extends RowDomTranslator | MathTableDomTranslator | MathContainerDomTranslator>(

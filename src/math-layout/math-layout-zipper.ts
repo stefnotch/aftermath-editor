@@ -336,17 +336,19 @@ export class MathLayoutSymbolZipper implements MathLayoutZipper<never> {
   }
 }
 
+export type RowIndex = [indexOfContainer: number, indexOfRow: number];
+
 /**
  * Indices of a row in the tree.
  * Order is "-> container -> row"
  */
-export type AncestorIndices = readonly [indexOfContainer: number, indexOfRow: number][];
+export type RowIndices = readonly RowIndex[];
 
 /**
  * Gets the indices of the given zipper in the tree.
  * As in, every "indexInParent" of every element that has a parent, including the starting one.
  */
-export function getAncestorIndices(zipper: MathLayoutRowZipper): AncestorIndices {
+export function getRowIndices(zipper: MathLayoutRowZipper): RowIndices {
   const ancestorIndices: [number, number][] = [];
   let current = zipper;
   while (true) {
@@ -360,10 +362,10 @@ export function getAncestorIndices(zipper: MathLayoutRowZipper): AncestorIndices
   return ancestorIndices;
 }
 
-export function fromAncestorIndices(root: MathLayoutRowZipper, ancestorIndices: AncestorIndices) {
+export function fromRowIndices(root: MathLayoutRowZipper, indices: RowIndices) {
   let current = root;
-  for (let i = 0; i < ancestorIndices.length; i++) {
-    const [firstIndex, secondIndex] = ancestorIndices[i];
+  for (let i = 0; i < indices.length; i++) {
+    const [firstIndex, secondIndex] = indices[i];
 
     const child = current.children.at(firstIndex);
     const nextChild = child?.children.at(secondIndex);
@@ -374,14 +376,11 @@ export function fromAncestorIndices(root: MathLayoutRowZipper, ancestorIndices: 
   return current;
 }
 
-export function getSharedAncestorIndices(
-  ancestorIndicesA: AncestorIndices,
-  ancestorIndicesB: AncestorIndices
-): AncestorIndices {
+export function getSharedRowIndices(indicesA: RowIndices, indicesB: RowIndices): RowIndices {
   const sharedAncestorIndices: [number, number][] = [];
-  for (let i = 0; i < ancestorIndicesA.length && i < ancestorIndicesB.length; i++) {
-    const a = ancestorIndicesA[i];
-    const b = ancestorIndicesB[i];
+  for (let i = 0; i < indicesA.length && i < indicesB.length; i++) {
+    const a = indicesA[i];
+    const b = indicesB[i];
     if (a[0] === b[0] && a[1] === b[1]) {
       sharedAncestorIndices.push([a[0], a[1]]);
     } else {

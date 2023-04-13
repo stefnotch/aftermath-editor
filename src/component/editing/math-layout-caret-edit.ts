@@ -4,7 +4,7 @@ import {
   MathLayoutContainerZipper,
   MathLayoutTableZipper,
   MathLayoutSymbolZipper,
-  getAncestorIndices,
+  getRowIndices,
   MathLayoutRowZipper,
 } from "../../math-layout/math-layout-zipper";
 import { MathmlLayout } from "../../mathml/rendering";
@@ -47,7 +47,7 @@ function removeAtPosition(position: MathLayoutPosition, direction: "left" | "rig
     zipper: MathLayoutContainerZipper | MathLayoutTableZipper | MathLayoutSymbolZipper
   ): MathLayoutSimpleEdit => ({
     type: "remove" as const,
-    zipper: getAncestorIndices(zipper.parent),
+    zipper: getRowIndices(zipper.parent),
     index: zipper.indexInParent,
     value: zipper.value,
   });
@@ -60,7 +60,7 @@ function removeAtPosition(position: MathLayoutPosition, direction: "left" | "rig
     [removeAction(zipper)].concat(
       values.map((v, i) => ({
         type: "insert" as const,
-        zipper: getAncestorIndices(zipper.parent),
+        zipper: getRowIndices(zipper.parent),
         offset: zipper.indexInParent + i,
         value: v,
       }))
@@ -121,7 +121,7 @@ function removeAtPosition(position: MathLayoutPosition, direction: "left" | "rig
 }
 
 function removeRange(caret: MathLayoutCaret): CaretEdit {
-  const ancestorIndices = getAncestorIndices(caret.zipper);
+  const ancestorIndices = getRowIndices(caret.zipper);
 
   return {
     edits: arrayUtils.range(caret.leftOffset, caret.rightOffset).map((i) => ({
