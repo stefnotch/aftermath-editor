@@ -4,6 +4,11 @@
 
 This is currently a work-in-progress. See it in action at https://stefnotch.github.io/aftermath-editor
 
+The goals, in order, are
+1. Nailing down the semantics of any particular equation. No more guessing how a computer or a fellow human might interpret it.
+2. Inputting and editing a formula should be as easy, intuitive and fast as reasonably possible.
+3. Beautiful rendering, following the lead of LaTeX and MathML.
+
 Compared to other editors out there, this editor cares about _what your formulas mean_. Since the computer then understands the formulas, it becomes pratical to use this as a next-gen calculator frontend.
 
 TODO:
