@@ -5,15 +5,15 @@ import { ViewportValue } from "./viewport-coordinate";
 
 export type RenderedPosition = { x: ViewportValue; y: ViewportValue; height: ViewportValue };
 
-export interface RenderedLayout {
+export interface RenderedLayout<T> {
   rootZipper: MathLayoutRowZipper;
-  semantics: todo;
+  parseResult: todo; // we need types for the MathParseResult. we'll use the slow serde json and https://github.com/1Password/typeshare
 
   /**
    *  For highlighting the element that contains the caret.
    * That is important, so that the user knows which row they're on!
    */
-  getElement(indices: RowIndices): Element;
+  getElement(indices: RowIndices): RenderedElement<T>;
 
   // TODO: https://github.com/stefnotch/aftermath-editor/issues/19
 
@@ -26,6 +26,20 @@ export interface RenderedLayout {
    * For clicking somewhere in the viewport and getting the caret position
    */
   getLayoutPosition(position: { x: ViewportValue; y: ViewportValue }): MathLayoutPosition;
+}
+
+/**
+ * A virtual DOM element
+ */
+export interface RenderedElement<T> {
+  /**
+   * The actual underlying DOM nodes
+   */
+  getElements(): T[];
+
+  addChild(child: RenderedElement<T>): void;
+
+  getChildren(): RenderedElement<T>[];
 }
 
 /*

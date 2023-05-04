@@ -58,8 +58,8 @@ function toCore(row: MathLayoutRow): CoreRow {
           },
         };
       } else if (v.type === "symbol") {
-        // TODO: NFD normalization? Or should that be done in the Rust code?
-        return { Symbol: v.value };
+        const value = v.value.normalize("NFD");
+        return { Symbol: value };
       } else {
         throw new Error("Unknown type", {
           cause: v,
@@ -69,7 +69,15 @@ function toCore(row: MathLayoutRow): CoreRow {
   };
 }
 
-// TODO: Unit tests to make sure they're in sync with the Rust code
+// TODO:
+// We're maintaining the types by hand for now, since we tried out mostly everything else.
+// Directly using WASM-bindgen's Typescript stuff doesn't work, because they don't support enums. https://github.com/rustwasm/wasm-bindgen/issues/2407
+// https://github.com/cloudflare/serde-wasm-bindgen/issues/19 doesn't generate Typescript types.
+// tsify hasn't been updated in a while https://github.com/madonoharu/tsify/issues/17
+// typeshare is only for JSON https://github.com/1Password/typeshare/issues/100 and is annoying to use (needs a CLI and such).
+//
+// Maybe in the future we can move to WebAssembly Interface Types, e.g. https://github.com/tauri-apps/tauri-bindgen
+
 type CoreRow = { values: CoreElement[] };
 type CoreElement =
   | { Fraction: [CoreRow, CoreRow] }
