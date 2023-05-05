@@ -1,39 +1,14 @@
-import init, { parse } from "../../aftermath-core/pkg/aftermath_core";
+import init, { parse as core_parse } from "../../aftermath-core/pkg/aftermath_core";
 import { MathLayoutRow } from "../math-layout/math-layout";
 
-init().then((aftermath_core) => {
-  console.log(aftermath_core);
-  console.log(
-    parse(
-      toCore({
-        type: "row",
-        values: [
-          {
-            type: "symbol",
-            value: "-",
-            width: 0,
-          },
-          {
-            type: "symbol",
-            value: "a",
-            width: 0,
-          },
-          {
-            type: "symbol",
-            value: "*",
-            width: 0,
-          },
-          {
-            type: "symbol",
-            value: "b",
-            width: 0,
-          },
-        ],
-        width: 0,
-      })
-    )
-  );
-});
+// Yay, top level await is neat https://v8.dev/features/top-level-await
+await init();
+
+export function parse(row: MathLayoutRow): CoreParseResult {
+  let result: CoreParseResult = core_parse(toCore(row));
+
+  return result;
+}
 
 function toCore(row: MathLayoutRow): CoreRow {
   return {
@@ -88,3 +63,23 @@ type CoreElement =
   | { Sub: CoreRow }
   | { Table: { cells: CoreRow[]; row_width: number } }
   | { Symbol: string };
+
+type CoreParseResult = {
+  value: CoreMathSemantic;
+  errors: CoreParseError[];
+};
+
+// TODO:
+type CoreMathSemantic = {
+  name: string;
+  args: CoreMathSemantic[];
+  row_index: any;
+  value: any;
+  range: any;
+};
+
+// TODO:
+type CoreParseError = {
+  error: any;
+  range: any;
+};
