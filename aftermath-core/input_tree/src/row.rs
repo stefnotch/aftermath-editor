@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::element::MathElement;
+use super::element::InputElement;
 
 /// A simple representation of what a math formula looks like.
 /// Optimized for editing, purposefully does not assign meaning to most characters.
@@ -12,13 +12,13 @@ use super::element::MathElement;
 /// Invariants:
 /// - The parent-child order is always Row -> Element -> Row -> Element -> ....
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Row {
-    pub values: Vec<MathElement>,
+pub struct InputRow {
+    pub values: Vec<InputElement>,
 }
 
-impl Row {
-    pub fn new(values: Vec<MathElement>) -> Self {
-        Row { values }
+impl InputRow {
+    pub fn new(values: Vec<InputElement>) -> Self {
+        InputRow { values }
     }
 }
 

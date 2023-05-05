@@ -3,17 +3,17 @@ use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
 
-use math_layout::row::RowIndex;
+use input_tree::row::RowIndex;
 
 /// https://github.com/cortex-js/compute-engine/issues/25
 /// mimics the math layout tree
 #[derive(Debug, Serialize, Deserialize)]
-pub struct MathSemantic {
+pub struct SyntaxTree {
     /// name of the function or constant
     pub name: String,
     /// arguments of the function
     /// if the function is a constant, this is empty
-    pub args: Vec<MathSemantic>,
+    pub args: Vec<SyntaxTree>,
     /// Mapping back to the original math layout
     pub row_index: Option<RowIndex>,
     /// value, especially for constants
@@ -23,7 +23,7 @@ pub struct MathSemantic {
     pub range: Range<usize>,
 }
 
-impl fmt::Display for MathSemantic {
+impl fmt::Display for SyntaxTree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // S-expression
         // S here sadly doesn't stand for Stef
@@ -48,7 +48,7 @@ impl fmt::Display for MathSemantic {
     }
 }
 
-impl Default for MathSemantic {
+impl Default for SyntaxTree {
     fn default() -> Self {
         Self {
             name: String::new(),

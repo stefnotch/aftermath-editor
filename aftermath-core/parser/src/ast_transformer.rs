@@ -1,11 +1,11 @@
-use super::MathSemantic;
+use super::SyntaxTree;
 
 // TODO: write implementation
 pub struct AstTransformer {
     transformations: Vec<AstTransformation>,
 }
 impl AstTransformer {
-    pub fn transform(&self, mut parse_result: MathSemantic) -> MathSemantic {
+    pub fn transform(&self, mut parse_result: SyntaxTree) -> SyntaxTree {
         // TODO: Rewrite this to be iterative
 
         parse_result.args = parse_result
@@ -25,7 +25,7 @@ impl AstTransformer {
         Self {
             // Default hardcoded tuple flattening transformation
             transformations: vec![AstTransformation {
-                transform: |mut v: MathSemantic| {
+                transform: |mut v: SyntaxTree| {
                     if v.name == "Tuple" {
                         v.args = v
                             .args
@@ -47,5 +47,5 @@ impl AstTransformer {
 }
 
 pub struct AstTransformation {
-    transform: fn(MathSemantic) -> MathSemantic,
+    transform: fn(SyntaxTree) -> SyntaxTree,
 }

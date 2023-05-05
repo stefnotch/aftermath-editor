@@ -1,15 +1,15 @@
 pub mod ast_transformer;
 mod grapheme_matcher;
 mod lexer;
-mod math_semantic;
 mod nfa_builder;
 pub mod parse_context;
 mod parse_result;
+mod syntax_tree;
 mod token_matcher;
 
 use std::ops::Range;
 
-use math_layout::{element::MathElement, row::Row};
+use input_tree::{element::InputElement, row::InputRow};
 
 use crate::lexer::Lexer;
 
@@ -18,10 +18,10 @@ use self::{
     token_matcher::MatchResult,
 };
 
-pub use self::math_semantic::MathSemantic;
 pub use self::parse_result::{ParseError, ParseErrorType, ParseResult};
+pub use self::syntax_tree::SyntaxTree;
 
-pub fn parse(input: &Row, context: &ParseContext) -> ParseResult<MathSemantic> {
+pub fn parse(input: &InputRow, context: &ParseContext) -> ParseResult<SyntaxTree> {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     // we have a LL(1) pratt parser, aka we can look one token ahead
     let lexer = Lexer::new(&input.values);
@@ -45,7 +45,7 @@ impl<'a> ParseContext<'a> {
         &self,
         mut lexer: Lexer<'input>,
         minimum_bp: u32,
-    ) -> (MathSemantic, Lexer<'input>) {
+    ) -> (SyntaxTree, Lexer<'input>) {
         println!(
             "parse_bp at {:?} with minimum_bp {}",
             lexer.get_slice(),
@@ -59,7 +59,7 @@ impl<'a> ParseContext<'a> {
                 parse_bp_start(&mut starting_token, self).expect("parse start failed");
             lexer = starting_token.end_token().unwrap();
 
-            let parse_result = parse_start.to_math_semantic(lexer, self);
+            let parse_result = parse_start.to_syntax_tree(lexer, self);
             lexer = parse_result.1;
             parse_result.0
         };
@@ -95,7 +95,7 @@ impl<'a> ParseContext<'a> {
                     let range = combine_ranges(&left_range, &lexer.get_range());
 
                     // Combine the left and right operand into a new left operand
-                    left = MathSemantic {
+                    left = SyntaxTree {
                         name: definition.name(),
                         args,
                         value: (definition.value_parser)(&match_result),
@@ -129,7 +129,7 @@ impl<'a> ParseContext<'a> {
                 let range = combine_ranges(&left_range, &lexer.get_range());
 
                 // Combine the left operand into a new left operand
-                left = MathSemantic {
+                left = SyntaxTree {
                     name: definition.name(),
                     args,
                     value: (definition.value_parser)(&match_result),
@@ -163,15 +163,15 @@ fn combine_ranges(range_1: &Range<usize>, range_2: &Range<usize>) -> Range<usize
 #[derive(Debug)]
 struct ParseStartResult<'input, 'definition> {
     definition: &'definition TokenDefinition,
-    match_result: MatchResult<'input, MathElement>,
+    match_result: MatchResult<'input, InputElement>,
     range: Range<usize>,
 }
 impl<'input, 'definition> ParseStartResult<'input, 'definition> {
-    fn to_math_semantic<'lexer>(
+    fn to_syntax_tree<'lexer>(
         self,
         lexer: Lexer<'lexer>,
         context: &ParseContext,
-    ) -> (MathSemantic, Lexer<'lexer>) {
+    ) -> (SyntaxTree, Lexer<'lexer>) {
         let (args, lexer) =
             self.definition
                 .parse_arguments(lexer, context, &self.match_result, None);
@@ -179,7 +179,7 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
 
         assert_eq!(lexer.get_range().start, self.range.start);
         (
-            MathSemantic {
+            SyntaxTree {
                 name: self.definition.name(),
                 args,
                 value,

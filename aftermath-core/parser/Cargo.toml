@@ -9,5 +9,5 @@ edition = "2021"
 unicode-segmentation = "1.10.1"
 unicode-normalization = "0.1.22"
 serde = { version = "1.0", features = ["derive"] }
-math_layout = { path = "../math_layout" }
+input_tree = { path = "../input_tree" }
 unicode-ident = "1.0.8"

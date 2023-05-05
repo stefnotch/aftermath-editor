@@ -1,18 +1,18 @@
 use std::ops::Range;
 
-use math_layout::element::MathElement;
+use input_tree::element::InputElement;
 
 // TODO: I bet there's a better design for this
 /// A lexer that can be nested
 pub struct Lexer<'input> {
     parent: Option<Box<Lexer<'input>>>,
-    values: &'input [MathElement],
+    values: &'input [InputElement],
     /// the index of the *next* element to be consumed
     index: usize,
 }
 
 impl<'input> Lexer<'input> {
-    pub fn new(row: &[MathElement]) -> Lexer {
+    pub fn new(row: &[InputElement]) -> Lexer {
         Lexer {
             parent: None,
             values: row,
@@ -55,7 +55,7 @@ impl<'input> Lexer<'input> {
         self.parent.take().map(|v| *v)
     }
 
-    pub fn get_slice(&self) -> &'input [MathElement] {
+    pub fn get_slice(&self) -> &'input [InputElement] {
         &self.values[self.index..]
     }
 
@@ -67,15 +67,15 @@ impl<'input> Lexer<'input> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use math_layout::{element::MathElement, row::Row};
+    use input_tree::{element::InputElement, row::InputRow};
 
     #[test]
     fn test_lexer() {
-        let layout = Row::new(vec![
-            MathElement::Symbol("a".to_string()),
-            MathElement::Fraction([
-                Row::new(vec![MathElement::Symbol("b".to_string())]),
-                Row::new(vec![MathElement::Symbol("c".to_string())]),
+        let layout = InputRow::new(vec![
+            InputElement::Symbol("a".to_string()),
+            InputElement::Fraction([
+                InputRow::new(vec![InputElement::Symbol("b".to_string())]),
+                InputRow::new(vec![InputElement::Symbol("c".to_string())]),
             ]),
         ]);
 
@@ -83,15 +83,15 @@ mod tests {
         let mut token = lexer.begin_token();
         assert_eq!(
             token.get_slice().get(0),
-            Some(&MathElement::Symbol("a".to_string()))
+            Some(&InputElement::Symbol("a".to_string()))
         );
         token.consume_n(1);
         lexer = token.end_token().unwrap();
         assert_eq!(
             lexer.get_slice().get(0),
-            Some(&MathElement::Fraction([
-                Row::new(vec![MathElement::Symbol("b".to_string())]),
-                Row::new(vec![MathElement::Symbol("c".to_string())]),
+            Some(&InputElement::Fraction([
+                InputRow::new(vec![InputElement::Symbol("b".to_string())]),
+                InputRow::new(vec![InputElement::Symbol("c".to_string())]),
             ]))
         );
         lexer.consume_n(1);

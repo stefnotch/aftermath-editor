@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
-use math_layout::{element::MathElement, row::RowIndex};
+use input_tree::{element::InputElement, row::RowIndex};
 
 use crate::{grapheme_matcher::GraphemeMatcher, token_matcher::MatchError};
 
 use super::{
     lexer::Lexer,
-    math_semantic::MathSemantic,
     nfa_builder::NFABuilder,
+    syntax_tree::SyntaxTree,
     token_matcher::{CapturingGroupId, MatchResult, NFA},
 };
 
@@ -45,7 +45,7 @@ impl<'a> ParseContext<'a> {
         &self,
         token: &mut Lexer<'input>,
         bp_pattern: BindingPowerPattern,
-    ) -> Option<(&TokenDefinition, MatchResult<'input, MathElement>)> {
+    ) -> Option<(&TokenDefinition, MatchResult<'input, InputElement>)> {
         let matches: Vec<_> = self
             .known_tokens
             .get(&bp_pattern)?
@@ -72,7 +72,7 @@ impl<'a> ParseContext<'a> {
         &self,
         lexer: &mut Lexer<'input>,
         symbol: &NFA,
-    ) -> Option<MatchResult<'input, MathElement>> {
+    ) -> Option<MatchResult<'input, InputElement>> {
         let match_result = symbol.matches(lexer.get_slice()).ok()?;
         lexer.consume_n(match_result.get_length());
         Some(match_result)
@@ -108,7 +108,7 @@ impl<'a> ParseContext<'a> {
                         v.get_input()
                             .iter()
                             .map(|v| match v {
-                                MathElement::Symbol(v) => v.clone(),
+                                InputElement::Symbol(v) => v.clone(),
                                 _ => panic!("expected variable"),
                             })
                             .collect::<String>()
@@ -133,7 +133,7 @@ impl<'a> ParseContext<'a> {
                         v.get_input()
                             .iter()
                             .map(|v| match v {
-                                MathElement::Symbol(v) => v.clone(),
+                                InputElement::Symbol(v) => v.clone(),
                                 _ => panic!("expected variable"),
                             })
                             .collect::<String>()
@@ -176,7 +176,7 @@ impl<'a> ParseContext<'a> {
                         v.get_input()
                             .iter()
                             .map(|v| match v {
-                                MathElement::Symbol(v) => v.clone(),
+                                InputElement::Symbol(v) => v.clone(),
                                 _ => panic!("expected variable"),
                             })
                             .collect::<String>()
@@ -291,20 +291,20 @@ pub enum TokenMatcher {
 impl TokenMatcher {
     fn matches<'input>(
         &self,
-        input: &'input [MathElement],
-    ) -> Result<MatchResult<'input, MathElement>, MatchError> {
+        input: &'input [InputElement],
+    ) -> Result<MatchResult<'input, InputElement>, MatchError> {
         match self {
             TokenMatcher::Pattern(pattern) => pattern.matches(input),
             TokenMatcher::Container(container_type) => {
                 let token = input.get(0).ok_or(MatchError::NoMatch)?;
                 match (container_type, token) {
-                    (ContainerType::Fraction, MathElement::Fraction(_))
-                    | (ContainerType::Root, MathElement::Root(_))
-                    | (ContainerType::Under, MathElement::Under(_))
-                    | (ContainerType::Over, MathElement::Over(_))
-                    | (ContainerType::Sup, MathElement::Sup(_))
-                    | (ContainerType::Sub, MathElement::Sub(_))
-                    | (ContainerType::Table, MathElement::Table { .. }) => {
+                    (ContainerType::Fraction, InputElement::Fraction(_))
+                    | (ContainerType::Root, InputElement::Root(_))
+                    | (ContainerType::Under, InputElement::Under(_))
+                    | (ContainerType::Over, InputElement::Over(_))
+                    | (ContainerType::Sup, InputElement::Sup(_))
+                    | (ContainerType::Sub, InputElement::Sub(_))
+                    | (ContainerType::Table, InputElement::Table { .. }) => {
                         Ok(MatchResult::new(&input[0..1], vec![]))
                     }
                     _ => Err(MatchError::NoMatch),
@@ -413,7 +413,7 @@ pub enum ContainerType {
 
 struct TokenArgumentParseResult<'lexer> {
     argument_index: Option<usize>,
-    argument: MathSemantic,
+    argument: SyntaxTree,
     lexer: Lexer<'lexer>,
 }
 
@@ -422,8 +422,8 @@ impl TokenArgumentParser {
         &self,
         lexer: Lexer<'lexer>,
         context: &ParseContext,
-        token_match_results: &MatchResult<'input, MathElement>,
-        previous_token: &mut Option<MathSemantic>,
+        token_match_results: &MatchResult<'input, InputElement>,
+        previous_token: &mut Option<SyntaxTree>,
     ) -> TokenArgumentParseResult<'lexer> {
         match self {
             TokenArgumentParser::Next {
@@ -453,7 +453,7 @@ impl TokenArgumentParser {
                 }
                 let range = lexer.get_range();
                 let lexer = lexer.end_token().unwrap();
-                let argument = MathSemantic {
+                let argument = SyntaxTree {
                     name: name.clone(),
                     args: vec![],
                     value: vec![],
@@ -473,9 +473,9 @@ impl TokenArgumentParser {
                 let argument = {
                     let values = token_match_results.get_capture_group(group_id).unwrap();
                     let lexer = Lexer::new(values);
-                    let (math_semantic, lexer) = context.parse_bp(lexer, 0);
+                    let (syntax_tree, lexer) = context.parse_bp(lexer, 0);
                     assert!(lexer.eof());
-                    math_semantic
+                    syntax_tree
                 };
 
                 TokenArgumentParseResult {
@@ -497,9 +497,9 @@ impl TokenArgumentParser {
 }
 
 pub type TokenDefinitionValueParser =
-    for<'input> fn(match_result: &MatchResult<'input, MathElement>) -> Vec<u8>;
+    for<'input> fn(match_result: &MatchResult<'input, InputElement>) -> Vec<u8>;
 
-fn no_value_parser<'input>(_match_result: &MatchResult<'input, MathElement>) -> Vec<u8> {
+fn no_value_parser<'input>(_match_result: &MatchResult<'input, InputElement>) -> Vec<u8> {
     vec![]
 }
 
@@ -589,12 +589,12 @@ impl TokenDefinition {
         &self,
         mut lexer: Lexer<'lexer>,
         context: &ParseContext,
-        token_match_results: &MatchResult<'input, MathElement>,
-        mut previous_token: Option<MathSemantic>,
-    ) -> (Vec<MathSemantic>, Lexer<'lexer>) {
+        token_match_results: &MatchResult<'input, InputElement>,
+        mut previous_token: Option<SyntaxTree>,
+    ) -> (Vec<SyntaxTree>, Lexer<'lexer>) {
         if self.is_container {
             let token = match token_match_results.get_input() {
-                [MathElement::Symbol(_)] => panic!("expected container token"),
+                [InputElement::Symbol(_)] => panic!("expected container token"),
                 [token] => token,
                 _ => panic!("expected single token"),
             };
@@ -610,15 +610,15 @@ impl TokenDefinition {
                 .enumerate()
                 .map(|(row_index, row)| {
                     let lexer = Lexer::new(&row.values);
-                    let (mut math_semantic, lexer) = context.parse_bp(lexer, 0);
-                    math_semantic.row_index = Some(RowIndex(token_index, row_index));
+                    let (mut syntax_tree, lexer) = context.parse_bp(lexer, 0);
+                    syntax_tree.row_index = Some(RowIndex(token_index, row_index));
                     assert!(lexer.eof());
-                    math_semantic
+                    syntax_tree
                 })
                 .collect();
             (arguments, lexer)
         } else {
-            let mut arguments = std::iter::repeat_with(|| MathSemantic::default())
+            let mut arguments = std::iter::repeat_with(|| SyntaxTree::default())
                 .take(self.argument_count)
                 .collect::<Vec<_>>();
             for parser in &self.arguments_parsers {

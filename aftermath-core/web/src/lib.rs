@@ -1,9 +1,9 @@
 mod utils;
 
-use math_layout::row::Row;
+use input_tree::row::InputRow;
 use parser::{
-    ast_transformer::AstTransformer, parse_context::ParseContext, MathSemantic, ParseError,
-    ParseResult,
+    ast_transformer::AstTransformer, parse_context::ParseContext, ParseError, ParseResult,
+    SyntaxTree,
 };
 use serde::Serialize;
 use utils::set_panic_hook;
@@ -16,9 +16,7 @@ use wasm_bindgen::prelude::*;
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[wasm_bindgen]
-extern "C" {
-    fn alert(s: &str);
-}
+extern "C" {}
 
 #[wasm_bindgen(start)]
 fn main() {
@@ -27,13 +25,13 @@ fn main() {
 
 #[derive(Serialize)]
 struct MathParseResult {
-    value: MathSemantic,
+    value: SyntaxTree,
     errors: Vec<ParseError>,
 }
 
 #[wasm_bindgen]
 pub fn parse(layout_row: JsValue) -> Result<JsValue, JsValue> {
-    let layout: Row = serde_wasm_bindgen::from_value(layout_row)?;
+    let layout: InputRow = serde_wasm_bindgen::from_value(layout_row)?;
 
     let context = ParseContext::default();
     let transformer = AstTransformer::new();
@@ -47,8 +45,8 @@ pub fn parse(layout_row: JsValue) -> Result<JsValue, JsValue> {
     Ok(serialized_result)
 }
 
-impl From<ParseResult<MathSemantic>> for MathParseResult {
-    fn from(result: ParseResult<MathSemantic>) -> Self {
+impl From<ParseResult<SyntaxTree>> for MathParseResult {
+    fn from(result: ParseResult<SyntaxTree>) -> Self {
         MathParseResult {
             value: result.value,
             errors: result.errors,

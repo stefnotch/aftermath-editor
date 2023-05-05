@@ -3,5 +3,5 @@
 members = [
     "web",
     "parser",
-    "math_layout",
+    "input_tree",
 ]

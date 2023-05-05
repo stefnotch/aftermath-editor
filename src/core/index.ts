@@ -1,11 +1,11 @@
-import init, { parse as core_parse } from "../../aftermath-core/pkg/aftermath_core";
+import init, { parse as core_parse } from "../../aftermath-core/pkg";
 import { MathLayoutRow } from "../math-layout/math-layout";
 
 // Yay, top level await is neat https://v8.dev/features/top-level-await
 await init();
 
-export function parse(row: MathLayoutRow): CoreParseResult {
-  let result: CoreParseResult = core_parse(toCore(row));
+export function parse(row: MathLayoutRow): ParseResult {
+  let result: ParseResult = core_parse(toCore(row));
 
   return result;
 }
@@ -64,22 +64,22 @@ type CoreElement =
   | { Table: { cells: CoreRow[]; row_width: number } }
   | { Symbol: string };
 
-type CoreParseResult = {
-  value: CoreMathSemantic;
-  errors: CoreParseError[];
+export type ParseResult = {
+  value: SyntaxTree;
+  errors: ParseError[];
 };
 
 // TODO:
-type CoreMathSemantic = {
+type SyntaxTree = {
   name: string;
-  args: CoreMathSemantic[];
+  args: SyntaxTree[];
   row_index: any;
   value: any;
   range: any;
 };
 
 // TODO:
-type CoreParseError = {
+type ParseError = {
   error: any;
   range: any;
 };

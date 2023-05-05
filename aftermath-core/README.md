@@ -2,6 +2,16 @@
 
 Written in Rust
 
+## `input_tree`
+
+## `parser`
+
+## `web`
+
+Exported bindings for the web.
+
+The `npm run build` command recreates the bindings. It's a tad complex, due to issues [like this one](https://github.com/rustwasm/wasm-pack/issues/642).
+
 # WASM Template info that I haven't deleted yet
 
 ## About

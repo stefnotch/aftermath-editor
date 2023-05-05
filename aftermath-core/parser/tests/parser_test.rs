@@ -1,13 +1,13 @@
-use math_layout::{element::MathElement, row::Row};
+use input_tree::{element::InputElement, row::InputRow};
 use parser::{parse, parse_context::ParseContext};
 
 #[test]
 fn test_parser() {
-    let layout = Row::new(vec![
-        MathElement::Symbol("-".to_string()),
-        MathElement::Symbol("b".to_string()),
-        MathElement::Symbol("*".to_string()),
-        MathElement::Symbol("C".to_string()),
+    let layout = InputRow::new(vec![
+        InputElement::Symbol("-".to_string()),
+        InputElement::Symbol("b".to_string()),
+        InputElement::Symbol("*".to_string()),
+        InputElement::Symbol("C".to_string()),
     ]);
 
     let context = ParseContext::default();
@@ -22,11 +22,11 @@ fn test_parser() {
 
 #[test]
 fn test_postfix() {
-    let layout = Row::new(vec![
-        MathElement::Symbol("c".to_string()),
-        MathElement::Symbol("+".to_string()),
-        MathElement::Symbol("a".to_string()),
-        MathElement::Symbol("!".to_string()),
+    let layout = InputRow::new(vec![
+        InputElement::Symbol("c".to_string()),
+        InputElement::Symbol("+".to_string()),
+        InputElement::Symbol("a".to_string()),
+        InputElement::Symbol("!".to_string()),
     ]);
 
     let context = ParseContext::default();
@@ -41,15 +41,15 @@ fn test_postfix() {
 
 #[test]
 fn test_parser_nested_brackets_and_postfix() {
-    let layout = Row::new(vec![
-        MathElement::Symbol("(".to_string()),
-        MathElement::Symbol("(".to_string()),
-        MathElement::Symbol("(".to_string()),
-        MathElement::Symbol("a".to_string()),
-        MathElement::Symbol("!".to_string()),
-        MathElement::Symbol(")".to_string()),
-        MathElement::Symbol(")".to_string()),
-        MathElement::Symbol(")".to_string()),
+    let layout = InputRow::new(vec![
+        InputElement::Symbol("(".to_string()),
+        InputElement::Symbol("(".to_string()),
+        InputElement::Symbol("(".to_string()),
+        InputElement::Symbol("a".to_string()),
+        InputElement::Symbol("!".to_string()),
+        InputElement::Symbol(")".to_string()),
+        InputElement::Symbol(")".to_string()),
+        InputElement::Symbol(")".to_string()),
     ]);
     let context = ParseContext::default();
 
@@ -63,10 +63,10 @@ fn test_parser_nested_brackets_and_postfix() {
 
 #[test]
 fn test_parser_tuple() {
-    let layout = Row::new(vec![
-        MathElement::Symbol("a".to_string()),
-        MathElement::Symbol(",".to_string()),
-        MathElement::Symbol("b".to_string()),
+    let layout = InputRow::new(vec![
+        InputElement::Symbol("a".to_string()),
+        InputElement::Symbol(",".to_string()),
+        InputElement::Symbol("b".to_string()),
     ]);
 
     let context = ParseContext::default();
@@ -81,14 +81,14 @@ fn test_parser_tuple() {
 
 #[test]
 fn test_parser_tuple_advanced() {
-    let layout = Row::new(vec![
-        MathElement::Symbol("(".to_string()),
-        MathElement::Symbol("a".to_string()),
-        MathElement::Symbol(",".to_string()),
-        MathElement::Symbol("b".to_string()),
-        MathElement::Symbol(",".to_string()),
-        MathElement::Symbol("c".to_string()),
-        MathElement::Symbol(")".to_string()),
+    let layout = InputRow::new(vec![
+        InputElement::Symbol("(".to_string()),
+        InputElement::Symbol("a".to_string()),
+        InputElement::Symbol(",".to_string()),
+        InputElement::Symbol("b".to_string()),
+        InputElement::Symbol(",".to_string()),
+        InputElement::Symbol("c".to_string()),
+        InputElement::Symbol(")".to_string()),
     ]);
 
     let context = ParseContext::default();
@@ -104,13 +104,13 @@ fn test_parser_tuple_advanced() {
 
 #[test]
 fn test_parser_function_call() {
-    let layout = Row::new(vec![
-        MathElement::Symbol("f".to_string()),
-        MathElement::Symbol("(".to_string()),
-        MathElement::Symbol("a".to_string()),
-        MathElement::Symbol(",".to_string()),
-        MathElement::Symbol("b".to_string()),
-        MathElement::Symbol(")".to_string()),
+    let layout = InputRow::new(vec![
+        InputElement::Symbol("f".to_string()),
+        InputElement::Symbol("(".to_string()),
+        InputElement::Symbol("a".to_string()),
+        InputElement::Symbol(",".to_string()),
+        InputElement::Symbol("b".to_string()),
+        InputElement::Symbol(")".to_string()),
     ]);
 
     let context = ParseContext::default();
@@ -127,12 +127,12 @@ fn test_parser_function_call() {
 
 #[test]
 fn test_parser_brackets_with_addition() {
-    let layout = Row::new(vec![
-        MathElement::Symbol("(".to_string()),
-        MathElement::Symbol("a".to_string()),
-        MathElement::Symbol("+".to_string()),
-        MathElement::Symbol("b".to_string()),
-        MathElement::Symbol(")".to_string()),
+    let layout = InputRow::new(vec![
+        InputElement::Symbol("(".to_string()),
+        InputElement::Symbol("a".to_string()),
+        InputElement::Symbol("+".to_string()),
+        InputElement::Symbol("b".to_string()),
+        InputElement::Symbol(")".to_string()),
     ]);
 
     let context = ParseContext::default();
@@ -147,15 +147,15 @@ fn test_parser_brackets_with_addition() {
 
 #[test]
 fn test_parser_fraction() {
-    let layout = Row::new(vec![
-        MathElement::Symbol("(".to_string()),
-        MathElement::Symbol("a".to_string()),
-        MathElement::Symbol("+".to_string()),
-        MathElement::Fraction([
-            Row::new(vec![MathElement::Symbol("b".to_string())]),
-            Row::new(vec![MathElement::Symbol("c".to_string())]),
+    let layout = InputRow::new(vec![
+        InputElement::Symbol("(".to_string()),
+        InputElement::Symbol("a".to_string()),
+        InputElement::Symbol("+".to_string()),
+        InputElement::Fraction([
+            InputRow::new(vec![InputElement::Symbol("b".to_string())]),
+            InputRow::new(vec![InputElement::Symbol("c".to_string())]),
         ]),
-        MathElement::Symbol(")".to_string()),
+        InputElement::Symbol(")".to_string()),
     ]);
 
     let context = ParseContext::default();
@@ -171,7 +171,7 @@ fn test_parser_fraction() {
 // TODO: Fix those tests to actually do something instead of printing stuff
 #[test]
 fn test_parser_empty_input() {
-    let layout = Row::new(vec![]);
+    let layout = InputRow::new(vec![]);
     let context = ParseContext::default();
 
     let parsed = parse(&layout, &context);
@@ -182,9 +182,9 @@ fn test_parser_empty_input() {
 
 #[test]
 fn test_parser_symbol_and_close_bracket() {
-    let layout = Row::new(vec![
-        MathElement::Symbol("a".to_string()),
-        MathElement::Symbol(")".to_string()),
+    let layout = InputRow::new(vec![
+        InputElement::Symbol("a".to_string()),
+        InputElement::Symbol(")".to_string()),
     ]);
     let context = ParseContext::default();
 
@@ -194,7 +194,7 @@ fn test_parser_symbol_and_close_bracket() {
 
 #[test]
 fn test_parser_close_bracket() {
-    let layout = Row::new(vec![MathElement::Symbol(")".to_string())]);
+    let layout = InputRow::new(vec![InputElement::Symbol(")".to_string())]);
     let context = ParseContext::default();
 
     let parsed = parse(&layout, &context);
