@@ -36,3 +36,9 @@ The editor uses a simple tree data structure that is similar to MathML, but is m
 - Fractions
 - Matrices
 - ...
+
+
+## Differences between this and ...?
+
+- MathLive is a WYSIWYG LaTeX math editor, and as such, [prioritizes handling any technically valid LaTeX](https://github.com/arnog/mathlive/issues/1846#issuecomment-1442619914). This editor however only tries to handle valid, meaningful mathematics.
+
