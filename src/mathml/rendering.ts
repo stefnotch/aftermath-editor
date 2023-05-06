@@ -7,7 +7,6 @@ import {
   MathLayoutContainer,
 } from "../math-layout/math-layout";
 import { endingBrackets, allBrackets, MathMLTags } from "./mathml-spec";
-import { TokenStream } from "../math-editor/token-stream";
 import { Offset } from "../math-layout/math-layout-offset";
 import { ViewportRect, ViewportValue } from "../rendering/viewport-coordinate";
 import { RowIndices, fromRowIndices, getRowIndices, MathLayoutRowZipper } from "../math-layout/math-layout-zipper";
@@ -719,4 +718,47 @@ function distanceToSegmentSquared(position: ViewportVector2, v: ViewportVector2,
 }
 function distanceToSegment(position: ViewportVector2, v: ViewportVector2, w: ViewportVector2) {
   return Math.sqrt(distanceToSegmentSquared(position, v, w));
+}
+
+class TokenStream<T> {
+  constructor(public value: readonly T[], public offset: number) {}
+
+  /**
+   * Gets the current value and removes it
+   */
+  next(): T | undefined {
+    const v = this.eof() ? undefined : this.value[this.offset];
+    this.offset++;
+    return v;
+  }
+
+  nextWithIndex() {
+    const offset = this.offset;
+    return {
+      value: this.next(),
+      index: offset,
+    };
+  }
+
+  /**
+   * Moves one step back
+   */
+  back() {
+    assert(this.offset > 0);
+    this.offset--;
+  }
+
+  /**
+   * Gets the current value
+   */
+  peek(plusOffset: number = 0): T | undefined {
+    return this.offset + plusOffset >= this.value.length ? undefined : this.value[this.offset + plusOffset];
+  }
+
+  /**
+   * Checks if it's at the end of the file
+   */
+  eof() {
+    return this.offset >= this.value.length;
+  }
 }

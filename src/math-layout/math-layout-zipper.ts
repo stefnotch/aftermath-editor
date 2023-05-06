@@ -1,4 +1,3 @@
-import { TokenStream } from "../math-editor/token-stream";
 import { assert } from "../utils/assert";
 import {
   MathLayoutRow,
@@ -78,10 +77,6 @@ export class MathLayoutRowZipper
         return new MathLayoutContainerZipper(v, this, i, childStartOffset);
       }
     });
-  }
-
-  get childrenStream() {
-    return new TokenStream(this.children, 0);
   }
 
   get root(): MathLayoutRowZipper {
@@ -191,10 +186,6 @@ export class MathLayoutContainerZipper implements MathLayoutZipper<MathLayoutRow
     });
   }
 
-  get childrenStream() {
-    return new TokenStream(this.children, 0);
-  }
-
   get root(): MathLayoutRowZipper {
     return this.parent.root;
   }
@@ -249,10 +240,6 @@ export class MathLayoutTableZipper implements MathLayoutZipper<MathLayoutRowZipp
     });
   }
 
-  get childrenStream() {
-    return new TokenStream(this.children, 0);
-  }
-
   get root(): MathLayoutRowZipper {
     return this.parent.root;
   }
@@ -300,10 +287,6 @@ export class MathLayoutSymbolZipper implements MathLayoutZipper<never> {
 
   get children() {
     return [];
-  }
-
-  get childrenStream() {
-    return new TokenStream(this.children, 0);
   }
 
   get root(): MathLayoutRowZipper {
