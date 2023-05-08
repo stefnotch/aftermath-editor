@@ -11,9 +11,9 @@ import {
   MathLayoutRowZipper,
   MathLayoutTableZipper,
 } from "../../math-layout/math-layout-zipper";
-import { MathmlLayout } from "../../mathml/rendering";
 import { assert, assertUnreachable } from "../../utils/assert";
 import { ViewportValue } from "../../rendering/viewport-coordinate";
+import { RenderResult } from "../../rendering/render-result";
 
 export type Direction = "left" | "right" | "up" | "down";
 export type SerializedCaret = { start: Offset; end: Offset; zipper: RowIndices };
@@ -79,24 +79,24 @@ export class MathLayoutCaret {
   }
 }
 
-export function moveCaret(
+export function moveCaret<T>(
   caret: MathLayoutCaret,
   direction: "up" | "down" | "left" | "right",
-  layout: MathmlLayout
+  renderResult: RenderResult<T>
 ): MathLayoutCaret | null {
   const layoutPosition = new MathLayoutPosition(
     caret.zipper,
     direction === "left" || direction === "up" ? caret.leftOffset : caret.rightOffset
   );
-  const viewportPosition = layout.layoutToViewportPosition(layoutPosition);
+  const viewportPosition = renderResult.getViewportPosition(layoutPosition);
 
   const newPosition = movePositionRecursive(
     layoutPosition,
     direction,
-    [viewportPosition.x, viewportPosition.y],
+    [viewportPosition.position.x, viewportPosition.position.y],
     (layoutPosition) => {
-      const position = layout.layoutToViewportPosition(layoutPosition);
-      return [position.x, position.y];
+      const position = renderResult.getViewportPosition(layoutPosition);
+      return [position.position.x, position.position.y];
     }
   );
 

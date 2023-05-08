@@ -1,7 +1,6 @@
 import { assert } from "../utils/assert";
 import { MathLayoutElement, MathLayoutRow, MathLayoutSymbol } from "../math-layout/math-layout";
 import { mathLayoutWithWidth, wrapInRow } from "../math-layout/math-layout-utils";
-import { allBrackets } from "./mathml-spec";
 import { tagIs } from "../utils/dom-utils";
 
 /**

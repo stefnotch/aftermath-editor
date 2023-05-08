@@ -168,18 +168,34 @@ fn test_parser_fraction() {
     assert_eq!(parsed.errors.len(), 0);
 }
 
-// TODO: Fix those tests to actually do something instead of printing stuff
 #[test]
 fn test_parser_empty_input() {
     let layout = InputRow::new(vec![]);
     let context = ParseContext::default();
 
     let parsed = parse(&layout, &context);
-    assert_eq!(parsed.errors.len(), 1);
-
-    println!("{:?}", parsed);
+    // "Nothing" is taken from https://cortexjs.io/compute-engine/reference/core/
+    assert_eq!(parsed.value.to_string(), "(Nothing)");
 }
 
+#[test]
+fn test_parser_empty_squareroot() {
+    // A square root is one of the few places in mathematics, where a default value exists
+    // $ \sqrt{a} = \sqrt[2]{a}$
+    let layout = InputRow::new(vec![InputElement::Root([
+        InputRow::new(vec![]),
+        InputRow::new(vec![InputElement::Symbol("a".to_string())]),
+    ])]);
+    let context = ParseContext::default();
+
+    let parsed = parse(&layout, &context);
+    assert_eq!(
+        parsed.value.to_string(),
+        "(Root () (Nothing) (Variable (61)))"
+    );
+}
+
+// TODO: Fix those tests to actually do something instead of printing stuff
 #[test]
 fn test_parser_symbol_and_close_bracket() {
     let layout = InputRow::new(vec![

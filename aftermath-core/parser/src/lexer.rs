@@ -55,12 +55,25 @@ impl<'input> Lexer<'input> {
         self.parent.take().map(|v| *v)
     }
 
+    /// Gets a slice with all the *next* elements
     pub fn get_slice(&self) -> &'input [InputElement] {
         &self.values[self.index..]
     }
 
     pub fn eof(&self) -> bool {
         self.index >= self.values.len()
+    }
+
+    pub fn get_symbols_as_string(&self) -> String {
+        let range = self.get_range();
+        let mut result = String::new();
+        for element in &self.values[range] {
+            match element {
+                InputElement::Symbol(s) => result.push_str(s),
+                _ => panic!("expected symbol"),
+            }
+        }
+        result
     }
 }
 

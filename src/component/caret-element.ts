@@ -3,7 +3,7 @@ import { ViewportValue } from "../rendering/viewport-coordinate";
 export interface CaretElement {
   setPosition(x: number, y: number): void;
   setHeight(v: number): void;
-  setHighlightContainer(element: Element): void;
+  setHighlightContainer(elements: Element[]): void;
   addSelection(x: number, y: number, width: number, height: number): void;
   clearSelections(): void;
   remove(): void;
@@ -29,7 +29,7 @@ export function createCaret(container: HTMLElement): CaretElement {
   selectionsContainer.style.left = "0px";
   container.append(selectionsContainer);
 
-  let highlightContainer: Element | null = null;
+  let highlightContainers: Element[] = [];
 
   function setPosition(x: ViewportValue, y: ViewportValue) {
     const parentPos = container.getBoundingClientRect();
@@ -44,10 +44,10 @@ export function createCaret(container: HTMLElement): CaretElement {
     caretElement.style.marginTop = `${-v}px`;
   }
 
-  function setHighlightContainer(element: Element | null) {
-    highlightContainer?.classList.remove("math-container-highlight");
-    highlightContainer = element;
-    highlightContainer?.classList.add("math-container-highlight");
+  function setHighlightContainer(elements: Element[]) {
+    highlightContainers.forEach((v) => v.classList.remove("math-container-highlight"));
+    highlightContainers = elements;
+    highlightContainers.forEach((v) => v.classList.add("math-container-highlight"));
   }
 
   function addSelection(x: number, y: number, width: number, height: number) {
@@ -69,7 +69,7 @@ export function createCaret(container: HTMLElement): CaretElement {
   }
 
   function remove() {
-    setHighlightContainer(null);
+    setHighlightContainer([]);
     clearSelections();
     container.removeChild(caretElement);
     container.removeChild(selectionsContainer);

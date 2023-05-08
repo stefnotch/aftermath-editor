@@ -4,6 +4,8 @@
  */
 export type ViewportValue = number;
 
+export type ViewportCoordinate = { x: ViewportValue; y: ViewportValue };
+
 export type ViewportRect = {
   readonly x: ViewportValue;
   readonly y: ViewportValue;

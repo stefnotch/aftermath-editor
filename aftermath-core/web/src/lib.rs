@@ -3,7 +3,7 @@ mod utils;
 use input_tree::row::InputRow;
 use parser::{
     ast_transformer::AstTransformer, parse_context::ParseContext, ParseError, ParseResult,
-    SyntaxTree,
+    SyntaxNode,
 };
 use serde::Serialize;
 use utils::set_panic_hook;
@@ -25,7 +25,7 @@ fn main() {
 
 #[derive(Serialize)]
 struct MathParseResult {
-    value: SyntaxTree,
+    value: SyntaxNode,
     errors: Vec<ParseError>,
 }
 
@@ -45,8 +45,8 @@ pub fn parse(layout_row: JsValue) -> Result<JsValue, JsValue> {
     Ok(serialized_result)
 }
 
-impl From<ParseResult<SyntaxTree>> for MathParseResult {
-    fn from(result: ParseResult<SyntaxTree>) -> Self {
+impl From<ParseResult<SyntaxNode>> for MathParseResult {
+    fn from(result: ParseResult<SyntaxNode>) -> Self {
         MathParseResult {
             value: result.value,
             errors: result.errors,

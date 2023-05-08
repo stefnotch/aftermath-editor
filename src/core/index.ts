@@ -70,16 +70,16 @@ export type ParseResult = {
 };
 
 // TODO:
-type SyntaxTree = {
+export type SyntaxTree = {
   name: string;
   args: SyntaxTree[];
-  row_index: any;
+  row_index?: any;
   value: any;
   range: any;
 };
 
 // TODO:
-type ParseError = {
+export type ParseError = {
   error: any;
   range: any;
 };

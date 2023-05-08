@@ -2,13 +2,17 @@ use std::collections::HashMap;
 
 use input_tree::{element::InputElement, row::RowIndex};
 
-use crate::{grapheme_matcher::GraphemeMatcher, token_matcher::MatchError};
+use crate::{
+    grapheme_matcher::GraphemeMatcher,
+    syntax_tree::{LeafNodeType, SyntaxLeafNode},
+    token_matcher::MatchError,
+    SyntaxNode,
+};
 
 use super::{
     lexer::Lexer,
     nfa_builder::NFABuilder,
-    syntax_tree::SyntaxTree,
-    token_matcher::{CapturingGroupId, MatchResult, NFA},
+    token_matcher::{MatchResult, NFA},
 };
 
 pub type BindingPowerPattern = (bool, bool);
@@ -104,16 +108,7 @@ impl<'a> ParseContext<'a> {
                             )
                             .build(),
                     ),
-                    TokenDefinition::new("Variable".into(), (None, None)).with_value_parser(|v| {
-                        v.get_input()
-                            .iter()
-                            .map(|v| match v {
-                                InputElement::Symbol(v) => v.clone(),
-                                _ => panic!("expected variable"),
-                            })
-                            .collect::<String>()
-                            .into()
-                    }),
+                    TokenDefinition::new("Variable".into(), (None, None)),
                 ),
                 (
                     TokenMatcher::Pattern(
@@ -129,16 +124,7 @@ impl<'a> ParseContext<'a> {
                             )
                             .build(),
                     ),
-                    TokenDefinition::new("Number".into(), (None, None)).with_value_parser(|v| {
-                        v.get_input()
-                            .iter()
-                            .map(|v| match v {
-                                InputElement::Symbol(v) => v.clone(),
-                                _ => panic!("expected variable"),
-                            })
-                            .collect::<String>()
-                            .into()
-                    }),
+                    TokenDefinition::new("Number".into(), (None, None)),
                 ),
                 (
                     // https://stackoverflow.com/questions/249791/regex-for-quoted-string-with-escaping-quotes
@@ -172,16 +158,7 @@ impl<'a> ParseContext<'a> {
                             .then_character('"'.into())
                             .build(),
                     ),
-                    TokenDefinition::new("String".into(), (None, None)).with_value_parser(|v| {
-                        v.get_input()
-                            .iter()
-                            .map(|v| match v {
-                                InputElement::Symbol(v) => v.clone(),
-                                _ => panic!("expected variable"),
-                            })
-                            .collect::<String>()
-                            .into()
-                    }),
+                    TokenDefinition::new("String".into(), (None, None)),
                 ),
                 (
                     ','.into(),
@@ -223,6 +200,9 @@ impl<'a> ParseContext<'a> {
                     TokenMatcher::Container(ContainerType::Fraction),
                     TokenDefinition::new("Fraction".into(), (None, None)).with_is_container(),
                 ),
+                // TODO: The dx at the end of an integral might not even be a closing bracket.
+                // After all, it can also sometimes appear inside an integral.
+
                 // Amusingly, if someone defines the closing bracket as a postfix operator, it'll break the brackets
                 // Brackets
                 (
@@ -236,14 +216,14 @@ impl<'a> ParseContext<'a> {
                         "RoundBrackets".into(),
                         (None, None),
                         vec![
-                            TokenArgumentParser::Next {
+                            TokenArgumentParser::ParseNext {
                                 minimum_binding_power: 0,
-                                argument_index: Some(0),
+                                argument_index: 0,
                             },
                             TokenArgumentParser::NextSymbol {
-                                name: "".into(),
                                 symbol: NFABuilder::match_character(')'.into()).build(),
-                                argument_index: None,
+                                symbol_type: LeafNodeType::Operator,
+                                argument_index: 1,
                             },
                         ],
                     ),
@@ -254,37 +234,28 @@ impl<'a> ParseContext<'a> {
                         "FunctionApplication".into(),
                         (Some(800), None),
                         vec![
-                            TokenArgumentParser::Previous {
-                                argument_index: Some(0),
-                            },
-                            TokenArgumentParser::Next {
+                            TokenArgumentParser::ParseNext {
                                 minimum_binding_power: 0,
-                                argument_index: Some(1),
+                                argument_index: 0,
                             },
                             TokenArgumentParser::NextSymbol {
-                                name: "".into(),
                                 symbol: NFABuilder::match_character(')'.into()).build(),
-                                argument_index: None,
+                                argument_index: 1,
+                                symbol_type: LeafNodeType::Operator,
                             },
                         ],
                     ),
                 ),
+                // TODO: "Nothing" token? Or at least document its existence
             ],
         )
     }
 }
 
-/// Matches the starting pattern of a given token, including brackets
+/// TODO: This should be replaced with a "parser" without a context.
+/// And the pub arguments_parsers: Vec<TokenArgumentParser>, should be replaced with a parser that has a state/context/whatever.
+/// That argument context should have the "previous token" and "self token" (complete with a range and the capturing groups).
 pub enum TokenMatcher {
-    // 1. binding power pattern
-    // 2. tricky
-    // - sin is 3 symbol tokens
-    // - Sum is a symbol token (with sub and sup afterwards, which end up behaving like postfix operators)
-    //   Sum is a prefix operator with a low binding power. Like sum_i (i^2)
-    // - d/dx is a fraction token, a symbol token, a symbol token, an unknown symbol token
-    //   d/dx is a prefix operator with a low binding power. Like d/dx (x^2)
-    // - d^n f / dx^n is a nasty notation
-    // - hat x is a over token with two symbol tokens. All fixed, which is nice
     Pattern(NFA),
     Container(ContainerType),
 }
@@ -364,7 +335,6 @@ pub struct TokenDefinition {
     is_container: bool,
     pub arguments_parsers: Vec<TokenArgumentParser>,
     argument_count: usize,
-    pub value_parser: TokenDefinitionValueParser,
 }
 
 #[derive(Debug)]
@@ -379,24 +349,14 @@ pub enum TokenArgumentParser {
 
     // Does not parse
     // - sup and sub that come after a sum, because those are postfix operators
-    Previous {
-        argument_index: Option<usize>,
-    },
-    Next {
+    ParseNext {
         minimum_binding_power: u32,
-        argument_index: Option<usize>,
+        argument_index: usize,
     },
     NextSymbol {
-        name: String,
         symbol: NFA,
-        argument_index: Option<usize>,
-    },
-    /// For capturing groups that are a part of the token itself.
-    /// In the case of a (None, None) token, it's obvious what that means.
-    /// In the case of an operator token, it refers to the capturing groups that are a part of the operator.
-    CapturingGroup {
-        group_id: CapturingGroupId,
-        argument_index: Option<usize>,
+        symbol_type: LeafNodeType,
+        argument_index: usize,
     },
 }
 
@@ -412,8 +372,8 @@ pub enum ContainerType {
 }
 
 struct TokenArgumentParseResult<'lexer> {
-    argument_index: Option<usize>,
-    argument: SyntaxTree,
+    argument_index: usize,
+    argument: SyntaxNode,
     lexer: Lexer<'lexer>,
 }
 
@@ -422,11 +382,9 @@ impl TokenArgumentParser {
         &self,
         lexer: Lexer<'lexer>,
         context: &ParseContext,
-        token_match_results: &MatchResult<'input, InputElement>,
-        previous_token: &mut Option<SyntaxTree>,
     ) -> TokenArgumentParseResult<'lexer> {
         match self {
-            TokenArgumentParser::Next {
+            TokenArgumentParser::ParseNext {
                 minimum_binding_power,
                 argument_index,
             } => {
@@ -435,14 +393,14 @@ impl TokenArgumentParser {
                     context.parse_bp(argument_lexer, *minimum_binding_power);
                 TokenArgumentParseResult {
                     argument_index: *argument_index,
-                    argument,
+                    argument: SyntaxNode::Container(argument),
                     lexer: argument_lexer.end_token().unwrap(),
                 }
             }
             TokenArgumentParser::NextSymbol {
-                name,
                 symbol,
                 argument_index,
+                symbol_type,
             } => {
                 let mut lexer = lexer.begin_token();
                 if let Some(_match_result) = context.get_symbol(&mut lexer, symbol) {
@@ -452,43 +410,16 @@ impl TokenArgumentParser {
                     panic!("expected closing bracket");
                 }
                 let range = lexer.get_range();
+                let symbols = lexer.get_symbols_as_string();
                 let lexer = lexer.end_token().unwrap();
-                let argument = SyntaxTree {
-                    name: name.clone(),
-                    args: vec![],
-                    value: vec![],
-                    row_index: None,
+                let argument = SyntaxLeafNode {
+                    node_type: symbol_type.clone(),
                     range,
+                    symbols,
                 };
                 TokenArgumentParseResult {
                     argument_index: *argument_index,
-                    argument,
-                    lexer,
-                }
-            }
-            TokenArgumentParser::CapturingGroup {
-                group_id,
-                argument_index,
-            } => {
-                let argument = {
-                    let values = token_match_results.get_capture_group(group_id).unwrap();
-                    let lexer = Lexer::new(values);
-                    let (syntax_tree, lexer) = context.parse_bp(lexer, 0);
-                    assert!(lexer.eof());
-                    syntax_tree
-                };
-
-                TokenArgumentParseResult {
-                    argument_index: *argument_index,
-                    argument,
-                    lexer,
-                }
-            }
-            TokenArgumentParser::Previous { argument_index } => {
-                let argument = previous_token.take().unwrap();
-                TokenArgumentParseResult {
-                    argument_index: *argument_index,
-                    argument,
+                    argument: SyntaxNode::Leaf(argument),
                     lexer,
                 }
             }
@@ -496,32 +427,22 @@ impl TokenArgumentParser {
     }
 }
 
-pub type TokenDefinitionValueParser =
-    for<'input> fn(match_result: &MatchResult<'input, InputElement>) -> Vec<u8>;
-
-fn no_value_parser<'input>(_match_result: &MatchResult<'input, InputElement>) -> Vec<u8> {
-    vec![]
-}
-
 impl TokenDefinition {
     pub fn new(name: TokenIdentifier, binding_power: (Option<u32>, Option<u32>)) -> Self {
         let arguments_parser = match binding_power {
-            (Some(_), Some(minimum_binding_power)) => vec![
-                TokenArgumentParser::Previous {
-                    argument_index: Some(0),
-                },
-                TokenArgumentParser::Next {
-                    minimum_binding_power,
-                    argument_index: Some(1),
-                },
-            ],
-            (Some(_), None) => vec![TokenArgumentParser::Previous {
-                argument_index: Some(0),
-            }],
-            (None, Some(minimum_binding_power)) => vec![TokenArgumentParser::Next {
+            // infix
+            (Some(_), Some(minimum_binding_power)) => vec![TokenArgumentParser::ParseNext {
                 minimum_binding_power,
-                argument_index: Some(0),
+                argument_index: 0,
             }],
+            // prefix
+            (Some(_), None) => vec![],
+            // postfix
+            (None, Some(minimum_binding_power)) => vec![TokenArgumentParser::ParseNext {
+                minimum_binding_power,
+                argument_index: 0,
+            }],
+            // symbol
             (None, None) => vec![],
         };
 
@@ -535,11 +456,9 @@ impl TokenDefinition {
     ) -> Self {
         let mut argument_indices: Vec<_> = arguments_parsers
             .iter()
-            .filter_map(|v| match v {
-                TokenArgumentParser::Next { argument_index, .. } => *argument_index,
+            .map(|v| match v {
+                TokenArgumentParser::ParseNext { argument_index, .. } => *argument_index,
                 TokenArgumentParser::NextSymbol { argument_index, .. } => *argument_index,
-                TokenArgumentParser::CapturingGroup { argument_index, .. } => *argument_index,
-                TokenArgumentParser::Previous { argument_index } => *argument_index,
             })
             .collect();
 
@@ -555,7 +474,6 @@ impl TokenDefinition {
             arguments_parsers,
             argument_count: argument_indices.len(),
             is_container: false,
-            value_parser: no_value_parser,
         }
     }
 
@@ -567,18 +485,18 @@ impl TokenDefinition {
         }
     }
 
-    pub fn with_value_parser(self, value_parser: TokenDefinitionValueParser) -> Self {
-        Self {
-            value_parser,
-            ..self
-        }
-    }
-
     fn binding_power_pattern(&self) -> (bool, bool) {
         (
             self.binding_power.0.is_some(),
             self.binding_power.1.is_some(),
         )
+    }
+
+    pub fn get_symbol_type(&self) -> LeafNodeType {
+        match self.binding_power {
+            (None, None) => LeafNodeType::Symbol,
+            _ => LeafNodeType::Operator,
+        }
     }
 
     pub fn name(&self) -> String {
@@ -590,8 +508,7 @@ impl TokenDefinition {
         mut lexer: Lexer<'lexer>,
         context: &ParseContext,
         token_match_results: &MatchResult<'input, InputElement>,
-        mut previous_token: Option<SyntaxTree>,
-    ) -> (Vec<SyntaxTree>, Lexer<'lexer>) {
+    ) -> (Vec<SyntaxNode>, Lexer<'lexer>) {
         if self.is_container {
             let token = match token_match_results.get_input() {
                 [InputElement::Symbol(_)] => panic!("expected container token"),
@@ -613,22 +530,28 @@ impl TokenDefinition {
                     let (mut syntax_tree, lexer) = context.parse_bp(lexer, 0);
                     syntax_tree.row_index = Some(RowIndex(token_index, row_index));
                     assert!(lexer.eof());
-                    syntax_tree
+                    SyntaxNode::Container(syntax_tree)
                 })
                 .collect();
             (arguments, lexer)
         } else {
-            let mut arguments = std::iter::repeat_with(|| SyntaxTree::default())
-                .take(self.argument_count)
-                .collect::<Vec<_>>();
+            // Fill arguments with dummies
+            let mut arguments = std::iter::repeat_with(|| {
+                SyntaxNode::Leaf(SyntaxLeafNode {
+                    node_type: LeafNodeType::Symbol,
+                    range: 0..0,
+                    symbols: "".into(),
+                })
+            })
+            .take(self.argument_count)
+            .collect::<Vec<_>>();
+
+            // And then set the argument values
             for parser in &self.arguments_parsers {
-                let parse_result =
-                    parser.parse(lexer, context, token_match_results, &mut previous_token);
+                let parse_result = parser.parse(lexer, context);
 
                 lexer = parse_result.lexer;
-                if let Some(argument_index) = parse_result.argument_index {
-                    arguments[argument_index] = parse_result.argument;
-                }
+                arguments[parse_result.argument_index] = parse_result.argument;
             }
 
             (arguments, lexer)

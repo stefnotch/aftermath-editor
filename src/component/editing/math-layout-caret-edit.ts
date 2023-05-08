@@ -8,6 +8,7 @@ import {
   MathLayoutRowZipper,
 } from "../../math-layout/math-layout-zipper";
 import { MathmlLayout } from "../../mathml/rendering";
+import { RenderResult } from "../../rendering/render-result";
 import arrayUtils from "../../utils/array-utils";
 import { MathLayoutCaret, moveCaret, SerializedCaret } from "./math-layout-caret";
 import { MathLayoutSimpleEdit } from "./math-layout-edit";
@@ -23,19 +24,27 @@ export type CaretEdit = {
   caret: SerializedCaret;
 };
 
-export function removeAtCaret(caret: MathLayoutCaret, direction: "left" | "right", layout: MathmlLayout): CaretEdit {
+export function removeAtCaret<T>(
+  caret: MathLayoutCaret,
+  direction: "left" | "right",
+  renderResult: RenderResult<T>
+): CaretEdit {
   if (caret.isCollapsed) {
-    return removeAtPosition(new MathLayoutPosition(caret.zipper, caret.start), direction, layout);
+    return removeAtPosition(new MathLayoutPosition(caret.zipper, caret.start), direction, renderResult);
   } else {
     return removeRange(caret);
   }
 }
 
-function removeAtPosition(position: MathLayoutPosition, direction: "left" | "right", layout: MathmlLayout): CaretEdit {
+function removeAtPosition<T>(
+  position: MathLayoutPosition,
+  direction: "left" | "right",
+  renderResult: RenderResult<T>
+): CaretEdit {
   // Nothing to delete, just move the caret
   const move = () => {
     const caret = new MathLayoutCaret(position.zipper, position.offset, position.offset);
-    const newCaret = moveCaret(caret, direction, layout) ?? caret;
+    const newCaret = moveCaret(caret, direction, renderResult) ?? caret;
     return {
       caret: MathLayoutCaret.serialize(newCaret.zipper, newCaret.start, newCaret.end),
       edits: [],

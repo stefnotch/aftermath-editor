@@ -11,7 +11,10 @@ use std::ops::Range;
 
 use input_tree::{element::InputElement, row::InputRow};
 
-use crate::lexer::Lexer;
+use crate::{
+    lexer::Lexer,
+    syntax_tree::{SyntaxContainerNode, SyntaxLeafNode},
+};
 
 use self::{
     parse_context::{ParseContext, TokenDefinition},
@@ -19,9 +22,9 @@ use self::{
 };
 
 pub use self::parse_result::{ParseError, ParseErrorType, ParseResult};
-pub use self::syntax_tree::SyntaxTree;
+pub use self::syntax_tree::SyntaxNode;
 
-pub fn parse(input: &InputRow, context: &ParseContext) -> ParseResult<SyntaxTree> {
+pub fn parse(input: &InputRow, context: &ParseContext) -> ParseResult<SyntaxNode> {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     // we have a LL(1) pratt parser, aka we can look one token ahead
     let lexer = Lexer::new(&input.values);
@@ -35,7 +38,7 @@ pub fn parse(input: &InputRow, context: &ParseContext) -> ParseResult<SyntaxTree
     assert!(lexer.eof(), "lexer not at end");
 
     ParseResult {
-        value: parse_result,
+        value: SyntaxNode::Container(parse_result),
         errors: Vec::new(),
     }
 }
@@ -45,7 +48,7 @@ impl<'a> ParseContext<'a> {
         &self,
         mut lexer: Lexer<'input>,
         minimum_bp: u32,
-    ) -> (SyntaxTree, Lexer<'input>) {
+    ) -> (SyntaxContainerNode, Lexer<'input>) {
         println!(
             "parse_bp at {:?} with minimum_bp {}",
             lexer.get_slice(),
@@ -53,7 +56,7 @@ impl<'a> ParseContext<'a> {
         );
 
         // bp stands for binding power
-        let mut left = {
+        let mut left: SyntaxContainerNode = {
             let mut starting_token = lexer.begin_token();
             let parse_start =
                 parse_bp_start(&mut starting_token, self).expect("parse start failed");
@@ -82,6 +85,8 @@ impl<'a> ParseContext<'a> {
                         lexer = operator.discard_token().unwrap();
                         break;
                     }
+                    let operator_range = operator.get_range();
+                    let operator_symbols = operator.get_symbols_as_string();
                     // Actually consume the operator
                     lexer = operator.end_token().unwrap();
 
@@ -89,18 +94,27 @@ impl<'a> ParseContext<'a> {
 
                     // Parse the right operand
                     let args;
-                    (args, lexer) =
-                        definition.parse_arguments(lexer, self, &match_result, Some(left));
+                    (args, lexer) = definition.parse_arguments(lexer, self, &match_result);
+
+                    let mut children = vec![
+                        SyntaxNode::Container(left),
+                        SyntaxNode::Leaf(SyntaxLeafNode {
+                            node_type: definition.get_symbol_type().into(),
+                            range: operator_range,
+                            symbols: operator_symbols,
+                        }),
+                    ];
+                    children.extend(args);
 
                     let range = combine_ranges(&left_range, &lexer.get_range());
 
                     // Combine the left and right operand into a new left operand
-                    left = SyntaxTree {
+                    left = SyntaxContainerNode {
                         name: definition.name(),
-                        args,
-                        value: (definition.value_parser)(&match_result),
+                        children,
                         row_index: None,
                         range,
+                        value: vec![],
                     };
                     continue;
                 } else {
@@ -117,6 +131,8 @@ impl<'a> ParseContext<'a> {
                     lexer = operator.discard_token().unwrap();
                     break;
                 }
+                let operator_range = operator.get_range();
+                let operator_symbols = operator.get_symbols_as_string();
 
                 // Actually consume the operator
                 lexer = operator.end_token().unwrap();
@@ -124,15 +140,23 @@ impl<'a> ParseContext<'a> {
                 let left_range = left.range.clone();
 
                 let args;
-                (args, lexer) = definition.parse_arguments(lexer, self, &match_result, Some(left));
+                (args, lexer) = definition.parse_arguments(lexer, self, &match_result);
+
+                let mut children = vec![SyntaxNode::Container(left)];
+                children.extend(args);
+                children.push(SyntaxNode::Leaf(SyntaxLeafNode {
+                    node_type: definition.get_symbol_type().into(),
+                    range: operator_range,
+                    symbols: operator_symbols,
+                }));
 
                 let range = combine_ranges(&left_range, &lexer.get_range());
 
                 // Combine the left operand into a new left operand
-                left = SyntaxTree {
+                left = SyntaxContainerNode {
                     name: definition.name(),
-                    args,
-                    value: (definition.value_parser)(&match_result),
+                    children,
+                    value: vec![],
                     row_index: None,
                     range,
                 };
@@ -165,24 +189,31 @@ struct ParseStartResult<'input, 'definition> {
     definition: &'definition TokenDefinition,
     match_result: MatchResult<'input, InputElement>,
     range: Range<usize>,
+    symbols: String,
 }
 impl<'input, 'definition> ParseStartResult<'input, 'definition> {
     fn to_syntax_tree<'lexer>(
         self,
         lexer: Lexer<'lexer>,
         context: &ParseContext,
-    ) -> (SyntaxTree, Lexer<'lexer>) {
-        let (args, lexer) =
-            self.definition
-                .parse_arguments(lexer, context, &self.match_result, None);
-        let value = (self.definition.value_parser)(&self.match_result);
+    ) -> (SyntaxContainerNode, Lexer<'lexer>) {
+        let (args, lexer) = self
+            .definition
+            .parse_arguments(lexer, context, &self.match_result);
+
+        let mut children = vec![SyntaxNode::Leaf(SyntaxLeafNode {
+            node_type: self.definition.get_symbol_type().into(),
+            range: self.range.clone(),
+            symbols: self.symbols,
+        })];
+        children.extend(args);
 
         assert_eq!(lexer.get_range().start, self.range.start);
         (
-            SyntaxTree {
+            SyntaxContainerNode {
                 name: self.definition.name(),
-                args,
-                value,
+                children,
+                value: vec![],
                 row_index: None,
                 range: lexer.get_range(),
             },
@@ -205,18 +236,22 @@ fn parse_bp_start<'input, 'definition>(
     } else if let Some((definition, match_result)) = context.get_token(token, (false, false)) {
         // Defined symbol
         let range = token.get_range();
+        let symbols = token.get_symbols_as_string();
         Ok(ParseStartResult {
             definition,
             match_result,
             range,
+            symbols,
         })
     } else if let Some((definition, match_result)) = context.get_token(token, (false, true)) {
         // Prefix operator
         let range = token.get_range();
+        let symbols = token.get_symbols_as_string();
         Ok(ParseStartResult {
             definition,
             match_result,
             range,
+            symbols,
         })
     } else {
         Err(ParseError {
