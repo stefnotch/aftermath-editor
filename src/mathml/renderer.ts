@@ -2,7 +2,8 @@ import { ParseResult, SyntaxTree } from "../core";
 import { RenderedElement, RenderResult, Renderer } from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { MathMLRenderResult } from "./renderer/render-result";
-import { SimpleContainerMathMLElement, TextMathMLElement } from "./renderer/rendered-elements";
+import { SimpleContainerMathMLElement } from "./renderer/rendered-elements";
+import { TextMathMLElement } from "./renderer/rendered-text-element";
 
 export class MathMLRenderer implements Renderer<MathMLElement> {
   private readonly renderers: Map<string, (syntaxTree: SyntaxTree) => RenderedElement<MathMLElement>> = new Map();
