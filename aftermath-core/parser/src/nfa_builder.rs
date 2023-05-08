@@ -1,6 +1,6 @@
 use super::{
     grapheme_matcher::GraphemeMatcher,
-    token_matcher::{CapturingGroupId, CapturingGroups, MatchIf, StateFragment, StateId, NFA},
+    token_matcher::{MatchIf, StateFragment, StateId, NFA},
 };
 
 /// A builder for an NFA
@@ -12,7 +12,6 @@ pub enum NFABuilder {
     ZeroOrOne(Box<NFABuilder>),
     ZeroOrMore(Box<NFABuilder>),
     OneOrMore(Box<NFABuilder>),
-    Capture(Box<NFABuilder>, CapturingGroupId),
     Any,
 }
 
@@ -52,30 +51,21 @@ impl NFABuilder {
     pub fn then_character(self, character: GraphemeMatcher) -> NFABuilder {
         self.concat(NFABuilder::match_character(character))
     }
-
-    pub fn capturing_group(self, id: CapturingGroupId) -> NFABuilder {
-        NFABuilder::Capture(Box::new(self), id)
-    }
 }
 
 impl NFABuilder {
     pub fn build(self) -> NFA {
         let mut states = Vec::new();
-        let mut capturing_groups = CapturingGroups::new();
         // A recursive builder is good enough for now
         // TODO: Make this iterative https://blog.moertel.com/posts/2013-05-11-recursive-to-iterative.html
-        let builder_fragment = self.build_nfa(&mut states, &mut capturing_groups);
+        let builder_fragment = self.build_nfa(&mut states);
         let end_state = push_state(&mut states, StateFragment::Final);
         set_end_states(&mut states, builder_fragment.end_states, end_state);
 
-        NFA::new(states, builder_fragment.start_state, capturing_groups)
+        NFA::new(states, builder_fragment.start_state)
     }
 
-    fn build_nfa(
-        self,
-        states: &mut Vec<StateFragment>,
-        capturing_groups: &mut CapturingGroups,
-    ) -> NFABuilderFragment {
+    fn build_nfa(self, states: &mut Vec<StateFragment>) -> NFABuilderFragment {
         match self {
             NFABuilder::Grapheme(character) => {
                 let start_state = push_state(
@@ -95,8 +85,8 @@ impl NFABuilder {
                 }
             }
             NFABuilder::Concat(a, b) => {
-                let a = a.build_nfa(states, capturing_groups);
-                let b = b.build_nfa(states, capturing_groups);
+                let a = a.build_nfa(states);
+                let b = b.build_nfa(states);
 
                 set_end_states(states, a.end_states, b.start_state);
 
@@ -106,8 +96,8 @@ impl NFABuilder {
                 }
             }
             NFABuilder::Or(a, b) => {
-                let a = a.build_nfa(states, capturing_groups);
-                let mut b = b.build_nfa(states, capturing_groups);
+                let a = a.build_nfa(states);
+                let mut b = b.build_nfa(states);
 
                 let start_state =
                     push_state(states, StateFragment::Split(a.start_state, b.start_state));
@@ -120,7 +110,7 @@ impl NFABuilder {
                 }
             }
             NFABuilder::ZeroOrOne(a) => {
-                let a = a.build_nfa(states, capturing_groups);
+                let a = a.build_nfa(states);
 
                 let start_state = push_state(states, StateFragment::Split(a.start_state, 0));
 
@@ -132,7 +122,7 @@ impl NFABuilder {
                 }
             }
             NFABuilder::ZeroOrMore(a) => {
-                let a = a.build_nfa(states, capturing_groups);
+                let a = a.build_nfa(states);
 
                 let start_state = push_state(states, StateFragment::Split(a.start_state, 0));
                 set_end_states(states, a.end_states, start_state);
@@ -144,7 +134,7 @@ impl NFABuilder {
                 }
             }
             NFABuilder::OneOrMore(a) => {
-                let a = a.build_nfa(states, capturing_groups);
+                let a = a.build_nfa(states);
 
                 let loop_state = push_state(states, StateFragment::Split(a.start_state, 0));
                 set_end_states(states, a.end_states, loop_state);
@@ -152,22 +142,6 @@ impl NFABuilder {
                 let end_states = vec![NFABuilderEndState::SplitB(loop_state)];
                 NFABuilderFragment {
                     start_state: a.start_state,
-                    end_states,
-                }
-            }
-            NFABuilder::Capture(a, group_id) => {
-                let a = a.build_nfa(states, capturing_groups);
-                let group_id = capturing_groups.add_group(group_id.clone());
-                let group_start_state = push_state(
-                    states,
-                    StateFragment::CaptureStart(a.start_state, group_id.clone()),
-                );
-                let group_end_state = push_state(states, StateFragment::CaptureEnd(0, group_id));
-                set_end_states(states, a.end_states, group_end_state);
-
-                let end_states = vec![NFABuilderEndState::CaptureEnd(group_end_state)];
-                NFABuilderFragment {
-                    start_state: group_start_state,
                     end_states,
                 }
             }
@@ -207,15 +181,6 @@ fn set_end_states(
                     _ => panic!("Expected a split state"),
                 }
             }
-            NFABuilderEndState::CaptureEnd(state_id) => {
-                let state = &mut states[state_id];
-                match state {
-                    StateFragment::CaptureEnd(next_state, _) => {
-                        *next_state = value;
-                    }
-                    _ => panic!("Expected a capture state"),
-                }
-            }
         }
     }
 }
@@ -228,7 +193,6 @@ struct NFABuilderFragment {
 enum NFABuilderEndState {
     Match(StateId),
     SplitB(StateId),
-    CaptureEnd(StateId),
 }
 
 #[cfg(test)]

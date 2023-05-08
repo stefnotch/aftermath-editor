@@ -18,7 +18,6 @@
 // TODO: Build a DFA
 // TODO: Have fast path (trie) for some things (profile first)
 
-mod capturing_group;
 mod matcher_state;
 
 use std::fmt::{Debug, Formatter};
@@ -26,10 +25,8 @@ use std::fmt::{Debug, Formatter};
 use input_tree::element::InputElement;
 
 use super::grapheme_matcher::GraphemeMatcher;
-use super::token_matcher::matcher_state::{MatchInfo, NFAMatches};
+use super::token_matcher::matcher_state::NFAMatches;
 
-pub(super) use super::token_matcher::capturing_group::CapturingGroupId;
-pub(super) use super::token_matcher::capturing_group::CapturingGroups;
 pub(super) use super::token_matcher::matcher_state::{MatchError, MatchResult};
 
 // TODO: Error prone
@@ -38,7 +35,6 @@ pub type StateId = usize;
 pub struct NFA {
     pub states: Vec<StateFragment>,
     pub start_state: StateId,
-    pub capturing_groups: CapturingGroups,
 }
 
 impl Debug for NFA {
@@ -57,8 +53,6 @@ pub enum StateFragment {
     /// A state that splits into two different states (with epsilon transitions)
     /// TODO: The following invariant might be useful: Only the second state can be a final state.
     Split(StateId, StateId),
-    CaptureStart(StateId, CapturingGroupId),
-    CaptureEnd(StateId, CapturingGroupId),
     /// A final state
     /// TODO: Add some ID to this, so that if we construct an NFA from multiple NFAs, we can still tell which one it is
     Final,
@@ -88,15 +82,10 @@ impl MatchIf {
 }
 
 impl NFA {
-    pub fn new(
-        states: Vec<StateFragment>,
-        start_state: StateId,
-        capturing_groups: CapturingGroups,
-    ) -> Self {
+    pub fn new(states: Vec<StateFragment>, start_state: StateId) -> Self {
         Self {
             states,
             start_state,
-            capturing_groups,
         }
     }
 
@@ -107,12 +96,10 @@ impl NFA {
         let mut current_states = NFAMatches::new(0);
         let mut best_final_states = NFAMatches::new(0);
         {
-            let starting_match_info = MatchInfo::new(self.capturing_groups.count());
             self.add_state(
                 0,
                 &mut current_states,
                 &mut best_final_states,
-                starting_match_info,
                 self.start_state,
             );
         }
@@ -122,7 +109,7 @@ impl NFA {
             let mut next_states = NFAMatches::new(input_length);
             let mut next_final_states = NFAMatches::new(input_length);
 
-            for (state_id, match_info) in current_states {
+            for state_id in current_states {
                 // The invariant here is that we only added MatchIf states
                 let state = self.states.get(state_id).unwrap();
                 match state {
@@ -132,7 +119,6 @@ impl NFA {
                                 index,
                                 &mut next_states,
                                 &mut next_final_states,
-                                match_info.clone(),
                                 *next_state,
                             );
                         }
@@ -142,12 +128,6 @@ impl NFA {
                     }
                     StateFragment::Final => {
                         panic!("Final states should not be in the current_states set")
-                    }
-                    StateFragment::CaptureStart(_, _) => {
-                        panic!("Capture start states should not be in the current_states set")
-                    }
-                    StateFragment::CaptureEnd(_, _) => {
-                        panic!("Capture end states should not be in the current_states set")
                     }
                 }
             }
@@ -166,29 +146,20 @@ impl NFA {
         input_index: usize,
         state_set: &mut NFAMatches,
         final_states: &mut NFAMatches,
-        mut match_info: MatchInfo,
         state: StateId,
     ) {
         match self.states.get(state) {
             Some(StateFragment::Final) => {
-                final_states.add_next_state((state, match_info));
+                final_states.add_next_state(state);
             }
             Some(StateFragment::Match(_, _)) => {
-                state_set.add_next_state((state, match_info));
+                state_set.add_next_state(state);
             }
             Some(StateFragment::Split(a, b)) => {
                 // follow the epsilon transitions
                 // and insert the states they lead to instead of this one
-                self.add_state(input_index, state_set, final_states, match_info.clone(), *a);
-                self.add_state(input_index, state_set, final_states, match_info, *b);
-            }
-            Some(StateFragment::CaptureStart(a, group)) => {
-                match_info.start_capture(group, input_index);
-                self.add_state(input_index, state_set, final_states, match_info, *a);
-            }
-            Some(StateFragment::CaptureEnd(a, group)) => {
-                match_info.end_capture(group, input_index);
-                self.add_state(input_index, state_set, final_states, match_info, *a);
+                self.add_state(input_index, state_set, final_states, *a);
+                self.add_state(input_index, state_set, final_states, *b);
             }
             None => {
                 panic!("State {:?} does not exist", state);

@@ -1,28 +1,23 @@
-use std::{collections::HashMap, ops::RangeInclusive};
+use std::collections::HashSet;
 
-use super::{capturing_group::CapturingGroupId, StateId};
+use super::StateId;
 
 #[derive(Debug, Clone)]
 pub struct NFAMatches {
-    states: HashMap<StateId, MatchInfo>,
+    states: HashSet<StateId>,
     input_length: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct MatchInfo {
-    capture_ranges: Vec<RangeInclusive<usize>>,
 }
 
 impl NFAMatches {
     pub fn new(input_length: usize) -> Self {
         Self {
-            states: HashMap::new(),
+            states: HashSet::new(),
             input_length,
         }
     }
 
-    pub fn add_next_state(&mut self, new_state: (StateId, MatchInfo)) {
-        self.states.insert(new_state.0, new_state.1);
+    pub fn add_next_state(&mut self, new_state: StateId) {
+        self.states.insert(new_state);
     }
 
     pub fn has_matches(&self) -> bool {
@@ -46,8 +41,8 @@ impl NFAMatches {
         } else if self.states.len() > 1 {
             Err(MatchError::MultipleMatches)
         } else {
-            let (_, match_info) = self.states.iter().next().unwrap();
-            Ok(MatchResult::new(input, match_info.capture_ranges.clone()))
+            let _ = self.states.iter().next().unwrap();
+            Ok(MatchResult::new(input))
         }
     }
 }
@@ -55,15 +50,11 @@ impl NFAMatches {
 #[derive(Debug)]
 pub struct MatchResult<'input, Input> {
     input: &'input [Input],
-    capture_ranges: Vec<RangeInclusive<usize>>,
 }
 
 impl<'input, Input> MatchResult<'input, Input> {
-    pub fn new(input: &'input [Input], capture_ranges: Vec<RangeInclusive<usize>>) -> Self {
-        Self {
-            input,
-            capture_ranges,
-        }
+    pub fn new(input: &'input [Input]) -> Self {
+        Self { input }
     }
 
     pub fn get_length(&self) -> usize {
@@ -71,11 +62,6 @@ impl<'input, Input> MatchResult<'input, Input> {
     }
     pub fn get_input(&self) -> &'input [Input] {
         self.input
-    }
-    pub fn get_capture_group(&self, group: &CapturingGroupId) -> Option<&'input [Input]> {
-        self.capture_ranges
-            .get(group.get())
-            .map(|range| &self.input[range.clone()])
     }
 }
 
@@ -85,27 +71,9 @@ pub enum MatchError {
     MultipleMatches,
 }
 
-impl MatchInfo {
-    pub fn new(capture_group_count: usize) -> Self {
-        Self {
-            // empty ranges
-            capture_ranges: vec![1..=0; capture_group_count],
-        }
-    }
-
-    pub fn start_capture(&mut self, group: &CapturingGroupId, index: usize) {
-        self.capture_ranges[group.get()] = index..=index;
-    }
-
-    pub fn end_capture(&mut self, group: &CapturingGroupId, index: usize) {
-        let range = self.capture_ranges[group.get()].clone();
-        self.capture_ranges[group.get()] = *(range.start())..=index;
-    }
-}
-
 impl IntoIterator for NFAMatches {
-    type Item = (StateId, MatchInfo);
-    type IntoIter = std::collections::hash_map::IntoIter<StateId, MatchInfo>;
+    type Item = StateId;
+    type IntoIter = std::collections::hash_set::IntoIter<StateId>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.states.into_iter()

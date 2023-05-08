@@ -276,7 +276,7 @@ impl TokenMatcher {
                     | (ContainerType::Sup, InputElement::Sup(_))
                     | (ContainerType::Sub, InputElement::Sub(_))
                     | (ContainerType::Table, InputElement::Table { .. }) => {
-                        Ok(MatchResult::new(&input[0..1], vec![]))
+                        Ok(MatchResult::new(&input[0..1]))
                     }
                     _ => Err(MatchError::NoMatch),
                 }
