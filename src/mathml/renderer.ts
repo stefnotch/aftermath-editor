@@ -1,4 +1,4 @@
-import { ParseResult, SyntaxTree } from "../core";
+import { ParseResult, SyntaxContainerNode, SyntaxNode } from "../core";
 import { RenderedElement, RenderResult, Renderer } from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { MathMLRenderResult } from "./renderer/render-result";
@@ -6,22 +6,22 @@ import { SimpleContainerMathMLElement } from "./renderer/rendered-elements";
 import { TextMathMLElement } from "./renderer/rendered-text-element";
 
 export class MathMLRenderer implements Renderer<MathMLElement> {
-  private readonly renderers: Map<string, (syntaxTree: SyntaxTree) => RenderedElement<MathMLElement>> = new Map();
+  private readonly renderers: Map<string, (syntaxTree: SyntaxContainerNode) => RenderedElement<MathMLElement>> = new Map();
 
   constructor() {
-    this.addRenderer("Variable", (syntaxTree: SyntaxTree) => {
+    this.addRenderer("Variable", (syntaxTree: SyntaxContainerNode) => {
       return new TextMathMLElement(syntaxTree, "mi");
     });
-    this.addRenderer("Number", (syntaxTree: SyntaxTree) => {
+    this.addRenderer("Number", (syntaxTree: SyntaxContainerNode) => {
       return new TextMathMLElement(syntaxTree, "mn");
     });
-    this.addRenderer("String", (syntaxTree: SyntaxTree) => {
+    this.addRenderer("String", (syntaxTree: SyntaxContainerNode) => {
       return new TextMathMLElement(syntaxTree, "mtext");
     });
     // TODO: all the others
   }
 
-  private addRenderer(name: string, renderer: (syntaxTree: SyntaxTree) => RenderedElement<MathMLElement>): void {
+  private addRenderer(name: string, renderer: (syntaxTree: SyntaxContainerNode) => RenderedElement<MathMLElement>): void {
     assert(!this.renderers.has(name), `Renderer for ${name} already exists`);
     this.renderers.set(name, renderer);
   }
@@ -30,19 +30,17 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
     return syntaxTreeNames.every((name) => this.renderers.has(name));
   }
 
-  render(parsed: ParseResult): RenderResult<MathMLElement> {
+  renderAll(parsed: ParseResult): RenderResult<MathMLElement> {
     // TODO: Rendering errors is like rendering non-semantic annotations
-    const element = this.renderSyntaxTree(parsed.value);
+    const element = this.render(parsed.value);
     return new MathMLRenderResult(element, parsed);
   }
 
-  private renderSyntaxTree(syntaxTree: SyntaxTree): RenderedElement<MathMLElement> {
+  render(syntaxTree: SyntaxContainerNode): RenderedElement<MathMLElement> {
     const renderer = this.renderers.get(syntaxTree.name);
     assert(renderer, `No renderer for "${syntaxTree.name}"`);
 
     const element = renderer(syntaxTree);
-    element.setChildren(syntaxTree.args.map((child) => this.renderSyntaxTree(child)));
-
     return element;
   }
 }

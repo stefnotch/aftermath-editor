@@ -1,24 +1,21 @@
-use super::SyntaxNode;
+use super::{SyntaxContainerNode, SyntaxNode};
 
 // TODO: Move to Typescript side
 pub struct AstTransformer {
     transformations: Vec<AstTransformation>,
 }
 impl AstTransformer {
-    pub fn transform(&self, mut parse_result: SyntaxNode) -> SyntaxNode {
+    pub fn transform(&self, mut parse_result: SyntaxContainerNode) -> SyntaxContainerNode {
         // TODO: Rewrite this to be iterative
 
-        parse_result = match parse_result {
-            SyntaxNode::Container(mut node) => {
-                node.children = node
-                    .children
-                    .into_iter()
-                    .map(|child| self.transform(child))
-                    .collect();
-                SyntaxNode::Container(node)
-            }
-            node => node,
-        };
+        parse_result.children = parse_result
+            .children
+            .into_iter()
+            .map(|child| match child {
+                SyntaxNode::Container(node) => SyntaxNode::Container(self.transform(node)),
+                node => node,
+            })
+            .collect();
 
         for transformation in self.transformations.iter() {
             parse_result = (transformation.transform)(parse_result);
@@ -31,8 +28,8 @@ impl AstTransformer {
         Self {
             // Default hardcoded tuple flattening transformation
             transformations: vec![AstTransformation {
-                transform: |v: SyntaxNode| match v {
-                    SyntaxNode::Container(mut node) if node.name == "Tuple" => {
+                transform: |mut node: SyntaxContainerNode| {
+                    if node.name == "Tuple" {
                         node.children = node
                             .children
                             .into_iter()
@@ -43,9 +40,8 @@ impl AstTransformer {
                                 inner_node => vec![inner_node].into_iter(),
                             })
                             .collect();
-                        SyntaxNode::Container(node)
                     }
-                    node => node,
+                    node
                 },
             }],
         }
@@ -53,5 +49,5 @@ impl AstTransformer {
 }
 
 pub struct AstTransformation {
-    transform: fn(SyntaxNode) -> SyntaxNode,
+    transform: fn(SyntaxContainerNode) -> SyntaxContainerNode,
 }

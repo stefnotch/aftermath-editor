@@ -413,7 +413,7 @@ impl TokenArgumentParser {
                     panic!("expected closing bracket");
                 }
                 let range = lexer.get_range();
-                let symbols = lexer.get_symbols_as_string();
+                let symbols = lexer.get_symbols();
                 let lexer = lexer.end_token().unwrap();
                 let argument = SyntaxLeafNode {
                     node_type: symbol_type.clone(),
@@ -543,7 +543,7 @@ impl TokenDefinition {
                 SyntaxNode::Leaf(SyntaxLeafNode {
                     node_type: LeafNodeType::Symbol,
                     range: 0..0,
-                    symbols: "".into(),
+                    symbols: vec![],
                 })
             })
             .take(self.argument_count)

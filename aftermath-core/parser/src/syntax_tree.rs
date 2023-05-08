@@ -53,8 +53,8 @@ pub struct SyntaxLeafNode {
     /// The range of this in the input tree row.
     /// The range can be empty.
     pub range: Range<usize>,
-    /// The symbols that make up this node, joined into one string.
-    pub symbols: String,
+    /// The symbols that make up this node, stored as a list of grapheme clusters.
+    pub symbols: Vec<String>,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, Clone)]
@@ -103,11 +103,13 @@ impl fmt::Display for SyntaxLeafNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "\"")?;
         // Print string, escaping quotes
-        for c in self.symbols.chars() {
-            match c {
-                '"' => write!(f, "\\\"")?,
-                '\\' => write!(f, "\\\\")?,
-                _ => write!(f, "{}", c)?,
+        for grapheme in &self.symbols {
+            for c in grapheme.chars() {
+                match c {
+                    '"' => write!(f, "\\\"")?,
+                    '\\' => write!(f, "\\\\")?,
+                    _ => write!(f, "{}", c)?,
+                }
             }
         }
         write!(f, "\"")

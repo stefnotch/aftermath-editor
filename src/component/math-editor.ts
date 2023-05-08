@@ -194,7 +194,7 @@ export class MathEditor extends HTMLElement {
       errors: [],
       value: {
         name: "Nothing",
-        args: [],
+        children: [],
         value: [],
         range: { start: 0, end: 0 },
       },

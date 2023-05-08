@@ -64,12 +64,12 @@ impl<'input> Lexer<'input> {
         self.index >= self.values.len()
     }
 
-    pub fn get_symbols_as_string(&self) -> String {
+    pub fn get_symbols(&self) -> Vec<String> {
         let range = self.get_range();
-        let mut result = String::new();
+        let mut result = Vec::new();
         for element in &self.values[range] {
             match element {
-                InputNode::Symbol(s) => result.push_str(s),
+                InputNode::Symbol(s) => result.push(s.to_string()),
                 _ => (),
             }
         }

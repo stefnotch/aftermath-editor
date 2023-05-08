@@ -1,4 +1,4 @@
-import { ParseResult, SyntaxTree } from "../core";
+import { ParseResult, SyntaxContainerNode } from "../core";
 import { Offset } from "../math-layout/math-layout-offset";
 import { MathLayoutPosition } from "../math-layout/math-layout-position";
 import { RowIndices } from "../math-layout/math-layout-zipper";
@@ -7,7 +7,9 @@ import { ViewportCoordinate, ViewportValue } from "./viewport-coordinate";
 export interface Renderer<T> {
   canRender(syntaxTreeNames: string[]): boolean;
 
-  render(parsed: ParseResult): RenderResult<T>;
+  renderAll(parsed: ParseResult): RenderResult<T>;
+
+  render(syntaxTree: SyntaxContainerNode): RenderedElement<T>;
 }
 
 /**
@@ -37,21 +39,21 @@ export interface RenderResult<T> {
 
 /**
  * A virtual DOM element.
- * Every element in the syntax tree has to be rendered, and has exactly one RenderedElement<T> associated with it.
+ * Every container element in the syntax tree has to be rendered, and has exactly one RenderedElement<T> associated with it.
+ *
+ * The containers are responsible for rendering their children.
  */
 export interface RenderedElement<T> {
   getViewportPosition(offset: Offset): RenderedPosition;
   /**
    * It's easier to walk down the render results if they know their syntax tree element.
    */
-  syntaxTree: SyntaxTree;
+  syntaxTree: SyntaxContainerNode;
 
   /**
    * The actual underlying DOM nodes
    */
   getElements(): T[];
-
-  setChildren(children: RenderedElement<T>[]): void;
 
   getChildren(): RenderedElement<T>[];
 }

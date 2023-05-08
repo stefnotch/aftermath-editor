@@ -65,17 +65,31 @@ type CoreElement =
   | { Symbol: string };
 
 export type ParseResult = {
-  value: SyntaxTree;
+  value: SyntaxContainerNode;
   errors: ParseError[];
 };
 
 // TODO:
-export type SyntaxTree = {
+export type SyntaxNode =
+  | {
+      Container: SyntaxContainerNode;
+    }
+  | {
+      Leaf: SyntaxLeafNode;
+    };
+
+export type SyntaxContainerNode = {
   name: string;
-  args: SyntaxTree[];
+  children: SyntaxNode[];
   row_index?: any;
   value: any;
   range: any;
+};
+
+export type SyntaxLeafNode = {
+  node_type: any;
+  range: any;
+  symbols: string[];
 };
 
 // TODO:

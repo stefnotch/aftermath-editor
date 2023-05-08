@@ -11,10 +11,7 @@ use std::ops::Range;
 
 use input_tree::{input_node::InputNode, row::InputRow};
 
-use crate::{
-    lexer::Lexer,
-    syntax_tree::{SyntaxContainerNode, SyntaxLeafNode},
-};
+use crate::lexer::Lexer;
 
 use self::{
     parse_context::{ParseContext, TokenDefinition},
@@ -22,9 +19,9 @@ use self::{
 };
 
 pub use self::parse_result::{ParseError, ParseErrorType, ParseResult};
-pub use self::syntax_tree::SyntaxNode;
+pub use self::syntax_tree::{SyntaxContainerNode, SyntaxLeafNode, SyntaxNode};
 
-pub fn parse(input: &InputRow, context: &ParseContext) -> ParseResult<SyntaxNode> {
+pub fn parse(input: &InputRow, context: &ParseContext) -> ParseResult<SyntaxContainerNode> {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     // we have a LL(1) pratt parser, aka we can look one token ahead
     let lexer = Lexer::new(&input.values);
@@ -38,7 +35,7 @@ pub fn parse(input: &InputRow, context: &ParseContext) -> ParseResult<SyntaxNode
     assert!(lexer.eof(), "lexer not at end");
 
     ParseResult {
-        value: SyntaxNode::Container(parse_result),
+        value: parse_result,
         errors: Vec::new(),
     }
 }
@@ -99,7 +96,7 @@ impl<'a> ParseContext<'a> {
                         break;
                     }
                     let operator_range = operator.get_range();
-                    let operator_symbols = operator.get_symbols_as_string();
+                    let operator_symbols = operator.get_symbols();
                     // Actually consume the operator
                     lexer = operator.end_token().unwrap();
 
@@ -145,7 +142,7 @@ impl<'a> ParseContext<'a> {
                     break;
                 }
                 let operator_range = operator.get_range();
-                let operator_symbols = operator.get_symbols_as_string();
+                let operator_symbols = operator.get_symbols();
 
                 // Actually consume the operator
                 lexer = operator.end_token().unwrap();
@@ -204,7 +201,7 @@ struct ParseStartResult<'input, 'definition> {
     definition: &'definition TokenDefinition,
     match_result: MatchResult<'input, InputNode>,
     range: Range<usize>,
-    symbols: String,
+    symbols: Vec<String>,
 }
 impl<'input, 'definition> ParseStartResult<'input, 'definition> {
     fn to_syntax_tree<'lexer>(
@@ -251,7 +248,7 @@ fn parse_bp_start<'input, 'definition>(
     } else if let Some((definition, match_result)) = context.get_token(token, (false, false)) {
         // Defined symbol
         let range = token.get_range();
-        let symbols = token.get_symbols_as_string();
+        let symbols = token.get_symbols();
         Ok(ParseStartResult {
             definition,
             match_result,
@@ -261,7 +258,7 @@ fn parse_bp_start<'input, 'definition>(
     } else if let Some((definition, match_result)) = context.get_token(token, (false, true)) {
         // Prefix operator
         let range = token.get_range();
-        let symbols = token.get_symbols_as_string();
+        let symbols = token.get_symbols();
         Ok(ParseStartResult {
             definition,
             match_result,

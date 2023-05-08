@@ -1,4 +1,4 @@
-import { SyntaxTree } from "../../core";
+import { SyntaxContainerNode } from "../../core";
 import { Offset } from "../../math-layout/math-layout-offset";
 import { RenderedElement, RenderedPosition } from "../../rendering/render-result";
 import { ViewportValue } from "../../rendering/viewport-coordinate";
@@ -10,13 +10,15 @@ export class TextMathMLElement implements RenderedElement<MathMLElement> {
   private static utf8Decoder = new TextDecoder("utf-8");
 
   element: MathMLElement;
-  private textElement: Text;
+  private textElements: Text[];
   private baselineReaderElement: MathMLElement;
 
-  constructor(public syntaxTree: SyntaxTree, elementName: MathMLTags) {
+  constructor(public syntaxTree: SyntaxContainerNode, elementName: MathMLTags) {
     this.baselineReaderElement = createMathElement("mphantom", []);
     // TODO: syntaxTree.value is no longer correct
-    this.textElement = document.createTextNode(TextMathMLElement.utf8Decoder.decode(syntaxTree.value)) ?? createPlaceholder();
+    this.textElements = syntaxTree.children[0].document.createTextNode(
+      TextMathMLElement.utf8Decoder.decode(syntaxTree.value)
+    ) ?? [createPlaceholder()];
     this.element = createMathElement(elementName, [this.baselineReaderElement, this.textElement]);
   }
   getViewportPosition(offset: Offset): RenderedPosition {
@@ -25,11 +27,13 @@ export class TextMathMLElement implements RenderedElement<MathMLElement> {
     const caretSize = getFontSize(this.element);
 
     const graphemeOffset = offset - this.syntaxTree.range.start;
-    // TODO: Go from grapheme offset to character offset
-    const { x } = getTextLayout(this.textElement, graphemeOffset);
+    const atEnd = graphemeOffset >= this.textElements.length;
+    const graphemeBounds = getTextBoundingBox(
+      atEnd ? this.textElements[this.textElements.length - 1] : this.textElements[graphemeOffset]
+    );
 
     return {
-      position: { x: x, y: baseline },
+      position: { x: graphemeBounds.x + (atEnd ? graphemeBounds.width : 0), y: baseline },
       height: caretSize * 0.8,
       depth: caretSize * 0.2,
     };
@@ -74,4 +78,13 @@ function getTextLayout(t: Text, index: number) {
     y: boundingBox.bottom,
     height: boundingBox.height,
   };
+}
+
+/**
+ * @returns The bounding box of the text.
+ */
+function getTextBoundingBox(t: Text) {
+  const range = document.createRange();
+  range.selectNode(t);
+  return range.getBoundingClientRect();
 }
