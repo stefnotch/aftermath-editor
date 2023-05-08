@@ -4,7 +4,7 @@ use super::row::InputRow;
 
 /// A container element which can contain rows
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum InputElement {
+pub enum InputNode {
     // containers
     /// A fraction, like $\frac{1}{2}$
     Fraction([InputRow; 2]),
@@ -32,16 +32,16 @@ pub enum InputElement {
     Symbol(String),
 }
 
-impl InputElement {
+impl InputNode {
     pub fn rows<'a>(&'a self) -> &'a [InputRow] {
         match self {
-            InputElement::Fraction(v)
-            | InputElement::Root(v)
-            | InputElement::Under(v)
-            | InputElement::Over(v) => v,
-            InputElement::Sup(v) | InputElement::Sub(v) => std::slice::from_ref(v),
-            InputElement::Table { cells, .. } => cells,
-            InputElement::Symbol(_) => &[],
+            InputNode::Fraction(v)
+            | InputNode::Root(v)
+            | InputNode::Under(v)
+            | InputNode::Over(v) => v,
+            InputNode::Sup(v) | InputNode::Sub(v) => std::slice::from_ref(v),
+            InputNode::Table { cells, .. } => cells,
+            InputNode::Symbol(_) => &[],
         }
     }
 }

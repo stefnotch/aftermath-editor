@@ -13,7 +13,7 @@ mod matcher_state;
 
 use std::fmt::{Debug, Formatter};
 
-use input_tree::element::InputElement;
+use input_tree::input_node::InputNode;
 
 use super::grapheme_matcher::GraphemeMatcher;
 use super::token_matcher::matcher_state::NFAMatches;
@@ -56,16 +56,16 @@ pub enum MatchIf {
 }
 
 impl MatchIf {
-    fn matches_all(matcher: &NFA, values: &[InputElement]) -> bool {
+    fn matches_all(matcher: &NFA, values: &[InputNode]) -> bool {
         match matcher.matches(values) {
             Ok(result) => result.get_length() == values.len(),
             Err(_) => false,
         }
     }
 
-    fn matches(&self, value: &InputElement) -> bool {
+    fn matches(&self, value: &InputNode) -> bool {
         match (self, value) {
-            (MatchIf::GraphemeCluster(matcher), InputElement::Symbol(a)) => matcher.matches(a),
+            (MatchIf::GraphemeCluster(matcher), InputNode::Symbol(a)) => matcher.matches(a),
             (MatchIf::Any, _) => true,
             (_, _) => false,
         }
@@ -82,8 +82,8 @@ impl NFA {
 
     pub fn matches<'input>(
         &self,
-        input: &'input [InputElement],
-    ) -> Result<MatchResult<'input, InputElement>, MatchError> {
+        input: &'input [InputNode],
+    ) -> Result<MatchResult<'input, InputNode>, MatchError> {
         let mut current_states = NFAMatches::new(0);
         let mut best_final_states = NFAMatches::new(0);
         {
@@ -171,9 +171,9 @@ mod tests {
             .build();
         assert_eq!(
             nfa.matches(&[
-                InputElement::Symbol("a".into()),
-                InputElement::Symbol("0".into()),
-                InputElement::Symbol("0".into())
+                InputNode::Symbol("a".into()),
+                InputNode::Symbol("0".into()),
+                InputNode::Symbol("0".into())
             ])
             .map(|x| x.get_length()),
             Ok(2)
@@ -188,11 +188,11 @@ mod tests {
             .build();
         assert_eq!(
             nfa.matches(&[
-                InputElement::Symbol("9".into()),
-                InputElement::Symbol("3".into()),
-                InputElement::Symbol("0".into()),
-                InputElement::Symbol("a".into()),
-                InputElement::Symbol("a".into())
+                InputNode::Symbol("9".into()),
+                InputNode::Symbol("3".into()),
+                InputNode::Symbol("0".into()),
+                InputNode::Symbol("a".into()),
+                InputNode::Symbol("a".into())
             ])
             .map(|x| x.get_length()),
             Ok(4)
@@ -209,11 +209,11 @@ mod tests {
             .build();
         assert_eq!(
             nfa.matches(&[
-                InputElement::Symbol("b".into()),
-                InputElement::Symbol("b".into()),
-                InputElement::Symbol("b".into()),
-                InputElement::Symbol("2".into()),
-                InputElement::Symbol("0".into())
+                InputNode::Symbol("b".into()),
+                InputNode::Symbol("b".into()),
+                InputNode::Symbol("b".into()),
+                InputNode::Symbol("2".into()),
+                InputNode::Symbol("0".into())
             ])
             .map(|x| x.get_length()),
             Ok(4)

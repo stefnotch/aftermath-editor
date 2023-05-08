@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use input_tree::{element::InputElement, row::RowIndex};
+use input_tree::{input_node::InputNode, row::RowIndex};
 
 use crate::{
     grapheme_matcher::GraphemeMatcher,
@@ -49,7 +49,7 @@ impl<'a> ParseContext<'a> {
         &self,
         token: &mut Lexer<'input>,
         bp_pattern: BindingPowerPattern,
-    ) -> Option<(&TokenDefinition, MatchResult<'input, InputElement>)> {
+    ) -> Option<(&TokenDefinition, MatchResult<'input, InputNode>)> {
         let matches: Vec<_> = self
             .known_tokens
             .get(&bp_pattern)?
@@ -76,7 +76,7 @@ impl<'a> ParseContext<'a> {
         &self,
         lexer: &mut Lexer<'input>,
         symbol: &NFA,
-    ) -> Option<MatchResult<'input, InputElement>> {
+    ) -> Option<MatchResult<'input, InputNode>> {
         let match_result = symbol.matches(lexer.get_slice()).ok()?;
         lexer.consume_n(match_result.get_length());
         Some(match_result)
@@ -200,6 +200,10 @@ impl<'a> ParseContext<'a> {
                     TokenMatcher::Container(ContainerType::Fraction),
                     TokenDefinition::new("Fraction".into(), (None, None)).with_is_container(),
                 ),
+                (
+                    TokenMatcher::Container(ContainerType::Root),
+                    TokenDefinition::new("Root".into(), (None, None)).with_is_container(),
+                ),
                 // TODO: The dx at the end of an integral might not even be a closing bracket.
                 // After all, it can also sometimes appear inside an integral.
 
@@ -262,20 +266,20 @@ pub enum TokenMatcher {
 impl TokenMatcher {
     fn matches<'input>(
         &self,
-        input: &'input [InputElement],
-    ) -> Result<MatchResult<'input, InputElement>, MatchError> {
+        input: &'input [InputNode],
+    ) -> Result<MatchResult<'input, InputNode>, MatchError> {
         match self {
             TokenMatcher::Pattern(pattern) => pattern.matches(input),
             TokenMatcher::Container(container_type) => {
                 let token = input.get(0).ok_or(MatchError::NoMatch)?;
                 match (container_type, token) {
-                    (ContainerType::Fraction, InputElement::Fraction(_))
-                    | (ContainerType::Root, InputElement::Root(_))
-                    | (ContainerType::Under, InputElement::Under(_))
-                    | (ContainerType::Over, InputElement::Over(_))
-                    | (ContainerType::Sup, InputElement::Sup(_))
-                    | (ContainerType::Sub, InputElement::Sub(_))
-                    | (ContainerType::Table, InputElement::Table { .. }) => {
+                    (ContainerType::Fraction, InputNode::Fraction(_))
+                    | (ContainerType::Root, InputNode::Root(_))
+                    | (ContainerType::Under, InputNode::Under(_))
+                    | (ContainerType::Over, InputNode::Over(_))
+                    | (ContainerType::Sup, InputNode::Sup(_))
+                    | (ContainerType::Sub, InputNode::Sub(_))
+                    | (ContainerType::Table, InputNode::Table { .. }) => {
                         Ok(MatchResult::new(&input[0..1]))
                     }
                     _ => Err(MatchError::NoMatch),
@@ -326,10 +330,10 @@ impl From<&TokenIdentifier> for String {
 #[derive(Debug)]
 pub struct TokenDefinition {
     pub name: TokenIdentifier,
-    /// a constant has no binding power
-    /// a prefix operator has a binding power on the right
-    /// a postfix operator has a binding power on the left
-    /// an infix operator has a binding power on the left and on the right
+    /// (None, None) is a constant
+    /// (None, Some) is a prefix operator
+    /// (Some, None) is a postfix operator
+    /// (Some, Some) is an infix operator
     pub binding_power: (Option<u32>, Option<u32>),
     // Not the most elegant design, but hey
     is_container: bool,
@@ -345,7 +349,6 @@ pub enum TokenArgumentParser {
     // - nothing for tokens
     // - stuff in brackets for brackets, and then the closing bracket
     // - bottom part of lim
-    // - infix and postfix operators using the previous token
 
     // Does not parse
     // - sup and sub that come after a sum, because those are postfix operators
@@ -436,12 +439,12 @@ impl TokenDefinition {
                 argument_index: 0,
             }],
             // prefix
-            (Some(_), None) => vec![],
-            // postfix
             (None, Some(minimum_binding_power)) => vec![TokenArgumentParser::ParseNext {
                 minimum_binding_power,
                 argument_index: 0,
             }],
+            // postfix
+            (Some(_), None) => vec![],
             // symbol
             (None, None) => vec![],
         };
@@ -507,11 +510,11 @@ impl TokenDefinition {
         &self,
         mut lexer: Lexer<'lexer>,
         context: &ParseContext,
-        token_match_results: &MatchResult<'input, InputElement>,
+        token_match_results: &MatchResult<'input, InputNode>,
     ) -> (Vec<SyntaxNode>, Lexer<'lexer>) {
         if self.is_container {
             let token = match token_match_results.get_input() {
-                [InputElement::Symbol(_)] => panic!("expected container token"),
+                [InputNode::Symbol(_)] => panic!("expected container token"),
                 [token] => token,
                 _ => panic!("expected single token"),
             };

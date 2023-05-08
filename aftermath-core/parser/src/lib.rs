@@ -9,7 +9,7 @@ mod token_matcher;
 
 use std::ops::Range;
 
-use input_tree::{element::InputElement, row::InputRow};
+use input_tree::{input_node::InputNode, row::InputRow};
 
 use crate::{
     lexer::Lexer,
@@ -155,13 +155,15 @@ impl<'a> ParseContext<'a> {
                 let args;
                 (args, lexer) = definition.parse_arguments(lexer, self, &match_result);
 
-                let mut children = vec![SyntaxNode::Container(left)];
+                let mut children = vec![
+                    SyntaxNode::Container(left),
+                    SyntaxNode::Leaf(SyntaxLeafNode {
+                        node_type: definition.get_symbol_type().into(),
+                        range: operator_range,
+                        symbols: operator_symbols,
+                    }),
+                ];
                 children.extend(args);
-                children.push(SyntaxNode::Leaf(SyntaxLeafNode {
-                    node_type: definition.get_symbol_type().into(),
-                    range: operator_range,
-                    symbols: operator_symbols,
-                }));
 
                 let range = combine_ranges(&left_range, &lexer.get_range());
 
@@ -200,7 +202,7 @@ fn combine_ranges(range_1: &Range<usize>, range_2: &Range<usize>) -> Range<usize
 #[derive(Debug)]
 struct ParseStartResult<'input, 'definition> {
     definition: &'definition TokenDefinition,
-    match_result: MatchResult<'input, InputElement>,
+    match_result: MatchResult<'input, InputNode>,
     range: Range<usize>,
     symbols: String,
 }
@@ -270,7 +272,7 @@ fn parse_bp_start<'input, 'definition>(
         Err(ParseError {
             error: ParseErrorType::UnexpectedToken,
             // TODO: Better range for error reporting
-            range: token.get_range(),
+            range: token.get_range().start..token.get_range().start + 1,
         })
     }
 }

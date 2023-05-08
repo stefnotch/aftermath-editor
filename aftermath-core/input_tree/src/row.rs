@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::element::InputElement;
+use super::input_node::InputNode;
 
 /// A simple representation of what a math formula looks like.
 /// Optimized for editing, purposefully does not assign meaning to most characters.
@@ -13,11 +13,11 @@ use super::element::InputElement;
 /// - The parent-child order is always Row -> Element -> Row -> Element -> ....
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InputRow {
-    pub values: Vec<InputElement>,
+    pub values: Vec<InputNode>,
 }
 
 impl InputRow {
-    pub fn new(values: Vec<InputElement>) -> Self {
+    pub fn new(values: Vec<InputNode>) -> Self {
         InputRow { values }
     }
 }

@@ -1,18 +1,18 @@
 use std::ops::Range;
 
-use input_tree::element::InputElement;
+use input_tree::input_node::InputNode;
 
 // TODO: I bet there's a better design for this
 /// A lexer that can be nested
 pub struct Lexer<'input> {
     parent: Option<Box<Lexer<'input>>>,
-    values: &'input [InputElement],
+    values: &'input [InputNode],
     /// the index of the *next* element to be consumed
     index: usize,
 }
 
 impl<'input> Lexer<'input> {
-    pub fn new(row: &[InputElement]) -> Lexer {
+    pub fn new(row: &[InputNode]) -> Lexer {
         Lexer {
             parent: None,
             values: row,
@@ -56,7 +56,7 @@ impl<'input> Lexer<'input> {
     }
 
     /// Gets a slice with all the *next* elements
-    pub fn get_slice(&self) -> &'input [InputElement] {
+    pub fn get_slice(&self) -> &'input [InputNode] {
         &self.values[self.index..]
     }
 
@@ -69,8 +69,8 @@ impl<'input> Lexer<'input> {
         let mut result = String::new();
         for element in &self.values[range] {
             match element {
-                InputElement::Symbol(s) => result.push_str(s),
-                _ => panic!("expected symbol"),
+                InputNode::Symbol(s) => result.push_str(s),
+                _ => (),
             }
         }
         result
@@ -80,15 +80,15 @@ impl<'input> Lexer<'input> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use input_tree::{element::InputElement, row::InputRow};
+    use input_tree::{input_node::InputNode, row::InputRow};
 
     #[test]
     fn test_lexer() {
         let layout = InputRow::new(vec![
-            InputElement::Symbol("a".to_string()),
-            InputElement::Fraction([
-                InputRow::new(vec![InputElement::Symbol("b".to_string())]),
-                InputRow::new(vec![InputElement::Symbol("c".to_string())]),
+            InputNode::Symbol("a".to_string()),
+            InputNode::Fraction([
+                InputRow::new(vec![InputNode::Symbol("b".to_string())]),
+                InputRow::new(vec![InputNode::Symbol("c".to_string())]),
             ]),
         ]);
 
@@ -96,15 +96,15 @@ mod tests {
         let mut token = lexer.begin_token();
         assert_eq!(
             token.get_slice().get(0),
-            Some(&InputElement::Symbol("a".to_string()))
+            Some(&InputNode::Symbol("a".to_string()))
         );
         token.consume_n(1);
         lexer = token.end_token().unwrap();
         assert_eq!(
             lexer.get_slice().get(0),
-            Some(&InputElement::Fraction([
-                InputRow::new(vec![InputElement::Symbol("b".to_string())]),
-                InputRow::new(vec![InputElement::Symbol("c".to_string())]),
+            Some(&InputNode::Fraction([
+                InputRow::new(vec![InputNode::Symbol("b".to_string())]),
+                InputRow::new(vec![InputNode::Symbol("c".to_string())]),
             ]))
         );
         lexer.consume_n(1);
