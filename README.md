@@ -27,18 +27,25 @@ The editor is built on top of [MathML Core](https://developer.mozilla.org/en-US/
 
 This is an ideal choice for an editor, since MathML gives us a standardized representation, fast and browser-native rendering and importantly accessibility.
 
-The editor uses a simple tree data structure that is similar to MathML, but is more suited for _editing_ formulas. Then, that tree is parsed into an abstract syntax tree, which has all the semantics. This is then used to render the formula as MathML.
+The editor web component has a few parts under the hood.
+
+First, it uses a simple tree data structure for the user input. That input tree is somewhat similar to MathML, but is more suited for _editing_ formulas. Keyboard and mouse input events are then used to modify the tree.
+
+Then, that input tree is parsed into an concrete syntax tree, which has all the semantics. The concrete syntax tree can then optionally get transformed, which lets one implement difficult parsing rules.
+
+Finally, the concrete syntax tree is used to render the formula as MathML.
+
+More info can be found in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Features
 
 <!-- Links to examples go here -->
 
+- [Planned features](https://github.com/users/stefnotch/projects/1/views/1)
 - Fractions
 - Matrices
 - ...
 
-
 ## Differences between this and ...?
 
 - MathLive is a WYSIWYG LaTeX math editor, and as such, [prioritizes handling any technically valid LaTeX](https://github.com/arnog/mathlive/issues/1846#issuecomment-1442619914). This editor however only tries to handle valid, meaningful mathematics.
-

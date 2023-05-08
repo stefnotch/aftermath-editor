@@ -6,7 +6,9 @@
 - Add a custom written Regex engine
 - Add a custom written Pratt parser
   - Hopefully will be replaced by chumsky
-  - Outputs semantic information, including ranges for where the info applies
+  - Outputs a concrete syntax tree
+- Rewrite renderer to use the concrete syntax tree
+- Improve the documentation
 
 # v0.0.7
 

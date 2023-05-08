@@ -1,15 +1,5 @@
-## Developer info
 
-Check out the roadmap https://github.com/users/stefnotch/projects/1/views/1
-
-- `src/components/math-editor.ts` contains a web component for the mathematical editor
-- `src/math-layout` contains all the code for the representation of what a math formula _looks_ like
-- `src/math-editor` is a WIP
-- `src/math-editor` is a WIP
-
-- `aftermath-core` contains a Rust package that has to be built and then gets imported by the rest of the code
-
-### Trees
+#### Trees
 
 Similar to https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/syntax.md#design-goals
 
@@ -32,18 +22,6 @@ Sources:
 - Semantics: computed/parsed, keeps references to the layout ranges
 - Layout: core, for editing, user-input
 - Cosmetics: like colors or text annotations
-
-```mermaid
-flowchart TD
-D[Display]
-S[Semantics]
-L[Layout]
-C[Cosmetics]
-
-L -->|parsed into| S
-S -->|render ranges| D
-C -->|rendered| D
-```
 
 ### Type Theory
 
