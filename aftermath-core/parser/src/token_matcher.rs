@@ -1,21 +1,12 @@
 // TODO:
-// - exact matches (sin, lim sup, etc.)
-// - ignore (like the bottom part of lim)
-// - regex-like matching (like /\d+(\.\d+)?/)
-//   - numbers
-//   - hex numbers
-//   - unknown identifier
-//   - disambiguation like this https://github.com/maciejhirsz/logos#token-disambiguation
 // - "text in quotes but not with escaped \" quotes"
 //    - parser's job: As in, the lexer will recognise the starting quote,
 //      and then the parser will create a new parsing context for the string, which
 //      encodes all those letter rules. The lexer there won't do anything special.
-// - unicode properties (e.g. "greek letter") https://unicode.org/reports/tr18/#examples_of_properties
 
 // See https://swtch.com/~rsc/regexp/regexp1.html
 // https://swtch.com/~rsc/regexp/regexp2.html
 // https://swtch.com/~rsc/regexp/regexp3.html
-// TODO: Build a DFA
 // TODO: Have fast path (trie) for some things (profile first)
 
 mod matcher_state;

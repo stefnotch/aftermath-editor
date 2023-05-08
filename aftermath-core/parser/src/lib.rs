@@ -55,6 +55,19 @@ impl<'a> ParseContext<'a> {
             minimum_bp
         );
 
+        if lexer.eof() {
+            return (
+                SyntaxContainerNode {
+                    name: "Nothing".into(),
+                    children: vec![],
+                    value: vec![],
+                    row_index: None,
+                    range: lexer.get_range(),
+                },
+                lexer,
+            );
+        }
+
         // bp stands for binding power
         let mut left: SyntaxContainerNode = {
             let mut starting_token = lexer.begin_token();

@@ -15,7 +15,7 @@ fn test_parser() {
     let parsed = parse(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        "(Multiply () (Subtract () (Variable (62))) (Variable (43)))"
+        r#"(Multiply () (Subtract () "-" (Variable () "b")) "*" (Variable () "C"))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -34,7 +34,7 @@ fn test_postfix() {
     let parsed = parse(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        "(Add () (Variable (63)) (Factorial () (Variable (61))))"
+        r#"(Add () (Variable () "c") "+" (Factorial () (Variable () "a") "!"))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -56,7 +56,7 @@ fn test_parser_nested_brackets_and_postfix() {
     let parsed = parse(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        "(RoundBrackets () (RoundBrackets () (RoundBrackets () (Factorial () (Variable (61))))))"
+        r#"(RoundBrackets () "(" (RoundBrackets () "(" (RoundBrackets () "(" (Factorial () (Variable () "a") "!") ")") ")") ")")"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -74,7 +74,7 @@ fn test_parser_tuple() {
     let parsed = parse(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        "(Tuple () (Variable (61)) (Variable (62)))"
+        r#"(Tuple () (Variable () "a") "," (Variable () "b"))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -97,7 +97,7 @@ fn test_parser_tuple_advanced() {
     // Not entirely satisfactory, but eh
     assert_eq!(
         parsed.value.to_string(),
-        "(RoundBrackets () (Tuple () (Tuple () (Variable (61)) (Variable (62))) (Variable (63))))"
+        r#"(RoundBrackets () "(" (Tuple () (Tuple () (Variable () "a") "," (Variable () "b")) "," (Variable () "c")) ")")"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -116,11 +116,9 @@ fn test_parser_function_call() {
     let context = ParseContext::default();
 
     let parsed = parse(&layout, &context);
-    // TODO: Document that the first argument is the function name
-    // and the second argument is a tuple of arguments
     assert_eq!(
         parsed.value.to_string(),
-        "(FunctionApplication () (Variable (66)) (Tuple () (Variable (61)) (Variable (62))))"
+        r#"(FunctionApplication () (Variable () "f") (Tuple () (Variable () "a") "," (Variable () "b")))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -140,7 +138,7 @@ fn test_parser_brackets_with_addition() {
 
     assert_eq!(
         parsed.value.to_string(),
-        "(RoundBrackets () (Add () (Variable (61)) (Variable (62))))"
+        r#"(RoundBrackets () "(" (Add () (Variable () "a") "+" (Variable () "b")) ")")"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -163,7 +161,7 @@ fn test_parser_fraction() {
 
     assert_eq!(
         parsed.value.to_string(),
-        "(RoundBrackets () (Add () (Variable (61)) (Fraction () (Variable (62)) (Variable (63)))))"
+        r#"(RoundBrackets () (Add () (Variable (61)) (Fraction () (Variable (62)) (Variable (63)))))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -191,7 +189,7 @@ fn test_parser_empty_squareroot() {
     let parsed = parse(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        "(Root () (Nothing) (Variable (61)))"
+        r#"(Root () (Nothing) (Variable () "a"))"#
     );
 }
 
