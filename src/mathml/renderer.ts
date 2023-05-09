@@ -3,12 +3,17 @@ import { RenderedElement, RenderResult, Renderer } from "../rendering/render-res
 import { assert } from "../utils/assert";
 import { MathMLRenderResult } from "./renderer/render-result";
 import { SimpleContainerMathMLElement } from "./renderer/rendered-elements";
+import { NothingMathMLElement } from "./renderer/rendered-nothing";
 import { TextMathMLElement } from "./renderer/rendered-text-element";
 
 export class MathMLRenderer implements Renderer<MathMLElement> {
   private readonly renderers: Map<string, (syntaxTree: SyntaxContainerNode) => RenderedElement<MathMLElement>> = new Map();
 
   constructor() {
+    this.addRenderer("Nothing", (syntaxTree: SyntaxContainerNode) => {
+      // TODO: Or do I render an empty mrow?
+      return new NothingMathMLElement(syntaxTree);
+    });
     this.addRenderer("Variable", (syntaxTree: SyntaxContainerNode) => {
       return new TextMathMLElement(syntaxTree, "mi");
     });
