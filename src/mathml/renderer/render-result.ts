@@ -26,7 +26,7 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
       assert(element.syntaxTree.range.start <= indexOfContainer && indexOfContainer < element.syntaxTree.range.end);
 
       const childElement = getChildElementWithIndex(element, indexOfContainer);
-      const rowChildElement = childElement.getChildren().find((c) => c.syntaxTree.row_index == indexOfRow);
+      const rowChildElement = childElement.getChildren().find((c) => c.syntaxTree.row_index?.[1] === BigInt(indexOfRow));
       assert(rowChildElement, `Couldn't find row ${indexOfRow} in ${childElement.syntaxTree.name}`);
       element = rowChildElement;
     }

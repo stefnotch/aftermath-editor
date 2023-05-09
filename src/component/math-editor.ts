@@ -196,7 +196,7 @@ export class MathEditor extends HTMLElement {
         name: "Nothing",
         children: [],
         value: [],
-        range: { start: 0, end: 0 },
+        range: { start: 0n, end: 0n },
       },
     });
     this.mathMlElement = document.createElement("math");
@@ -340,8 +340,9 @@ export class MathEditor extends HTMLElement {
     this.inputTree = inputTree;
 
     const parsed = parse(this.inputTree.value);
+    console.log("Parsed", parsed);
     this.renderResult = this.renderer.renderAll(parsed);
-    console.log(parsed, this.renderResult);
+    console.log("Rendered", this.renderResult);
 
     // The MathML elements directly under the <math> tag
     const topLevelElements = this.renderResult.getElement([]).getElements();

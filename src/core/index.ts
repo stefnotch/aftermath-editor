@@ -69,7 +69,6 @@ export type ParseResult = {
   errors: ParseError[];
 };
 
-// TODO:
 export type SyntaxNode =
   | {
       Container: SyntaxContainerNode;
@@ -78,17 +77,22 @@ export type SyntaxNode =
       Leaf: SyntaxLeafNode;
     };
 
+export type Range<T> = {
+  start: T;
+  end: T;
+};
+
 export type SyntaxContainerNode = {
   name: string;
   children: SyntaxNode[];
-  row_index?: any;
-  value: any;
-  range: any;
+  row_index?: [bigint, bigint];
+  value: any; // TODO:
+  range: Range<bigint>;
 };
 
 export type SyntaxLeafNode = {
-  node_type: any;
-  range: any;
+  node_type: "Operator" | "Leaf";
+  range: Range<bigint>;
   symbols: string[];
 };
 
