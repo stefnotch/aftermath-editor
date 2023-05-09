@@ -1,5 +1,5 @@
-import { SyntaxTree } from "../../core";
-import { RenderedElement } from "../../rendering/render-result";
+import { SyntaxContainerNode } from "../../core";
+import { RenderedElement, RenderedPosition } from "../../rendering/render-result";
 import { assert } from "../../utils/assert";
 import { MathMLTags } from "../mathml-spec";
 
@@ -7,8 +7,11 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
   element: MathMLElement;
   children: RenderedElement<MathMLElement>[] = [];
 
-  constructor(public syntaxTree: SyntaxTree, elementName: MathMLTags) {
+  constructor(public syntaxTree: SyntaxContainerNode, elementName: MathMLTags) {
     this.element = createMathElement(elementName, []);
+  }
+  getViewportPosition(offset: number): RenderedPosition {
+    throw new Error("Method not implemented.");
   }
   getElements(): MathMLElement[] {
     return [this.element];
@@ -16,7 +19,7 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
   setChildren(children: RenderedElement<MathMLElement>[]): void {
     // TODO: Assert expected number of children for the given elementName
 
-    assert(children.length === this.syntaxTree.args.length, "Invalid number of children");
+    assert(children.length === this.syntaxTree.children.length, "Invalid number of children");
     this.children = children;
     this.element.append(...children.map((c) => wrapInMRow(c.getElements())));
   }

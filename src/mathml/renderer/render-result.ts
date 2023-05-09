@@ -1,8 +1,10 @@
 import { ParseResult } from "../../core";
+import { Offset } from "../../math-layout/math-layout-offset";
 import { MathLayoutPosition } from "../../math-layout/math-layout-position";
 import { RowIndices, getRowIndices } from "../../math-layout/math-layout-zipper";
 import { RenderResult, RenderedElement, RenderedPosition } from "../../rendering/render-result";
 import { ViewportCoordinate } from "../../rendering/viewport-coordinate";
+import { assert } from "../../utils/assert";
 
 export class MathMLRenderResult implements RenderResult<MathMLElement> {
   private readonly rootElement: RenderedElement<MathMLElement>;
@@ -20,12 +22,39 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
     let element = this.rootElement;
 
     for (let rowIndex of indices) {
+      let [indexOfContainer, indexOfRow] = rowIndex;
+      assert(element.syntaxTree.range.start <= indexOfContainer && indexOfContainer < element.syntaxTree.range.end);
+
+      const childElement = getChildElementWithIndex(element, indexOfContainer);
+      const rowChildElement = childElement.getChildren().find((c) => c.syntaxTree.row_index == indexOfRow);
+      assert(rowChildElement, `Couldn't find row ${indexOfRow} in ${childElement.syntaxTree.name}`);
+      element = rowChildElement;
     }
-    // this.rootElement.syntaxTree.range
-    throw new Error("Method not implemented.");
+    return element;
   }
 
   getLayoutPosition(position: ViewportCoordinate): MathLayoutPosition {
     throw new Error("Method not implemented.");
   }
+}
+
+/**
+ *
+ * @param element A rendered element
+ * @param indexOfContainer The offset in the input tree row.
+ * @returns The deepest child element that contains the given index.
+ */
+function getChildElementWithIndex(
+  element: RenderedElement<MathMLElement>,
+  indexOfContainer: Offset
+): RenderedElement<MathMLElement> {
+  for (let childElement of element.getChildren()) {
+    // If we find a better matching child, we go deeper
+    if (childElement.syntaxTree.range.start <= indexOfContainer && indexOfContainer < childElement.syntaxTree.range.end) {
+      return getChildElementWithIndex(childElement, indexOfContainer);
+    }
+  }
+
+  // Giving up, returning the current element
+  return element;
 }

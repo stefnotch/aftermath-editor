@@ -190,7 +190,7 @@ export class MathEditor extends HTMLElement {
     this.renderer = new MathMLRenderer();
     // TODO: assert(this.renderer.canRender(...));
 
-    this.renderResult = this.renderer.render({
+    this.renderResult = this.renderer.renderAll({
       errors: [],
       value: {
         name: "Nothing",
@@ -340,7 +340,7 @@ export class MathEditor extends HTMLElement {
     this.inputTree = inputTree;
 
     const parsed = parse(this.inputTree.value);
-    this.renderResult = this.renderer.render(parsed);
+    this.renderResult = this.renderer.renderAll(parsed);
     console.log(parsed, this.renderResult);
 
     // The MathML elements directly under the <math> tag
