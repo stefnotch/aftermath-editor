@@ -80,7 +80,7 @@ impl<'a> ParserRules<'a> {
                 // Infix operators only get applied if there is something valid after them
                 // So we check if the next parsing step would be successful, while avoiding consuming the token
                 let mut next_token = operator.begin_token();
-                let symbol_comes_next = parse_bp_start(&mut next_token, self).is_ok();
+                let symbol_comes_next = is_starting_token_next(&mut next_token, self);
                 operator = next_token.discard_token().unwrap();
                 if symbol_comes_next {
                     // Infix operator
@@ -201,6 +201,17 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
     }
 }
 
+fn is_starting_token_next<'input, 'definition>(
+    token: &mut Lexer<'input>,
+    context: &'definition ParserRules,
+) -> bool {
+    if token.eof() {
+        return false;
+    }
+    return context.get_token(token, (false, false)).is_some()
+        || context.get_token(token, (false, true)).is_some();
+}
+
 /// Expects a token or an opening bracket or a prefix operator
 fn parse_bp_start<'input, 'definition>(
     token: &mut Lexer<'input>,
@@ -233,10 +244,11 @@ fn parse_bp_start<'input, 'definition>(
             symbols,
         })
     } else {
+        // Consume one token and report an error
+        token.consume_n(1);
         Err(ParseError {
             error: ParseErrorType::UnexpectedToken,
-            // TODO: Better range for error reporting
-            range: token.get_range().start..token.get_range().start + 1,
+            range: token.get_range(),
         })
     }
 }
