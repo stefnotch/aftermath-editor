@@ -8,7 +8,7 @@ use input_tree::row::RowIndex;
 /// A concrete syntax tree.
 /// Has a few invariants:
 /// - Parent range always contains all the child ranges
-/// - Child ranges are sorted (TODO: do I need this?)
+/// - Child ranges are sorted
 /// - Child ranges are non-overlapping
 /// - Child ranges are contiguous, we don't skip any tokens
 ///
@@ -26,6 +26,18 @@ impl SyntaxNode {
             SyntaxNode::Leaf(node) => node.range.clone(),
         }
     }
+
+    /// Returns the range of all the children combined, and verifies the invariants.
+    fn get_combined_range(children: &[SyntaxNode]) -> Range<usize> {
+        assert!(!children.is_empty());
+        let mut prev_child_range = children[0].range();
+        for child in children.iter().skip(1) {
+            let child_range = child.range();
+            assert!(prev_child_range.end == child_range.start);
+            prev_child_range = child_range;
+        }
+        children[0].range().start..prev_child_range.end
+    }
 }
 
 /// A node in a concrete syntax tree that contains other nodes.
@@ -42,7 +54,7 @@ pub struct SyntaxContainerNode {
     /// stored as bytes, and interpreted according to the name
     pub value: Vec<u8>,
     /// The range of this in the input tree row.
-    pub range: Range<usize>,
+    range: Range<usize>,
 }
 
 /// A leaf node in a concrete syntax tree.
@@ -63,6 +75,34 @@ pub enum LeafNodeType {
     Symbol,
     /// A symbol node
     Operator,
+}
+
+impl SyntaxContainerNode {
+    pub fn new(name: String, range_start: usize, children: Vec<SyntaxNode>) -> Self {
+        let range = if children.is_empty() {
+            range_start..range_start
+        } else {
+            SyntaxNode::get_combined_range(&children)
+        };
+        assert!(range.start == range_start);
+
+        Self {
+            name,
+            children,
+            range,
+            row_index: None,
+            value: vec![],
+        }
+    }
+
+    pub fn with_row_index(mut self, row_index: RowIndex) -> Self {
+        self.row_index = Some(row_index);
+        self
+    }
+
+    pub fn range(&self) -> Range<usize> {
+        self.range.clone()
+    }
 }
 
 impl fmt::Display for SyntaxNode {

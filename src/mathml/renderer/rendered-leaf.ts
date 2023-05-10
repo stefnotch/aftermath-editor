@@ -14,7 +14,7 @@ export class LeafMathMLElement {
     this.textElements = syntaxTree.symbols.map((v) => document.createTextNode(v)) ?? [createPlaceholder()];
   }
   getViewportXPosition(offset: Offset): { x: ViewportValue } {
-    const graphemeOffset = BigInt(offset) - this.syntaxTree.range.start;
+    const graphemeOffset = offset - Number(this.syntaxTree.range.start);
     const atEnd = graphemeOffset >= this.textElements.length;
     const graphemeText = this.textElements[atEnd ? this.textElements.length - 1 : graphemeOffset];
     const graphemeBounds = getTextBoundingBox(graphemeText);

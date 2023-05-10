@@ -26,6 +26,7 @@ impl AstTransformer {
 
     pub fn new() -> Self {
         Self {
+            // TODO: With long enough lists, this will overflow the stack
             // Default hardcoded tuple flattening transformation
             transformations: vec![AstTransformation {
                 transform: |mut node: SyntaxContainerNode| {

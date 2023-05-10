@@ -28,7 +28,7 @@ pub fn parse(input: &InputRow, context: &ParseContext) -> ParseResult<SyntaxCont
     let (parse_result, lexer) = context.parse_bp(lexer, 0);
     println!("parse result: {:?}", parse_result);
     assert_eq!(
-        parse_result.range.end,
+        parse_result.range().end,
         input.values.len(),
         "range not until end"
     );
@@ -54,13 +54,7 @@ impl<'a> ParseContext<'a> {
 
         if lexer.eof() {
             return (
-                SyntaxContainerNode {
-                    name: "Nothing".into(),
-                    children: vec![],
-                    value: vec![],
-                    row_index: None,
-                    range: lexer.get_range(),
-                },
+                SyntaxContainerNode::new("Nothing".into(), lexer.get_range().start, vec![]),
                 lexer,
             );
         }
@@ -100,12 +94,13 @@ impl<'a> ParseContext<'a> {
                     // Actually consume the operator
                     lexer = operator.end_token().unwrap();
 
-                    let left_range = left.range.clone();
+                    let left_range = left.range().clone();
 
                     // Parse the right operand
                     let args;
                     (args, lexer) = definition.parse_arguments(lexer, self, &match_result);
 
+                    // Combine the left and right operand into a new left operand
                     let mut children = vec![
                         SyntaxNode::Container(left),
                         SyntaxNode::Leaf(SyntaxLeafNode {
@@ -116,16 +111,7 @@ impl<'a> ParseContext<'a> {
                     ];
                     children.extend(args);
 
-                    let range = combine_ranges(&left_range, &lexer.get_range());
-
-                    // Combine the left and right operand into a new left operand
-                    left = SyntaxContainerNode {
-                        name: definition.name(),
-                        children,
-                        row_index: None,
-                        range,
-                        value: vec![],
-                    };
+                    left = SyntaxContainerNode::new(definition.name(), left_range.start, children);
                     continue;
                 } else {
                     lexer = operator.discard_token().unwrap();
@@ -147,11 +133,12 @@ impl<'a> ParseContext<'a> {
                 // Actually consume the operator
                 lexer = operator.end_token().unwrap();
 
-                let left_range = left.range.clone();
+                let left_range = left.range();
 
                 let args;
                 (args, lexer) = definition.parse_arguments(lexer, self, &match_result);
 
+                // Combine the left operand into a new left operand
                 let mut children = vec![
                     SyntaxNode::Container(left),
                     SyntaxNode::Leaf(SyntaxLeafNode {
@@ -162,16 +149,7 @@ impl<'a> ParseContext<'a> {
                 ];
                 children.extend(args);
 
-                let range = combine_ranges(&left_range, &lexer.get_range());
-
-                // Combine the left operand into a new left operand
-                left = SyntaxContainerNode {
-                    name: definition.name(),
-                    children,
-                    value: vec![],
-                    row_index: None,
-                    range,
-                };
+                left = SyntaxContainerNode::new(definition.name(), left_range.start, children);
                 continue;
             } else {
                 lexer = operator.discard_token().unwrap();
@@ -189,11 +167,6 @@ impl<'a> ParseContext<'a> {
 
         (left, lexer)
     }
-}
-fn combine_ranges(range_1: &Range<usize>, range_2: &Range<usize>) -> Range<usize> {
-    let start = range_1.start.min(range_2.start);
-    let end = range_1.end.max(range_2.end);
-    start..end
 }
 
 #[derive(Debug)]
@@ -222,13 +195,7 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
 
         assert_eq!(lexer.get_range().start, self.range.start);
         (
-            SyntaxContainerNode {
-                name: self.definition.name(),
-                children,
-                value: vec![],
-                row_index: None,
-                range: lexer.get_range(),
-            },
+            SyntaxContainerNode::new(self.definition.name(), lexer.get_range().start, children),
             lexer,
         )
     }
