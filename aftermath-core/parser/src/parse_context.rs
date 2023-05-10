@@ -17,15 +17,15 @@ use super::{
 
 pub type BindingPowerPattern = (bool, bool);
 // TODO: Display tokens in a flattened, sorted way (for debugging)
-pub struct ParseContext<'a> {
+pub struct ParserRules<'a> {
     // takes the parent context and gives it back afterwards
-    parent_context: Option<&'a ParseContext<'a>>,
+    parent_context: Option<&'a ParserRules<'a>>,
     known_tokens: HashMap<BindingPowerPattern, Vec<(TokenMatcher, TokenDefinition)>>,
 }
 
-impl<'a> ParseContext<'a> {
+impl<'a> ParserRules<'a> {
     pub fn new(
-        parent_context: Option<&'a ParseContext<'a>>,
+        parent_context: Option<&'a ParserRules<'a>>,
         tokens: Vec<(TokenMatcher, TokenDefinition)>,
     ) -> Self {
         let known_tokens =
@@ -83,14 +83,14 @@ impl<'a> ParseContext<'a> {
     }
 }
 
-impl<'a> ParseContext<'a> {
-    pub fn default() -> ParseContext<'a> {
+impl<'a> ParserRules<'a> {
+    pub fn default() -> ParserRules<'a> {
         // TODO: Add more default tokens
         // 3. Parser for functions
         // 4. Parser for whitespace
         // 5. Parser for chains of < <=, which could be treated as a "domain restriction"
 
-        ParseContext::new(
+        ParserRules::new(
             None,
             vec![
                 // TODO: Good whitespace handling
@@ -384,7 +384,7 @@ impl TokenArgumentParser {
     fn parse<'lexer, 'input>(
         &self,
         lexer: Lexer<'lexer>,
-        context: &ParseContext,
+        context: &ParserRules,
     ) -> TokenArgumentParseResult<'lexer> {
         match self {
             TokenArgumentParser::ParseNext {
@@ -509,7 +509,7 @@ impl TokenDefinition {
     pub fn parse_arguments<'lexer, 'input>(
         &self,
         mut lexer: Lexer<'lexer>,
-        context: &ParseContext,
+        context: &ParserRules,
         token_match_results: &MatchResult<'input, InputNode>,
     ) -> (Vec<SyntaxNode>, Lexer<'lexer>) {
         if self.is_container {

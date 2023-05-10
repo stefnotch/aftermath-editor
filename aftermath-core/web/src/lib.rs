@@ -2,7 +2,7 @@ mod utils;
 
 use input_tree::row::InputRow;
 use parser::{
-    ast_transformer::AstTransformer, parse_context::ParseContext, ParseError, ParseResult,
+    ast_transformer::AstTransformer, parse_context::ParserRules, ParseError, ParseResult,
     SyntaxContainerNode,
 };
 use serde::Serialize;
@@ -33,7 +33,7 @@ struct MathParseResult {
 pub fn parse(layout_row: JsValue) -> Result<JsValue, JsValue> {
     let layout: InputRow = serde_wasm_bindgen::from_value(layout_row)?;
 
-    let context = ParseContext::default();
+    let context = ParserRules::default();
     let transformer = AstTransformer::new();
     let mut parsed: MathParseResult = parser::parse(&layout, &context).into();
     parsed.value = transformer.transform(parsed.value);

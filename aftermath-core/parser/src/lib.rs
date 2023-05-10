@@ -14,14 +14,14 @@ use input_tree::{input_node::InputNode, row::InputRow};
 use crate::lexer::Lexer;
 
 use self::{
-    parse_context::{ParseContext, TokenDefinition},
+    parse_context::{ParserRules, TokenDefinition},
     token_matcher::MatchResult,
 };
 
 pub use self::parse_result::{ParseError, ParseErrorType, ParseResult};
 pub use self::syntax_tree::{SyntaxContainerNode, SyntaxLeafNode, SyntaxNode};
 
-pub fn parse(input: &InputRow, context: &ParseContext) -> ParseResult<SyntaxContainerNode> {
+pub fn parse(input: &InputRow, context: &ParserRules) -> ParseResult<SyntaxContainerNode> {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     // we have a LL(1) pratt parser, aka we can look one token ahead
     let lexer = Lexer::new(&input.values);
@@ -40,7 +40,7 @@ pub fn parse(input: &InputRow, context: &ParseContext) -> ParseResult<SyntaxCont
     }
 }
 
-impl<'a> ParseContext<'a> {
+impl<'a> ParserRules<'a> {
     fn parse_bp<'input>(
         &self,
         mut lexer: Lexer<'input>,
@@ -180,7 +180,7 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
     fn to_syntax_tree<'lexer>(
         self,
         lexer: Lexer<'lexer>,
-        context: &ParseContext,
+        context: &ParserRules,
     ) -> (SyntaxContainerNode, Lexer<'lexer>) {
         let (args, lexer) = self
             .definition
@@ -204,7 +204,7 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
 /// Expects a token or an opening bracket or a prefix operator
 fn parse_bp_start<'input, 'definition>(
     token: &mut Lexer<'input>,
-    context: &'definition ParseContext,
+    context: &'definition ParserRules,
 ) -> Result<ParseStartResult<'input, 'definition>, ParseError> {
     println!("parse_bp_start at {:?}", token.get_slice());
     if token.eof() {
