@@ -11,7 +11,7 @@ use std::ops::Range;
 
 use input_tree::{input_node::InputNode, row::InputRow};
 
-use crate::lexer::Lexer;
+use crate::{lexer::Lexer, syntax_tree::LeafNodeType};
 
 use self::{
     parse_context::{ParserRules, TokenDefinition},
@@ -62,11 +62,55 @@ impl<'a> ParserRules<'a> {
         // bp stands for binding power
         let mut left: SyntaxContainerNode = {
             let mut starting_token = lexer.begin_token();
-            let parse_start =
-                parse_bp_start(&mut starting_token, self).expect("parse start failed");
-            lexer = starting_token.end_token().unwrap();
 
-            let parse_result = parse_start.to_syntax_tree(lexer, self);
+            let parse_result = if let Some((definition, match_result)) =
+                self.get_token(&mut starting_token, (false, false))
+            {
+                // Defined symbol
+                let range = starting_token.get_range();
+                let symbols = starting_token.get_symbols();
+                lexer = starting_token.end_token().unwrap();
+                ParseStartResult {
+                    definition,
+                    match_result,
+                    range,
+                    symbols,
+                }
+                .to_syntax_tree(lexer, self)
+            } else if let Some((definition, match_result)) =
+                self.get_token(&mut starting_token, (false, true))
+            {
+                // Prefix operator
+                let range = starting_token.get_range();
+                let symbols = starting_token.get_symbols();
+                lexer = starting_token.end_token().unwrap();
+                ParseStartResult {
+                    definition,
+                    match_result,
+                    range,
+                    symbols,
+                }
+                .to_syntax_tree(lexer, self)
+            } else {
+                // Consume one token and report an error
+                starting_token.consume_n(1);
+                let range = starting_token.get_range();
+                let symbols = starting_token.get_symbols();
+                lexer = starting_token.end_token().unwrap();
+                (
+                    // TODO: Document this node
+                    SyntaxContainerNode::new(
+                        "Error".into(),
+                        range.start,
+                        vec![SyntaxNode::Leaf(SyntaxLeafNode {
+                            node_type: LeafNodeType::Symbol,
+                            range: range.clone(),
+                            symbols: symbols,
+                        })],
+                    ),
+                    lexer,
+                )
+            };
             lexer = parse_result.1;
             parse_result.0
         };
@@ -210,45 +254,4 @@ fn is_starting_token_next<'input, 'definition>(
     }
     return context.get_token(token, (false, false)).is_some()
         || context.get_token(token, (false, true)).is_some();
-}
-
-/// Expects a token or an opening bracket or a prefix operator
-fn parse_bp_start<'input, 'definition>(
-    token: &mut Lexer<'input>,
-    context: &'definition ParserRules,
-) -> Result<ParseStartResult<'input, 'definition>, ParseError> {
-    println!("parse_bp_start at {:?}", token.get_slice());
-    if token.eof() {
-        Err(ParseError {
-            error: ParseErrorType::UnexpectedEndOfInput,
-            range: token.get_range(),
-        })
-    } else if let Some((definition, match_result)) = context.get_token(token, (false, false)) {
-        // Defined symbol
-        let range = token.get_range();
-        let symbols = token.get_symbols();
-        Ok(ParseStartResult {
-            definition,
-            match_result,
-            range,
-            symbols,
-        })
-    } else if let Some((definition, match_result)) = context.get_token(token, (false, true)) {
-        // Prefix operator
-        let range = token.get_range();
-        let symbols = token.get_symbols();
-        Ok(ParseStartResult {
-            definition,
-            match_result,
-            range,
-            symbols,
-        })
-    } else {
-        // Consume one token and report an error
-        token.consume_n(1);
-        Err(ParseError {
-            error: ParseErrorType::UnexpectedToken,
-            range: token.get_range(),
-        })
-    }
 }
