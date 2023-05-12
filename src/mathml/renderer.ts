@@ -11,7 +11,6 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
 
   constructor() {
     this.addRenderer("Nothing", (syntaxTree: SyntaxContainerNode) => {
-      // TODO: Or do I render an empty mrow?
       return new NothingMathMLElement(syntaxTree);
     });
     this.addRenderer("Variable", (syntaxTree: SyntaxContainerNode) => {
@@ -24,8 +23,21 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
       return new TextMathMLElement(syntaxTree, "mtext");
     });
     this.addRenderer("Fraction", (syntaxTree: SyntaxContainerNode) => {
-      let element = new SimpleContainerMathMLElement(syntaxTree, "mfrac");
-      element.setChildren(syntaxTree.children.map((c) => this.render(c.Container)));
+      return new SimpleContainerMathMLElement(syntaxTree, "mfrac", this);
+    });
+    this.addRenderer("Root", (syntaxTree: SyntaxContainerNode) => {
+      // We have to switch the arguments here, because MathML uses the second argument as the root
+      syntaxTree.children.reverse();
+      return new SimpleContainerMathMLElement(syntaxTree, "mroot", this);
+    });
+    ["Add", "Subtract", "Multiply", "FunctionApplication"].forEach((name) => {
+      this.addRenderer(name, (syntaxTree: SyntaxContainerNode) => {
+        return new SimpleContainerMathMLElement(syntaxTree, "mrow", this);
+      });
+    });
+    this.addRenderer("Error", (syntaxTree: SyntaxContainerNode) => {
+      const element = new SimpleContainerMathMLElement(syntaxTree, "merror", this);
+      console.warn("Rendering error", syntaxTree, element);
       return element;
     });
     // TODO: all the others
@@ -33,7 +45,16 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
 
   private addRenderer(name: string, renderer: (syntaxTree: SyntaxContainerNode) => RenderedElement<MathMLElement>): void {
     assert(!this.renderers.has(name), `Renderer for ${name} already exists`);
-    this.renderers.set(name, renderer);
+
+    if (import.meta.env.DEV) {
+      this.renderers.set(name, (syntaxTree: SyntaxContainerNode) => {
+        const rendered = renderer(syntaxTree);
+        rendered.getElements().forEach((v) => v.setAttribute("data-renderer-name", name));
+        return rendered;
+      });
+    } else {
+      this.renderers.set(name, renderer);
+    }
   }
 
   canRender(syntaxTreeNames: string[]): boolean {

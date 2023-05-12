@@ -31,6 +31,41 @@ export type MathMLTags =
   | "mtr"
   | "mtd";
 
+// TODO: Fill this
+export const MathMLTagsExpectedChildrenCount: Record<MathMLTags, number | null> = {
+  math: "TODO:" as any as number,
+  semantics: "TODO:" as any as number,
+  annotation: "TODO:" as any as number,
+  "annotation-xml": "TODO:" as any as number,
+  mtext: "TODO:" as any as number,
+  mi: "TODO:" as any as number,
+  mn: "TODO:" as any as number,
+  mo: "TODO:" as any as number,
+  mspace: "TODO:" as any as number,
+  ms: "TODO:" as any as number,
+  mrow: null,
+  mfrac: 2,
+  msqrt: "TODO:" as any as number,
+  mroot: 2,
+  mstyle: "TODO:" as any as number,
+  merror: null,
+  maction: "TODO:" as any as number,
+  mpadded: "TODO:" as any as number,
+  mphantom: "TODO:" as any as number,
+  msub: "TODO:" as any as number,
+  msup: "TODO:" as any as number,
+  msubsup: "TODO:" as any as number,
+  munder: "TODO:" as any as number,
+  mover: "TODO:" as any as number,
+  munderover: "TODO:" as any as number,
+  mmultiscripts: "TODO:" as any as number,
+  none: "TODO:" as any as number,
+  mprescripts: "TODO:" as any as number,
+  mtable: null,
+  mtr: "TODO:" as any as number,
+  mtd: "TODO:" as any as number,
+};
+
 // See https://www.w3.org/TR/mathml-core/#operator-dictionary
 // https://github.com/w3c/mathml-core/issues/112
 const bracketsList: [string, string][] = [

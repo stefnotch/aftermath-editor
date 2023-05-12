@@ -5,15 +5,15 @@ import { ViewportValue } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
 import { MathMLTags } from "../mathml-spec";
 import { createMathElement } from "./rendered-elements";
-import { LeafMathMLElement } from "./rendered-leaf";
+import { LeafMathMLElement, getTextBoundingBox } from "./rendered-leaf";
 
 export class TextMathMLElement implements RenderedElement<MathMLElement> {
   element: MathMLElement;
   private textElement: LeafMathMLElement;
-  private baselineReaderElement: MathMLElement;
+  private baselineReaderElement: Text;
 
   constructor(public syntaxTree: SyntaxContainerNode, elementName: MathMLTags) {
-    this.baselineReaderElement = createMathElement("mphantom", []);
+    this.baselineReaderElement = document.createTextNode("");
     assert(syntaxTree.children.length === 1);
 
     const text = syntaxTree.children[0];
@@ -23,8 +23,8 @@ export class TextMathMLElement implements RenderedElement<MathMLElement> {
     this.element = createMathElement(elementName, [this.baselineReaderElement, ...this.textElement.getElements()]);
   }
   getViewportPosition(offset: Offset): RenderedPosition {
-    // The baseline isn't exposed as a property, so we have this workaround https://github.com/w3c/mathml-core/issues/38
-    const baseline = this.baselineReaderElement.getBoundingClientRect().bottom;
+    // The baseline isn't exposed as a property, so we have this questionable workaround https://github.com/w3c/mathml-core/issues/38
+    const baseline = getTextBoundingBox(this.baselineReaderElement).bottom;
     const caretSize = getFontSize(this.element);
 
     const { x } = this.textElement.getViewportXPosition(offset);

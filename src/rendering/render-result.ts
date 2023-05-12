@@ -55,5 +55,8 @@ export interface RenderedElement<T> {
    */
   getElements(): T[];
 
+  /**
+   * The children of this element, *excluding the leaf nodes*.
+   */
   getChildren(): RenderedElement<T>[];
 }

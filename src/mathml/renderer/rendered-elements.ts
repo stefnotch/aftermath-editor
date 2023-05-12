@@ -1,14 +1,41 @@
 import { SyntaxContainerNode } from "../../core";
-import { RenderedElement, RenderedPosition } from "../../rendering/render-result";
-import { assert } from "../../utils/assert";
-import { MathMLTags } from "../mathml-spec";
+import { RenderedElement, RenderedPosition, Renderer } from "../../rendering/render-result";
+import { assert, assertUnreachable } from "../../utils/assert";
+import { MathMLTags, MathMLTagsExpectedChildrenCount } from "../mathml-spec";
+import { LeafMathMLElement } from "./rendered-leaf";
+import { TextMathMLElement } from "./rendered-text-element";
 
 export class SimpleContainerMathMLElement implements RenderedElement<MathMLElement> {
   element: MathMLElement;
   children: RenderedElement<MathMLElement>[] = [];
 
-  constructor(public syntaxTree: SyntaxContainerNode, elementName: MathMLTags) {
+  constructor(public syntaxTree: SyntaxContainerNode, elementName: MathMLTags, renderer: Renderer<MathMLElement>) {
     this.element = createMathElement(elementName, []);
+
+    this.setChildren(
+      elementName,
+      this.syntaxTree.children.map((c) => {
+        if ("Container" in c) {
+          return renderer.render(c.Container);
+        } else if ("Leaf" in c) {
+          if (c.Leaf.node_type === "Operator") {
+            return new TextMathMLElement(
+              {
+                name: syntaxTree.name,
+                children: [c],
+                range: c.Leaf.range,
+                value: [],
+              },
+              "mo"
+            );
+          } else {
+            return new LeafMathMLElement(c.Leaf);
+          }
+        } else {
+          assertUnreachable(c);
+        }
+      })
+    );
   }
   getViewportPosition(offset: number): RenderedPosition {
     throw new Error("Method not implemented.");
@@ -16,12 +43,20 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
   getElements(): MathMLElement[] {
     return [this.element];
   }
-  setChildren(children: RenderedElement<MathMLElement>[]): void {
-    // TODO: Assert expected number of children for the given elementName
+  private setChildren(elementName: MathMLTags, children: (RenderedElement<MathMLElement> | LeafMathMLElement)[]): void {
+    assert(
+      MathMLTagsExpectedChildrenCount[elementName] === null || MathMLTagsExpectedChildrenCount[elementName] === children.length,
+      "Invalid number of children for " + elementName
+    );
 
     assert(children.length === this.syntaxTree.children.length, "Invalid number of children");
-    this.children = children;
-    this.element.append(...children.map((c) => wrapInMRow(c.getElements())));
+    // Ah yes, using flatMap to avoid having to do an unsafe type cast
+    this.children = children.flatMap((c) => (c instanceof LeafMathMLElement ? [] : [c]));
+    this.element.append(
+      ...children.flatMap(
+        (c): Array<Node> => (c instanceof LeafMathMLElement ? c.getElements() : [wrapInMRow(c.getElements())])
+      )
+    );
   }
   getChildren(): RenderedElement<MathMLElement>[] {
     return this.children;

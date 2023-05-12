@@ -31,7 +31,7 @@ export class LeafMathMLElement {
 /**
  * @returns The bounding box of the text.
  */
-function getTextBoundingBox(t: Text) {
+export function getTextBoundingBox(t: Text) {
   assert(t.isConnected);
   const range = document.createRange();
   range.selectNode(t);
