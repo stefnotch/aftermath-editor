@@ -27,15 +27,31 @@ pub use self::syntax_tree::{SyntaxContainerNode, SyntaxLeafNode, SyntaxNode};
 pub fn parse(input: &InputRow, context: &ParserRules) -> ParseResult<SyntaxContainerNode> {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     // we could also have used https://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/ as the tutorial
-    let lexer = Lexer::new(&input.values);
-    let (parse_result, lexer) = context.parse_bp(lexer, 0);
+    let mut lexer = Lexer::new(&input.values);
+    let mut parse_result;
+    (parse_result, lexer) = context.parse_bp(lexer, 0);
 
     if !lexer.eof() {
-        // TODO: It would be really bad behaviour if
-        // input is "a + \frac{b}{c}"
-        // we don't have a plus parser
-        // and then "+ \frac{b}{c}" ends up being an error and not rendered correctly/at all
-        // the really bad part is that a fraction should always be rendered as a fraction!
+        // If the input is "a + \frac{b}{c}" and we don't have a plus parser,
+        // then "+ \frac{b}{c}" ends up being an error and not rendered correctly/at all.
+        // This is really bad, since a fraction should always be rendered as a fraction!
+
+        // So to fix that, we'll just parse the rest of the input repeatedly.
+        let mut error_children = vec![];
+
+        while !lexer.eof() {
+            let mut next_token;
+            (next_token, lexer) = context.parse_bp(lexer, 0);
+            if next_token.range().is_empty() {
+                (next_token, lexer) = error_and_consume_one(lexer);
+            }
+            error_children.push(SyntaxNode::Container(next_token));
+        }
+
+        let range = parse_result.range().start..get_child_range_end(&error_children);
+        let mut children = vec![SyntaxNode::Container(parse_result)];
+        children.extend(error_children);
+        parse_result = SyntaxContainerNode::new("Error".into(), range, children);
     }
 
     println!("parse result: {:?}", parse_result);
@@ -105,22 +121,7 @@ impl<'a> ParserRules<'a> {
             } else {
                 // Consume one token and report an error
                 // TODO: Check if next node is maybe a (true, true) or (true, false) token. If so, we should instead report an error for the missing operator.
-                let mut starting_range = lexer.begin_range();
-                starting_range.consume_n(1);
-                let token = starting_range.end_range();
-                (
-                    // TODO: Document this node
-                    SyntaxContainerNode::new(
-                        "Error".into(),
-                        token.range.clone(),
-                        vec![SyntaxNode::Leaf(SyntaxLeafNode {
-                            node_type: LeafNodeType::Symbol,
-                            range: token.range.clone(),
-                            symbols: token.get_symbols(),
-                        })],
-                    ),
-                    lexer,
-                )
+                error_and_consume_one(lexer)
             };
             lexer = parse_result.1;
             parse_result.0
@@ -210,6 +211,25 @@ impl<'a> ParserRules<'a> {
 
         (left, lexer)
     }
+}
+
+fn error_and_consume_one(mut lexer: Lexer) -> (SyntaxContainerNode, Lexer) {
+    let mut starting_range = lexer.begin_range();
+    starting_range.consume_n(1);
+    let token = starting_range.end_range();
+    (
+        // TODO: Document this node
+        SyntaxContainerNode::new(
+            "Error".into(),
+            token.range.clone(),
+            vec![SyntaxNode::Leaf(SyntaxLeafNode {
+                node_type: LeafNodeType::Symbol,
+                range: token.range.clone(),
+                symbols: token.get_symbols(),
+            })],
+        ),
+        lexer,
+    )
 }
 
 #[derive(Debug)]

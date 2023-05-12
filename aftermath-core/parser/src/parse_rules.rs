@@ -7,7 +7,7 @@ use crate::{
     lexer::LexerRange,
     syntax_tree::{LeafNodeType, SyntaxLeafNode},
     token_matcher::MatchError,
-    SyntaxNode,
+    SyntaxContainerNode, SyntaxNode,
 };
 
 use super::{
@@ -427,8 +427,18 @@ impl TokenArgumentParser {
                         lexer,
                     }
                 } else {
-                    // TODO: Better error message
-                    panic!("expected closing bracket");
+                    let token = lexer.begin_range().end_range();
+                    // TODO: Report this error properly?
+                    TokenArgumentParseResult {
+                        argument_index: *argument_index,
+                        argument: SyntaxNode::Container(SyntaxContainerNode::new(
+                            // TODO: Document this node
+                            "Error".into(),
+                            token.range.clone(),
+                            vec![],
+                        )),
+                        lexer,
+                    }
                 }
             }
         }
