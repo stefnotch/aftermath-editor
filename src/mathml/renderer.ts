@@ -23,6 +23,11 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
     this.addRenderer("String", (syntaxTree: SyntaxContainerNode) => {
       return new TextMathMLElement(syntaxTree, "mtext");
     });
+    this.addRenderer("Fraction", (syntaxTree: SyntaxContainerNode) => {
+      let element = new SimpleContainerMathMLElement(syntaxTree, "mfrac");
+      element.setChildren(syntaxTree.children.map((c) => this.render(c.Container)));
+      return element;
+    });
     // TODO: all the others
   }
 
