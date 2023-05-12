@@ -2,7 +2,7 @@
 
 <!-- Picture goes here instead of title -->
 
-> _A natural formula editor that understands your maths._
+> _A natural math editor that understands your formulas._
 
 ## Why?
 
