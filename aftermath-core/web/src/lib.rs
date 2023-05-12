@@ -2,7 +2,7 @@ mod utils;
 
 use input_tree::row::InputRow;
 use parser::{
-    ast_transformer::AstTransformer, parse_context::ParserRules, ParseError, ParseResult,
+    ast_transformer::AstTransformer, parse_rules::ParserRules, ParseError, ParseResult,
     SyntaxContainerNode,
 };
 use serde::Serialize;

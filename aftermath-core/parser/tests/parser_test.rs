@@ -1,5 +1,5 @@
 use input_tree::{input_node::InputNode, row::InputRow};
-use parser::{parse, parse_context::ParserRules};
+use parser::{parse, parse_rules::ParserRules};
 
 #[test]
 fn test_parser() {

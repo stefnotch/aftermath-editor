@@ -2,8 +2,8 @@ pub mod ast_transformer;
 mod grapheme_matcher;
 mod lexer;
 mod nfa_builder;
-pub mod parse_context;
 mod parse_result;
+pub mod parse_rules;
 mod syntax_tree;
 mod token_matcher;
 
@@ -15,7 +15,7 @@ use lexer::LexerRange;
 use crate::{lexer::Lexer, syntax_tree::LeafNodeType};
 
 use self::{
-    parse_context::{ParserRules, TokenDefinition},
+    parse_rules::{ParserRules, TokenDefinition},
     token_matcher::MatchResult,
 };
 

@@ -38,6 +38,7 @@ impl<'input> Lexer<'input> {
         }
     }
 
+    // TODO: Remove this function, and then remove the begin_token and lexer parent
     pub fn get_range(&self) -> Range<usize> {
         let parent_index = self.parent.as_ref().map(|v| v.index).unwrap_or(0);
         parent_index..self.index
