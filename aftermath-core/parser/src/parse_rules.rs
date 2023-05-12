@@ -397,13 +397,11 @@ impl TokenArgumentParser {
                 minimum_binding_power,
                 argument_index,
             } => {
-                let argument_lexer = lexer.begin_token();
-                let (argument, argument_lexer) =
-                    context.parse_bp(argument_lexer, *minimum_binding_power);
+                let (argument, lexer) = context.parse_bp(lexer, *minimum_binding_power);
                 TokenArgumentParseResult {
                     argument_index: *argument_index,
                     argument: SyntaxNode::Container(argument),
-                    lexer: argument_lexer.end_token().unwrap(),
+                    lexer,
                 }
             }
             TokenArgumentParser::NextSymbol {
@@ -524,7 +522,8 @@ impl TokenDefinition {
                 _ => panic!("expected single token"),
             };
             let token_index = {
-                let lexer_end = lexer.get_range().end;
+                // TODO: This is a bit of a mess
+                let lexer_end = lexer.begin_range().end_range().range().start;
                 assert!(lexer_end > 0);
                 lexer_end - 1
             };

@@ -59,7 +59,11 @@ impl<'a> ParserRules<'a> {
         if lexer.eof() {
             // TODO: Document this node
             return (
-                SyntaxContainerNode::new("Nothing".into(), lexer.get_range(), vec![]),
+                SyntaxContainerNode::new(
+                    "Nothing".into(),
+                    lexer.begin_range().end_range().range(),
+                    vec![],
+                ),
                 lexer,
             );
         }
@@ -228,8 +232,6 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
             symbols: self.symbols,
         })];
         children.extend(args);
-
-        assert_eq!(lexer.get_range().start, self.range.start);
 
         let range = self.range.start..get_child_range_end(&children);
         (

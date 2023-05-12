@@ -5,7 +5,6 @@ use input_tree::input_node::InputNode;
 // TODO: I bet there's a better design for this
 /// A lexer that can be nested
 pub struct Lexer<'input> {
-    parent: Option<Box<Lexer<'input>>>,
     values: &'input [InputNode],
     /// the index of the *next* element to be consumed
     index: usize,
@@ -14,19 +13,8 @@ pub struct Lexer<'input> {
 impl<'input> Lexer<'input> {
     pub fn new(row: &[InputNode]) -> Lexer {
         Lexer {
-            parent: None,
             values: row,
             index: 0,
-        }
-    }
-
-    pub fn begin_token(self) -> Lexer<'input> {
-        let index = self.index;
-        let row = self.values;
-        Lexer {
-            parent: Some(Box::new(self)),
-            values: row,
-            index,
         }
     }
 
@@ -35,22 +23,6 @@ impl<'input> Lexer<'input> {
         LexerRange {
             lexer: self,
             range: index..index,
-        }
-    }
-
-    // TODO: Remove this function, and then remove the begin_token and lexer parent
-    pub fn get_range(&self) -> Range<usize> {
-        let parent_index = self.parent.as_ref().map(|v| v.index).unwrap_or(0);
-        parent_index..self.index
-    }
-
-    pub fn end_token(self) -> Option<Lexer<'input>> {
-        assert!(self.index <= self.values.len());
-        if let Some(mut parent) = self.parent {
-            parent.index = self.index;
-            Some(*parent)
-        } else {
-            None
         }
     }
 
