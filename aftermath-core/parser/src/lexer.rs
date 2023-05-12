@@ -2,8 +2,6 @@ use std::ops::Range;
 
 use input_tree::input_node::InputNode;
 
-// TODO: I bet there's a better design for this
-/// A lexer that can be nested
 pub struct Lexer<'input> {
     values: &'input [InputNode],
     /// the index of the *next* element to be consumed

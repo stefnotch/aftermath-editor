@@ -189,7 +189,7 @@ fn test_parser_empty_squareroot() {
     let parsed = parse(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        r#"(Root () (Nothing) (Variable () "a"))"#
+        r#"(Root () (Nothing ()) (Variable () "a"))"#
     );
 }
 

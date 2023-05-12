@@ -13,7 +13,7 @@ use input_tree::row::RowIndex;
 /// - Child ranges are contiguous, we don't skip any tokens
 /// - Child range rules only apply if they are on the same row (see row_index)
 ///
-/// references the input tree
+/// indices reference the input tree
 #[derive(Debug, Serialize)]
 pub enum SyntaxNode {
     Container(SyntaxContainerNode),

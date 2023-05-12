@@ -564,4 +564,8 @@ impl TokenDefinition {
             (arguments, lexer)
         }
     }
+
+    pub fn is_container(&self) -> bool {
+        self.is_container
+    }
 }

@@ -226,18 +226,27 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
             .definition
             .parse_arguments(lexer, context, &self.match_result);
 
-        let mut children = vec![SyntaxNode::Leaf(SyntaxLeafNode {
-            node_type: self.definition.get_symbol_type().into(),
-            range: self.range.clone(),
-            symbols: self.symbols,
-        })];
-        children.extend(args);
+        if self.definition.is_container() {
+            let children = args;
+            let range = self.range;
+            (
+                SyntaxContainerNode::new(self.definition.name(), range, children),
+                lexer,
+            )
+        } else {
+            let mut children = vec![SyntaxNode::Leaf(SyntaxLeafNode {
+                node_type: self.definition.get_symbol_type().into(),
+                range: self.range.clone(),
+                symbols: self.symbols,
+            })];
+            children.extend(args);
 
-        let range = self.range.start..get_child_range_end(&children);
-        (
-            SyntaxContainerNode::new(self.definition.name(), range, children),
-            lexer,
-        )
+            let range = self.range.start..get_child_range_end(&children);
+            (
+                SyntaxContainerNode::new(self.definition.name(), range, children),
+                lexer,
+            )
+        }
     }
 }
 
