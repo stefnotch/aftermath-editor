@@ -12,7 +12,10 @@ use std::ops::Range;
 use input_tree::{input_node::InputNode, row::InputRow};
 use lexer::LexerRange;
 
-use crate::{lexer::Lexer, syntax_tree::LeafNodeType};
+use crate::{
+    lexer::Lexer,
+    syntax_tree::{get_child_range_end, LeafNodeType},
+};
 
 use self::{
     parse_rules::{ParserRules, TokenDefinition},
@@ -54,8 +57,9 @@ impl<'a> ParserRules<'a> {
         );
 
         if lexer.eof() {
+            // TODO: Document this node
             return (
-                SyntaxContainerNode::new("Nothing".into(), lexer.get_range().start, vec![]),
+                SyntaxContainerNode::new("Nothing".into(), lexer.get_range(), vec![]),
                 lexer,
             );
         }
@@ -95,7 +99,7 @@ impl<'a> ParserRules<'a> {
                     // TODO: Document this node
                     SyntaxContainerNode::new(
                         "Error".into(),
-                        token.range.start,
+                        token.range.clone(),
                         vec![SyntaxNode::Leaf(SyntaxLeafNode {
                             node_type: LeafNodeType::Symbol,
                             range: token.range.clone(),
@@ -130,7 +134,7 @@ impl<'a> ParserRules<'a> {
                     // Actually consume the operator
                     let token = operator_range.end_range();
 
-                    let left_range = left.range().clone();
+                    let range_start = left.range().start;
 
                     // Parse the right operand
                     let args;
@@ -147,7 +151,9 @@ impl<'a> ParserRules<'a> {
                     ];
                     children.extend(args);
 
-                    left = SyntaxContainerNode::new(definition.name(), left_range.start, children);
+                    // Range that includes the left side, and the last child
+                    let range = range_start..get_child_range_end(&children);
+                    left = SyntaxContainerNode::new(definition.name(), range, children);
                     continue;
                 }
             }
@@ -164,7 +170,7 @@ impl<'a> ParserRules<'a> {
                 // Actually consume the operator
                 let token = operator_range.end_range();
 
-                let left_range = left.range();
+                let range_start = left.range().start;
 
                 let args;
                 (args, lexer) = definition.parse_arguments(lexer, self, &match_result);
@@ -180,7 +186,8 @@ impl<'a> ParserRules<'a> {
                 ];
                 children.extend(args);
 
-                left = SyntaxContainerNode::new(definition.name(), left_range.start, children);
+                let range = range_start..get_child_range_end(&children);
+                left = SyntaxContainerNode::new(definition.name(), range, children);
                 continue;
             }
 
@@ -223,8 +230,10 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
         children.extend(args);
 
         assert_eq!(lexer.get_range().start, self.range.start);
+
+        let range = self.range.start..get_child_range_end(&children);
         (
-            SyntaxContainerNode::new(self.definition.name(), self.range.start, children),
+            SyntaxContainerNode::new(self.definition.name(), range, children),
             lexer,
         )
     }

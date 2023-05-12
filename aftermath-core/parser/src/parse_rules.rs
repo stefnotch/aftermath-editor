@@ -516,6 +516,7 @@ impl TokenDefinition {
         context: &ParserRules,
         token_match_results: &MatchResult<'input, InputNode>,
     ) -> (Vec<SyntaxNode>, Lexer<'lexer>) {
+        // TODO: This is a bit of a mess
         if self.is_container {
             let token = match token_match_results.get_input() {
                 [InputNode::Symbol(_)] => panic!("expected container token"),
@@ -535,7 +536,7 @@ impl TokenDefinition {
                 .map(|(row_index, row)| {
                     let lexer = Lexer::new(&row.values);
                     let (mut syntax_tree, lexer) = context.parse_bp(lexer, 0);
-                    syntax_tree.row_index = Some(RowIndex(token_index, row_index));
+                    syntax_tree = syntax_tree.with_row_index(RowIndex(token_index, row_index));
                     assert!(lexer.eof());
                     SyntaxNode::Container(syntax_tree)
                 })
