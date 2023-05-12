@@ -29,7 +29,9 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
               "mo"
             );
           } else {
-            return new LeafMathMLElement(c.Leaf);
+            throw new Error("Invalid leaf element in this container element", {
+              cause: { container: syntaxTree, element: c.Leaf },
+            });
           }
         } else {
           assertUnreachable(c);
@@ -38,12 +40,18 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
     );
   }
   getViewportPosition(offset: number): RenderedPosition {
-    throw new Error("Method not implemented.");
+    assert(this.syntaxTree.range.start <= offset && offset <= this.syntaxTree.range.end, "Invalid offset");
+    const child = this.children.find((c) => c.syntaxTree.range.start <= offset && offset <= c.syntaxTree.range.end);
+    if (child) {
+      return child.getViewportPosition(offset);
+    } else {
+      throw new Error("Don't know how to render this offset");
+    }
   }
   getElements(): MathMLElement[] {
     return [this.element];
   }
-  private setChildren(elementName: MathMLTags, children: (RenderedElement<MathMLElement> | LeafMathMLElement)[]): void {
+  private setChildren(elementName: MathMLTags, children: RenderedElement<MathMLElement>[]): void {
     assert(
       MathMLTagsExpectedChildrenCount[elementName] === null || MathMLTagsExpectedChildrenCount[elementName] === children.length,
       "Invalid number of children for " + elementName
