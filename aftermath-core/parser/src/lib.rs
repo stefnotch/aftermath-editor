@@ -10,7 +10,6 @@ mod token_matcher;
 use std::ops::Range;
 
 use input_tree::{input_node::InputNode, row::InputRow};
-use lexer::LexerRange;
 
 use crate::{
     lexer::Lexer,
@@ -27,9 +26,18 @@ pub use self::syntax_tree::{SyntaxContainerNode, SyntaxLeafNode, SyntaxNode};
 
 pub fn parse(input: &InputRow, context: &ParserRules) -> ParseResult<SyntaxContainerNode> {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
-    // we have a LL(1) pratt parser, aka we can look one token ahead
+    // we could also have used https://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/ as the tutorial
     let lexer = Lexer::new(&input.values);
     let (parse_result, lexer) = context.parse_bp(lexer, 0);
+
+    if !lexer.eof() {
+        // TODO: It would be really bad behaviour if
+        // input is "a + \frac{b}{c}"
+        // we don't have a plus parser
+        // and then "+ \frac{b}{c}" ends up being an error and not rendered correctly/at all
+        // the really bad part is that a fraction should always be rendered as a fraction!
+    }
+
     println!("parse result: {:?}", parse_result);
     assert_eq!(
         parse_result.range().end,
@@ -96,6 +104,7 @@ impl<'a> ParserRules<'a> {
                 .to_syntax_tree(lexer, self)
             } else {
                 // Consume one token and report an error
+                // TODO: Check if next node is maybe a (true, true) or (true, false) token. If so, we should instead report an error for the missing operator.
                 let mut starting_range = lexer.begin_range();
                 starting_range.consume_n(1);
                 let token = starting_range.end_range();
@@ -121,45 +130,39 @@ impl<'a> ParserRules<'a> {
         loop {
             // Not sure yet what happens when we have a postfix operator with a low binding power
             // Also not sure what happens when there's a right associative and a left associative operator with the same binding powers
-            if let Some((mut operator_range, definition, match_result)) =
+            if let Some((operator_range, definition, match_result)) =
                 self.get_token(lexer.begin_range(), (true, true))
             {
-                // Infix operators only get applied if there is something valid after them
-                // So we check if the next parsing step would be successful, while avoiding consuming the token
-                let symbol_comes_next =
-                    is_starting_token_next(operator_range.begin_subrange(), self);
-                if symbol_comes_next {
-                    // Infix operator
-                    // Not super elegant, but it works
-                    if definition.binding_power.0.unwrap() < minimum_bp {
-                        // operator_range is automatically dropped here, so we don't have to do it manually
-                        break;
-                    }
-                    // Actually consume the operator
-                    let token = operator_range.end_range();
-
-                    let range_start = left.range().start;
-
-                    // Parse the right operand
-                    let args;
-                    (args, lexer) = definition.parse_arguments(lexer, self, &match_result);
-
-                    // Combine the left and right operand into a new left operand
-                    let mut children = vec![
-                        SyntaxNode::Container(left),
-                        SyntaxNode::Leaf(SyntaxLeafNode {
-                            node_type: definition.get_symbol_type().into(),
-                            range: token.range.clone(),
-                            symbols: token.get_symbols(),
-                        }),
-                    ];
-                    children.extend(args);
-
-                    // Range that includes the left side, and the last child
-                    let range = range_start..get_child_range_end(&children);
-                    left = SyntaxContainerNode::new(definition.name(), range, children);
-                    continue;
+                // Infix operator
+                // Not super elegant, but it works
+                if definition.binding_power.0.unwrap() < minimum_bp {
+                    // operator_range is automatically dropped here, so we don't have to do it manually
+                    break;
                 }
+                // Actually consume the operator
+                let token = operator_range.end_range();
+
+                let range_start = left.range().start;
+
+                // Parse the right operand
+                let args;
+                (args, lexer) = definition.parse_arguments(lexer, self, &match_result);
+
+                // Combine the left and right operand into a new left operand
+                let mut children = vec![
+                    SyntaxNode::Container(left),
+                    SyntaxNode::Leaf(SyntaxLeafNode {
+                        node_type: definition.get_symbol_type().into(),
+                        range: token.range.clone(),
+                        symbols: token.get_symbols(),
+                    }),
+                ];
+                children.extend(args);
+
+                // Range that includes the left side, and the last child
+                let range = range_start..get_child_range_end(&children);
+                left = SyntaxContainerNode::new(definition.name(), range, children);
+                continue;
             }
 
             if let Some((operator_range, definition, match_result)) =
@@ -248,19 +251,4 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
             )
         }
     }
-}
-
-fn is_starting_token_next<'input, 'definition>(
-    mut lexer_range: LexerRange<'input, 'definition>,
-    context: &'definition ParserRules,
-) -> bool {
-    if lexer_range.lexer().eof() {
-        return false;
-    }
-    return context
-        .get_token(lexer_range.begin_subrange(), (false, false))
-        .is_some()
-        || context
-            .get_token(lexer_range.begin_subrange(), (false, true))
-            .is_some();
 }

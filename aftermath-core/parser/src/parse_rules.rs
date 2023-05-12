@@ -24,6 +24,9 @@ pub struct ParserRules<'a> {
     known_tokens: HashMap<BindingPowerPattern, Vec<(TokenMatcher, TokenDefinition)>>,
 }
 
+/// Rules for parsing
+/// Invariant:
+/// - No postfix and infix token may have the same symbol. If they do, the infix token always wins.
 impl<'a> ParserRules<'a> {
     pub fn new(
         parent_context: Option<&'a ParserRules<'a>>,
@@ -369,7 +372,7 @@ pub enum TokenArgumentParser {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum ContainerType {
     Fraction,
     Root,
@@ -555,6 +558,8 @@ impl TokenDefinition {
 
             // And then set the argument values
             for parser in &self.arguments_parsers {
+                // TODO: If something expected was not found (e.g. a closing bracket), this should report the appropriate error
+                // And it should not consume anything
                 let parse_result = parser.parse(lexer, context);
 
                 lexer = parse_result.lexer;
