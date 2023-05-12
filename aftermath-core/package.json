@@ -4,6 +4,6 @@
     "postinstall": "wasm-pack build --target web --dev --out-dir ../pkg web"
   },
   "devDependencies": {
-    "wasm-pack": "^0.11.0"
+    "wasm-pack": "^0.11.1"
   }
 }
