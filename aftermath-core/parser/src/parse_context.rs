@@ -4,6 +4,7 @@ use input_tree::{input_node::InputNode, row::RowIndex};
 
 use crate::{
     grapheme_matcher::GraphemeMatcher,
+    lexer::LexerRange,
     syntax_tree::{LeafNodeType, SyntaxLeafNode},
     token_matcher::MatchError,
     SyntaxNode,
@@ -45,16 +46,22 @@ impl<'a> ParserRules<'a> {
         }
     }
 
-    pub fn get_token<'input>(
+    pub fn get_token<'input, 'lexer>(
         &self,
-        token: &mut Lexer<'input>,
+        mut lexer_range: LexerRange<'input, 'lexer>,
         bp_pattern: BindingPowerPattern,
-    ) -> Option<(&TokenDefinition, MatchResult<'input, InputNode>)> {
+    ) -> Option<(
+        LexerRange<'input, 'lexer>,
+        &TokenDefinition,
+        MatchResult<'input, InputNode>,
+    )> {
         let matches: Vec<_> = self
             .known_tokens
             .get(&bp_pattern)?
             .iter()
-            .map(|(matcher, definition)| (matcher.matches(token.get_slice()), definition))
+            .map(|(matcher, definition)| {
+                (matcher.matches(lexer_range.get_next_slice()), definition)
+            })
             .filter_map(|(match_result, definition)| match_result.ok().map(|v| (v, definition)))
             .collect();
 
@@ -63,23 +70,22 @@ impl<'a> ParserRules<'a> {
             panic!("multiple matches for token");
         } else if matches.len() == 1 {
             let (match_result, definition) = matches.into_iter().next().unwrap();
-            token.consume_n(match_result.get_length());
-
-            Some((definition, match_result))
+            lexer_range.consume_n(match_result.get_length());
+            Some((lexer_range, definition, match_result))
         } else {
             self.parent_context
-                .and_then(|v| v.get_token(token, bp_pattern))
+                .and_then(|v| v.get_token(lexer_range, bp_pattern))
         }
     }
 
-    pub fn get_symbol<'input>(
+    pub fn get_symbol<'input, 'lexer>(
         &self,
-        lexer: &mut Lexer<'input>,
+        mut lexer_range: LexerRange<'input, 'lexer>,
         symbol: &NFA,
-    ) -> Option<MatchResult<'input, InputNode>> {
-        let match_result = symbol.matches(lexer.get_slice()).ok()?;
-        lexer.consume_n(match_result.get_length());
-        Some(match_result)
+    ) -> Option<(LexerRange<'input, 'lexer>, MatchResult<'input, InputNode>)> {
+        let match_result = symbol.matches(lexer_range.get_next_slice()).ok()?;
+        lexer_range.consume_n(match_result.get_length());
+        Some((lexer_range, match_result))
     }
 }
 
@@ -383,7 +389,7 @@ struct TokenArgumentParseResult<'lexer> {
 impl TokenArgumentParser {
     fn parse<'lexer, 'input>(
         &self,
-        lexer: Lexer<'lexer>,
+        mut lexer: Lexer<'lexer>,
         context: &ParserRules,
     ) -> TokenArgumentParseResult<'lexer> {
         match self {
@@ -405,25 +411,23 @@ impl TokenArgumentParser {
                 argument_index,
                 symbol_type,
             } => {
-                let mut lexer = lexer.begin_token();
-                if let Some(_match_result) = context.get_symbol(&mut lexer, symbol) {
-                    // Yay
+                if let Some((lexer_range, _match_result)) =
+                    context.get_symbol(lexer.begin_range(), symbol)
+                {
+                    let token = lexer_range.end_range();
+                    let argument = SyntaxLeafNode {
+                        node_type: symbol_type.clone(),
+                        range: token.range.clone(),
+                        symbols: token.get_symbols(),
+                    };
+                    TokenArgumentParseResult {
+                        argument_index: *argument_index,
+                        argument: SyntaxNode::Leaf(argument),
+                        lexer,
+                    }
                 } else {
                     // TODO: Better error message
                     panic!("expected closing bracket");
-                }
-                let range = lexer.get_range();
-                let symbols = lexer.get_symbols();
-                let lexer = lexer.end_token().unwrap();
-                let argument = SyntaxLeafNode {
-                    node_type: symbol_type.clone(),
-                    range,
-                    symbols,
-                };
-                TokenArgumentParseResult {
-                    argument_index: *argument_index,
-                    argument: SyntaxNode::Leaf(argument),
-                    lexer,
                 }
             }
         }

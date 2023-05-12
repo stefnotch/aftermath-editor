@@ -30,9 +30,12 @@ impl<'input> Lexer<'input> {
         }
     }
 
-    pub fn consume_n(&mut self, count: usize) {
-        self.index += count;
-        assert!(self.index <= self.values.len());
+    pub fn begin_range<'lexer>(&'lexer mut self) -> LexerRange<'input, 'lexer> {
+        let index = self.index;
+        LexerRange {
+            lexer: self,
+            range: index..index,
+        }
     }
 
     pub fn get_range(&self) -> Range<usize> {
@@ -40,7 +43,6 @@ impl<'input> Lexer<'input> {
         parent_index..self.index
     }
 
-    // TODO: https://doc.rust-lang.org/reference/attributes/diagnostics.html#the-must_use-attribute ?
     pub fn end_token(self) -> Option<Lexer<'input>> {
         assert!(self.index <= self.values.len());
         if let Some(mut parent) = self.parent {
@@ -51,29 +53,74 @@ impl<'input> Lexer<'input> {
         }
     }
 
-    pub fn discard_token(mut self) -> Option<Lexer<'input>> {
-        self.parent.take().map(|v| *v)
-    }
-
-    /// Gets a slice with all the *next* elements
-    pub fn get_slice(&self) -> &'input [InputNode] {
-        &self.values[self.index..]
+    pub fn get_next_value(&self) -> Option<&'input InputNode> {
+        self.values.get(self.index)
     }
 
     pub fn eof(&self) -> bool {
         self.index >= self.values.len()
     }
+}
 
+// TODO: With that, the lexer could take ownership of the input
+pub struct LexerRange<'input, 'lexer> {
+    lexer: &'lexer mut Lexer<'input>,
+    range: Range<usize>,
+}
+
+impl<'input, 'lexer> LexerRange<'input, 'lexer> {
+    pub fn begin_subrange<'sublexer>(&'sublexer mut self) -> LexerRange<'input, 'sublexer> {
+        let index = self.range.end;
+        LexerRange {
+            lexer: self.lexer,
+            range: index..index,
+        }
+    }
+
+    pub fn end_range(self) -> LexerToken<'input> {
+        self.lexer.index = self.range.end;
+
+        let value = &self.lexer.values[self.range.clone()];
+        LexerToken {
+            value,
+            range: self.range,
+        }
+    }
+
+    pub fn lexer(&self) -> &Lexer<'input> {
+        self.lexer
+    }
+
+    pub fn consume_n(&mut self, count: usize) {
+        self.range.end += count;
+        assert!(self.range.end <= self.lexer.values.len());
+    }
+
+    /// Gets a slice with all the *next* elements
+    pub fn get_next_slice(&self) -> &'input [InputNode] {
+        &self.lexer.values[self.range.end..]
+    }
+}
+
+pub struct LexerToken<'input> {
+    pub value: &'input [InputNode],
+    pub range: Range<usize>,
+}
+
+impl<'input> LexerToken<'input> {
     pub fn get_symbols(&self) -> Vec<String> {
-        let range = self.get_range();
         let mut result = Vec::new();
-        for element in &self.values[range] {
+        for element in &self.value[..] {
             match element {
                 InputNode::Symbol(s) => result.push(s.to_string()),
                 _ => (),
             }
         }
         result
+    }
+
+    pub fn range(&self) -> Range<usize> {
+        self.range.clone()
     }
 }
 
@@ -83,7 +130,7 @@ mod tests {
     use input_tree::{input_node::InputNode, row::InputRow};
 
     #[test]
-    fn test_lexer() {
+    fn test_lexer_slicing() {
         let layout = InputRow::new(vec![
             InputNode::Symbol("a".to_string()),
             InputNode::Fraction([
@@ -93,21 +140,90 @@ mod tests {
         ]);
 
         let mut lexer = Lexer::new(&layout.values);
-        let mut token = lexer.begin_token();
+        let mut lexer_range = lexer.begin_range();
         assert_eq!(
-            token.get_slice().get(0),
+            lexer_range.lexer().get_next_value(),
             Some(&InputNode::Symbol("a".to_string()))
         );
-        token.consume_n(1);
-        lexer = token.end_token().unwrap();
         assert_eq!(
-            lexer.get_slice().get(0),
+            lexer_range.get_next_slice().get(0),
+            Some(&InputNode::Symbol("a".to_string()))
+        );
+        lexer_range.consume_n(1);
+        assert_eq!(
+            lexer_range.lexer().get_next_value(),
+            Some(&InputNode::Symbol("a".to_string()))
+        );
+        assert_eq!(
+            lexer_range.get_next_slice().get(0),
             Some(&InputNode::Fraction([
                 InputRow::new(vec![InputNode::Symbol("b".to_string())]),
                 InputRow::new(vec![InputNode::Symbol("c".to_string())]),
             ]))
         );
-        lexer.consume_n(1);
-        assert_eq!(lexer.get_slice().get(0), None);
+        let _token = lexer_range.end_range();
+    }
+
+    #[test]
+    fn test_lexer_token() {
+        let layout = InputRow::new(vec![
+            InputNode::Symbol("a".to_string()),
+            InputNode::Fraction([
+                InputRow::new(vec![InputNode::Symbol("b".to_string())]),
+                InputRow::new(vec![InputNode::Symbol("c".to_string())]),
+            ]),
+        ]);
+
+        let mut lexer = Lexer::new(&layout.values);
+        let mut lexer_range = lexer.begin_range();
+        lexer_range.consume_n(1);
+        let token = lexer_range.end_range();
+        assert_eq!(
+            token.value.get(0),
+            Some(&InputNode::Symbol("a".to_string()))
+        );
+        assert_eq!(
+            lexer.get_next_value(),
+            Some(&InputNode::Fraction([
+                InputRow::new(vec![InputNode::Symbol("b".to_string())]),
+                InputRow::new(vec![InputNode::Symbol("c".to_string())]),
+            ]))
+        );
+    }
+
+    #[test]
+    fn test_lexer_second_token() {
+        let layout = InputRow::new(vec![
+            InputNode::Symbol("a".to_string()),
+            InputNode::Symbol("b".to_string()),
+        ]);
+
+        let mut lexer = Lexer::new(&layout.values);
+        {
+            let mut lexer_range = lexer.begin_range();
+            lexer_range.consume_n(1);
+            let _token = lexer_range.end_range();
+        }
+        let mut lexer_range = lexer.begin_range();
+        assert_eq!(
+            lexer_range.get_next_slice().get(0),
+            Some(&InputNode::Symbol("b".to_string()))
+        );
+        assert_eq!(
+            lexer_range.lexer.get_next_value(),
+            Some(&InputNode::Symbol("b".to_string()))
+        );
+        lexer_range.consume_n(1);
+        assert_eq!(lexer_range.get_next_slice().get(0), None);
+        assert_eq!(
+            lexer_range.lexer.get_next_value(),
+            Some(&InputNode::Symbol("b".to_string()))
+        );
+        let token = lexer_range.end_range();
+        assert_eq!(lexer.get_next_value(), None);
+        assert_eq!(
+            token.value.get(0),
+            Some(&InputNode::Symbol("b".to_string()))
+        );
     }
 }

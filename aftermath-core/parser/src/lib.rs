@@ -10,6 +10,7 @@ mod token_matcher;
 use std::ops::Range;
 
 use input_tree::{input_node::InputNode, row::InputRow};
+use lexer::LexerRange;
 
 use crate::{lexer::Lexer, syntax_tree::LeafNodeType};
 
@@ -48,7 +49,7 @@ impl<'a> ParserRules<'a> {
     ) -> (SyntaxContainerNode, Lexer<'input>) {
         println!(
             "parse_bp at {:?} with minimum_bp {}",
-            lexer.get_slice(),
+            lexer.get_next_value(),
             minimum_bp
         );
 
@@ -61,51 +62,44 @@ impl<'a> ParserRules<'a> {
 
         // bp stands for binding power
         let mut left: SyntaxContainerNode = {
-            let mut starting_token = lexer.begin_token();
-
-            let parse_result = if let Some((definition, match_result)) =
-                self.get_token(&mut starting_token, (false, false))
+            let parse_result = if let Some((starting_range, definition, match_result)) =
+                self.get_token(lexer.begin_range(), (false, false))
             {
                 // Defined symbol
-                let range = starting_token.get_range();
-                let symbols = starting_token.get_symbols();
-                lexer = starting_token.end_token().unwrap();
+                let token = starting_range.end_range();
                 ParseStartResult {
                     definition,
                     match_result,
-                    range,
-                    symbols,
+                    range: token.range.clone(),
+                    symbols: token.get_symbols(),
                 }
                 .to_syntax_tree(lexer, self)
-            } else if let Some((definition, match_result)) =
-                self.get_token(&mut starting_token, (false, true))
+            } else if let Some((starting_range, definition, match_result)) =
+                self.get_token(lexer.begin_range(), (false, true))
             {
                 // Prefix operator
-                let range = starting_token.get_range();
-                let symbols = starting_token.get_symbols();
-                lexer = starting_token.end_token().unwrap();
+                let token = starting_range.end_range();
                 ParseStartResult {
                     definition,
                     match_result,
-                    range,
-                    symbols,
+                    range: token.range.clone(),
+                    symbols: token.get_symbols(),
                 }
                 .to_syntax_tree(lexer, self)
             } else {
                 // Consume one token and report an error
-                starting_token.consume_n(1);
-                let range = starting_token.get_range();
-                let symbols = starting_token.get_symbols();
-                lexer = starting_token.end_token().unwrap();
+                let mut starting_range = lexer.begin_range();
+                starting_range.consume_n(1);
+                let token = starting_range.end_range();
                 (
                     // TODO: Document this node
                     SyntaxContainerNode::new(
                         "Error".into(),
-                        range.start,
+                        token.range.start,
                         vec![SyntaxNode::Leaf(SyntaxLeafNode {
                             node_type: LeafNodeType::Symbol,
-                            range: range.clone(),
-                            symbols: symbols,
+                            range: token.range.clone(),
+                            symbols: token.get_symbols(),
                         })],
                     ),
                     lexer,
@@ -119,24 +113,22 @@ impl<'a> ParserRules<'a> {
         loop {
             // Not sure yet what happens when we have a postfix operator with a low binding power
             // Also not sure what happens when there's a right associative and a left associative operator with the same binding powers
-            let mut operator = lexer.begin_token();
-            if let Some((definition, match_result)) = self.get_token(&mut operator, (true, true)) {
+            if let Some((mut operator_range, definition, match_result)) =
+                self.get_token(lexer.begin_range(), (true, true))
+            {
                 // Infix operators only get applied if there is something valid after them
                 // So we check if the next parsing step would be successful, while avoiding consuming the token
-                let mut next_token = operator.begin_token();
-                let symbol_comes_next = is_starting_token_next(&mut next_token, self);
-                operator = next_token.discard_token().unwrap();
+                let symbol_comes_next =
+                    is_starting_token_next(operator_range.begin_subrange(), self);
                 if symbol_comes_next {
                     // Infix operator
                     // Not super elegant, but it works
                     if definition.binding_power.0.unwrap() < minimum_bp {
-                        lexer = operator.discard_token().unwrap();
+                        // operator_range is automatically dropped here, so we don't have to do it manually
                         break;
                     }
-                    let operator_range = operator.get_range();
-                    let operator_symbols = operator.get_symbols();
                     // Actually consume the operator
-                    lexer = operator.end_token().unwrap();
+                    let token = operator_range.end_range();
 
                     let left_range = left.range().clone();
 
@@ -149,33 +141,28 @@ impl<'a> ParserRules<'a> {
                         SyntaxNode::Container(left),
                         SyntaxNode::Leaf(SyntaxLeafNode {
                             node_type: definition.get_symbol_type().into(),
-                            range: operator_range,
-                            symbols: operator_symbols,
+                            range: token.range.clone(),
+                            symbols: token.get_symbols(),
                         }),
                     ];
                     children.extend(args);
 
                     left = SyntaxContainerNode::new(definition.name(), left_range.start, children);
                     continue;
-                } else {
-                    lexer = operator.discard_token().unwrap();
                 }
-            } else {
-                lexer = operator.discard_token().unwrap();
             }
 
-            let mut operator = lexer.begin_token();
-            if let Some((definition, match_result)) = self.get_token(&mut operator, (true, false)) {
+            if let Some((operator_range, definition, match_result)) =
+                self.get_token(lexer.begin_range(), (true, false))
+            {
                 // Postfix operator
                 if definition.binding_power.0.unwrap() < minimum_bp {
-                    lexer = operator.discard_token().unwrap();
+                    // operator_range is automatically dropped here, so we don't have to do it manually
                     break;
                 }
-                let operator_range = operator.get_range();
-                let operator_symbols = operator.get_symbols();
 
                 // Actually consume the operator
-                lexer = operator.end_token().unwrap();
+                let token = operator_range.end_range();
 
                 let left_range = left.range();
 
@@ -187,19 +174,17 @@ impl<'a> ParserRules<'a> {
                     SyntaxNode::Container(left),
                     SyntaxNode::Leaf(SyntaxLeafNode {
                         node_type: definition.get_symbol_type().into(),
-                        range: operator_range,
-                        symbols: operator_symbols,
+                        range: token.range.clone(),
+                        symbols: token.get_symbols(),
                     }),
                 ];
                 children.extend(args);
 
                 left = SyntaxContainerNode::new(definition.name(), left_range.start, children);
                 continue;
-            } else {
-                lexer = operator.discard_token().unwrap();
             }
 
-            println!("not expected operator {:?}", lexer.get_slice());
+            println!("not expected operator {:?}", lexer.get_next_value());
             // Not an expected operator
             // This can happen when
             // - the minimum binding power is too high, in which case we should return to the caller
@@ -239,19 +224,23 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
 
         assert_eq!(lexer.get_range().start, self.range.start);
         (
-            SyntaxContainerNode::new(self.definition.name(), lexer.get_range().start, children),
+            SyntaxContainerNode::new(self.definition.name(), self.range.start, children),
             lexer,
         )
     }
 }
 
 fn is_starting_token_next<'input, 'definition>(
-    token: &mut Lexer<'input>,
+    mut lexer_range: LexerRange<'input, 'definition>,
     context: &'definition ParserRules,
 ) -> bool {
-    if token.eof() {
+    if lexer_range.lexer().eof() {
         return false;
     }
-    return context.get_token(token, (false, false)).is_some()
-        || context.get_token(token, (false, true)).is_some();
+    return context
+        .get_token(lexer_range.begin_subrange(), (false, false))
+        .is_some()
+        || context
+            .get_token(lexer_range.begin_subrange(), (false, true))
+            .is_some();
 }
