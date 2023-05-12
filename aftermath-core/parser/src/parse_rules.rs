@@ -5,6 +5,7 @@ use input_tree::{input_node::InputNode, row::RowIndex};
 use crate::{
     grapheme_matcher::GraphemeMatcher,
     lexer::LexerRange,
+    parse_row,
     syntax_tree::{LeafNodeType, SyntaxLeafNode},
     token_matcher::MatchError,
     SyntaxContainerNode, SyntaxNode,
@@ -546,10 +547,11 @@ impl TokenDefinition {
                 .iter()
                 .enumerate()
                 .map(|(row_index, row)| {
-                    let lexer = Lexer::new(&row.values);
-                    let (mut syntax_tree, lexer) = context.parse_bp(lexer, 0);
-                    syntax_tree = syntax_tree.with_row_index(RowIndex(token_index, row_index));
-                    assert!(lexer.eof());
+                    let row_parse_result = parse_row(row, context);
+                    // TODO: Bubble up the row_parse_result.errors
+                    let syntax_tree = row_parse_result
+                        .value
+                        .with_row_index(RowIndex(token_index, row_index));
                     SyntaxNode::Container(syntax_tree)
                 })
                 .collect();

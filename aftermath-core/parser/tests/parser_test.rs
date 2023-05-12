@@ -1,5 +1,5 @@
 use input_tree::{input_node::InputNode, row::InputRow};
-use parser::{parse, parse_rules::ParserRules};
+use parser::{parse_row, parse_rules::ParserRules};
 
 #[test]
 fn test_parser() {
@@ -12,7 +12,7 @@ fn test_parser() {
 
     let context = ParserRules::default();
 
-    let parsed = parse(&layout, &context);
+    let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
         r#"(Multiply () (Subtract () "-" (Variable () "b")) "*" (Variable () "C"))"#
@@ -31,7 +31,7 @@ fn test_postfix() {
 
     let context = ParserRules::default();
 
-    let parsed = parse(&layout, &context);
+    let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
         r#"(Add () (Variable () "c") "+" (Factorial () (Variable () "a") "!"))"#
@@ -53,7 +53,7 @@ fn test_parser_nested_brackets_and_postfix() {
     ]);
     let context = ParserRules::default();
 
-    let parsed = parse(&layout, &context);
+    let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
         r#"(RoundBrackets () "(" (RoundBrackets () "(" (RoundBrackets () "(" (Factorial () (Variable () "a") "!") ")") ")") ")")"#
@@ -71,7 +71,7 @@ fn test_parser_tuple() {
 
     let context = ParserRules::default();
 
-    let parsed = parse(&layout, &context);
+    let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
         r#"(Tuple () (Variable () "a") "," (Variable () "b"))"#
@@ -93,7 +93,7 @@ fn test_parser_tuple_advanced() {
 
     let context = ParserRules::default();
 
-    let parsed = parse(&layout, &context);
+    let parsed = parse_row(&layout, &context);
     // Not entirely satisfactory, but eh
     assert_eq!(
         parsed.value.to_string(),
@@ -115,7 +115,7 @@ fn test_parser_function_call() {
 
     let context = ParserRules::default();
 
-    let parsed = parse(&layout, &context);
+    let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
         r#"(FunctionApplication () (Variable () "f") "(" (Tuple () (Variable () "a") "," (Variable () "b")) ")")"#
@@ -134,7 +134,7 @@ fn test_parser_brackets_with_addition() {
     ]);
 
     let context = ParserRules::default();
-    let parsed = parse(&layout, &context);
+    let parsed = parse_row(&layout, &context);
 
     assert_eq!(
         parsed.value.to_string(),
@@ -157,7 +157,7 @@ fn test_parser_fraction() {
     ]);
 
     let context = ParserRules::default();
-    let parsed = parse(&layout, &context);
+    let parsed = parse_row(&layout, &context);
 
     assert_eq!(
         parsed.value.to_string(),
@@ -171,7 +171,7 @@ fn test_parser_empty_input() {
     let layout = InputRow::new(vec![]);
     let context = ParserRules::default();
 
-    let parsed = parse(&layout, &context);
+    let parsed = parse_row(&layout, &context);
     // "Nothing" is taken from https://cortexjs.io/compute-engine/reference/core/
     assert_eq!(parsed.value.to_string(), "(Nothing ())");
 }
@@ -186,7 +186,7 @@ fn test_parser_empty_squareroot() {
     ])]);
     let context = ParserRules::default();
 
-    let parsed = parse(&layout, &context);
+    let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
         r#"(Root () (Nothing ()) (Variable () "a"))"#
@@ -202,7 +202,7 @@ fn test_parser_symbol_and_close_bracket() {
     ]);
     let context = ParserRules::default();
 
-    let parsed = parse(&layout, &context);
+    let parsed = parse_row(&layout, &context);
     println!("{:?}", parsed);
 }
 
@@ -211,6 +211,6 @@ fn test_parser_close_bracket() {
     let layout = InputRow::new(vec![InputNode::Symbol(")".to_string())]);
     let context = ParserRules::default();
 
-    let parsed = parse(&layout, &context);
+    let parsed = parse_row(&layout, &context);
     println!("{:?}", parsed);
 }

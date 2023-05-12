@@ -24,7 +24,7 @@ use self::{
 pub use self::parse_result::{ParseError, ParseErrorType, ParseResult};
 pub use self::syntax_tree::{SyntaxContainerNode, SyntaxLeafNode, SyntaxNode};
 
-pub fn parse(input: &InputRow, context: &ParserRules) -> ParseResult<SyntaxContainerNode> {
+pub fn parse_row(input: &InputRow, context: &ParserRules) -> ParseResult<SyntaxContainerNode> {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     // we could also have used https://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/ as the tutorial
     let mut lexer = Lexer::new(&input.values);

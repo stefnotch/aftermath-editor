@@ -35,7 +35,7 @@ pub fn parse(layout_row: JsValue) -> Result<JsValue, JsValue> {
 
     let context = ParserRules::default();
     let transformer = AstTransformer::new();
-    let mut parsed: MathParseResult = parser::parse(&layout, &context).into();
+    let mut parsed: MathParseResult = parser::parse_row(&layout, &context).into();
     parsed.value = transformer.transform(parsed.value);
 
     let serializer =
