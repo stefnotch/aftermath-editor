@@ -37,6 +37,14 @@ pub enum SyntaxNodes {
     Containers(Vec<SyntaxNode>),
     Leaves(Vec<SyntaxLeafNode>),
 }
+impl SyntaxNodes {
+    fn is_empty(&self) -> bool {
+        match self {
+            SyntaxNodes::Containers(children) => children.is_empty(),
+            SyntaxNodes::Leaves(children) => children.is_empty(),
+        }
+    }
+}
 
 /// A leaf node in a concrete syntax tree.
 #[derive(Debug, Serialize)]

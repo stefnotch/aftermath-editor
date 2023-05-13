@@ -34,7 +34,7 @@ fn test_postfix() {
     let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        r#"(Add () (Variable () "c") "+" (Factorial () (Variable () "a") "!"))"#
+        r#"(Add (Variable "c") (Operator "+") (Factorial (Variable "a") (Operator "!")))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -74,7 +74,7 @@ fn test_parser_tuple() {
     let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        r#"(Tuple () (Variable () "a") "," (Variable () "b"))"#
+        r#"(Tuple (Variable "a") (Operator ",") (Variable "b"))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -118,7 +118,7 @@ fn test_parser_function_call() {
     let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        r#"(FunctionApplication () (Variable () "f") "(" (Tuple () (Variable () "a") "," (Variable () "b")) ")")"#
+        r#"(FunctionApplication (Variable "f") (Operator "(") (Tuple (Variable "a") (Operator ",") (Variable "b")) (Operator ")"))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -173,7 +173,7 @@ fn test_parser_empty_input() {
 
     let parsed = parse_row(&layout, &context);
     // "Nothing" is taken from https://cortexjs.io/compute-engine/reference/core/
-    assert_eq!(parsed.value.to_string(), "(Nothing ())");
+    assert_eq!(parsed.value.to_string(), "(Nothing)");
 }
 
 #[test]
@@ -189,7 +189,7 @@ fn test_parser_empty_squareroot() {
     let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        r#"(Root () (Nothing ()) (Variable () "a"))"#
+        r#"(Root (Nothing) (Variable "a"))"#
     );
 }
 

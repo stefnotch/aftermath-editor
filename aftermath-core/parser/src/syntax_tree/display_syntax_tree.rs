@@ -8,13 +8,19 @@ impl fmt::Display for SyntaxNodes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SyntaxNodes::Containers(children) => {
-                for child in children {
-                    write!(f, "{}", child)?;
+                if let Some((first, tail)) = children.split_first() {
+                    write!(f, "{}", first)?;
+                    for child in tail {
+                        write!(f, " {}", child)?;
+                    }
                 }
             }
             SyntaxNodes::Leaves(children) => {
-                for child in children {
-                    write!(f, "{}", child)?;
+                if let Some((first, tail)) = children.split_first() {
+                    write!(f, "{}", first)?;
+                    for child in tail {
+                        write!(f, " {}", child)?;
+                    }
                 }
             }
         };
@@ -28,16 +34,18 @@ impl fmt::Display for SyntaxNode {
         // S here sadly doesn't stand for Stef
         write!(f, "({}", self.name)?;
 
-        // Always print the arguments
-        write!(f, " {}", self.children)?;
+        // Print the arguments, every argument has () around it
+        if !self.children.is_empty() {
+            write!(f, " ")?;
+            write!(f, "{}", self.children)?;
+        }
 
-        // Optionally print the value
+        // Print the value
         if !self.value.is_empty() {
-            write!(f, " (")?;
+            write!(f, " ")?;
             for byte in &self.value {
                 write!(f, "{:02x}", byte)?;
             }
-            write!(f, ")")?;
         }
 
         write!(f, ")")

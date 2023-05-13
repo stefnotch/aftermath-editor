@@ -391,6 +391,7 @@ struct TokenArgumentParseResult<'lexer> {
 }
 
 pub fn operator_syntax_node(leaf_node: SyntaxLeafNode) -> SyntaxNode {
+    assert!(leaf_node.node_type == LeafNodeType::Operator);
     // TODO: Document this node
     SyntaxNode::new(
         "Operator".into(),
@@ -513,7 +514,7 @@ impl TokenDefinition {
         }
     }
 
-    fn binding_power_pattern(&self) -> (bool, bool) {
+    pub fn binding_power_pattern(&self) -> (bool, bool) {
         (
             self.binding_power.0.is_some(),
             self.binding_power.1.is_some(),

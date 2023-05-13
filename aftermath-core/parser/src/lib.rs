@@ -260,7 +260,8 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
                 ),
                 lexer,
             )
-        } else {
+        } else if self.definition.binding_power_pattern() == (false, true) {
+            // prefix
             let mut children = vec![operator_syntax_node(SyntaxLeafNode {
                 node_type: self.definition.get_symbol_type().into(),
                 range: self.range.clone(),
@@ -274,6 +275,24 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
                     self.definition.name(),
                     range,
                     SyntaxNodes::Containers(children),
+                ),
+                lexer,
+            )
+        } else {
+            assert!(
+                args.is_empty(),
+                "Cannot have an atom with args in the current flawed implementation"
+            );
+            // atom
+            (
+                SyntaxNode::new(
+                    self.definition.name(),
+                    self.range.clone(),
+                    SyntaxNodes::Leaves(vec![SyntaxLeafNode {
+                        node_type: self.definition.get_symbol_type().into(),
+                        range: self.range.clone(),
+                        symbols: self.symbols,
+                    }]),
                 ),
                 lexer,
             )
