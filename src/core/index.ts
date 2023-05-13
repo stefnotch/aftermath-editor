@@ -1,5 +1,6 @@
 import init, { parse as core_parse } from "../../aftermath-core/pkg";
 import { MathLayoutRow } from "../math-layout/math-layout";
+import { Offset } from "../math-layout/math-layout-offset";
 
 // Yay, top level await is neat https://v8.dev/features/top-level-await
 await init();
@@ -65,16 +66,16 @@ type CoreElement =
   | { Symbol: string };
 
 export type ParseResult = {
-  value: SyntaxContainerNode;
+  value: SyntaxNode;
   errors: ParseError[];
 };
 
-export type SyntaxNode =
+export type SyntaxNodes =
   | {
-      Container: SyntaxContainerNode;
+      Containers: SyntaxNode[];
     }
   | {
-      Leaf: SyntaxLeafNode;
+      Leaves: SyntaxLeafNode[];
     };
 
 export type Range<T> = {
@@ -82,9 +83,9 @@ export type Range<T> = {
   end: T;
 };
 
-export type SyntaxContainerNode = {
+export type SyntaxNode<T extends SyntaxNodes = SyntaxNodes> = {
   name: string;
-  children: SyntaxNode[];
+  children: T;
   row_index?: [bigint, bigint];
   value: any; // TODO:
   range: Range<bigint>;
@@ -101,3 +102,14 @@ export type ParseError = {
   error: any;
   range: any;
 };
+
+export function hasContainersChildren(node: SyntaxNode): node is SyntaxNode<{ Containers: SyntaxNode[] }> {
+  return "Containers" in node.children;
+}
+export function hasLeavesChildren(node: SyntaxNode): node is SyntaxNode<{ Leaves: SyntaxLeafNode[] }> {
+  return "Leaves" in node.children;
+}
+
+export function offsetInRange(offset: Offset, range: Range<bigint>): boolean {
+  return range.start <= offset && offset <= range.end;
+}

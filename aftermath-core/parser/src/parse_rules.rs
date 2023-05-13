@@ -8,7 +8,7 @@ use crate::{
     parse_row,
     syntax_tree::{LeafNodeType, SyntaxLeafNode},
     token_matcher::MatchError,
-    SyntaxContainerNode, SyntaxNode,
+    SyntaxNode, SyntaxNodes,
 };
 
 use super::{
@@ -390,6 +390,15 @@ struct TokenArgumentParseResult<'lexer> {
     lexer: Lexer<'lexer>,
 }
 
+pub fn operator_syntax_node(leaf_node: SyntaxLeafNode) -> SyntaxNode {
+    // TODO: Document this node
+    SyntaxNode::new(
+        "Operator".into(),
+        leaf_node.range(),
+        SyntaxNodes::Leaves(vec![leaf_node]),
+    )
+}
+
 impl TokenArgumentParser {
     fn parse<'lexer, 'input>(
         &self,
@@ -404,7 +413,7 @@ impl TokenArgumentParser {
                 let (argument, lexer) = context.parse_bp(lexer, *minimum_binding_power);
                 TokenArgumentParseResult {
                     argument_index: *argument_index,
-                    argument: SyntaxNode::Container(argument),
+                    argument,
                     lexer,
                 }
             }
@@ -424,7 +433,7 @@ impl TokenArgumentParser {
                     };
                     TokenArgumentParseResult {
                         argument_index: *argument_index,
-                        argument: SyntaxNode::Leaf(argument),
+                        argument: operator_syntax_node(argument),
                         lexer,
                     }
                 } else {
@@ -432,12 +441,12 @@ impl TokenArgumentParser {
                     // TODO: Report this error properly?
                     TokenArgumentParseResult {
                         argument_index: *argument_index,
-                        argument: SyntaxNode::Container(SyntaxContainerNode::new(
+                        argument: SyntaxNode::new(
                             // TODO: Document this node
                             "Error".into(),
                             token.range.clone(),
-                            vec![],
-                        )),
+                            SyntaxNodes::Leaves(vec![]),
+                        ),
                         lexer,
                     }
                 }
@@ -552,18 +561,15 @@ impl TokenDefinition {
                     let syntax_tree = row_parse_result
                         .value
                         .with_row_index(RowIndex(token_index, row_index));
-                    SyntaxNode::Container(syntax_tree)
+                    syntax_tree
                 })
                 .collect();
             (arguments, lexer)
         } else {
             // Fill arguments with dummies
             let mut arguments = std::iter::repeat_with(|| {
-                SyntaxNode::Leaf(SyntaxLeafNode {
-                    node_type: LeafNodeType::Symbol,
-                    range: 0..0,
-                    symbols: vec![],
-                })
+                // TODO: Inefficient
+                SyntaxNode::new("dummy".into(), 0..0, SyntaxNodes::Leaves(vec![]))
             })
             .take(self.argument_count)
             .collect::<Vec<_>>();

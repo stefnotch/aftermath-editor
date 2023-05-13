@@ -1,11 +1,13 @@
-use core::fmt;
+mod display_syntax_tree;
+
 use std::ops::Range;
 
 use serde::Serialize;
 
+pub use display_syntax_tree::*;
 use input_tree::row::RowIndex;
 
-/// A concrete syntax tree.
+/// A node in a concrete syntax tree that contains other nodes.
 /// Has a few invariants:
 /// - Parent range always contains all the child ranges
 /// - Child ranges are sorted
@@ -15,35 +17,11 @@ use input_tree::row::RowIndex;
 ///
 /// indices reference the input tree
 #[derive(Debug, Serialize)]
-pub enum SyntaxNode {
-    Container(SyntaxContainerNode),
-    Leaf(SyntaxLeafNode),
-}
-
-impl SyntaxNode {
-    pub fn range(&self) -> Range<usize> {
-        match self {
-            SyntaxNode::Container(node) => node.range.clone(),
-            SyntaxNode::Leaf(node) => node.range.clone(),
-        }
-    }
-
-    pub fn row_index(&self) -> Option<RowIndex> {
-        match self {
-            SyntaxNode::Container(node) => node.row_index(),
-            SyntaxNode::Leaf(_) => None,
-        }
-    }
-}
-
-/// A node in a concrete syntax tree that contains other nodes.
-/// This can also be a "Variable" node, which just contains a single leaf node.
-#[derive(Debug, Serialize)]
-pub struct SyntaxContainerNode {
+pub struct SyntaxNode {
     /// name of the function or constant
     pub name: String,
     /// children of the node, including the operator token(s)
-    pub children: Vec<SyntaxNode>,
+    pub children: SyntaxNodes,
     /// Which container and row to go down to reach this node
     /// TODO: Maybe there's a better way to do this?
     row_index: Option<RowIndex>,
@@ -52,6 +30,12 @@ pub struct SyntaxContainerNode {
     pub value: Vec<u8>,
     /// The range of this in the input tree row.
     range: Range<usize>,
+}
+
+#[derive(Debug, Serialize)]
+pub enum SyntaxNodes {
+    Containers(Vec<SyntaxNode>),
+    Leaves(Vec<SyntaxLeafNode>),
 }
 
 /// A leaf node in a concrete syntax tree.
@@ -74,9 +58,9 @@ pub enum LeafNodeType {
     Operator,
 }
 
-impl SyntaxContainerNode {
-    pub fn new(name: String, range: Range<usize>, children: Vec<SyntaxNode>) -> Self {
-        if let Some(child_range) = SyntaxContainerNode::get_combined_range(&children) {
+impl SyntaxNode {
+    pub fn new(name: String, range: Range<usize>, children: SyntaxNodes) -> Self {
+        if let Some(child_range) = SyntaxNode::get_combined_range(&children) {
             assert!(range.start <= child_range.start && child_range.end <= range.end);
         }
         Self {
@@ -89,17 +73,24 @@ impl SyntaxContainerNode {
     }
 
     /// Returns the range of all the children combined, and verifies the invariants.
-    fn get_combined_range(children: &[SyntaxNode]) -> Option<Range<usize>> {
-        let mut child_iter = children.iter().filter(|c| c.row_index().is_none());
-
+    fn get_combined_range(children: &SyntaxNodes) -> Option<Range<usize>> {
+        let binding = match children {
+            SyntaxNodes::Containers(children) => children
+                .iter()
+                .filter(|c| c.row_index().is_none())
+                .map(|v| v.range())
+                .collect::<Vec<_>>(),
+            SyntaxNodes::Leaves(children) => children.iter().map(|v| v.range()).collect(),
+        };
+        let mut child_iter = binding.iter();
         if let Some(first) = child_iter.next() {
-            let mut prev_child_range = first.range();
+            let mut prev_child_range = first;
             for child in child_iter {
-                let child_range = child.range();
+                let child_range = child;
                 assert!(prev_child_range.end == child_range.start);
                 prev_child_range = child_range;
             }
-            Some(first.range().start..prev_child_range.end)
+            Some(first.start..prev_child_range.end)
         } else {
             None
         }
@@ -125,53 +116,8 @@ pub fn get_child_range_end(children: &[SyntaxNode]) -> usize {
     child_iter.last().unwrap().range().end
 }
 
-impl fmt::Display for SyntaxNode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            SyntaxNode::Container(node) => write!(f, "{}", node),
-            SyntaxNode::Leaf(node) => write!(f, "{}", node),
-        }
-    }
-}
-
-impl fmt::Display for SyntaxContainerNode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // S-expression
-        // S here sadly doesn't stand for Stef
-        write!(f, "({}", self.name)?;
-
-        // Always print the value
-        write!(f, " (")?;
-        if !self.value.is_empty() {
-            for byte in &self.value {
-                write!(f, "{:02x}", byte)?;
-            }
-        }
-        write!(f, ")")?;
-
-        // Optionally print the arguments
-        if !self.children.is_empty() {
-            for arg in &self.children {
-                write!(f, " {}", arg)?;
-            }
-        }
-        write!(f, ")")
-    }
-}
-
-impl fmt::Display for SyntaxLeafNode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "\"")?;
-        // Print string, escaping quotes
-        for grapheme in &self.symbols {
-            for c in grapheme.chars() {
-                match c {
-                    '"' => write!(f, "\\\"")?,
-                    '\\' => write!(f, "\\\\")?,
-                    _ => write!(f, "{}", c)?,
-                }
-            }
-        }
-        write!(f, "\"")
+impl SyntaxLeafNode {
+    pub fn range(&self) -> Range<usize> {
+        self.range.clone()
     }
 }

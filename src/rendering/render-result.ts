@@ -1,4 +1,4 @@
-import { ParseResult, SyntaxContainerNode } from "../core";
+import { ParseResult, SyntaxNode } from "../core";
 import { Offset } from "../math-layout/math-layout-offset";
 import { MathLayoutPosition } from "../math-layout/math-layout-position";
 import { RowIndices } from "../math-layout/math-layout-zipper";
@@ -9,7 +9,7 @@ export interface Renderer<T> {
 
   renderAll(parsed: ParseResult): RenderResult<T>;
 
-  render(syntaxTree: SyntaxContainerNode): RenderedElement<T>;
+  render(syntaxTree: SyntaxNode): RenderedElement<T>;
 }
 
 /**
@@ -48,7 +48,7 @@ export interface RenderedElement<T> {
   /**
    * It's easier to walk down the render results if they know their syntax tree element.
    */
-  syntaxTree: SyntaxContainerNode;
+  syntaxTree: SyntaxNode;
 
   /**
    * The actual underlying DOM nodes

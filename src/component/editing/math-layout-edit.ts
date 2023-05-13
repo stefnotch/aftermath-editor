@@ -1,7 +1,7 @@
 import { MathLayoutElement } from "../../math-layout/math-layout";
 import { Offset } from "../../math-layout/math-layout-offset";
 import { RowIndices, fromRowIndices, MathLayoutRowZipper } from "../../math-layout/math-layout-zipper";
-import { assert, assertUnreachable } from "../../utils/assert";
+import { assertUnreachable } from "../../utils/assert";
 import { MathLayoutCaret, SerializedCaret } from "./math-layout-caret";
 
 export type MathLayoutEdit = {

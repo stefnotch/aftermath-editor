@@ -10,6 +10,7 @@ mod token_matcher;
 use std::ops::Range;
 
 use input_tree::{input_node::InputNode, row::InputRow};
+use parse_rules::operator_syntax_node;
 
 use crate::{
     lexer::Lexer,
@@ -22,9 +23,9 @@ use self::{
 };
 
 pub use self::parse_result::{ParseError, ParseErrorType, ParseResult};
-pub use self::syntax_tree::{SyntaxContainerNode, SyntaxLeafNode, SyntaxNode};
+pub use self::syntax_tree::{SyntaxLeafNode, SyntaxNode, SyntaxNodes};
 
-pub fn parse_row(input: &InputRow, context: &ParserRules) -> ParseResult<SyntaxContainerNode> {
+pub fn parse_row(input: &InputRow, context: &ParserRules) -> ParseResult<SyntaxNode> {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     // we could also have used https://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/ as the tutorial
     let mut lexer = Lexer::new(&input.values);
@@ -45,13 +46,13 @@ pub fn parse_row(input: &InputRow, context: &ParserRules) -> ParseResult<SyntaxC
             if next_token.range().is_empty() {
                 (next_token, lexer) = error_and_consume_one(lexer);
             }
-            error_children.push(SyntaxNode::Container(next_token));
+            error_children.push(next_token);
         }
 
         let range = parse_result.range().start..get_child_range_end(&error_children);
-        let mut children = vec![SyntaxNode::Container(parse_result)];
+        let mut children = vec![parse_result];
         children.extend(error_children);
-        parse_result = SyntaxContainerNode::new("Error".into(), range, children);
+        parse_result = SyntaxNode::new("Error".into(), range, SyntaxNodes::Containers(children));
     }
 
     println!("parse result: {:?}", parse_result);
@@ -73,7 +74,7 @@ impl<'a> ParserRules<'a> {
         &self,
         mut lexer: Lexer<'input>,
         minimum_bp: u32,
-    ) -> (SyntaxContainerNode, Lexer<'input>) {
+    ) -> (SyntaxNode, Lexer<'input>) {
         println!(
             "parse_bp at {:?} with minimum_bp {}",
             lexer.get_next_value(),
@@ -83,17 +84,17 @@ impl<'a> ParserRules<'a> {
         if lexer.eof() {
             // TODO: Document this node
             return (
-                SyntaxContainerNode::new(
+                SyntaxNode::new(
                     "Nothing".into(),
                     lexer.begin_range().end_range().range(),
-                    vec![],
+                    SyntaxNodes::Leaves(vec![]),
                 ),
                 lexer,
             );
         }
 
         // bp stands for binding power
-        let mut left: SyntaxContainerNode = {
+        let mut left: SyntaxNode = {
             let parse_result = if let Some((starting_range, definition, match_result)) =
                 self.get_token(lexer.begin_range(), (false, false))
             {
@@ -148,13 +149,12 @@ impl<'a> ParserRules<'a> {
                 // Parse the right operand
                 let args;
                 (args, lexer) = definition.parse_arguments(lexer, self, &match_result);
-
                 // Combine the left and right operand into a new left operand
                 let mut children = vec![
-                    SyntaxNode::Container(left),
-                    SyntaxNode::Leaf(SyntaxLeafNode {
+                    left,
+                    operator_syntax_node(SyntaxLeafNode {
                         node_type: definition.get_symbol_type().into(),
-                        range: token.range.clone(),
+                        range: token.range(),
                         symbols: token.get_symbols(),
                     }),
                 ];
@@ -162,7 +162,7 @@ impl<'a> ParserRules<'a> {
 
                 // Range that includes the left side, and the last child
                 let range = range_start..get_child_range_end(&children);
-                left = SyntaxContainerNode::new(definition.name(), range, children);
+                left = SyntaxNode::new(definition.name(), range, SyntaxNodes::Containers(children));
                 continue;
             }
 
@@ -185,8 +185,8 @@ impl<'a> ParserRules<'a> {
 
                 // Combine the left operand into a new left operand
                 let mut children = vec![
-                    SyntaxNode::Container(left),
-                    SyntaxNode::Leaf(SyntaxLeafNode {
+                    left,
+                    operator_syntax_node(SyntaxLeafNode {
                         node_type: definition.get_symbol_type().into(),
                         range: token.range.clone(),
                         symbols: token.get_symbols(),
@@ -195,7 +195,7 @@ impl<'a> ParserRules<'a> {
                 children.extend(args);
 
                 let range = range_start..get_child_range_end(&children);
-                left = SyntaxContainerNode::new(definition.name(), range, children);
+                left = SyntaxNode::new(definition.name(), range, SyntaxNodes::Containers(children));
                 continue;
             }
 
@@ -213,20 +213,20 @@ impl<'a> ParserRules<'a> {
     }
 }
 
-fn error_and_consume_one(mut lexer: Lexer) -> (SyntaxContainerNode, Lexer) {
+fn error_and_consume_one(mut lexer: Lexer) -> (SyntaxNode, Lexer) {
     let mut starting_range = lexer.begin_range();
     starting_range.consume_n(1);
     let token = starting_range.end_range();
     (
         // TODO: Document this node
-        SyntaxContainerNode::new(
+        SyntaxNode::new(
             "Error".into(),
             token.range.clone(),
-            vec![SyntaxNode::Leaf(SyntaxLeafNode {
+            SyntaxNodes::Leaves(vec![SyntaxLeafNode {
                 node_type: LeafNodeType::Symbol,
                 range: token.range.clone(),
                 symbols: token.get_symbols(),
-            })],
+            }]),
         ),
         lexer,
     )
@@ -244,7 +244,7 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
         self,
         lexer: Lexer<'lexer>,
         context: &ParserRules,
-    ) -> (SyntaxContainerNode, Lexer<'lexer>) {
+    ) -> (SyntaxNode, Lexer<'lexer>) {
         let (args, lexer) = self
             .definition
             .parse_arguments(lexer, context, &self.match_result);
@@ -253,11 +253,15 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
             let children = args;
             let range = self.range;
             (
-                SyntaxContainerNode::new(self.definition.name(), range, children),
+                SyntaxNode::new(
+                    self.definition.name(),
+                    range,
+                    SyntaxNodes::Containers(children),
+                ),
                 lexer,
             )
         } else {
-            let mut children = vec![SyntaxNode::Leaf(SyntaxLeafNode {
+            let mut children = vec![operator_syntax_node(SyntaxLeafNode {
                 node_type: self.definition.get_symbol_type().into(),
                 range: self.range.clone(),
                 symbols: self.symbols,
@@ -266,7 +270,11 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
 
             let range = self.range.start..get_child_range_end(&children);
             (
-                SyntaxContainerNode::new(self.definition.name(), range, children),
+                SyntaxNode::new(
+                    self.definition.name(),
+                    range,
+                    SyntaxNodes::Containers(children),
+                ),
                 lexer,
             )
         }

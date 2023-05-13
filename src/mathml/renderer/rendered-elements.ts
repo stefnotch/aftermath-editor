@@ -1,42 +1,23 @@
-import { SyntaxContainerNode } from "../../core";
+import { SyntaxNode } from "../../core";
 import { RenderedElement, RenderedPosition, Renderer } from "../../rendering/render-result";
-import { assert, assertUnreachable } from "../../utils/assert";
+import { assert } from "../../utils/assert";
 import { MathMLTags, MathMLTagsExpectedChildrenCount } from "../mathml-spec";
 import { LeafMathMLElement } from "./rendered-leaf";
-import { TextMathMLElement } from "./rendered-text-element";
 
 export class SimpleContainerMathMLElement implements RenderedElement<MathMLElement> {
   element: MathMLElement;
   children: RenderedElement<MathMLElement>[] = [];
 
-  constructor(public syntaxTree: SyntaxContainerNode, elementName: MathMLTags, renderer: Renderer<MathMLElement>) {
+  constructor(
+    public syntaxTree: SyntaxNode<{ Containers: SyntaxNode[] }>,
+    elementName: MathMLTags,
+    renderer: Renderer<MathMLElement>
+  ) {
     this.element = createMathElement(elementName, []);
 
     this.setChildren(
       elementName,
-      this.syntaxTree.children.map((c) => {
-        if ("Container" in c) {
-          return renderer.render(c.Container);
-        } else if ("Leaf" in c) {
-          if (c.Leaf.node_type === "Operator") {
-            return new TextMathMLElement(
-              {
-                name: syntaxTree.name,
-                children: [c],
-                range: c.Leaf.range,
-                value: [],
-              },
-              "mo"
-            );
-          } else {
-            throw new Error("Invalid leaf element in this container element", {
-              cause: { container: syntaxTree, element: c.Leaf },
-            });
-          }
-        } else {
-          assertUnreachable(c);
-        }
-      })
+      syntaxTree.children.Containers.map((c) => renderer.render(c))
     );
   }
   getViewportPosition(offset: number): RenderedPosition {
@@ -57,7 +38,7 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
       "Invalid number of children for " + elementName
     );
 
-    assert(children.length === this.syntaxTree.children.length, "Invalid number of children");
+    assert(children.length === this.syntaxTree.children.Containers.length, "Invalid number of children");
     // Ah yes, using flatMap to avoid having to do an unsafe type cast
     this.children = children.flatMap((c) => (c instanceof LeafMathMLElement ? [] : [c]));
     this.element.append(

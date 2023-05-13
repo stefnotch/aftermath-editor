@@ -1,4 +1,4 @@
-import { SyntaxContainerNode } from "../../core";
+import { SyntaxNode } from "../../core";
 import { Offset } from "../../math-layout/math-layout-offset";
 import { RenderedElement, RenderedPosition } from "../../rendering/render-result";
 import { ViewportValue } from "../../rendering/viewport-coordinate";
@@ -9,9 +9,14 @@ export class NothingMathMLElement implements RenderedElement<MathMLElement> {
   element: MathMLElement;
   private baselineReaderElement: MathMLElement;
 
-  constructor(public syntaxTree: SyntaxContainerNode) {
+  constructor(public syntaxTree: SyntaxNode) {
     this.baselineReaderElement = createMathElement("mphantom", []);
-    assert(syntaxTree.children.length === 0);
+    if ("Leaves" in syntaxTree.children) {
+      assert(syntaxTree.children.Leaves.length === 0);
+    } else {
+      assert("Containers" in syntaxTree.children);
+      assert(syntaxTree.children.Containers.length === 0);
+    }
 
     this.element = createMathElement("mrow", [this.baselineReaderElement, createPlaceholder()]);
   }

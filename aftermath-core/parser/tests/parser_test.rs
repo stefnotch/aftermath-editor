@@ -15,7 +15,7 @@ fn test_parser() {
     let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        r#"(Multiply () (Subtract () "-" (Variable () "b")) "*" (Variable () "C"))"#
+        r#"(Multiply (Subtract (Operator "-") (Variable "b")) (Operator "*") (Variable "C"))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }

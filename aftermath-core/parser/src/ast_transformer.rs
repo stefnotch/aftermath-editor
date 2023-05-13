@@ -1,21 +1,22 @@
-use super::{SyntaxContainerNode, SyntaxNode};
+use crate::syntax_tree::SyntaxNodes;
+
+use super::SyntaxNode;
 
 // TODO: Move to Typescript side
 pub struct AstTransformer {
     transformations: Vec<AstTransformation>,
 }
 impl AstTransformer {
-    pub fn transform(&self, mut parse_result: SyntaxContainerNode) -> SyntaxContainerNode {
-        // TODO: Rewrite this to be iterative
-
-        parse_result.children = parse_result
-            .children
-            .into_iter()
-            .map(|child| match child {
-                SyntaxNode::Container(node) => SyntaxNode::Container(self.transform(node)),
-                node => node,
-            })
-            .collect();
+    pub fn transform(&self, mut parse_result: SyntaxNode) -> SyntaxNode {
+        parse_result.children = match parse_result.children {
+            SyntaxNodes::Containers(children) => SyntaxNodes::Containers(
+                children
+                    .into_iter()
+                    .map(|child| self.transform(child))
+                    .collect(),
+            ),
+            v => v,
+        };
 
         for transformation in self.transformations.iter() {
             parse_result = (transformation.transform)(parse_result);
@@ -29,18 +30,24 @@ impl AstTransformer {
             // TODO: With long enough lists, this will overflow the stack
             // Default hardcoded tuple flattening transformation
             transformations: vec![AstTransformation {
-                transform: |mut node: SyntaxContainerNode| {
+                transform: |mut node: SyntaxNode| {
                     if node.name == "Tuple" {
-                        node.children = node
-                            .children
-                            .into_iter()
-                            .flat_map(|x| match x {
-                                SyntaxNode::Container(inner_node) if inner_node.name == "Tuple" => {
-                                    inner_node.children.into_iter()
-                                }
-                                inner_node => vec![inner_node].into_iter(),
-                            })
-                            .collect();
+                        node.children = match node.children {
+                            SyntaxNodes::Containers(children) => SyntaxNodes::Containers(
+                                children
+                                    .into_iter()
+                                    .flat_map(|child| match child.children {
+                                        SyntaxNodes::Containers(inner_nodes)
+                                            if child.name == "Tuple" =>
+                                        {
+                                            inner_nodes
+                                        }
+                                        _ => vec![child],
+                                    })
+                                    .collect(),
+                            ),
+                            v => v,
+                        };
                     }
                     node
                 },
@@ -50,5 +57,5 @@ impl AstTransformer {
 }
 
 pub struct AstTransformation {
-    transform: fn(SyntaxContainerNode) -> SyntaxContainerNode,
+    transform: fn(SyntaxNode) -> SyntaxNode,
 }

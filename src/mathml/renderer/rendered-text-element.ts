@@ -1,4 +1,4 @@
-import { SyntaxContainerNode } from "../../core";
+import { SyntaxLeafNode, SyntaxNode, offsetInRange } from "../../core";
 import { Offset } from "../../math-layout/math-layout-offset";
 import { RenderedElement, RenderedPosition } from "../../rendering/render-result";
 import { ViewportValue } from "../../rendering/viewport-coordinate";
@@ -9,25 +9,28 @@ import { LeafMathMLElement, getTextBoundingBox } from "./rendered-leaf";
 
 export class TextMathMLElement implements RenderedElement<MathMLElement> {
   element: MathMLElement;
-  private textElement: LeafMathMLElement;
+  private textElements: LeafMathMLElement[];
   private baselineReaderElement: Text;
 
-  constructor(public syntaxTree: SyntaxContainerNode, elementName: MathMLTags) {
+  constructor(public syntaxTree: SyntaxNode<{ Leaves: SyntaxLeafNode[] }>, elementName: MathMLTags) {
     this.baselineReaderElement = document.createTextNode("");
-    assert(syntaxTree.children.length === 1);
 
-    const text = syntaxTree.children[0];
-    assert("Leaf" in text);
-
-    this.textElement = new LeafMathMLElement(text.Leaf);
-    this.element = createMathElement(elementName, [this.baselineReaderElement, ...this.textElement.getElements()]);
+    this.textElements = syntaxTree.children.Leaves.map((v) => new LeafMathMLElement(v));
+    let children = [this.baselineReaderElement];
+    for (let textElement of this.textElements) {
+      children.push(...textElement.getElements());
+    }
+    this.element = createMathElement(elementName, children);
   }
   getViewportPosition(offset: Offset): RenderedPosition {
+    assert(offsetInRange(offset, this.syntaxTree.range), "Invalid offset");
     // The baseline isn't exposed as a property, so we have this questionable workaround https://github.com/w3c/mathml-core/issues/38
     const baseline = getTextBoundingBox(this.baselineReaderElement).bottom;
     const caretSize = getFontSize(this.element);
 
-    const { x } = this.textElement.getViewportXPosition(offset);
+    const { x } =
+      this.textElements.find((v) => offsetInRange(offset, v.syntaxTree.range))?.getViewportXPosition(offset) ??
+      getTextBoundingBox(this.baselineReaderElement);
 
     return {
       position: { x: x, y: baseline },
