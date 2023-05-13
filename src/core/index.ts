@@ -84,7 +84,7 @@ export type Range<T> = {
 };
 
 export type SyntaxNode<T extends SyntaxNodes = SyntaxNodes> = {
-  name: string;
+  name: string[];
   children: T;
   row_index?: [bigint, bigint];
   value: any; // TODO:

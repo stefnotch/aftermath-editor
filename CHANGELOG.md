@@ -5,8 +5,10 @@
 - Deal with Unicode segmentation
 - Add a custom written Regex engine
 - Add a custom written Pratt parser
+  - Table driven, for extensibility
   - Hopefully will be replaced by chumsky
   - Outputs a concrete syntax tree
+- Concrete syntax tree has namespaced tokens for extensibility
 - Rewrite renderer to use the concrete syntax tree
 - Improve the documentation
 

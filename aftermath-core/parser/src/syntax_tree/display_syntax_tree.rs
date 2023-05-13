@@ -2,7 +2,7 @@ use core::fmt;
 
 use crate::{SyntaxLeafNode, SyntaxNode};
 
-use super::SyntaxNodes;
+use super::{NodeIdentifier, SyntaxNodes};
 
 impl fmt::Display for SyntaxNodes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -66,5 +66,20 @@ impl fmt::Display for SyntaxLeafNode {
             }
         }
         write!(f, "\"")
+    }
+}
+
+impl fmt::Display for NodeIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let values = self.0.iter();
+
+        if let Some(value) = values.next() {
+            write!(f, "{}", value)?;
+            for value in values {
+                write!(f, "::{}", value)?;
+            }
+        }
+
+        Ok(())
     }
 }

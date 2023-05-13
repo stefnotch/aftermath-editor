@@ -1,6 +1,7 @@
 pub mod ast_transformer;
 mod grapheme_matcher;
 mod lexer;
+mod nfa;
 mod nfa_builder;
 mod parse_result;
 pub mod parse_rules;
@@ -14,6 +15,7 @@ use parse_rules::operator_syntax_node;
 
 use crate::{
     lexer::Lexer,
+    parse_rules::built_in_rules::BuiltInRules,
     syntax_tree::{get_child_range_end, LeafNodeType},
 };
 
@@ -52,7 +54,11 @@ pub fn parse_row(input: &InputRow, context: &ParserRules) -> ParseResult<SyntaxN
         let range = parse_result.range().start..get_child_range_end(&error_children);
         let mut children = vec![parse_result];
         children.extend(error_children);
-        parse_result = SyntaxNode::new("Error".into(), range, SyntaxNodes::Containers(children));
+        parse_result = SyntaxNode::new(
+            BuiltInRules::error_name(),
+            range,
+            SyntaxNodes::Containers(children),
+        );
     }
 
     println!("parse result: {:?}", parse_result);
@@ -82,10 +88,9 @@ impl<'a> ParserRules<'a> {
         );
 
         if lexer.eof() {
-            // TODO: Document this node
             return (
                 SyntaxNode::new(
-                    "Nothing".into(),
+                    BuiltInRules::nothing_name(),
                     lexer.begin_range().end_range().range(),
                     SyntaxNodes::Leaves(vec![]),
                 ),
@@ -153,7 +158,7 @@ impl<'a> ParserRules<'a> {
                 let mut children = vec![
                     left,
                     operator_syntax_node(SyntaxLeafNode {
-                        node_type: definition.get_symbol_type().into(),
+                        node_type: LeafNodeType::Operator,
                         range: token.range(),
                         symbols: token.get_symbols(),
                     }),
@@ -187,7 +192,7 @@ impl<'a> ParserRules<'a> {
                 let mut children = vec![
                     left,
                     operator_syntax_node(SyntaxLeafNode {
-                        node_type: definition.get_symbol_type().into(),
+                        node_type: LeafNodeType::Operator,
                         range: token.range.clone(),
                         symbols: token.get_symbols(),
                     }),
@@ -218,9 +223,8 @@ fn error_and_consume_one(mut lexer: Lexer) -> (SyntaxNode, Lexer) {
     starting_range.consume_n(1);
     let token = starting_range.end_range();
     (
-        // TODO: Document this node
         SyntaxNode::new(
-            "Error".into(),
+            BuiltInRules::error_name(),
             token.range.clone(),
             SyntaxNodes::Leaves(vec![SyntaxLeafNode {
                 node_type: LeafNodeType::Symbol,
@@ -260,40 +264,27 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
                 ),
                 lexer,
             )
-        } else if self.definition.binding_power_pattern() == (false, true) {
-            // prefix
-            let mut children = vec![operator_syntax_node(SyntaxLeafNode {
+        } else {
+            let leaf_node = SyntaxLeafNode {
                 node_type: self.definition.get_symbol_type().into(),
                 range: self.range.clone(),
                 symbols: self.symbols,
-            })];
-            children.extend(args);
+            };
 
-            let range = self.range.start..get_child_range_end(&children);
-            (
-                SyntaxNode::new(
-                    self.definition.name(),
-                    range,
+            // If it's a child without any arguments, we don't need to create a container
+            let (range, children) = if args.is_empty() {
+                (self.range, SyntaxNodes::Leaves(vec![leaf_node]))
+            } else {
+                let mut children = vec![operator_syntax_node(leaf_node)];
+                children.extend(args);
+                (
+                    self.range.start..get_child_range_end(&children),
                     SyntaxNodes::Containers(children),
-                ),
-                lexer,
-            )
-        } else {
-            assert!(
-                args.is_empty(),
-                "Cannot have an atom with args in the current flawed implementation"
-            );
-            // atom
+                )
+            };
+
             (
-                SyntaxNode::new(
-                    self.definition.name(),
-                    self.range.clone(),
-                    SyntaxNodes::Leaves(vec![SyntaxLeafNode {
-                        node_type: self.definition.get_symbol_type().into(),
-                        range: self.range.clone(),
-                        symbols: self.symbols,
-                    }]),
-                ),
+                SyntaxNode::new(self.definition.name(), range, children),
                 lexer,
             )
         }
