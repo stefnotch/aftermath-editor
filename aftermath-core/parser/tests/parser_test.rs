@@ -15,7 +15,7 @@ fn test_parser() {
     let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        r#"(Multiply (Subtract (Operator "-") (Variable "b")) (Operator "*") (Variable "C"))"#
+        r#"(Arithmetic::Multiply (Arithmetic::Subtract (BuiltIn::Operator "-") (Core::Variable "b")) (BuiltIn::Operator "*") (Core::Variable "C"))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -34,7 +34,7 @@ fn test_postfix() {
     let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        r#"(Add (Variable "c") (Operator "+") (Factorial (Variable "a") (Operator "!")))"#
+        r#"(Arithmetic::Add (Core::Variable "c") (BuiltIn::Operator "+") (Unsorted::Factorial (Core::Variable "a") (BuiltIn::Operator "!")))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -56,7 +56,12 @@ fn test_parser_nested_brackets_and_postfix() {
     let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        r#"(RoundBrackets () "(" (RoundBrackets () "(" (RoundBrackets () "(" (Factorial () (Variable () "a") "!") ")") ")") ")")"#
+        format!(
+            "{}{}{}",
+            r#"(Core::RoundBrackets (BuiltIn::Operator "(") (Core::RoundBrackets (BuiltIn::Operator "(") (Core::RoundBrackets (BuiltIn::Operator "(") "#,
+            r#"(Unsorted::Factorial (Core::Variable "a") (BuiltIn::Operator "!")) "#,
+            r#"(BuiltIn::Operator ")")) (BuiltIn::Operator ")")) (BuiltIn::Operator ")"))"#
+        )
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -74,7 +79,7 @@ fn test_parser_tuple() {
     let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        r#"(Tuple (Variable "a") (Operator ",") (Variable "b"))"#
+        r#"(Collections::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b"))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -94,10 +99,14 @@ fn test_parser_tuple_advanced() {
     let context = ParserRules::default();
 
     let parsed = parse_row(&layout, &context);
-    // Not entirely satisfactory, but eh
     assert_eq!(
         parsed.value.to_string(),
-        r#"(RoundBrackets () "(" (Tuple () (Tuple () (Variable () "a") "," (Variable () "b")) "," (Variable () "c")) ")")"#
+        format!(
+            "{}{}{}",
+            r#"(Core::RoundBrackets (BuiltIn::Operator "(") "#,
+            r#"(Collections::Tuple (Collections::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b")) (BuiltIn::Operator ",") (Core::Variable "c")) "#,
+            r#"(BuiltIn::Operator ")"))"#
+        )
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -118,7 +127,12 @@ fn test_parser_function_call() {
     let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        r#"(FunctionApplication (Variable "f") (Operator "(") (Tuple (Variable "a") (Operator ",") (Variable "b")) (Operator ")"))"#
+        format!(
+            "{}{}{}",
+            r#"(Function::FunctionApplication (Core::Variable "f") (BuiltIn::Operator "(") ("#,
+            r#"Collections::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b")"#,
+            r#") (BuiltIn::Operator ")"))"#
+        )
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -138,7 +152,7 @@ fn test_parser_brackets_with_addition() {
 
     assert_eq!(
         parsed.value.to_string(),
-        r#"(RoundBrackets () "(" (Add () (Variable () "a") "+" (Variable () "b")) ")")"#
+        r#"(Core::RoundBrackets (BuiltIn::Operator "(") (Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (Core::Variable "b")) (BuiltIn::Operator ")"))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -161,7 +175,7 @@ fn test_parser_fraction() {
 
     assert_eq!(
         parsed.value.to_string(),
-        r#"(RoundBrackets () "(" (Add () (Variable () "a") "+" (Fraction () (Variable () "b") (Variable () "c"))) ")")"#
+        r#"(Core::RoundBrackets (BuiltIn::Operator "(") (Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (BuiltIn::Fraction (Core::Variable "b") (Core::Variable "c"))) (BuiltIn::Operator ")"))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -173,7 +187,7 @@ fn test_parser_empty_input() {
 
     let parsed = parse_row(&layout, &context);
     // "Nothing" is taken from https://cortexjs.io/compute-engine/reference/core/
-    assert_eq!(parsed.value.to_string(), "(Nothing)");
+    assert_eq!(parsed.value.to_string(), "(BuiltIn::Nothing)");
 }
 
 #[test]
@@ -189,7 +203,7 @@ fn test_parser_empty_squareroot() {
     let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        r#"(Root (Nothing) (Variable "a"))"#
+        r#"(BuiltIn::Root (BuiltIn::Nothing) (Core::Variable "a"))"#
     );
 }
 
