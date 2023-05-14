@@ -1,12 +1,14 @@
-import init, { parse as core_parse } from "../../aftermath-core/pkg";
+import init, { MathParser } from "../../aftermath-core/pkg";
 import { MathLayoutRow } from "../math-layout/math-layout";
 import { Offset } from "../math-layout/math-layout-offset";
 
 // Yay, top level await is neat https://v8.dev/features/top-level-await
 await init();
 
+const parser = MathParser.new();
+
 export function parse(row: MathLayoutRow): ParseResult {
-  let result: ParseResult = core_parse(toCore(row));
+  let result: ParseResult = parser.parse(toCore(row));
 
   return result;
 }

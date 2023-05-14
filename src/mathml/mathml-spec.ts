@@ -32,6 +32,12 @@ export type MathMLTags =
   | "mtd";
 
 // TODO: Fill this
+/**
+ * How many children are expected for each MathML tag.
+ * null means any number of children is allowed.
+ *
+ * Note that MathML itself doesn't place any restrictions on the number of children, but we do.
+ */
 export const MathMLTagsExpectedChildrenCount: Record<MathMLTags, number | null> = {
   math: "TODO:" as any as number,
   semantics: "TODO:" as any as number,

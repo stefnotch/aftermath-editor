@@ -27,19 +27,31 @@ struct MathParseResult {
 }
 
 #[wasm_bindgen]
-pub fn parse(layout_row: JsValue) -> Result<JsValue, JsValue> {
-    let layout: InputRow = serde_wasm_bindgen::from_value(layout_row)?;
+pub struct MathParser {
+    parser_rules: ParserRules<'static>,
+}
 
-    let context = ParserRules::default();
-    // let transformer = AstTransformer::new();
-    let mut parsed: MathParseResult = parser::parse_row(&layout, &context).into();
-    //  parsed.value = transformer.transform(parsed.value);
+#[wasm_bindgen]
+impl MathParser {
+    pub fn new() -> Self {
+        Self {
+            parser_rules: ParserRules::default(),
+        }
+    }
 
-    let serializer =
-        serde_wasm_bindgen::Serializer::new().serialize_large_number_types_as_bigints(true);
+    pub fn parse(&self, layout_row: JsValue) -> Result<JsValue, JsValue> {
+        let layout: InputRow = serde_wasm_bindgen::from_value(layout_row)?;
 
-    let serialized_result = parsed.serialize(&serializer)?;
-    Ok(serialized_result)
+        // let transformer = AstTransformer::new();
+        let mut parsed: MathParseResult = parser::parse_row(&layout, &self.parser_rules).into();
+        //  parsed.value = transformer.transform(parsed.value);
+
+        let serializer =
+            serde_wasm_bindgen::Serializer::new().serialize_large_number_types_as_bigints(true);
+
+        let serialized_result = parsed.serialize(&serializer)?;
+        Ok(serialized_result)
+    }
 }
 
 impl From<ParseResult<SyntaxNode>> for MathParseResult {

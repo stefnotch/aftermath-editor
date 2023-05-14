@@ -104,6 +104,15 @@ impl<'a> ParserRules<'a> {
         lexer_range.consume_n(match_result.get_length());
         Some((lexer_range, match_result))
     }
+
+    // TODO: Expose to Typescript side, so that I can "assert all tokens are known"
+    pub fn get_token_names(&self) -> Vec<NodeIdentifier> {
+        self.known_tokens
+            .values()
+            .flatten()
+            .map(|v| v.name.clone())
+            .collect()
+    }
 }
 
 impl<'a> ParserRules<'a> {
