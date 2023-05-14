@@ -1,4 +1,3 @@
-pub mod ast_transformer;
 mod grapheme_matcher;
 mod lexer;
 mod nfa;
@@ -253,40 +252,43 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
             .definition
             .parse_arguments(lexer, context, &self.match_result);
 
-        if self.definition.is_container() {
-            let children = args;
-            let range = self.range;
-            (
-                SyntaxNode::new(
-                    self.definition.name(),
-                    range,
-                    SyntaxNodes::Containers(children),
-                ),
-                lexer,
-            )
-        } else {
-            let leaf_node = SyntaxLeafNode {
-                node_type: self.definition.get_symbol_type().into(),
-                range: self.range.clone(),
-                symbols: self.symbols,
-            };
-
-            // If it's a child without any arguments, we don't need to create a container
-            let (range, children) = if args.is_empty() {
-                (self.range, SyntaxNodes::Leaves(vec![leaf_node]))
-            } else {
-                let mut children = vec![operator_syntax_node(leaf_node)];
-                children.extend(args);
+        match self.definition.starting_parser {
+            parse_rules::StartingTokenMatcher::Container(_starting_container) => {
+                let children = args;
+                let range = self.range;
                 (
-                    self.range.start..get_child_range_end(&children),
-                    SyntaxNodes::Containers(children),
+                    SyntaxNode::new(
+                        self.definition.name(),
+                        range,
+                        SyntaxNodes::Containers(children),
+                    ),
+                    lexer,
                 )
-            };
+            }
+            parse_rules::StartingTokenMatcher::Token(starting_token) => {
+                let leaf_node = SyntaxLeafNode {
+                    node_type: starting_token.symbol_type,
+                    range: self.range.clone(),
+                    symbols: self.symbols,
+                };
 
-            (
-                SyntaxNode::new(self.definition.name(), range, children),
-                lexer,
-            )
+                // If it's a child without any arguments, we don't need to create a container
+                let (range, children) = if args.is_empty() {
+                    (self.range, SyntaxNodes::Leaves(vec![leaf_node]))
+                } else {
+                    let mut children = vec![operator_syntax_node(leaf_node)];
+                    children.extend(args);
+                    (
+                        self.range.start..get_child_range_end(&children),
+                        SyntaxNodes::Containers(children),
+                    )
+                };
+
+                (
+                    SyntaxNode::new(self.definition.name(), range, children),
+                    lexer,
+                )
+            }
         }
     }
 }

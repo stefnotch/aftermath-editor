@@ -1,4 +1,9 @@
-use crate::syntax_tree::NodeIdentifier;
+use crate::{
+    parse_rules::{ContainerType, StartingTokenMatcher},
+    syntax_tree::NodeIdentifier,
+};
+
+use super::TokenDefinition;
 
 pub struct BuiltInRules {}
 
@@ -20,5 +25,20 @@ impl BuiltInRules {
     /// An operator node, this is a node that can be skipped in an abstract syntax tree.
     pub fn operator_name() -> NodeIdentifier {
         BuiltInRules::rule_name("Operator")
+    }
+
+    pub fn get_rules() -> Vec<TokenDefinition> {
+        vec![
+            TokenDefinition::new(
+                BuiltInRules::rule_name("Fraction"),
+                (None, None),
+                StartingTokenMatcher::Container(ContainerType::Fraction),
+            ),
+            TokenDefinition::new(
+                BuiltInRules::rule_name("Root"),
+                (None, None),
+                StartingTokenMatcher::Container(ContainerType::Root),
+            ),
+        ]
     }
 }

@@ -1,3 +1,4 @@
+pub mod arithmetic_rules;
 pub mod built_in_rules;
 pub mod core_rules;
 
@@ -6,7 +7,6 @@ use std::collections::HashMap;
 use input_tree::{input_node::InputNode, row::RowIndex};
 
 use crate::{
-    grapheme_matcher::GraphemeMatcher,
     lexer::LexerRange,
     parse_row,
     syntax_tree::{LeafNodeType, NodeIdentifier, SyntaxLeafNode},
@@ -109,43 +109,6 @@ impl<'a> ParserRules<'a> {
         ParserRules::new(
             None,
             vec![
-                // TODO: Good whitespace handling
-                /*(
-                    TokenMatcher::Pattern( NFABuilder::match_character((' ').into()).build(),
-                ),
-                    TokenDefinition::new(minimal_definitions.empty.clone(), (None, None)),
-                ),*/
-                TokenDefinition::new(
-                    "Variable".into(),
-                    (None, None),
-                    StartingTokenMatcher::Token(TokenMatcher {
-                        symbol: NFABuilder::match_character(GraphemeMatcher::IdentifierStart)
-                            .then(
-                                NFABuilder::match_character(GraphemeMatcher::IdentifierContinue)
-                                    .zero_or_more(),
-                            )
-                            .build(),
-                        symbol_type: LeafNodeType::Symbol,
-                    }),
-                ),
-                TokenDefinition::new(
-                    "Number".into(),
-                    (None, None),
-                    StartingTokenMatcher::Token(TokenMatcher {
-                        symbol: NFABuilder::match_character(('0'..='9').into())
-                            .one_or_more()
-                            .then(
-                                NFABuilder::match_character('.'.into())
-                                    .then(
-                                        NFABuilder::match_character(('0'..='9').into())
-                                            .one_or_more(),
-                                    )
-                                    .optional(),
-                            )
-                            .build(),
-                        symbol_type: LeafNodeType::Symbol,
-                    }),
-                ),
                 TokenDefinition::new(
                     "String".into(),
                     (None, None),
@@ -183,52 +146,10 @@ impl<'a> ParserRules<'a> {
                     }),
                 ),
                 TokenDefinition::new("Tuple".into(), (Some(50), Some(51)), ','.into()),
-                TokenDefinition::new("Add".into(), (Some(100), Some(101)), '+'.into()),
-                TokenDefinition::new("Subtract".into(), (Some(100), Some(101)), '-'.into()),
-                TokenDefinition::new("Add".into(), (None, Some(400)), '+'.into()),
-                TokenDefinition::new("Subtract".into(), (None, Some(400)), '-'.into()),
-                TokenDefinition::new("Multiply".into(), (Some(200), Some(201)), '*'.into()),
-                TokenDefinition::new("Divide".into(), (Some(200), Some(201)), '/'.into()),
                 TokenDefinition::new("Ring".into(), (Some(501), Some(500)), '.'.into()),
                 TokenDefinition::new("Factorial".into(), (Some(600), None), '!'.into()),
-                TokenDefinition::new(
-                    "Fraction".into(),
-                    (None, None),
-                    StartingTokenMatcher::Container(ContainerType::Fraction),
-                ),
-                TokenDefinition::new(
-                    "Root".into(),
-                    (None, None),
-                    StartingTokenMatcher::Container(ContainerType::Root),
-                ),
                 // TODO: The dx at the end of an integral might not even be a closing bracket.
                 // After all, it can also sometimes appear inside an integral.
-
-                // Amusingly, if someone defines the closing bracket as a postfix operator, it'll break the brackets
-                // Brackets
-
-                // Unit tuple
-                TokenDefinition::new("RoundBrackets".into(), (None, None), ['(', ')'][..].into()),
-                TokenDefinition::new_with_parsers(
-                    "RoundBrackets".into(),
-                    (None, None),
-                    '('.into(),
-                    vec![
-                        Argument {
-                            parser: ArgumentParserType::Next {
-                                minimum_binding_power: 0,
-                            },
-                            argument_index: 0,
-                        },
-                        Argument {
-                            parser: ArgumentParserType::NextToken(TokenMatcher {
-                                symbol: NFABuilder::match_character(')'.into()).build(),
-                                symbol_type: LeafNodeType::Operator,
-                            }),
-                            argument_index: 1,
-                        },
-                    ],
-                ),
                 TokenDefinition::new_with_parsers(
                     "FunctionApplication".into(),
                     (Some(800), None),
@@ -248,15 +169,12 @@ impl<'a> ParserRules<'a> {
                             argument_index: 1,
                         },
                     ],
-                ), // TODO: "Nothing" token? Or at least document its existence
+                ),
             ],
         )
     }
 }
 
-/// TODO: This should be replaced with a "parser" without a context.
-/// And the pub arguments_parsers: Vec<TokenArgumentParser>, should be replaced with a parser that has a state/context/whatever.
-/// That argument context should have the "previous token" and "self token" (complete with a range and the capturing groups).
 #[derive(Debug)]
 pub enum StartingTokenMatcher {
     Token(TokenMatcher),
@@ -286,25 +204,30 @@ impl StartingTokenMatcher {
             }
         }
     }
-}
 
-impl From<&[char]> for StartingTokenMatcher {
-    fn from(pattern: &[char]) -> StartingTokenMatcher {
-        StartingTokenMatcher::Token(TokenMatcher {
-            symbol: pattern
+    pub fn from_characters(characters: Vec<char>, symbol_type: LeafNodeType) -> Self {
+        Self::Token(TokenMatcher {
+            symbol: characters
                 .iter()
                 .map(|c| NFABuilder::match_character((*c).into()))
                 .reduce(|a, b| a.concat(b))
                 .unwrap()
                 .build(),
+            symbol_type,
         })
     }
-}
 
-impl From<char> for StartingTokenMatcher {
-    fn from(pattern: char) -> StartingTokenMatcher {
-        StartingTokenMatcher::Token(TokenMatcher {
-            symbol: NFABuilder::match_character(pattern.into()).build(),
+    pub fn from_character(character: char, symbol_type: LeafNodeType) -> Self {
+        Self::Token(TokenMatcher {
+            symbol: NFABuilder::match_character(character.into()).build(),
+            symbol_type,
+        })
+    }
+
+    pub fn operator_from_character(character: char) -> Self {
+        Self::Token(TokenMatcher {
+            symbol: NFABuilder::match_character(character.into()).build(),
+            symbol_type: LeafNodeType::Operator,
         })
     }
 }
@@ -312,7 +235,7 @@ impl From<char> for StartingTokenMatcher {
 #[derive(Debug)]
 pub struct TokenMatcher {
     symbol: NFA,
-    symbol_type: LeafNodeType,
+    pub symbol_type: LeafNodeType,
 }
 
 #[derive(Debug)]
