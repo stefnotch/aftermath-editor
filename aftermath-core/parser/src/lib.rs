@@ -252,7 +252,7 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
             .definition
             .parse_arguments(lexer, context, &self.match_result);
 
-        match self.definition.starting_parser {
+        match &self.definition.starting_parser {
             parse_rules::StartingTokenMatcher::Container(_starting_container) => {
                 let children = args;
                 let range = self.range;
@@ -267,7 +267,7 @@ impl<'input, 'definition> ParseStartResult<'input, 'definition> {
             }
             parse_rules::StartingTokenMatcher::Token(starting_token) => {
                 let leaf_node = SyntaxLeafNode {
-                    node_type: starting_token.symbol_type,
+                    node_type: starting_token.symbol_type.clone(),
                     range: self.range.clone(),
                     symbols: self.symbols,
                 };

@@ -71,7 +71,7 @@ impl fmt::Display for SyntaxLeafNode {
 
 impl fmt::Display for NodeIdentifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let values = self.0.iter();
+        let mut values = self.0.iter();
 
         if let Some(value) = values.next() {
             write!(f, "{}", value)?;

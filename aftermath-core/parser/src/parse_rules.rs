@@ -1,6 +1,9 @@
 pub mod arithmetic_rules;
 pub mod built_in_rules;
+pub mod collections_rules;
 pub mod core_rules;
+pub mod function_rules;
+pub mod string_rules;
 
 use std::collections::HashMap;
 
@@ -14,7 +17,11 @@ use crate::{
     SyntaxNode, SyntaxNodes,
 };
 
-use self::built_in_rules::BuiltInRules;
+use self::{
+    arithmetic_rules::ArithmeticRules, built_in_rules::BuiltInRules,
+    collections_rules::CollectionsRules, core_rules::CoreRules, function_rules::FunctionRules,
+    string_rules::StringRules,
+};
 
 use super::{
     lexer::Lexer,
@@ -102,76 +109,27 @@ impl<'a> ParserRules<'a> {
 impl<'a> ParserRules<'a> {
     pub fn default() -> ParserRules<'a> {
         // TODO: Add more default tokens
-        // 3. Parser for functions
         // 4. Parser for whitespace
         // 5. Parser for chains of < <=, which could be treated as a "domain restriction"
 
-        ParserRules::new(
-            None,
-            vec![
-                TokenDefinition::new(
-                    "String".into(),
-                    (None, None),
-                    // https://stackoverflow.com/questions/249791/regex-for-quoted-string-with-escaping-quotes
-                    /*
-                    flowchart LR
-                        A(Quote &quot) --> B(Epsilon)
-                        B --> C(Backslash \)
-                        C --> D(Any)
-                        D -->B
-                        B -->F(Final Quote &quot)
-                        B -->G(Other)
-                        G -->B
-                        */
-                    StartingTokenMatcher::Token(TokenMatcher {
-                        symbol: NFABuilder::match_character(('"').into())
-                            .then(
-                                // Skip quote
-                                NFABuilder::match_character(('\0'..='!').into())
-                                    .or(
-                                        // Skip backslash
-                                        NFABuilder::match_character(('#'..='[').into()),
-                                    )
-                                    .or(
-                                        // Rest of Unicode characters
-                                        NFABuilder::match_character((']'..=char::MAX).into()),
-                                    )
-                                    .or(NFABuilder::match_character('\\'.into())
-                                        .then_character(('\0'..=char::MAX).into()))
-                                    .zero_or_more(),
-                            )
-                            .then_character('"'.into())
-                            .build(),
-                        symbol_type: LeafNodeType::Symbol,
-                    }),
-                ),
-                TokenDefinition::new("Tuple".into(), (Some(50), Some(51)), ','.into()),
-                TokenDefinition::new("Ring".into(), (Some(501), Some(500)), '.'.into()),
-                TokenDefinition::new("Factorial".into(), (Some(600), None), '!'.into()),
-                // TODO: The dx at the end of an integral might not even be a closing bracket.
-                // After all, it can also sometimes appear inside an integral.
-                TokenDefinition::new_with_parsers(
-                    "FunctionApplication".into(),
-                    (Some(800), None),
-                    ['('][..].into(),
-                    vec![
-                        Argument {
-                            parser: ArgumentParserType::Next {
-                                minimum_binding_power: 0,
-                            },
-                            argument_index: 0,
-                        },
-                        Argument {
-                            parser: ArgumentParserType::NextToken(TokenMatcher {
-                                symbol: NFABuilder::match_character(')'.into()).build(),
-                                symbol_type: LeafNodeType::Operator,
-                            }),
-                            argument_index: 1,
-                        },
-                    ],
-                ),
-            ],
-        )
+        let mut rules = vec![];
+        rules.extend(BuiltInRules::get_rules());
+        // Bonus rules
+        rules.extend(ArithmeticRules::get_rules());
+        rules.extend(CollectionsRules::get_rules());
+        rules.extend(CoreRules::get_rules());
+        rules.extend(FunctionRules::get_rules());
+        rules.extend(StringRules::get_rules());
+
+        // TODO: The dx at the end of an integral might not even be a closing bracket.
+        // After all, it can also sometimes appear inside an integral.
+        rules.push(TokenDefinition::new(
+            NodeIdentifier::new(vec!["Unsorted".into(), "Factorial".into()]),
+            (Some(600), None),
+            StartingTokenMatcher::operator_from_character('!'),
+        ));
+
+        ParserRules::new(None, rules)
     }
 }
 
