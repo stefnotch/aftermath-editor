@@ -1,11 +1,11 @@
-import { ParseResult, SyntaxNode } from "../core";
+import { NodeIdentifier, ParseResult, SyntaxNode } from "../core";
 import { Offset } from "../math-layout/math-layout-offset";
 import { MathLayoutPosition } from "../math-layout/math-layout-position";
 import { RowIndices } from "../math-layout/math-layout-zipper";
 import { ViewportCoordinate, ViewportValue } from "./viewport-coordinate";
 
 export interface Renderer<T> {
-  canRender(syntaxTreeNames: string[]): boolean;
+  canRender(syntaxTreeNames: NodeIdentifier): boolean;
 
   renderAll(parsed: ParseResult): RenderResult<T>;
 

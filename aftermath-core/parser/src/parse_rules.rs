@@ -105,8 +105,8 @@ impl<'a> ParserRules<'a> {
         Some((lexer_range, match_result))
     }
 
-    // TODO: Expose to Typescript side, so that I can "assert all tokens are known"
     pub fn get_token_names(&self) -> Vec<NodeIdentifier> {
+        // TODO: Some tokens, like "Operator" are missing
         self.known_tokens
             .values()
             .flatten()
@@ -311,14 +311,10 @@ impl Argument {
                     }
                 } else {
                     let token = lexer.begin_range().end_range();
-                    // TODO: Report this error properly?
+                    // TODO: Report this error properly
                     TokenArgumentParseResult {
                         argument_index: *argument_index,
-                        argument: SyntaxNode::new(
-                            BuiltInRules::error_name(),
-                            token.range.clone(),
-                            SyntaxNodes::Leaves(vec![]),
-                        ),
+                        argument: BuiltInRules::error_message_node(token.range(), vec![]),
                         lexer,
                     }
                 }

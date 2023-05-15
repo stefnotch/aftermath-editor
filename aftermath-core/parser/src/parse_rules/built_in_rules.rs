@@ -1,6 +1,9 @@
+use std::ops::Range;
+
 use crate::{
     parse_rules::{ContainerType, StartingTokenMatcher},
     syntax_tree::NodeIdentifier,
+    SyntaxLeafNode, SyntaxNode, SyntaxNodes,
 };
 
 use super::TokenDefinition;
@@ -13,8 +16,29 @@ impl BuiltInRules {
     }
 
     /// A parse error.
-    pub fn error_name() -> NodeIdentifier {
+    fn error_name() -> NodeIdentifier {
         BuiltInRules::rule_name("Error")
+    }
+
+    /// A error message.
+    fn error_message_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("ErrorMessage")
+    }
+
+    pub fn parse_error_node(range: Range<usize>, children: Vec<SyntaxNode>) -> SyntaxNode {
+        SyntaxNode::new(
+            BuiltInRules::error_name(),
+            range,
+            SyntaxNodes::Containers(children),
+        )
+    }
+
+    pub fn error_message_node(range: Range<usize>, children: Vec<SyntaxLeafNode>) -> SyntaxNode {
+        SyntaxNode::new(
+            BuiltInRules::error_message_name(),
+            range,
+            SyntaxNodes::Leaves(children),
+        )
     }
 
     /// An empty node, this happens when a row is empty.

@@ -20,7 +20,7 @@ import { Offset } from "../math-layout/math-layout-offset";
 import "./../core";
 import { MathMLRenderer } from "../mathml/renderer";
 import { RenderResult } from "../rendering/render-result";
-import { parse } from "./../core";
+import { getNodeIdentifiers, joinNodeIdentifier, parse } from "./../core";
 
 const debugSettings = {
   debugRenderRows: true,
@@ -188,12 +188,14 @@ export class MathEditor extends HTMLElement {
 
     // Rendering
     this.renderer = new MathMLRenderer();
-    // TODO: assert(this.renderer.canRender(...));
+    getNodeIdentifiers().forEach((name) => {
+      assert(this.renderer.canRender(name), "Cannot render " + joinNodeIdentifier(name) + ".");
+    });
 
     this.renderResult = this.renderer.renderAll({
       errors: [],
       value: {
-        name: "Nothing",
+        name: ["BuiltIn", "Nothing"],
         children: { Leaves: [] },
         value: [],
         range: { start: 0n, end: 0n },
@@ -349,7 +351,6 @@ export class MathEditor extends HTMLElement {
     this.setMathMl(topLevelElements);
   }
 
-  // TODO: Rename to "renderCosmetics"
   renderCarets() {
     if (!this.isConnected) return;
     this.carets.map((v) => this.renderCaret(v));

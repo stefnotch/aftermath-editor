@@ -29,6 +29,7 @@ struct MathParseResult {
 #[wasm_bindgen]
 pub struct MathParser {
     parser_rules: ParserRules<'static>,
+    serializer: serde_wasm_bindgen::Serializer,
 }
 
 #[wasm_bindgen]
@@ -36,6 +37,8 @@ impl MathParser {
     pub fn new() -> Self {
         Self {
             parser_rules: ParserRules::default(),
+            serializer: serde_wasm_bindgen::Serializer::new()
+                .serialize_large_number_types_as_bigints(true),
         }
     }
 
@@ -46,10 +49,13 @@ impl MathParser {
         let mut parsed: MathParseResult = parser::parse_row(&layout, &self.parser_rules).into();
         //  parsed.value = transformer.transform(parsed.value);
 
-        let serializer =
-            serde_wasm_bindgen::Serializer::new().serialize_large_number_types_as_bigints(true);
+        let serialized_result = parsed.serialize(&self.serializer)?;
+        Ok(serialized_result)
+    }
 
-        let serialized_result = parsed.serialize(&serializer)?;
+    pub fn get_token_names(&self) -> Result<JsValue, JsValue> {
+        let token_names = self.parser_rules.get_token_names();
+        let serialized_result = token_names.serialize(&self.serializer)?;
         Ok(serialized_result)
     }
 }

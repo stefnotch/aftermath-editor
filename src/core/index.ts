@@ -13,6 +13,17 @@ export function parse(row: MathLayoutRow): ParseResult {
   return result;
 }
 
+export function getNodeIdentifiers(): Array<NodeIdentifier> {
+  return parser.get_token_names();
+}
+
+// TODO: I want tuples and records for this https://github.com/tc39/proposal-record-tuple
+export type NodeIdentifier = string[];
+export type NodeIdentifierJoined = string;
+export function joinNodeIdentifier(nodeIdentifier: NodeIdentifier): NodeIdentifierJoined {
+  return nodeIdentifier.join("::");
+}
+
 function toCore(row: MathLayoutRow): CoreRow {
   return {
     values: row.values.map((v) => {

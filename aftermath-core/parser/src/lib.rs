@@ -53,11 +53,7 @@ pub fn parse_row(input: &InputRow, context: &ParserRules) -> ParseResult<SyntaxN
         let range = parse_result.range().start..get_child_range_end(&error_children);
         let mut children = vec![parse_result];
         children.extend(error_children);
-        parse_result = SyntaxNode::new(
-            BuiltInRules::error_name(),
-            range,
-            SyntaxNodes::Containers(children),
-        );
+        parse_result = BuiltInRules::parse_error_node(range, children)
     }
 
     println!("parse result: {:?}", parse_result);
@@ -222,14 +218,14 @@ fn error_and_consume_one(mut lexer: Lexer) -> (SyntaxNode, Lexer) {
     starting_range.consume_n(1);
     let token = starting_range.end_range();
     (
-        SyntaxNode::new(
-            BuiltInRules::error_name(),
-            token.range.clone(),
-            SyntaxNodes::Leaves(vec![SyntaxLeafNode {
+        // TODO: Report an error message
+        BuiltInRules::error_message_node(
+            token.range(),
+            vec![SyntaxLeafNode {
                 node_type: LeafNodeType::Symbol,
-                range: token.range.clone(),
+                range: token.range(),
                 symbols: token.get_symbols(),
-            }]),
+            }],
         ),
         lexer,
     )

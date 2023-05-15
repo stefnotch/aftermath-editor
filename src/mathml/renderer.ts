@@ -1,4 +1,12 @@
-import { ParseResult, SyntaxNode, hasContainersChildren, hasLeavesChildren } from "../core";
+import {
+  NodeIdentifier,
+  NodeIdentifierJoined,
+  ParseResult,
+  SyntaxNode,
+  hasContainersChildren,
+  hasLeavesChildren,
+  joinNodeIdentifier,
+} from "../core";
 import { RenderedElement, RenderResult, Renderer } from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { MathMLRenderResult } from "./renderer/render-result";
@@ -7,65 +15,136 @@ import { NothingMathMLElement } from "./renderer/rendered-nothing";
 import { TextMathMLElement } from "./renderer/rendered-text-element";
 
 export class MathMLRenderer implements Renderer<MathMLElement> {
-  private readonly renderers: Map<string, (syntaxTree: SyntaxNode) => RenderedElement<MathMLElement>> = new Map();
+  private readonly renderers: Map<NodeIdentifierJoined, (syntaxTree: SyntaxNode) => RenderedElement<MathMLElement>> = new Map();
 
   constructor() {
-    this.addRenderer("Nothing", (syntaxTree: SyntaxNode) => {
-      return new NothingMathMLElement(syntaxTree);
-    });
-    this.addRenderer("Variable", (syntaxTree: SyntaxNode) => {
-      assert(hasLeavesChildren(syntaxTree));
-      return new TextMathMLElement(syntaxTree, "mi");
-    });
-    this.addRenderer("Number", (syntaxTree: SyntaxNode) => {
-      assert(hasLeavesChildren(syntaxTree));
-      return new TextMathMLElement(syntaxTree, "mn");
-    });
-    this.addRenderer("String", (syntaxTree: SyntaxNode) => {
-      assert(hasLeavesChildren(syntaxTree));
-      return new TextMathMLElement(syntaxTree, "mtext");
-    });
-    this.addRenderer("Fraction", (syntaxTree: SyntaxNode) => {
-      assert(hasContainersChildren(syntaxTree));
-      return new SimpleContainerMathMLElement(syntaxTree, "mfrac", this);
-    });
-    this.addRenderer("Root", (syntaxTree: SyntaxNode) => {
-      // We have to switch the arguments here, because MathML uses the second argument as the root
-      assert(hasContainersChildren(syntaxTree));
-      syntaxTree.children.Containers.reverse();
-      return new SimpleContainerMathMLElement(syntaxTree, "mroot", this);
-    });
-    ["Add", "Subtract", "Multiply", "FunctionApplication"].forEach((name) => {
-      this.addRenderer(name, (syntaxTree: SyntaxNode) => {
+    {
+      const builtIn = this.rendererCollection("BuiltIn");
+      builtIn.add("Nothing", (syntaxTree) => {
+        return new NothingMathMLElement(syntaxTree);
+      });
+      builtIn.add("Error", (syntaxTree) => {
+        assert(hasContainersChildren(syntaxTree));
+        const element = new SimpleContainerMathMLElement(syntaxTree, "merror", this);
+        console.warn("Rendering error", syntaxTree, element);
+        return element;
+      });
+      builtIn.add("ErrorMessage", (syntaxTree) => {
+        assert(hasLeavesChildren(syntaxTree));
+        const element = new TextMathMLElement(syntaxTree, "merror");
+        console.warn("Rendering error", syntaxTree, element);
+        return element;
+      });
+      builtIn.add("Operator", (syntaxTree) => {
+        assert(hasLeavesChildren(syntaxTree));
+        return new TextMathMLElement(syntaxTree, "mo");
+      });
+      builtIn.add("Fraction", (syntaxTree) => {
+        assert(hasContainersChildren(syntaxTree));
+        return new SimpleContainerMathMLElement(syntaxTree, "mfrac", this);
+      });
+      builtIn.add("Root", (syntaxTree) => {
+        // We have to switch the arguments here, because MathML uses the second argument as the root
+        assert(hasContainersChildren(syntaxTree));
+        syntaxTree.children.Containers.reverse();
+        return new SimpleContainerMathMLElement(syntaxTree, "mroot", this);
+      });
+    }
+    {
+      const core = this.rendererCollection("Core");
+      core.add("Variable", (syntaxTree) => {
+        assert(hasLeavesChildren(syntaxTree));
+        return new TextMathMLElement(syntaxTree, "mi");
+      });
+      core.add("RoundBrackets", (syntaxTree) => {
         assert(hasContainersChildren(syntaxTree));
         return new SimpleContainerMathMLElement(syntaxTree, "mrow", this);
       });
-    });
-    this.addRenderer("Error", (syntaxTree: SyntaxNode) => {
-      assert(hasLeavesChildren(syntaxTree));
-      const element = new TextMathMLElement(syntaxTree, "merror");
-      console.warn("Rendering error", syntaxTree, element);
-      return element;
-    });
+    }
+    {
+      const arithmetic = this.rendererCollection("Arithmetic");
+      arithmetic.add("Number", (syntaxTree) => {
+        assert(hasLeavesChildren(syntaxTree));
+        return new TextMathMLElement(syntaxTree, "mn");
+      });
+      ["Add", "Subtract", "Multiply", "Divide"].forEach((name) => {
+        arithmetic.add(name, (syntaxTree) => {
+          assert(hasContainersChildren(syntaxTree));
+          return new SimpleContainerMathMLElement(syntaxTree, "mrow", this);
+        });
+      });
+    }
+    {
+      const collections = this.rendererCollection("Collections");
+      collections.add("Tuple", (syntaxTree) => {
+        assert(hasContainersChildren(syntaxTree));
+        return new SimpleContainerMathMLElement(syntaxTree, "mrow", this);
+      });
+    }
+    {
+      const unsorted = this.rendererCollection("Unsorted");
+      unsorted.add("Factorial", (syntaxTree) => {
+        assert(hasContainersChildren(syntaxTree));
+        return new SimpleContainerMathMLElement(syntaxTree, "mrow", this);
+      });
+    }
+    {
+      const string = this.rendererCollection("String");
+      string.add("String", (syntaxTree) => {
+        assert(hasLeavesChildren(syntaxTree));
+        return new TextMathMLElement(syntaxTree, "mtext");
+      });
+    }
+    {
+      const functions = this.rendererCollection("Function");
+      ["FunctionApplication"].forEach((name) => {
+        functions.add(name, (syntaxTree) => {
+          assert(hasContainersChildren(syntaxTree));
+          return new SimpleContainerMathMLElement(syntaxTree, "mrow", this);
+        });
+      });
+    }
+
     // TODO: all the others
   }
 
-  private addRenderer(name: string, renderer: (syntaxTree: SyntaxNode) => RenderedElement<MathMLElement>): void {
-    assert(!this.renderers.has(name), `Renderer for ${name} already exists`);
+  /**
+   * For setting up namespaced renderers
+   */
+  private rendererCollection(namePart: string) {
+    const self = this;
 
-    if (import.meta.env.DEV) {
-      this.renderers.set(name, (syntaxTree: SyntaxNode) => {
-        const rendered = renderer(syntaxTree);
-        rendered.getElements().forEach((v) => v.setAttribute("data-renderer-name", name));
-        return rendered;
-      });
-    } else {
-      this.renderers.set(name, renderer);
+    function addRenderer(nameFull: NodeIdentifier, renderer: (syntaxTree: SyntaxNode) => RenderedElement<MathMLElement>): void {
+      let name = joinNodeIdentifier(nameFull);
+      assert(!self.renderers.has(name), `Renderer for ${name} already exists`);
+
+      if (import.meta.env.DEV) {
+        self.renderers.set(name, (syntaxTree: SyntaxNode) => {
+          const rendered = renderer(syntaxTree);
+          rendered.getElements().forEach((v) => v.setAttribute("data-renderer-name", name));
+          return rendered;
+        });
+      } else {
+        self.renderers.set(name, renderer);
+      }
     }
+
+    function renderCollectionInternal(nameParts: string[]) {
+      return {
+        add: (name: string, renderer: (syntaxTree: SyntaxNode) => RenderedElement<MathMLElement>) => {
+          addRenderer(nameParts.concat([name]), renderer);
+        },
+        rendererCollection(namePart: string) {
+          return renderCollectionInternal(nameParts.concat([namePart]));
+        },
+      };
+    }
+
+    return renderCollectionInternal([namePart]);
   }
 
-  canRender(syntaxTreeNames: string[]): boolean {
-    return syntaxTreeNames.every((name) => this.renderers.has(name));
+  canRender(nodeIdentifier: NodeIdentifier): boolean {
+    return this.renderers.has(joinNodeIdentifier(nodeIdentifier));
   }
 
   renderAll(parsed: ParseResult): RenderResult<MathMLElement> {
@@ -75,8 +154,8 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
   }
 
   render(syntaxTree: SyntaxNode): RenderedElement<MathMLElement> {
-    const renderer = this.renderers.get(syntaxTree.name);
-    assert(renderer, `No renderer for "${syntaxTree.name}"`);
+    const renderer = this.renderers.get(joinNodeIdentifier(syntaxTree.name));
+    assert(renderer, `No renderer for "${joinNodeIdentifier(syntaxTree.name)}"`);
 
     const element = renderer(syntaxTree);
     return element;
