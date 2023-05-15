@@ -18,6 +18,44 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
   private readonly renderers: Map<NodeIdentifierJoined, (syntaxTree: SyntaxNode) => RenderedElement<MathMLElement>> = new Map();
 
   constructor() {
+    // TODO:
+    // Maybe detect under-over?
+    // If it's a square root, make the 2 a bit lighter?
+    // Bracket pairing (we already get enough info from the syntax tree!)
+    // element.setAttribute("stretchy", "false"); when rendering brackets
+    // sub, sup without a base element - create a placeholder
+    // look at https://w3c.github.io/mathml-core/#operator-tables
+
+    // TODO:
+    // under, over, underover, sub, sup, subsup
+    // table
+    /*
+if (mathIR.type === "table") {
+    const width = mathIR.rowWidth;
+    const rows: MathLayoutRow[][] = [];
+    const childTranslators: RowDomTranslator[] = [];
+    // copy rows from mathIR.values into rows
+    for (let i = 0; i < mathIR.values.length; i += width) {
+      rows.push(mathIR.values.slice(i, i + width));
+    }
+    const element = createMathElement(
+      "mtable",
+      rows.map((row) =>
+        createMathElement(
+          "mtr",
+          row.map((cell) => {
+            const cellWithElement = fromMathLayoutRow(cell);
+            childTranslators.push(cellWithElement.translator);
+            return createMathElement("mtd", [cellWithElement.element]);
+          })
+        )
+      )
+    );
+    const translator = new MathTableDomTranslator(mathIR, element, childTranslators);
+    return { element, translator };
+  }
+  */
+
     {
       const builtIn = this.rendererCollection("BuiltIn");
       builtIn.add("Nothing", (syntaxTree) => {

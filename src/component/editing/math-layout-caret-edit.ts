@@ -7,7 +7,6 @@ import {
   getRowIndices,
   MathLayoutRowZipper,
 } from "../../math-layout/math-layout-zipper";
-import { MathmlLayout } from "../../mathml/rendering";
 import { RenderResult } from "../../rendering/render-result";
 import arrayUtils from "../../utils/array-utils";
 import { MathLayoutCaret, moveCaret, SerializedCaret } from "./math-layout-caret";

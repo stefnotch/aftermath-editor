@@ -10,7 +10,7 @@ import inputHandlerStyles from "./input-handler-style.css?inline";
 import { createCaret, CaretElement } from "./caret-element";
 import { createInputHandler, MathmlInputHandler } from "./input-handler-element";
 import { MathLayoutCaret, moveCaret } from "./editing/math-layout-caret";
-import { MathLayoutRowZipper, getRowIndices } from "../math-layout/math-layout-zipper";
+import { MathLayoutRowZipper, fromRowIndices, getRowIndices } from "../math-layout/math-layout-zipper";
 import { applyEdit, inverseEdit, MathLayoutEdit } from "./editing/math-layout-edit";
 import { UndoRedoManager } from "./editing/undo-redo-manager";
 import { CaretEdit, removeAtCaret } from "./editing/math-layout-caret-edit";
@@ -155,7 +155,7 @@ export class MathEditor extends HTMLElement {
       e.preventDefault();
 
       this.carets.clearCarets();
-      this.carets.addPointerDownCaret(e.pointerId, newCaret.zipper, newCaret.offset);
+      this.carets.addPointerDownCaret(e.pointerId, fromRowIndices(this.inputTree, newCaret.indices), newCaret.offset);
       this.renderCarets();
     });
     container.addEventListener("pointerup", (e) => {
@@ -176,7 +176,10 @@ export class MathEditor extends HTMLElement {
       if (!newPosition) return;
 
       // TODO: Table selections
-      caret.caret = MathLayoutCaret.getSharedCaret(caret.startPosition, newPosition);
+      caret.caret = MathLayoutCaret.getSharedCaret(
+        caret.startPosition,
+        new MathLayoutPosition(fromRowIndices(this.inputTree, newPosition.indices), newPosition.offset)
+      );
       this.renderCarets();
     });
 
@@ -383,7 +386,10 @@ export class MathEditor extends HTMLElement {
   }
 
   renderCaret(caret: MathCaret) {
-    const layout = this.renderResult.getViewportPosition(new MathLayoutPosition(caret.caret.zipper, caret.caret.end));
+    const layout = this.renderResult.getViewportPosition({
+      indices: getRowIndices(caret.caret.zipper),
+      offset: caret.caret.end,
+    });
     caret.element.setPosition(layout.position.x, layout.position.y);
     caret.element.setHeight(layout.height);
 
@@ -392,12 +398,14 @@ export class MathEditor extends HTMLElement {
 
     caret.element.clearSelections();
     if (!caret.caret.isCollapsed) {
-      const rangeLayoutLeft = this.renderResult.getViewportPosition(
-        new MathLayoutPosition(caret.caret.zipper, caret.caret.leftOffset)
-      );
-      const rangeLayoutRight = this.renderResult.getViewportPosition(
-        new MathLayoutPosition(caret.caret.zipper, caret.caret.rightOffset)
-      );
+      const rangeLayoutLeft = this.renderResult.getViewportPosition({
+        indices: getRowIndices(caret.caret.zipper),
+        offset: caret.caret.leftOffset,
+      });
+      const rangeLayoutRight = this.renderResult.getViewportPosition({
+        indices: getRowIndices(caret.caret.zipper),
+        offset: caret.caret.rightOffset,
+      });
 
       const width = rangeLayoutRight.position.x - rangeLayoutLeft.position.x;
       const height = rangeLayoutLeft.height;
@@ -549,7 +557,7 @@ export class MathEditor extends HTMLElement {
     }
   }
 
-  setMathMl(elements: MathMLElement[]) {
+  setMathMl(elements: ReadonlyArray<MathMLElement>) {
     for (const element of elements) {
       assert(element instanceof MathMLElement);
     }

@@ -1,9 +1,9 @@
 import { SyntaxNode } from "../../core";
 import { Offset } from "../../math-layout/math-layout-offset";
 import { RenderedElement, RenderedPosition } from "../../rendering/render-result";
-import { ViewportValue } from "../../rendering/viewport-coordinate";
+import { ViewportRect, ViewportValue } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
-import { createMathElement, createPlaceholder } from "./rendered-elements";
+import { createMathElement, createPlaceholder, getElementBounds } from "./rendered-elements";
 
 export class NothingMathMLElement implements RenderedElement<MathMLElement> {
   element: MathMLElement;
@@ -19,6 +19,9 @@ export class NothingMathMLElement implements RenderedElement<MathMLElement> {
     }
 
     this.element = createMathElement("mrow", [this.baselineReaderElement, createPlaceholder()]);
+  }
+  getBounds(): ViewportRect {
+    return getElementBounds(this.element);
   }
   getViewportPosition(offset: Offset): RenderedPosition {
     assert(offset === 0, "NothingMathMLElement only supports offset 0");

@@ -1,8 +1,7 @@
 import { NodeIdentifier, ParseResult, SyntaxNode } from "../core";
 import { Offset } from "../math-layout/math-layout-offset";
-import { MathLayoutPosition } from "../math-layout/math-layout-position";
 import { RowIndices } from "../math-layout/math-layout-zipper";
-import { ViewportCoordinate, ViewportValue } from "./viewport-coordinate";
+import { ViewportCoordinate, ViewportRect, ViewportValue } from "./viewport-coordinate";
 
 export interface Renderer<T> {
   canRender(syntaxTreeNames: NodeIdentifier): boolean;
@@ -17,6 +16,7 @@ export interface Renderer<T> {
  * Height and depth are relative to the baseline of the row.
  */
 export type RenderedPosition = { position: ViewportCoordinate; height: ViewportValue; depth: ViewportValue };
+export type RowIndicesAndOffset = { indices: RowIndices; offset: Offset };
 export interface RenderResult<T> {
   /**
    *  For highlighting the element that contains the caret.
@@ -29,12 +29,15 @@ export interface RenderResult<T> {
   /**
    * For getting the caret position (and the positions for the selections)
    */
-  getViewportPosition(layoutPosition: MathLayoutPosition): RenderedPosition;
+  getViewportPosition(layoutPosition: RowIndicesAndOffset): RenderedPosition;
 
   /**
-   * For clicking somewhere in the viewport and getting the caret position
+   * For clicking somewhere in the viewport and getting the caret position.
+   *
+   * Note: There's a more complicated, optimized variant where we use extra info from the DOM.
+   * See code before commit https://github.com/stefnotch/aftermath-editor/commit/502261f54deccc75778b0233247cf61c6c9bdf98 with "getAncestorIndicesFromDom"
    */
-  getLayoutPosition(position: ViewportCoordinate): MathLayoutPosition;
+  getLayoutPosition(position: ViewportCoordinate): RowIndicesAndOffset;
 }
 
 /**
@@ -44,7 +47,6 @@ export interface RenderResult<T> {
  * The containers are responsible for rendering their children.
  */
 export interface RenderedElement<T> {
-  getViewportPosition(offset: Offset): RenderedPosition;
   /**
    * It's easier to walk down the render results if they know their syntax tree element.
    */
@@ -53,10 +55,20 @@ export interface RenderedElement<T> {
   /**
    * The actual underlying DOM nodes
    */
-  getElements(): T[];
+  getElements(): ReadonlyArray<T>;
 
   /**
    * The children of this element, *excluding the leaf nodes*.
    */
-  getChildren(): RenderedElement<T>[];
+  getChildren(): ReadonlyArray<RenderedElement<T>>;
+
+  /**
+   * @param offset The offset in the input tree row.
+   */
+  getViewportPosition(offset: Offset): RenderedPosition;
+
+  /**
+   * Gets the bounding box of the element.
+   */
+  getBounds(): ViewportRect;
 }

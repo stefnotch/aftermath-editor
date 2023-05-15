@@ -1,4 +1,4 @@
-import { SyntaxLeafNode } from "../../core";
+import { SyntaxLeafNode, offsetInRange } from "../../core";
 import { Offset } from "../../math-layout/math-layout-offset";
 import { ViewportValue } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
@@ -14,7 +14,7 @@ export class LeafMathMLElement {
     this.textElements = syntaxTree.symbols.map((v) => document.createTextNode(v)) ?? [createPlaceholder()];
   }
   getViewportXPosition(offset: Offset): { x: ViewportValue } {
-    assert(this.syntaxTree.range.start <= offset && offset <= this.syntaxTree.range.end, "Invalid offset");
+    assert(offsetInRange(offset, this.syntaxTree.range), "Invalid offset");
     const graphemeOffset = offset - Number(this.syntaxTree.range.start);
     const atEnd = graphemeOffset >= this.textElements.length;
     const graphemeText = this.textElements[atEnd ? this.textElements.length - 1 : graphemeOffset];

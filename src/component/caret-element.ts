@@ -3,7 +3,7 @@ import { ViewportValue } from "../rendering/viewport-coordinate";
 export interface CaretElement {
   setPosition(x: number, y: number): void;
   setHeight(v: number): void;
-  setHighlightContainer(elements: Element[]): void;
+  setHighlightContainer(elements: ReadonlyArray<Element>): void;
   addSelection(x: number, y: number, width: number, height: number): void;
   clearSelections(): void;
   remove(): void;
@@ -29,7 +29,7 @@ export function createCaret(container: HTMLElement): CaretElement {
   selectionsContainer.style.left = "0px";
   container.append(selectionsContainer);
 
-  let highlightContainers: Element[] = [];
+  let highlightContainers: ReadonlyArray<Element> = [];
 
   function setPosition(x: ViewportValue, y: ViewportValue) {
     const parentPos = container.getBoundingClientRect();
@@ -44,7 +44,7 @@ export function createCaret(container: HTMLElement): CaretElement {
     caretElement.style.marginTop = `${-v}px`;
   }
 
-  function setHighlightContainer(elements: Element[]) {
+  function setHighlightContainer(elements: ReadonlyArray<Element>) {
     highlightContainers.forEach((v) => v.classList.remove("math-container-highlight"));
     highlightContainers = elements;
     highlightContainers.forEach((v) => v.classList.add("math-container-highlight"));

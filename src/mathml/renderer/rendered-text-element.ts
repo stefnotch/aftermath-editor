@@ -1,10 +1,10 @@
 import { SyntaxLeafNode, SyntaxNode, offsetInRange } from "../../core";
 import { Offset } from "../../math-layout/math-layout-offset";
 import { RenderedElement, RenderedPosition } from "../../rendering/render-result";
-import { ViewportValue } from "../../rendering/viewport-coordinate";
+import { ViewportRect, ViewportValue } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
 import { MathMLTags } from "../mathml-spec";
-import { createMathElement } from "./rendered-elements";
+import { createMathElement, getElementBounds } from "./rendered-elements";
 import { LeafMathMLElement, getTextBoundingBox } from "./rendered-leaf";
 
 export class TextMathMLElement implements RenderedElement<MathMLElement> {
@@ -13,6 +13,7 @@ export class TextMathMLElement implements RenderedElement<MathMLElement> {
   private baselineReaderElement: Text;
 
   constructor(public syntaxTree: SyntaxNode<{ Leaves: SyntaxLeafNode[] }>, elementName: MathMLTags) {
+    // TODO: That baseline is only correct if we don't have any line wrapping.
     this.baselineReaderElement = document.createTextNode("");
 
     this.textElements = syntaxTree.children.Leaves.map((v) => new LeafMathMLElement(v));
@@ -21,6 +22,9 @@ export class TextMathMLElement implements RenderedElement<MathMLElement> {
       children.push(...textElement.getElements());
     }
     this.element = createMathElement(elementName, children);
+  }
+  getBounds(): ViewportRect {
+    return getElementBounds(this.element);
   }
   getViewportPosition(offset: Offset): RenderedPosition {
     assert(offsetInRange(offset, this.syntaxTree.range), "Invalid offset");
