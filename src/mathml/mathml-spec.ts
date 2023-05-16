@@ -111,7 +111,7 @@ const ambigousBracketsList: [string, string][] = [
 
 // Source: https://stackoverflow.com/a/22015930/3492994
 function zipWith<T>(a: T[], b: T[]) {
-  return Array.from(Array(Math.max(a.length, b.length)), (v, i) => [a[i], b[i]]);
+  return Array.from(Array(Math.max(a.length, b.length)), (_, i) => [a[i], b[i]]);
 }
 
 const parseUnicode = (v: string) => String.fromCodePoint(parseInt(v.trim().replace(/U\+([a-zA-Z0-9]+)/, "$1"), 16));
