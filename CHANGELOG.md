@@ -1,5 +1,7 @@
 # next
 
+# v0.1.0
+
 - Semantics parser written in Rust, compiled to WebAssembly
 - Text is no longer a first class concept, see https://github.com/stefnotch/aftermath-editor/issues/21#issuecomment-1422725139
 - Deal with Unicode segmentation
