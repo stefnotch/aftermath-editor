@@ -152,7 +152,8 @@ export class MathEditor extends HTMLElement {
       if (!newCaret) return;
 
       container.setPointerCapture(e.pointerId);
-      e.preventDefault();
+      // If I'm going to prevent default, then I also have to manually trigger the focus!
+      // e.preventDefault();
 
       this.carets.clearCarets();
       this.carets.addPointerDownCaret(e.pointerId, fromRowIndices(this.inputTree, newCaret.indices), newCaret.offset);
