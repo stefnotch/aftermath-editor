@@ -82,7 +82,7 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
       // Go down the tree, and check all children that are on a new row
       // Note: This could be kinda inefficient for large tables, but that's a problem for another day
       getChildrenWithRowIndex(renderedElement).forEach((v) =>
-        roots.push({ renderedElement: v.element, rowIndices: rowIndices.concat(v.rowIndex) })
+        roots.push({ renderedElement: v.element, rowIndices: rowIndices.concat([v.rowIndex]) })
       );
     }
 
@@ -153,6 +153,11 @@ function getChildElementWithIndex(
   indexOfContainer: Offset
 ): RenderedElement<MathMLElement> {
   for (let childElement of element.getChildren()) {
+    // Skip the children that are on a new row
+    if (childElement.syntaxTree.row_index) {
+      continue;
+    }
+
     // If we find a better matching child, we go deeper
     if (childElement.syntaxTree.range.start <= indexOfContainer && indexOfContainer < childElement.syntaxTree.range.end) {
       return getChildElementWithIndex(childElement, indexOfContainer);

@@ -7,13 +7,10 @@ import { MathMLTags } from "../mathml-spec";
 import { createMathElement, getElementBounds } from "./rendered-element";
 import { LeafMathMLElement } from "./rendered-leaf";
 
-// The baseline isn't exposed as a property, so we have this questionable workaround
-// https://github.com/w3c/mathml-core/issues/38
-
 /**
- * A text math element with word wrapping.
+ * A symbol math element without word wrapping.
  */
-export class TextMathMLElement implements RenderedElement<MathMLElement> {
+export class SymbolMathMLElement implements RenderedElement<MathMLElement> {
   element: MathMLElement;
   private textElements: LeafMathMLElement[];
 
@@ -24,6 +21,7 @@ export class TextMathMLElement implements RenderedElement<MathMLElement> {
       children.push(...textElement.getElements());
     }
     this.element = createMathElement(elementName, children);
+    this.element.style.whiteSpace = "nowrap";
   }
 
   getBounds(): ViewportRect {
@@ -40,6 +38,11 @@ export class TextMathMLElement implements RenderedElement<MathMLElement> {
     const x =
       textElement?.getViewportXPosition(offset)?.x ??
       (atEnd ? this.element.getBoundingClientRect().right : this.element.getBoundingClientRect().left);
+
+    // Symbol elements might be stretchy, in which case they can become pretty large.
+    // The baseline isn't exposed as a property, so we have this questionable workaround
+    // https://github.com/w3c/mathml-core/issues/38
+
     const baseline = textElement?.getBaseline(offset).y ?? this.element.getBoundingClientRect().bottom;
 
     return {
@@ -59,7 +62,7 @@ export class TextMathMLElement implements RenderedElement<MathMLElement> {
 /**
  * @returns The font size of the given element, used for calculating how large the caret should be.
  */
-function getFontSize(element: Element): ViewportValue {
+export function getFontSize(element: Element): ViewportValue {
   const fontSize = +globalThis.getComputedStyle(element).getPropertyValue("font-size").replace("px", "");
   assert(!isNaN(fontSize) && fontSize > 0);
   return fontSize;

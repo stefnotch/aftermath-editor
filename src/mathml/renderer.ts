@@ -10,8 +10,10 @@ import {
 import { RenderedElement, RenderResult, Renderer } from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { MathMLRenderResult } from "./renderer/render-result";
-import { SimpleContainerMathMLElement } from "./renderer/rendered-elements";
+import { SimpleContainerMathMLElement } from "./renderer/rendered-element";
 import { NothingMathMLElement } from "./renderer/rendered-nothing";
+import { RowsContainerMathMLElement } from "./renderer/rendered-rows-element";
+import { SymbolMathMLElement } from "./renderer/rendered-symbol-element";
 import { TextMathMLElement } from "./renderer/rendered-text-element";
 
 export class MathMLRenderer implements Renderer<MathMLElement> {
@@ -75,17 +77,17 @@ if (mathIR.type === "table") {
       });
       builtIn.add("Operator", (syntaxTree) => {
         assert(hasLeavesChildren(syntaxTree));
-        return new TextMathMLElement(syntaxTree, "mo");
+        return new SymbolMathMLElement(syntaxTree, "mo");
       });
       builtIn.add("Fraction", (syntaxTree) => {
         assert(hasContainersChildren(syntaxTree));
-        return new SimpleContainerMathMLElement(syntaxTree, "mfrac", this);
+        return new RowsContainerMathMLElement(syntaxTree, "mfrac", this);
       });
       builtIn.add("Root", (syntaxTree) => {
         // We have to switch the arguments here, because MathML uses the second argument as the root
         assert(hasContainersChildren(syntaxTree));
         syntaxTree.children.Containers.reverse();
-        return new SimpleContainerMathMLElement(syntaxTree, "mroot", this);
+        return new RowsContainerMathMLElement(syntaxTree, "mroot", this);
       });
     }
     {

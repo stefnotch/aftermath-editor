@@ -62,11 +62,7 @@ impl<'a> ParserRules<'a> {
         &self,
         mut lexer_range: LexerRange<'input, 'lexer>,
         bp_pattern: BindingPowerPattern,
-    ) -> Option<(
-        LexerRange<'input, 'lexer>,
-        &TokenDefinition,
-        MatchResult<'input, InputNode>,
-    )> {
+    ) -> Option<(LexerRange<'input, 'lexer>, &TokenDefinition)> {
         let matches: Vec<_> = self
             .known_tokens
             .get(&bp_pattern)?
@@ -88,7 +84,7 @@ impl<'a> ParserRules<'a> {
         } else if matches.len() == 1 {
             let (match_result, definition) = matches.into_iter().next().unwrap();
             lexer_range.consume_n(match_result.get_length());
-            Some((lexer_range, definition, match_result))
+            Some((lexer_range, definition))
         } else {
             self.parent_context
                 .and_then(|v| v.get_token(lexer_range, bp_pattern))
@@ -112,6 +108,42 @@ impl<'a> ParserRules<'a> {
             .flatten()
             .map(|v| v.name.clone())
             .collect()
+    }
+
+    pub fn parse_new_row_token<'input, 'lexer>(
+        &self,
+        mut lexer_range: LexerRange<'input, 'lexer>,
+    ) -> Option<SyntaxNode> {
+        let next_token = lexer_range.get_next_slice().get(0)?;
+        let rows = next_token.rows();
+        if rows.is_empty() {
+            // Not a token with rows
+            return None;
+        }
+
+        // A token with rows
+        lexer_range.consume_n(1);
+        let token = lexer_range.end_range();
+        let token_index = token.range().start;
+
+        // TODO: We're losing the table row_width information here.
+        Some(SyntaxNode::new(
+            BuiltInRules::get_new_row_token_name(next_token),
+            token.range(),
+            SyntaxNodes::Containers(
+                rows.iter()
+                    .enumerate()
+                    .map(|(row_index, row)| {
+                        let row_parse_result = parse_row(row, self);
+                        // TODO: Bubble up the row_parse_result.errors
+                        let syntax_tree = row_parse_result
+                            .value
+                            .with_row_index(RowIndex(token_index, row_index));
+                        syntax_tree
+                    })
+                    .collect(),
+            ),
+        ))
     }
 }
 
@@ -145,7 +177,6 @@ impl<'a> ParserRules<'a> {
 #[derive(Debug)]
 pub enum StartingTokenMatcher {
     Token(TokenMatcher),
-    Container(ContainerType),
 }
 impl StartingTokenMatcher {
     fn matches<'input>(
@@ -154,21 +185,6 @@ impl StartingTokenMatcher {
     ) -> Result<MatchResult<'input, InputNode>, MatchError> {
         match self {
             StartingTokenMatcher::Token(TokenMatcher { symbol, .. }) => symbol.matches(input),
-            StartingTokenMatcher::Container(container_type) => {
-                let token = input.get(0).ok_or(MatchError::NoMatch)?;
-                match (container_type, token) {
-                    (ContainerType::Fraction, InputNode::Fraction(_))
-                    | (ContainerType::Root, InputNode::Root(_))
-                    | (ContainerType::Under, InputNode::Under(_))
-                    | (ContainerType::Over, InputNode::Over(_))
-                    | (ContainerType::Sup, InputNode::Sup(_))
-                    | (ContainerType::Sub, InputNode::Sub(_))
-                    | (ContainerType::Table, InputNode::Table { .. }) => {
-                        Ok(MatchResult::new(&input[0..1]))
-                    }
-                    _ => Err(MatchError::NoMatch),
-                }
-            }
         }
     }
 
@@ -237,17 +253,6 @@ pub struct Argument {
 pub enum ArgumentParserType {
     Next { minimum_binding_power: u32 },
     NextToken(TokenMatcher),
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum ContainerType {
-    Fraction,
-    Root,
-    Under,
-    Over,
-    Sup,
-    Sub,
-    Table,
 }
 
 struct TokenArgumentParseResult<'lexer> {
@@ -392,63 +397,25 @@ impl TokenDefinition {
         &self,
         mut lexer: Lexer<'lexer>,
         context: &ParserRules,
-        token_match_results: &MatchResult<'input, InputNode>,
     ) -> (Vec<SyntaxNode>, Lexer<'lexer>) {
-        // TODO: This is a bit of a mess
-        if self.is_container() {
-            let token = match token_match_results.get_input() {
-                [InputNode::Symbol(_)] => panic!("expected container token"),
-                [token] => token,
-                _ => panic!("expected single token"),
-            };
-            let token_index = {
-                // TODO: This is a bit of a mess
-                let lexer_end = lexer.begin_range().end_range().range().start;
-                assert!(lexer_end > 0);
-                lexer_end - 1
-            };
+        // Fill arguments with dummies
+        let mut arguments = std::iter::repeat_with(|| None)
+            .take(self.argument_count)
+            .collect::<Vec<_>>();
 
-            let arguments: Vec<_> = token
-                .rows()
-                .iter()
-                .enumerate()
-                .map(|(row_index, row)| {
-                    let row_parse_result = parse_row(row, context);
-                    // TODO: Bubble up the row_parse_result.errors
-                    let syntax_tree = row_parse_result
-                        .value
-                        .with_row_index(RowIndex(token_index, row_index));
-                    syntax_tree
-                })
-                .collect();
-            (arguments, lexer)
-        } else {
-            // Fill arguments with dummies
-            let mut arguments = std::iter::repeat_with(|| None)
-                .take(self.argument_count)
-                .collect::<Vec<_>>();
+        // And then set the argument values
+        for parser in &self.arguments_parsers {
+            // TODO: If something expected was not found (e.g. a closing bracket), this should report the appropriate error
+            // And it should not consume anything
+            let parse_result = parser.parse(lexer, context);
 
-            // And then set the argument values
-            for parser in &self.arguments_parsers {
-                // TODO: If something expected was not found (e.g. a closing bracket), this should report the appropriate error
-                // And it should not consume anything
-                let parse_result = parser.parse(lexer, context);
-
-                lexer = parse_result.lexer;
-                arguments[parse_result.argument_index] = Some(parse_result.argument);
-            }
-
-            (
-                arguments.into_iter().collect::<Option<Vec<_>>>().unwrap(),
-                lexer,
-            )
+            lexer = parse_result.lexer;
+            arguments[parse_result.argument_index] = Some(parse_result.argument);
         }
-    }
 
-    pub fn is_container(&self) -> bool {
-        match self.starting_parser {
-            StartingTokenMatcher::Token(_) => false,
-            StartingTokenMatcher::Container(_) => true,
-        }
+        (
+            arguments.into_iter().collect::<Option<Vec<_>>>().unwrap(),
+            lexer,
+        )
     }
 }

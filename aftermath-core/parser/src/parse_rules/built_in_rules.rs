@@ -1,10 +1,8 @@
 use std::ops::Range;
 
-use crate::{
-    parse_rules::{ContainerType, StartingTokenMatcher},
-    syntax_tree::NodeIdentifier,
-    SyntaxLeafNode, SyntaxNode, SyntaxNodes,
-};
+use input_tree::input_node::InputNode;
+
+use crate::{syntax_tree::NodeIdentifier, SyntaxLeafNode, SyntaxNode, SyntaxNodes};
 
 use super::TokenDefinition;
 
@@ -52,17 +50,19 @@ impl BuiltInRules {
     }
 
     pub fn get_rules() -> Vec<TokenDefinition> {
-        vec![
-            TokenDefinition::new(
-                BuiltInRules::rule_name("Fraction"),
-                (None, None),
-                StartingTokenMatcher::Container(ContainerType::Fraction),
-            ),
-            TokenDefinition::new(
-                BuiltInRules::rule_name("Root"),
-                (None, None),
-                StartingTokenMatcher::Container(ContainerType::Root),
-            ),
-        ]
+        vec![]
+    }
+
+    pub fn get_new_row_token_name(next_token: &InputNode) -> NodeIdentifier {
+        match next_token {
+            InputNode::Fraction(_) => BuiltInRules::rule_name("Fraction"),
+            InputNode::Root(_) => BuiltInRules::rule_name("Root"),
+            InputNode::Under(_) => BuiltInRules::rule_name("Under"),
+            InputNode::Over(_) => BuiltInRules::rule_name("Over"),
+            InputNode::Sup(_) => BuiltInRules::rule_name("Sup"),
+            InputNode::Sub(_) => BuiltInRules::rule_name("Sub"),
+            InputNode::Table { .. } => BuiltInRules::rule_name("Table"),
+            InputNode::Symbol(_) => BuiltInRules::rule_name("Symbol"),
+        }
     }
 }

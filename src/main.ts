@@ -15,3 +15,19 @@ document.querySelectorAll("math[data-editor]").forEach((el) => {
 if (import.meta.env.PROD) {
   console.log("Running version", version);
 }
+
+if (import.meta.env.DEV) {
+  // Debug utility
+  (window as any).displayBoundingRect = (el: { getBoundingClientRect(): DOMRect }) => {
+    let rect = el.getBoundingClientRect();
+    let display = document.createElement("div");
+    display.style.position = "fixed";
+    display.style.top = `${rect.top}px`;
+    display.style.left = `${rect.left}px`;
+    display.style.width = `${rect.width}px`;
+    display.style.height = `${rect.height}px`;
+    display.style.border = "1px solid red";
+    display.style.pointerEvents = "none";
+    document.body.append(display);
+  };
+}

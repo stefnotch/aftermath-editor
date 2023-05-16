@@ -14,6 +14,10 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
     renderer: Renderer<MathMLElement>
   ) {
     assert(syntaxTree.children.Containers.length > 0, "Needs at least one child");
+    assert(
+      syntaxTree.children.Containers.every((v) => v.row_index === undefined),
+      "Cannot deal with row_index"
+    );
     this.element = createMathElement(elementName, []);
 
     this.setChildren(
@@ -22,23 +26,28 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
     );
     assert(this.children.length > 0, "Needs at least one rendered child");
   }
+
   getBounds(): ViewportRect {
     return getElementBounds(this.element);
   }
-  getViewportPosition(offset: number): RenderedPosition {
-    // TODO: This breaks when children have a row_index
 
+  getViewportPosition(offset: number): RenderedPosition {
     assert(this.syntaxTree.range.start <= offset && offset <= this.syntaxTree.range.end, "Invalid offset");
-    const child = this.children.find((c) => c.syntaxTree.range.start <= offset && offset <= c.syntaxTree.range.end);
+    // Don't look at children that are on a new row
+    const child = this.children.find(
+      (c) => c.syntaxTree.row_index === undefined && c.syntaxTree.range.start <= offset && offset <= c.syntaxTree.range.end
+    );
     if (child) {
       return child.getViewportPosition(offset);
     } else {
-      throw new Error("Don't know how to render this offset");
+      throw new Error("Should not happen");
     }
   }
+
   getElements(): MathMLElement[] {
     return [this.element];
   }
+
   private setChildren(elementName: MathMLTags, children: RenderedElement<MathMLElement>[]): void {
     assert(
       MathMLTagsExpectedChildrenCount[elementName] === null || MathMLTagsExpectedChildrenCount[elementName] === children.length,
@@ -49,6 +58,7 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
     this.children = children;
     this.element.append(...children.map((v) => wrapInMRow(v.getElements())));
   }
+
   getChildren(): RenderedElement<MathMLElement>[] {
     return this.children;
   }

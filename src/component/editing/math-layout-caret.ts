@@ -88,14 +88,20 @@ export function moveCaret<T>(
     caret.zipper,
     direction === "left" || direction === "up" ? caret.leftOffset : caret.rightOffset
   );
-  const viewportPosition = renderResult.getViewportPosition(layoutPosition);
+  const viewportPosition = renderResult.getViewportPosition({
+    indices: getRowIndices(layoutPosition.zipper),
+    offset: layoutPosition.offset,
+  });
 
   const newPosition = movePositionRecursive(
     layoutPosition,
     direction,
     [viewportPosition.position.x, viewportPosition.position.y],
     (layoutPosition) => {
-      const position = renderResult.getViewportPosition(layoutPosition);
+      const position = renderResult.getViewportPosition({
+        indices: getRowIndices(layoutPosition.zipper),
+        offset: layoutPosition.offset,
+      });
       return [position.position.x, position.position.y];
     }
   );

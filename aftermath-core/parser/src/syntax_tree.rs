@@ -15,6 +15,7 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 /// - Child ranges are non-overlapping
 /// - Child ranges are contiguous, we don't skip any tokens
 /// - Child range rules only apply if they are on the same row (see row_index)
+/// - Either all child ranges have a row_index, or none do.
 ///
 /// indices reference the input tree
 #[derive(Debug, Serialize)]
@@ -133,6 +134,7 @@ impl SyntaxNode {
         }
     }
 
+    // TODO: Refactor to respect the "all or none" row_index rule
     pub fn with_row_index(mut self, row_index: RowIndex) -> Self {
         self.row_index = Some(row_index);
         self

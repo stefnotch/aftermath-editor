@@ -9,7 +9,7 @@ mod token_matcher;
 
 use std::ops::Range;
 
-use input_tree::{input_node::InputNode, row::InputRow};
+use input_tree::row::InputRow;
 use parse_rules::operator_syntax_node;
 
 use crate::{
@@ -18,10 +18,7 @@ use crate::{
     syntax_tree::{get_child_range_end, LeafNodeType},
 };
 
-use self::{
-    parse_rules::{ParserRules, TokenDefinition},
-    token_matcher::MatchResult,
-};
+use self::parse_rules::{ParserRules, TokenDefinition};
 
 pub use self::parse_result::{ParseError, ParseErrorType, ParseResult};
 pub use self::syntax_tree::{SyntaxLeafNode, SyntaxNode, SyntaxNodes};
@@ -95,30 +92,32 @@ impl<'a> ParserRules<'a> {
 
         // bp stands for binding power
         let mut left: SyntaxNode = {
-            let parse_result = if let Some((starting_range, definition, match_result)) =
+            let parse_result = if let Some((starting_range, definition)) =
                 self.get_token(lexer.begin_range(), (false, false))
             {
                 // Defined symbol
                 let token = starting_range.end_range();
                 ParseStartResult {
                     definition,
-                    match_result,
                     range: token.range.clone(),
                     symbols: token.get_symbols(),
                 }
                 .to_syntax_tree(lexer, self)
-            } else if let Some((starting_range, definition, match_result)) =
+            } else if let Some((starting_range, definition)) =
                 self.get_token(lexer.begin_range(), (false, true))
             {
                 // Prefix operator
                 let token = starting_range.end_range();
                 ParseStartResult {
                     definition,
-                    match_result,
                     range: token.range.clone(),
                     symbols: token.get_symbols(),
                 }
                 .to_syntax_tree(lexer, self)
+            } else if let Some(syntax_node) = self.parse_new_row_token(lexer.begin_range()) {
+                // This is the only place where we can actually encounter things like fractions or roots
+                // So we hardcode the logic here
+                (syntax_node, lexer)
             } else {
                 // Consume one token and report an error
                 // TODO: Check if next node is maybe a (true, true) or (true, false) token. If so, we should instead report an error for the missing operator.
@@ -132,7 +131,7 @@ impl<'a> ParserRules<'a> {
         loop {
             // Not sure yet what happens when we have a postfix operator with a low binding power
             // Also not sure what happens when there's a right associative and a left associative operator with the same binding powers
-            if let Some((operator_range, definition, match_result)) =
+            if let Some((operator_range, definition)) =
                 self.get_token(lexer.begin_range(), (true, true))
             {
                 // Infix operator
@@ -148,7 +147,7 @@ impl<'a> ParserRules<'a> {
 
                 // Parse the right operand
                 let args;
-                (args, lexer) = definition.parse_arguments(lexer, self, &match_result);
+                (args, lexer) = definition.parse_arguments(lexer, self);
                 // Combine the left and right operand into a new left operand
                 let mut children = vec![
                     left,
@@ -166,7 +165,7 @@ impl<'a> ParserRules<'a> {
                 continue;
             }
 
-            if let Some((operator_range, definition, match_result)) =
+            if let Some((operator_range, definition)) =
                 self.get_token(lexer.begin_range(), (true, false))
             {
                 // Postfix operator
@@ -181,7 +180,7 @@ impl<'a> ParserRules<'a> {
                 let range_start = left.range().start;
 
                 let args;
-                (args, lexer) = definition.parse_arguments(lexer, self, &match_result);
+                (args, lexer) = definition.parse_arguments(lexer, self);
 
                 // Combine the left operand into a new left operand
                 let mut children = vec![
@@ -232,35 +231,20 @@ fn error_and_consume_one(mut lexer: Lexer) -> (SyntaxNode, Lexer) {
 }
 
 #[derive(Debug)]
-struct ParseStartResult<'input, 'definition> {
+struct ParseStartResult<'definition> {
     definition: &'definition TokenDefinition,
-    match_result: MatchResult<'input, InputNode>,
     range: Range<usize>,
     symbols: Vec<String>,
 }
-impl<'input, 'definition> ParseStartResult<'input, 'definition> {
+impl<'definition> ParseStartResult<'definition> {
     fn to_syntax_tree<'lexer>(
         self,
         lexer: Lexer<'lexer>,
         context: &ParserRules,
     ) -> (SyntaxNode, Lexer<'lexer>) {
-        let (args, lexer) = self
-            .definition
-            .parse_arguments(lexer, context, &self.match_result);
+        let (args, lexer) = self.definition.parse_arguments(lexer, context);
 
         match &self.definition.starting_parser {
-            parse_rules::StartingTokenMatcher::Container(_starting_container) => {
-                let children = args;
-                let range = self.range;
-                (
-                    SyntaxNode::new(
-                        self.definition.name(),
-                        range,
-                        SyntaxNodes::Containers(children),
-                    ),
-                    lexer,
-                )
-            }
             parse_rules::StartingTokenMatcher::Token(starting_token) => {
                 let leaf_node = SyntaxLeafNode {
                     node_type: starting_token.symbol_type.clone(),

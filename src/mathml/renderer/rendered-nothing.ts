@@ -3,7 +3,7 @@ import { Offset } from "../../math-layout/math-layout-offset";
 import { RenderedElement, RenderedPosition } from "../../rendering/render-result";
 import { ViewportRect, ViewportValue } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
-import { createMathElement, createPlaceholder, getElementBounds } from "./rendered-elements";
+import { createMathElement, createPlaceholder, getElementBounds } from "./rendered-element";
 
 export class NothingMathMLElement implements RenderedElement<MathMLElement> {
   element: MathMLElement;
