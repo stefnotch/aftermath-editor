@@ -107,6 +107,25 @@ class MathEditorCarets {
   }
 }
 
+class RenderTaskQueue {
+  tasks: (() => void)[] = [];
+  constructor() {}
+
+  add(task: () => void) {
+    this.tasks.push(task);
+    setTimeout(() => {
+      this.run();
+    }, 0);
+  }
+
+  private run() {
+    while (this.tasks.length > 0) {
+      const task = this.tasks.shift()!;
+      task();
+    }
+  }
+}
+
 export class MathEditor extends HTMLElement {
   carets: MathEditorCarets;
   inputHandler: MathmlInputHandler;
@@ -120,6 +139,7 @@ export class MathEditor extends HTMLElement {
 
   renderer: MathMLRenderer;
   renderResult: RenderResult<MathMLElement>;
+  renderTaskQueue = new RenderTaskQueue();
 
   mathMlElement: Element;
 
@@ -207,7 +227,6 @@ export class MathEditor extends HTMLElement {
     });
     this.mathMlElement = document.createElement("math");
     container.append(this.mathMlElement);
-    this.setMathMl(this.renderResult.getElement([]).getElements());
 
     // Keyboard input
     // https://d-toybox.com/studio/lib/input_event_viewer.html
@@ -270,34 +289,36 @@ export class MathEditor extends HTMLElement {
 
     this.inputHandler.inputElement.addEventListener("beforeinput", (ev) => {
       console.info("beforeinput", ev);
-
-      if (ev.inputType === "deleteContentBackward" || ev.inputType === "deleteWordBackward") {
-        const edit = this.recordEdit(this.carets.map((v) => removeAtCaret(v.caret, "left", this.renderResult)));
-        this.saveEdit(edit);
-        this.applyEdit(edit);
-      } else if (ev.inputType === "deleteContentForward" || ev.inputType === "deleteWordForward") {
-        const edit = this.recordEdit(this.carets.map((v) => removeAtCaret(v.caret, "right", this.renderResult)));
-        this.saveEdit(edit);
-        this.applyEdit(edit);
-      } else if (ev.inputType === "insertText") {
-        const data = ev.data;
-        // TODO:
-        if (data != null) {
-          this.carets.map((caret) => this.insertAtCaret(caret, data));
+      // Woah, apparently running this code later fixes a Firefox textarea bug
+      this.renderTaskQueue.add(() => {
+        if (ev.inputType === "deleteContentBackward" || ev.inputType === "deleteWordBackward") {
+          const edit = this.recordEdit(this.carets.map((v) => removeAtCaret(v.caret, "left", this.renderResult)));
+          this.saveEdit(edit);
+          this.applyEdit(edit);
+        } else if (ev.inputType === "deleteContentForward" || ev.inputType === "deleteWordForward") {
+          const edit = this.recordEdit(this.carets.map((v) => removeAtCaret(v.caret, "right", this.renderResult)));
+          this.saveEdit(edit);
+          this.applyEdit(edit);
+        } else if (ev.inputType === "insertText") {
+          const data = ev.data;
+          // TODO:
+          if (data != null) {
+            this.carets.map((caret) => this.insertAtCaret(caret, data));
+          }
+        } else if (ev.inputType === "historyUndo") {
+          // TODO: https://stackoverflow.com/questions/27027833/is-it-possible-to-edit-a-text-input-with-javascript-and-add-to-the-undo-stack
+          // ^ Fix it using this slightly dirty hack
+          // Doesn't reliably fire, ugh
+          // I might be able to hack around this by firing keyboard events such that the browser has something to undo
+          // Or I could just wait for the Keyboard API to get implemented
+          ev.preventDefault();
+        } else if (ev.inputType === "historyRedo") {
+          // Doesn't reliably fire, ugh
+          // I might be able to hack around this by firing keyboard events such that the browser has something to redo
+          // Or I could just wait for the Keyboard API to get implemented
+          ev.preventDefault();
         }
-      } else if (ev.inputType === "historyUndo") {
-        // TODO: https://stackoverflow.com/questions/27027833/is-it-possible-to-edit-a-text-input-with-javascript-and-add-to-the-undo-stack
-        // ^ Fix it using this slightly dirty hack
-        // Doesn't reliably fire, ugh
-        // I might be able to hack around this by firing keyboard events such that the browser has something to undo
-        // Or I could just wait for the Keyboard API to get implemented
-        ev.preventDefault();
-      } else if (ev.inputType === "historyRedo") {
-        // Doesn't reliably fire, ugh
-        // I might be able to hack around this by firing keyboard events such that the browser has something to redo
-        // Or I could just wait for the Keyboard API to get implemented
-        ev.preventDefault();
-      }
+      });
     });
 
     const styles = document.createElement("style");
@@ -351,8 +372,14 @@ export class MathEditor extends HTMLElement {
     console.log("Rendered", this.renderResult);
 
     // The MathML elements directly under the <math> tag
-    const topLevelElements = this.renderResult.getElement([]).getElements();
-    this.setMathMl(topLevelElements);
+    const setMathMl = (elements: readonly MathMLElement[]) => {
+      for (const element of elements) {
+        assert(element instanceof MathMLElement);
+      }
+      this.mathMlElement.replaceChildren(...elements);
+    };
+
+    setMathMl(this.renderResult.getElement([]).getElements());
   }
 
   renderCarets() {
@@ -556,14 +583,5 @@ export class MathEditor extends HTMLElement {
       caret.row.value = caret.row.value.slice(0, caret.offset) + text + caret.row.value.slice(caret.offset);
       caret.offset += text.length;
     }
-  }
-
-  setMathMl(elements: ReadonlyArray<MathMLElement>) {
-    for (const element of elements) {
-      assert(element instanceof MathMLElement);
-    }
-
-    // Notice how this doesn't copy the attributes
-    this.mathMlElement.replaceChildren(...elements);
   }
 }
