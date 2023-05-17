@@ -15,7 +15,6 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 /// - Child ranges are non-overlapping
 /// - Child ranges are contiguous, we don't skip any tokens
 /// - Child range rules only apply if they are on the same row (see row_index)
-/// - Either all child ranges have a row_index, or none do.
 ///
 /// indices reference the input tree
 #[derive(Debug, Serialize)]
@@ -24,9 +23,8 @@ pub struct SyntaxNode {
     pub name: NodeIdentifier,
     /// children of the node, including the operator token(s)
     pub children: SyntaxNodes,
-    /// Which container and row to go down to reach this node
-    /// TODO: Maybe there's a better way to do this?
-    row_index: Option<RowIndex>,
+    /// When this syntax node actually starts a new row in the input tree.
+    new_row: Option<(RowIndex, Range<usize>)>,
     /// value, especially for constants
     /// stored as bytes, and interpreted according to the name
     pub value: Vec<u8>,
@@ -105,7 +103,7 @@ impl SyntaxNode {
             name,
             children,
             range,
-            row_index: None,
+            new_row: None,
             value: vec![],
         }
     }
@@ -113,11 +111,9 @@ impl SyntaxNode {
     /// Returns the range of all the children combined, and verifies the invariants.
     fn get_combined_range(children: &SyntaxNodes) -> Option<Range<usize>> {
         let binding = match children {
-            SyntaxNodes::Containers(children) => children
-                .iter()
-                .filter(|c| c.row_index().is_none())
-                .map(|v| v.range())
-                .collect::<Vec<_>>(),
+            SyntaxNodes::Containers(children) => {
+                children.iter().map(|v| v.range()).collect::<Vec<_>>()
+            }
             SyntaxNodes::Leaves(children) => children.iter().map(|v| v.range()).collect(),
         };
         let mut child_iter = binding.iter();
@@ -134,9 +130,8 @@ impl SyntaxNode {
         }
     }
 
-    // TODO: Refactor to respect the "all or none" row_index rule
-    pub fn with_row_index(mut self, row_index: RowIndex) -> Self {
-        self.row_index = Some(row_index);
+    pub fn with_new_row(mut self, new_row_index: RowIndex, new_row_range: Range<usize>) -> Self {
+        self.new_row = Some((new_row_index, new_row_range));
         self
     }
 
@@ -144,15 +139,21 @@ impl SyntaxNode {
         self.range.clone()
     }
 
-    pub fn row_index(&self) -> Option<RowIndex> {
-        self.row_index.clone()
+    pub fn wrap_in_new_row(
+        mut self,
+        parent_range: Range<usize>,
+        row_index: RowIndex,
+    ) -> SyntaxNode {
+        let new_row_range = self.range;
+        self.new_row = Some((row_index, new_row_range));
+        self.range = parent_range;
+        self
     }
 }
 
 pub fn get_child_range_end(children: &[SyntaxNode]) -> usize {
     assert!(children.len() > 0);
-    let child_iter = children.iter().filter(|c| c.row_index().is_none());
-    child_iter.last().unwrap().range().end
+    children.last().unwrap().range().end
 }
 
 impl SyntaxLeafNode {

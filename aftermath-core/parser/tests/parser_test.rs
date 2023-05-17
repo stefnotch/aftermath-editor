@@ -9,9 +9,7 @@ fn test_parser() {
         InputNode::Symbol("*".to_string()),
         InputNode::Symbol("C".to_string()),
     ]);
-
     let context = ParserRules::default();
-
     let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
@@ -28,13 +26,47 @@ fn test_postfix() {
         InputNode::Symbol("a".to_string()),
         InputNode::Symbol("!".to_string()),
     ]);
-
     let context = ParserRules::default();
-
     let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
         r#"(Arithmetic::Add (Core::Variable "c") (BuiltIn::Operator "+") (Unsorted::Factorial (Core::Variable "a") (BuiltIn::Operator "!")))"#
+    );
+    assert_eq!(parsed.errors.len(), 0);
+}
+
+#[test]
+fn test_sub() {
+    let layout = InputRow::new(vec![
+        InputNode::Symbol("a".to_string()),
+        InputNode::Sub(InputRow::new(vec![InputNode::Symbol("1".to_string())])),
+    ]);
+    let context = ParserRules::default();
+    let parsed = parse_row(&layout, &context);
+    assert_eq!(
+        parsed.value.to_string(),
+        r#"(BuiltIn::Sub (Core::Variable "a") (BuiltIn::Row (Arithmetic::Number "1")))"#
+    );
+    assert_eq!(parsed.errors.len(), 0);
+}
+
+#[test]
+fn test_sup_sub() {
+    let layout = InputRow::new(vec![
+        InputNode::Symbol("a".to_string()),
+        InputNode::Sup(InputRow::new(vec![InputNode::Symbol("1".to_string())])),
+        InputNode::Sub(InputRow::new(vec![InputNode::Symbol("2".to_string())])),
+    ]);
+    let context = ParserRules::default();
+    let parsed = parse_row(&layout, &context);
+    assert_eq!(
+        parsed.value.to_string(),
+        format!(
+            "{}{}{}",
+            r#"(BuiltIn::Sub "#,
+            r#"(BuiltIn::Sup (Core::Variable "a") (BuiltIn::Row (Arithmetic::Number "1")))"#,
+            r#" (BuiltIn::Row (Arithmetic::Number "2")))"#
+        )
     );
     assert_eq!(parsed.errors.len(), 0);
 }

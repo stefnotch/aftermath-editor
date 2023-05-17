@@ -83,6 +83,14 @@ if (mathIR.type === "table") {
         assert(hasContainersChildren(syntaxTree));
         return new RowsContainerMathMLElement(syntaxTree, "mfrac", this);
       });
+      builtIn.add("Sup", (syntaxTree) => {
+        assert(hasContainersChildren(syntaxTree));
+        return new RowsContainerMathMLElement(syntaxTree, "msup", this);
+      });
+      builtIn.add("Sub", (syntaxTree) => {
+        assert(hasContainersChildren(syntaxTree));
+        return new RowsContainerMathMLElement(syntaxTree, "msub", this);
+      });
       builtIn.add("Root", (syntaxTree) => {
         // We have to switch the arguments here, because MathML uses the second argument as the root
         assert(hasContainersChildren(syntaxTree));

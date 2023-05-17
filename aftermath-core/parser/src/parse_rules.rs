@@ -351,6 +351,19 @@ impl TokenDefinition {
         (arguments, lexer)
     }
 
+    fn get_new_row_token_name(token: &InputNode) -> Option<NodeIdentifier> {
+        match token {
+            InputNode::Fraction(_) => Some(BuiltInRules::fraction_rule_name()),
+            InputNode::Root(_) => Some(BuiltInRules::root_rule_name()),
+            InputNode::Under(_) => Some(BuiltInRules::under_rule_name()),
+            InputNode::Over(_) => Some(BuiltInRules::over_rule_name()),
+            InputNode::Sup(_) => Some(BuiltInRules::row_rule_name()),
+            InputNode::Sub(_) => Some(BuiltInRules::row_rule_name()),
+            InputNode::Table { .. } => Some(BuiltInRules::table_rule_name()),
+            InputNode::Symbol(_) => None,
+        }
+    }
+
     pub fn parse_starting_token(
         &self,
         token: LexerToken,
@@ -359,7 +372,7 @@ impl TokenDefinition {
         // Hardcoded for now
         match token.value {
             [input_node] => {
-                if let Some(node_identifier) = BuiltInRules::get_new_row_token_name(input_node) {
+                if let Some(node_identifier) = Self::get_new_row_token_name(input_node) {
                     let token_index = token.range().start;
 
                     // TODO: We're losing the table row_width information here.
@@ -374,9 +387,13 @@ impl TokenDefinition {
                                 .map(|(row_index, row)| {
                                     let row_parse_result = parse_row(row, parser_rules);
                                     // TODO: Bubble up the row_parse_result.errors
-                                    let syntax_tree = row_parse_result
-                                        .value
-                                        .with_row_index(RowIndex(token_index, row_index));
+                                    let mut syntax_tree = row_parse_result.value;
+
+                                    syntax_tree = syntax_tree.wrap_in_new_row(
+                                        // We're pretending that the new row is a zero width token
+                                        token.range().end..token.range().end,
+                                        RowIndex(token_index, row_index),
+                                    );
                                     syntax_tree
                                 })
                                 .collect(),

@@ -63,17 +63,28 @@ impl BuiltInRules {
         BuiltInRules::rule_name("Operator")
     }
 
-    pub fn get_new_row_token_name(token: &InputNode) -> Option<NodeIdentifier> {
-        match token {
-            InputNode::Fraction(_) => Some(BuiltInRules::rule_name("Fraction")),
-            InputNode::Root(_) => Some(BuiltInRules::rule_name("Root")),
-            InputNode::Under(_) => Some(BuiltInRules::rule_name("Under")),
-            InputNode::Over(_) => Some(BuiltInRules::rule_name("Over")),
-            InputNode::Sup(_) => Some(BuiltInRules::rule_name("Sup")),
-            InputNode::Sub(_) => Some(BuiltInRules::rule_name("Sub")),
-            InputNode::Table { .. } => Some(BuiltInRules::rule_name("Table")),
-            InputNode::Symbol(_) => None,
-        }
+    pub fn fraction_rule_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("Fraction")
+    }
+
+    pub fn root_rule_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("Root")
+    }
+
+    pub fn under_rule_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("Under")
+    }
+
+    pub fn over_rule_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("Over")
+    }
+
+    pub fn row_rule_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("Row")
+    }
+
+    pub fn table_rule_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("Table")
     }
 }
 

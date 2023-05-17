@@ -50,7 +50,6 @@ pub fn parse_row(input: &InputRow, context: &ParserRules) -> ParseResult<SyntaxN
         parse_result = BuiltInRules::parse_error_node(range, children)
     }
 
-    println!("parse result: {:?}", parse_result);
     assert_eq!(
         parse_result.range().end,
         input.values.len(),
