@@ -4,7 +4,7 @@ use input_tree::input_node::InputNode;
 
 use crate::{syntax_tree::NodeIdentifier, SyntaxLeafNode, SyntaxNode, SyntaxNodes};
 
-use super::TokenDefinition;
+use super::{ParseRuleCollection, TokenDefinition};
 
 pub struct BuiltInRules {}
 
@@ -49,10 +49,6 @@ impl BuiltInRules {
         BuiltInRules::rule_name("Operator")
     }
 
-    pub fn get_rules() -> Vec<TokenDefinition> {
-        vec![]
-    }
-
     pub fn get_new_row_token_name(next_token: &InputNode) -> NodeIdentifier {
         match next_token {
             InputNode::Fraction(_) => BuiltInRules::rule_name("Fraction"),
@@ -64,5 +60,29 @@ impl BuiltInRules {
             InputNode::Table { .. } => BuiltInRules::rule_name("Table"),
             InputNode::Symbol(_) => BuiltInRules::rule_name("Symbol"),
         }
+    }
+}
+
+impl ParseRuleCollection for BuiltInRules {
+    fn get_rules() -> Vec<TokenDefinition> {
+        vec![]
+    }
+
+    fn get_rule_names() -> Vec<NodeIdentifier> {
+        vec![
+            Self::error_name(),
+            Self::error_message_name(),
+            Self::nothing_name(),
+            Self::operator_name(),
+            // Keep this in sync with get_new_row_token_name
+            BuiltInRules::rule_name("Fraction"),
+            BuiltInRules::rule_name("Root"),
+            BuiltInRules::rule_name("Under"),
+            BuiltInRules::rule_name("Over"),
+            BuiltInRules::rule_name("Sup"),
+            BuiltInRules::rule_name("Sub"),
+            BuiltInRules::rule_name("Table"),
+            BuiltInRules::rule_name("Symbol"),
+        ]
     }
 }

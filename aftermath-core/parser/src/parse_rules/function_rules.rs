@@ -23,14 +23,12 @@ impl FunctionRules {
                     parser: ArgumentParserType::Next {
                         minimum_binding_power: 0,
                     },
-                    argument_index: 0,
                 },
                 Argument {
                     parser: ArgumentParserType::NextToken(TokenMatcher {
                         symbol: NFABuilder::match_character(')'.into()).build(),
                         symbol_type: LeafNodeType::Operator,
                     }),
-                    argument_index: 1,
                 },
             ],
         )]

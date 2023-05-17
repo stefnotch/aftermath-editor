@@ -105,7 +105,7 @@ impl<'a> ParserRules<'a> {
     }
 
     pub fn get_token_names(&self) -> Vec<NodeIdentifier> {
-        // TODO: Some tokens, like "Operator" are missing
+        // TODO: Read this from the rules (ParseRuleCollection)
         self.known_tokens
             .values()
             .flatten()
@@ -238,14 +238,13 @@ pub struct TokenMatcher {
 #[derive(Debug)]
 pub struct TokenDefinition {
     pub name: NodeIdentifier,
-    /// (None, None) is a constant
-    /// (None, Some) is a prefix operator
-    /// (Some, None) is a postfix operator
+    /// (None, None) is a constant\
+    /// (None, Some) is a prefix operator\
+    /// (Some, None) is a postfix operator\
     /// (Some, Some) is an infix operator
     pub binding_power: (Option<u32>, Option<u32>),
     pub starting_parser: StartingTokenMatcher,
-    pub arguments_parsers: Vec<Argument>,
-    argument_count: usize,
+    arguments_parser: Vec<Argument>,
 }
 
 #[derive(Debug)]
@@ -259,7 +258,6 @@ pub struct Argument {
 
     // Does not parse
     // - sup and sub that come after a sum, because those are postfix operators
-    argument_index: usize,
     parser: ArgumentParserType,
 }
 
@@ -270,7 +268,6 @@ pub enum ArgumentParserType {
 }
 
 struct TokenArgumentParseResult<'lexer> {
-    argument_index: usize,
     argument: SyntaxNode,
     lexer: Lexer<'lexer>,
 }
@@ -296,14 +293,9 @@ impl Argument {
                     ArgumentParserType::Next {
                         minimum_binding_power,
                     },
-                argument_index,
             } => {
                 let (argument, lexer) = context.parse_bp(lexer, *minimum_binding_power);
-                TokenArgumentParseResult {
-                    argument_index: *argument_index,
-                    argument,
-                    lexer,
-                }
+                TokenArgumentParseResult { argument, lexer }
             }
             Argument {
                 parser:
@@ -311,7 +303,6 @@ impl Argument {
                         symbol,
                         symbol_type,
                     }),
-                argument_index,
             } => {
                 if let Some((lexer_range, _match_result)) =
                     context.get_symbol(lexer.begin_range(), symbol)
@@ -323,7 +314,6 @@ impl Argument {
                         symbols: token.get_symbols(),
                     };
                     TokenArgumentParseResult {
-                        argument_index: *argument_index,
                         // TODO: This is wrong
                         argument: operator_syntax_node(argument),
                         lexer,
@@ -332,7 +322,6 @@ impl Argument {
                     let token = lexer.begin_range().end_range();
                     // TODO: Report this error properly
                     TokenArgumentParseResult {
-                        argument_index: *argument_index,
                         argument: BuiltInRules::error_message_node(token.range(), vec![]),
                         lexer,
                     }
@@ -354,14 +343,12 @@ impl TokenDefinition {
                 parser: ArgumentParserType::Next {
                     minimum_binding_power,
                 },
-                argument_index: 0,
             }],
             // prefix
             (None, Some(minimum_binding_power)) => vec![Argument {
                 parser: ArgumentParserType::Next {
                     minimum_binding_power,
                 },
-                argument_index: 0,
             }],
             // postfix
             (Some(_), None) => vec![],
@@ -378,21 +365,11 @@ impl TokenDefinition {
         starting_parser: StartingTokenMatcher,
         arguments_parsers: Vec<Argument>,
     ) -> Self {
-        let mut argument_indices: Vec<_> =
-            arguments_parsers.iter().map(|v| v.argument_index).collect();
-
-        argument_indices.sort();
-        assert_eq!(
-            argument_indices,
-            (0..argument_indices.len()).collect::<Vec<_>>()
-        );
-
         Self {
             name,
             binding_power,
             starting_parser,
-            arguments_parsers,
-            argument_count: argument_indices.len(),
+            arguments_parser: arguments_parsers,
         }
     }
 
@@ -414,24 +391,27 @@ impl TokenDefinition {
         mut lexer: Lexer<'lexer>,
         context: &ParserRules,
     ) -> (Vec<SyntaxNode>, Lexer<'lexer>) {
-        // Fill arguments with dummies
-        let mut arguments = std::iter::repeat_with(|| None)
-            .take(self.argument_count)
-            .collect::<Vec<_>>();
+        let mut arguments = vec![];
 
-        // And then set the argument values
-        for parser in &self.arguments_parsers {
+        for parser in &self.arguments_parser {
             // TODO: If something expected was not found (e.g. a closing bracket), this should report the appropriate error
             // And it should not consume anything
             let parse_result = parser.parse(lexer, context);
 
             lexer = parse_result.lexer;
-            arguments[parse_result.argument_index] = Some(parse_result.argument);
+            arguments.push(parse_result.argument);
         }
 
-        (
-            arguments.into_iter().collect::<Option<Vec<_>>>().unwrap(),
-            lexer,
-        )
+        (arguments, lexer)
+    }
+}
+
+pub trait ParseRuleCollection {
+    fn get_rules() -> Vec<TokenDefinition>;
+    fn get_rule_names() -> Vec<NodeIdentifier> {
+        Self::get_rules()
+            .into_iter()
+            .map(|v| v.name)
+            .collect::<Vec<_>>()
     }
 }

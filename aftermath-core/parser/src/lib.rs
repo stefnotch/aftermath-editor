@@ -111,6 +111,7 @@ impl<'a> ParserRules<'a> {
                         let (range, children) = if args.is_empty() {
                             (token.range(), SyntaxNodes::Leaves(vec![leaf_node]))
                         } else {
+                            // Otherwise, we need to create a container
                             let mut children = vec![operator_syntax_node(leaf_node)];
                             children.extend(args);
                             (
