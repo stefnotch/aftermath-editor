@@ -242,7 +242,7 @@ export class MathEditor extends HTMLElement {
     this.inputHandler = createInputHandler(inputContainer);
 
     this.inputHandler.inputElement.addEventListener("keydown", (ev) => {
-      console.info("keydown", ev);
+      // console.info("keydown", ev);
       if (ev.key === "ArrowUp") {
         this.carets.map((caret) => this.moveCaret(caret, "up"));
         this.renderCarets();

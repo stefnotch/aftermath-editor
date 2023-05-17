@@ -7,9 +7,6 @@ import { MathMLTags } from "../mathml-spec";
 import { createMathElement, getElementBounds } from "./rendered-element";
 import { LeafMathMLElement } from "./rendered-leaf";
 
-// The baseline isn't exposed as a property, so we have this questionable workaround
-// https://github.com/w3c/mathml-core/issues/38
-
 /**
  * A text math element with word wrapping.
  */

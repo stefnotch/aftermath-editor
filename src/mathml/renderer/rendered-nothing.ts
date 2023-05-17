@@ -26,6 +26,7 @@ export class NothingMathMLElement implements RenderedElement<MathMLElement> {
   getViewportPosition(offset: Offset): RenderedPosition {
     assert(offset === 0, "NothingMathMLElement only supports offset 0");
     // The baseline isn't exposed as a property, so we have this workaround https://github.com/w3c/mathml-core/issues/38
+    // https://jsfiddle.net/se6n81rg/1/
     const baseline = this.baselineReaderElement.getBoundingClientRect().bottom;
     const caretSize = getFontSize(this.element);
 

@@ -42,6 +42,7 @@ export class SymbolMathMLElement implements RenderedElement<MathMLElement> {
     // Symbol elements might be stretchy, in which case they can become pretty large.
     // The baseline isn't exposed as a property, so we have this questionable workaround
     // https://github.com/w3c/mathml-core/issues/38
+    // https://jsfiddle.net/se6n81rg/1/
 
     const baseline = textElement?.getBaseline(offset).y ?? this.element.getBoundingClientRect().bottom;
 

@@ -42,6 +42,7 @@ export class RowsContainerMathMLElement implements RenderedElement<MathMLElement
 
     // The baseline isn't exposed as a property, so we have this questionable workaround
     // https://github.com/w3c/mathml-core/issues/38
+    // https://jsfiddle.net/se6n81rg/1/
 
     let positionReader: MathMLElement;
 
