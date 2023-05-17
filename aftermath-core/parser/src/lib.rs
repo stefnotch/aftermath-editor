@@ -14,7 +14,7 @@ use parse_rules::operator_syntax_node;
 
 use crate::{
     lexer::Lexer,
-    parse_rules::built_in_rules::BuiltInRules,
+    parse_rules::{built_in_rules::BuiltInRules, TokenType},
     syntax_tree::{get_child_range_end, LeafNodeType},
 };
 
@@ -93,27 +93,35 @@ impl<'a> ParserRules<'a> {
         // bp stands for binding power
         let mut left: SyntaxNode = {
             let parse_result = if let Some((starting_range, definition)) =
-                self.get_token(lexer.begin_range(), (false, false))
+                self.get_token(lexer.begin_range(), TokenType::Starting)
             {
                 // Defined symbol
                 let token = starting_range.end_range();
-                ParseStartResult {
-                    definition,
-                    range: token.range.clone(),
-                    symbols: token.get_symbols(),
+                let (args, lexer) = definition.parse_arguments(lexer, self);
+
+                match &definition.starting_parser {
+                    parse_rules::StartingTokenMatcher::Token(starting_token) => {
+                        let leaf_node = SyntaxLeafNode {
+                            node_type: starting_token.symbol_type.clone(),
+                            range: token.range(),
+                            symbols: token.get_symbols(),
+                        };
+
+                        // If it's a child without any arguments, we don't need to create a container
+                        let (range, children) = if args.is_empty() {
+                            (token.range(), SyntaxNodes::Leaves(vec![leaf_node]))
+                        } else {
+                            let mut children = vec![operator_syntax_node(leaf_node)];
+                            children.extend(args);
+                            (
+                                token.range().start..get_child_range_end(&children),
+                                SyntaxNodes::Containers(children),
+                            )
+                        };
+
+                        (SyntaxNode::new(definition.name(), range, children), lexer)
+                    }
                 }
-                .to_syntax_tree(lexer, self)
-            } else if let Some((starting_range, definition)) =
-                self.get_token(lexer.begin_range(), (false, true))
-            {
-                // Prefix operator
-                let token = starting_range.end_range();
-                ParseStartResult {
-                    definition,
-                    range: token.range.clone(),
-                    symbols: token.get_symbols(),
-                }
-                .to_syntax_tree(lexer, self)
             } else if let Some(syntax_node) = self.parse_new_row_token(lexer.begin_range()) {
                 // This is the only place where we can actually encounter things like fractions or roots
                 // So we hardcode the logic here
@@ -129,13 +137,10 @@ impl<'a> ParserRules<'a> {
 
         // Repeatedly and recursively consume operators with higher binding power
         loop {
-            // Not sure yet what happens when we have a postfix operator with a low binding power
-            // Also not sure what happens when there's a right associative and a left associative operator with the same binding powers
+            // Not sure what happens when there's a right associative and a left associative operator with the same binding powers
             if let Some((operator_range, definition)) =
-                self.get_token(lexer.begin_range(), (true, true))
+                self.get_token(lexer.begin_range(), TokenType::Continue)
             {
-                // Infix operator
-                // Not super elegant, but it works
                 if definition.binding_power.0.unwrap() < minimum_bp {
                     // operator_range is automatically dropped here, so we don't have to do it manually
                     break;
@@ -145,7 +150,6 @@ impl<'a> ParserRules<'a> {
 
                 let range_start = left.range().start;
 
-                // Parse the right operand
                 let args;
                 (args, lexer) = definition.parse_arguments(lexer, self);
                 // Combine the left and right operand into a new left operand
@@ -160,39 +164,6 @@ impl<'a> ParserRules<'a> {
                 children.extend(args);
 
                 // Range that includes the left side, and the last child
-                let range = range_start..get_child_range_end(&children);
-                left = SyntaxNode::new(definition.name(), range, SyntaxNodes::Containers(children));
-                continue;
-            }
-
-            if let Some((operator_range, definition)) =
-                self.get_token(lexer.begin_range(), (true, false))
-            {
-                // Postfix operator
-                if definition.binding_power.0.unwrap() < minimum_bp {
-                    // operator_range is automatically dropped here, so we don't have to do it manually
-                    break;
-                }
-
-                // Actually consume the operator
-                let token = operator_range.end_range();
-
-                let range_start = left.range().start;
-
-                let args;
-                (args, lexer) = definition.parse_arguments(lexer, self);
-
-                // Combine the left operand into a new left operand
-                let mut children = vec![
-                    left,
-                    operator_syntax_node(SyntaxLeafNode {
-                        node_type: LeafNodeType::Operator,
-                        range: token.range.clone(),
-                        symbols: token.get_symbols(),
-                    }),
-                ];
-                children.extend(args);
-
                 let range = range_start..get_child_range_end(&children);
                 left = SyntaxNode::new(definition.name(), range, SyntaxNodes::Containers(children));
                 continue;
@@ -228,47 +199,4 @@ fn error_and_consume_one(mut lexer: Lexer) -> (SyntaxNode, Lexer) {
         ),
         lexer,
     )
-}
-
-#[derive(Debug)]
-struct ParseStartResult<'definition> {
-    definition: &'definition TokenDefinition,
-    range: Range<usize>,
-    symbols: Vec<String>,
-}
-impl<'definition> ParseStartResult<'definition> {
-    fn to_syntax_tree<'lexer>(
-        self,
-        lexer: Lexer<'lexer>,
-        context: &ParserRules,
-    ) -> (SyntaxNode, Lexer<'lexer>) {
-        let (args, lexer) = self.definition.parse_arguments(lexer, context);
-
-        match &self.definition.starting_parser {
-            parse_rules::StartingTokenMatcher::Token(starting_token) => {
-                let leaf_node = SyntaxLeafNode {
-                    node_type: starting_token.symbol_type.clone(),
-                    range: self.range.clone(),
-                    symbols: self.symbols,
-                };
-
-                // If it's a child without any arguments, we don't need to create a container
-                let (range, children) = if args.is_empty() {
-                    (self.range, SyntaxNodes::Leaves(vec![leaf_node]))
-                } else {
-                    let mut children = vec![operator_syntax_node(leaf_node)];
-                    children.extend(args);
-                    (
-                        self.range.start..get_child_range_end(&children),
-                        SyntaxNodes::Containers(children),
-                    )
-                };
-
-                (
-                    SyntaxNode::new(self.definition.name(), range, children),
-                    lexer,
-                )
-            }
-        }
-    }
 }

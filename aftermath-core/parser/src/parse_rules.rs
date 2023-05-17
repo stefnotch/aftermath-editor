@@ -29,25 +29,28 @@ use super::{
     token_matcher::{MatchResult, NFA},
 };
 
-pub type BindingPowerPattern = (bool, bool);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TokenType {
+    Starting,
+    Continue,
+}
+
 // TODO: Display tokens in a flattened, sorted way (for debugging)
 pub struct ParserRules<'a> {
     // takes the parent context and gives it back afterwards
     parent_context: Option<&'a ParserRules<'a>>,
-    known_tokens: HashMap<BindingPowerPattern, Vec<TokenDefinition>>,
+    known_tokens: HashMap<TokenType, Vec<TokenDefinition>>,
 }
 
 /// Rules for parsing
-/// Invariant:
-/// - No postfix and infix token may have the same symbol. If they do, the infix token always wins.
+/// - No prefix and atom token may have the same symbol.
+/// - No postfix and infix token may have the same symbol.
 impl<'a> ParserRules<'a> {
     pub fn new(parent_context: Option<&'a ParserRules<'a>>, tokens: Vec<TokenDefinition>) -> Self {
         let known_tokens = tokens
             .into_iter()
             .fold(HashMap::new(), |mut acc, definition| {
-                let entry = acc
-                    .entry(definition.binding_power_pattern())
-                    .or_insert(vec![]);
+                let entry = acc.entry(definition.token_type()).or_insert(vec![]);
                 entry.push(definition);
                 acc
             });
@@ -61,11 +64,11 @@ impl<'a> ParserRules<'a> {
     pub fn get_token<'input, 'lexer>(
         &self,
         mut lexer_range: LexerRange<'input, 'lexer>,
-        bp_pattern: BindingPowerPattern,
+        token_type: TokenType,
     ) -> Option<(LexerRange<'input, 'lexer>, &TokenDefinition)> {
         let matches: Vec<_> = self
             .known_tokens
-            .get(&bp_pattern)?
+            .get(&token_type)?
             .iter()
             .map(|definition| {
                 (
@@ -87,7 +90,7 @@ impl<'a> ParserRules<'a> {
             Some((lexer_range, definition))
         } else {
             self.parent_context
-                .and_then(|v| v.get_token(lexer_range, bp_pattern))
+                .and_then(|v| v.get_token(lexer_range, token_type))
         }
     }
 
@@ -115,11 +118,22 @@ impl<'a> ParserRules<'a> {
         mut lexer_range: LexerRange<'input, 'lexer>,
     ) -> Option<SyntaxNode> {
         let next_token = lexer_range.get_next_slice().get(0)?;
-        let rows = next_token.rows();
-        if rows.is_empty() {
+
+        let is_atom_token = match next_token {
+            InputNode::Fraction(_)
+            | InputNode::Root(_)
+            | InputNode::Under(_)
+            | InputNode::Over(_)
+            | InputNode::Table { .. } => true,
+            InputNode::Sup(_) | InputNode::Sub(_) | InputNode::Symbol(_) => false,
+        };
+
+        if !is_atom_token {
             // Not a token with rows
             return None;
         }
+
+        let rows = next_token.rows();
 
         // A token with rows
         lexer_range.consume_n(1);
@@ -382,11 +396,13 @@ impl TokenDefinition {
         }
     }
 
-    fn binding_power_pattern(&self) -> (bool, bool) {
-        (
-            self.binding_power.0.is_some(),
-            self.binding_power.1.is_some(),
-        )
+    fn token_type(&self) -> TokenType {
+        match self.binding_power {
+            (Some(_), Some(_)) => TokenType::Continue,
+            (None, Some(_)) => TokenType::Starting,
+            (Some(_), None) => TokenType::Continue,
+            (None, None) => TokenType::Starting,
+        }
     }
 
     pub fn name(&self) -> NodeIdentifier {
