@@ -1,3 +1,5 @@
+use input_tree::input_node::InputNodeType;
+
 use super::{
     grapheme_matcher::GraphemeMatcher,
     token_matcher::{MatchIf, StateFragment, StateId, NFA},
@@ -7,6 +9,7 @@ use super::{
 #[derive(Debug)]
 pub enum NFABuilder {
     Grapheme(GraphemeMatcher),
+    InputNode(InputNodeType),
     Concat(Box<NFABuilder>, Box<NFABuilder>),
     Or(Box<NFABuilder>, Box<NFABuilder>),
     ZeroOrOne(Box<NFABuilder>),
@@ -18,6 +21,10 @@ pub enum NFABuilder {
 impl NFABuilder {
     pub fn match_character(character: GraphemeMatcher) -> NFABuilder {
         NFABuilder::Grapheme(character)
+    }
+
+    pub fn match_input_node(node_type: InputNodeType) -> NFABuilder {
+        NFABuilder::InputNode(node_type)
     }
 
     pub fn concat(self, right: NFABuilder) -> NFABuilder {
@@ -71,6 +78,16 @@ impl NFABuilder {
                 let start_state = push_state(
                     states,
                     StateFragment::Match(MatchIf::GraphemeCluster(character), 0),
+                );
+                NFABuilderFragment {
+                    start_state,
+                    end_states: vec![NFABuilderEndState::Match(start_state)],
+                }
+            }
+            NFABuilder::InputNode(input_node) => {
+                let start_state = push_state(
+                    states,
+                    StateFragment::Match(MatchIf::InputNode(input_node), 0),
                 );
                 NFABuilderFragment {
                     start_state,

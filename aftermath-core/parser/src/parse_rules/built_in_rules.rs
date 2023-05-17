@@ -1,8 +1,13 @@
 use std::ops::Range;
 
-use input_tree::input_node::InputNode;
+use input_tree::input_node::{InputNode, InputNodeType};
 
-use crate::{syntax_tree::NodeIdentifier, SyntaxLeafNode, SyntaxNode, SyntaxNodes};
+use crate::{
+    nfa_builder::NFABuilder,
+    parse_rules::{StartingTokenMatcher, TokenMatcher},
+    syntax_tree::{LeafNodeType, NodeIdentifier},
+    SyntaxLeafNode, SyntaxNode, SyntaxNodes,
+};
 
 use super::{ParseRuleCollection, TokenDefinition};
 
@@ -39,6 +44,15 @@ impl BuiltInRules {
         )
     }
 
+    pub fn operator_node(leaf_node: SyntaxLeafNode) -> SyntaxNode {
+        assert!(leaf_node.node_type == LeafNodeType::Operator);
+        SyntaxNode::new(
+            BuiltInRules::operator_name(),
+            leaf_node.range(),
+            SyntaxNodes::Leaves(vec![leaf_node]),
+        )
+    }
+
     /// An empty node, this happens when a row is empty.
     pub fn nothing_name() -> NodeIdentifier {
         BuiltInRules::rule_name("Nothing")
@@ -49,40 +63,96 @@ impl BuiltInRules {
         BuiltInRules::rule_name("Operator")
     }
 
-    pub fn get_new_row_token_name(next_token: &InputNode) -> NodeIdentifier {
-        match next_token {
-            InputNode::Fraction(_) => BuiltInRules::rule_name("Fraction"),
-            InputNode::Root(_) => BuiltInRules::rule_name("Root"),
-            InputNode::Under(_) => BuiltInRules::rule_name("Under"),
-            InputNode::Over(_) => BuiltInRules::rule_name("Over"),
-            InputNode::Sup(_) => BuiltInRules::rule_name("Sup"),
-            InputNode::Sub(_) => BuiltInRules::rule_name("Sub"),
-            InputNode::Table { .. } => BuiltInRules::rule_name("Table"),
-            InputNode::Symbol(_) => BuiltInRules::rule_name("Symbol"),
+    pub fn get_new_row_token_name(token: &InputNode) -> Option<NodeIdentifier> {
+        match token {
+            InputNode::Fraction(_) => Some(BuiltInRules::rule_name("Fraction")),
+            InputNode::Root(_) => Some(BuiltInRules::rule_name("Root")),
+            InputNode::Under(_) => Some(BuiltInRules::rule_name("Under")),
+            InputNode::Over(_) => Some(BuiltInRules::rule_name("Over")),
+            InputNode::Sup(_) => Some(BuiltInRules::rule_name("Sup")),
+            InputNode::Sub(_) => Some(BuiltInRules::rule_name("Sub")),
+            InputNode::Table { .. } => Some(BuiltInRules::rule_name("Table")),
+            InputNode::Symbol(_) => None,
         }
     }
 }
 
 impl ParseRuleCollection for BuiltInRules {
     fn get_rules() -> Vec<TokenDefinition> {
-        vec![]
+        vec![
+            // Matching those as *single* tokens is fine,
+            //   since I think that AST transformations are about as powerful as typical parsing techniques.
+            // So if we want something like a matrix surrounded with brackets,
+            //   we just write the appropriate AST transformation.
+            TokenDefinition::new(
+                Self::rule_name("Fraction"),
+                (None, None),
+                StartingTokenMatcher::Token(TokenMatcher {
+                    symbol: NFABuilder::match_input_node(InputNodeType::Fraction).build(),
+                    symbol_type: LeafNodeType::Symbol,
+                }),
+            ),
+            TokenDefinition::new(
+                Self::rule_name("Root"),
+                (None, None),
+                StartingTokenMatcher::Token(TokenMatcher {
+                    symbol: NFABuilder::match_input_node(InputNodeType::Root).build(),
+                    symbol_type: LeafNodeType::Symbol,
+                }),
+            ),
+            TokenDefinition::new(
+                Self::rule_name("Under"),
+                (None, None),
+                StartingTokenMatcher::Token(TokenMatcher {
+                    symbol: NFABuilder::match_input_node(InputNodeType::Under).build(),
+                    symbol_type: LeafNodeType::Symbol,
+                }),
+            ),
+            TokenDefinition::new(
+                Self::rule_name("Over"),
+                (None, None),
+                StartingTokenMatcher::Token(TokenMatcher {
+                    symbol: NFABuilder::match_input_node(InputNodeType::Over).build(),
+                    symbol_type: LeafNodeType::Symbol,
+                }),
+            ),
+            // Yay, thanks to the WYSIWYG editing model, I don't have to deal with "exponent associativity".
+            // After all, it's clear if something is inside a superscript or not.
+            TokenDefinition::new(
+                Self::rule_name("Sup"),
+                (Some(1000), None),
+                StartingTokenMatcher::Token(TokenMatcher {
+                    symbol: NFABuilder::match_input_node(InputNodeType::Sup).build(),
+                    symbol_type: LeafNodeType::Operator,
+                }),
+            ),
+            TokenDefinition::new(
+                Self::rule_name("Sub"),
+                (Some(1000), None),
+                StartingTokenMatcher::Token(TokenMatcher {
+                    symbol: NFABuilder::match_input_node(InputNodeType::Sub).build(),
+                    symbol_type: LeafNodeType::Operator,
+                }),
+            ),
+            // TODO: Table row_width
+            TokenDefinition::new(
+                Self::rule_name("Table"),
+                (None, None),
+                StartingTokenMatcher::Token(TokenMatcher {
+                    symbol: NFABuilder::match_input_node(InputNodeType::Table).build(),
+                    symbol_type: LeafNodeType::Symbol,
+                }),
+            ),
+            // skip symbol
+        ]
     }
 
-    fn get_rule_names() -> Vec<NodeIdentifier> {
+    fn get_extra_rule_names() -> Vec<NodeIdentifier> {
         vec![
             Self::error_name(),
             Self::error_message_name(),
             Self::nothing_name(),
             Self::operator_name(),
-            // Keep this in sync with get_new_row_token_name
-            BuiltInRules::rule_name("Fraction"),
-            BuiltInRules::rule_name("Root"),
-            BuiltInRules::rule_name("Under"),
-            BuiltInRules::rule_name("Over"),
-            BuiltInRules::rule_name("Sup"),
-            BuiltInRules::rule_name("Sub"),
-            BuiltInRules::rule_name("Table"),
-            BuiltInRules::rule_name("Symbol"),
         ]
     }
 }

@@ -44,4 +44,29 @@ impl InputNode {
             InputNode::Symbol(_) => &[],
         }
     }
+
+    pub fn get_node_type(&self) -> InputNodeType {
+        match self {
+            InputNode::Fraction(_) => InputNodeType::Fraction,
+            InputNode::Root(_) => InputNodeType::Root,
+            InputNode::Under(_) => InputNodeType::Under,
+            InputNode::Over(_) => InputNodeType::Over,
+            InputNode::Sup(_) => InputNodeType::Sup,
+            InputNode::Sub(_) => InputNodeType::Sub,
+            InputNode::Table { .. } => InputNodeType::Table,
+            InputNode::Symbol(_) => InputNodeType::Symbol,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum InputNodeType {
+    Fraction,
+    Root,
+    Under,
+    Over,
+    Sup,
+    Sub,
+    Table,
+    Symbol,
 }

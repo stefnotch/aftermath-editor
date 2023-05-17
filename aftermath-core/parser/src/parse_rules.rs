@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use input_tree::{input_node::InputNode, row::RowIndex};
 
 use crate::{
-    lexer::LexerRange,
+    lexer::{LexerRange, LexerToken},
     parse_row,
     syntax_tree::{LeafNodeType, NodeIdentifier, SyntaxLeafNode},
     token_matcher::MatchError,
@@ -40,6 +40,7 @@ pub struct ParserRules<'a> {
     // takes the parent context and gives it back afterwards
     parent_context: Option<&'a ParserRules<'a>>,
     known_tokens: HashMap<TokenType, Vec<TokenDefinition>>,
+    // rule_collections: Vec<&'a dyn ParseRuleCollection>,
 }
 
 /// Rules for parsing
@@ -111,53 +112,6 @@ impl<'a> ParserRules<'a> {
             .flatten()
             .map(|v| v.name.clone())
             .collect()
-    }
-
-    pub fn parse_new_row_token<'input, 'lexer>(
-        &self,
-        mut lexer_range: LexerRange<'input, 'lexer>,
-    ) -> Option<SyntaxNode> {
-        let next_token = lexer_range.get_next_slice().get(0)?;
-
-        let is_atom_token = match next_token {
-            InputNode::Fraction(_)
-            | InputNode::Root(_)
-            | InputNode::Under(_)
-            | InputNode::Over(_)
-            | InputNode::Table { .. } => true,
-            InputNode::Sup(_) | InputNode::Sub(_) | InputNode::Symbol(_) => false,
-        };
-
-        if !is_atom_token {
-            // Not a token with rows
-            return None;
-        }
-
-        let rows = next_token.rows();
-
-        // A token with rows
-        lexer_range.consume_n(1);
-        let token = lexer_range.end_range();
-        let token_index = token.range().start;
-
-        // TODO: We're losing the table row_width information here.
-        Some(SyntaxNode::new(
-            BuiltInRules::get_new_row_token_name(next_token),
-            token.range(),
-            SyntaxNodes::Containers(
-                rows.iter()
-                    .enumerate()
-                    .map(|(row_index, row)| {
-                        let row_parse_result = parse_row(row, self);
-                        // TODO: Bubble up the row_parse_result.errors
-                        let syntax_tree = row_parse_result
-                            .value
-                            .with_row_index(RowIndex(token_index, row_index));
-                        syntax_tree
-                    })
-                    .collect(),
-            ),
-        ))
     }
 }
 
@@ -272,15 +226,6 @@ struct TokenArgumentParseResult<'lexer> {
     lexer: Lexer<'lexer>,
 }
 
-pub fn operator_syntax_node(leaf_node: SyntaxLeafNode) -> SyntaxNode {
-    assert!(leaf_node.node_type == LeafNodeType::Operator);
-    SyntaxNode::new(
-        BuiltInRules::operator_name(),
-        leaf_node.range(),
-        SyntaxNodes::Leaves(vec![leaf_node]),
-    )
-}
-
 impl Argument {
     fn parse<'lexer, 'input>(
         &self,
@@ -314,8 +259,9 @@ impl Argument {
                         symbols: token.get_symbols(),
                     };
                     TokenArgumentParseResult {
-                        // TODO: This is wrong
-                        argument: operator_syntax_node(argument),
+                        // TODO: This might sometimes be wrong, whenever an argument is actually a value
+                        // ArgumentParserType::NextToken should probably have a parameter for this
+                        argument: BuiltInRules::operator_node(argument),
                         lexer,
                     }
                 } else {
@@ -404,14 +350,77 @@ impl TokenDefinition {
 
         (arguments, lexer)
     }
+
+    pub fn parse_starting_token(
+        &self,
+        token: LexerToken,
+        parser_rules: &ParserRules,
+    ) -> SyntaxNode {
+        // Hardcoded for now
+        match token.value {
+            [input_node] => {
+                if let Some(node_identifier) = BuiltInRules::get_new_row_token_name(input_node) {
+                    let token_index = token.range().start;
+
+                    // TODO: We're losing the table row_width information here.
+                    return SyntaxNode::new(
+                        node_identifier,
+                        token.range(),
+                        SyntaxNodes::Containers(
+                            input_node
+                                .rows()
+                                .iter()
+                                .enumerate()
+                                .map(|(row_index, row)| {
+                                    let row_parse_result = parse_row(row, parser_rules);
+                                    // TODO: Bubble up the row_parse_result.errors
+                                    let syntax_tree = row_parse_result
+                                        .value
+                                        .with_row_index(RowIndex(token_index, row_index));
+                                    syntax_tree
+                                })
+                                .collect(),
+                        ),
+                    );
+                }
+            }
+            _ => {}
+        };
+
+        let leaf_node = SyntaxLeafNode {
+            node_type: match &self.starting_parser {
+                StartingTokenMatcher::Token(v) => v.symbol_type.clone(),
+            },
+            range: token.range(),
+            symbols: token.get_symbols(),
+        };
+
+        match (self.token_type(), &leaf_node.node_type) {
+            (TokenType::Starting, LeafNodeType::Symbol) => SyntaxNode::new(
+                self.name(),
+                token.range(),
+                SyntaxNodes::Leaves(vec![leaf_node]),
+            ),
+            (TokenType::Starting, LeafNodeType::Operator) => BuiltInRules::operator_node(leaf_node),
+            (TokenType::Continue, LeafNodeType::Symbol) => {
+                panic!("symbol node in continue token")
+            }
+            (TokenType::Continue, LeafNodeType::Operator) => BuiltInRules::operator_node(leaf_node),
+        }
+    }
 }
 
 pub trait ParseRuleCollection {
     fn get_rules() -> Vec<TokenDefinition>;
+    fn get_extra_rule_names() -> Vec<NodeIdentifier> {
+        vec![]
+    }
     fn get_rule_names() -> Vec<NodeIdentifier> {
-        Self::get_rules()
+        let mut rules_names = Self::get_rules()
             .into_iter()
             .map(|v| v.name)
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>();
+        rules_names.extend(Self::get_extra_rule_names());
+        rules_names
     }
 }

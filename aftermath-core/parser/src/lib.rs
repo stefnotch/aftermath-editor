@@ -7,10 +7,7 @@ pub mod parse_rules;
 mod syntax_tree;
 mod token_matcher;
 
-use std::ops::Range;
-
 use input_tree::row::InputRow;
-use parse_rules::operator_syntax_node;
 
 use crate::{
     lexer::Lexer,
@@ -18,7 +15,7 @@ use crate::{
     syntax_tree::{get_child_range_end, LeafNodeType},
 };
 
-use self::parse_rules::{ParserRules, TokenDefinition};
+use self::parse_rules::ParserRules;
 
 pub use self::parse_result::{ParseError, ParseErrorType, ParseResult};
 pub use self::syntax_tree::{SyntaxLeafNode, SyntaxNode, SyntaxNodes};
@@ -99,34 +96,25 @@ impl<'a> ParserRules<'a> {
                 let token = starting_range.end_range();
                 let (args, lexer) = definition.parse_arguments(lexer, self);
 
-                match &definition.starting_parser {
-                    parse_rules::StartingTokenMatcher::Token(starting_token) => {
-                        let leaf_node = SyntaxLeafNode {
-                            node_type: starting_token.symbol_type.clone(),
-                            range: token.range(),
-                            symbols: token.get_symbols(),
-                        };
+                // If it's a child without any arguments, we don't need to create a container
+                if args.is_empty() {
+                    (definition.parse_starting_token(token, self), lexer)
+                } else {
+                    // Otherwise, we need to create a container
+                    let range_start = token.range().start;
+                    let mut children = vec![definition.parse_starting_token(token, self)];
+                    children.extend(args);
+                    let range = range_start..get_child_range_end(&children);
 
-                        // If it's a child without any arguments, we don't need to create a container
-                        let (range, children) = if args.is_empty() {
-                            (token.range(), SyntaxNodes::Leaves(vec![leaf_node]))
-                        } else {
-                            // Otherwise, we need to create a container
-                            let mut children = vec![operator_syntax_node(leaf_node)];
-                            children.extend(args);
-                            (
-                                token.range().start..get_child_range_end(&children),
-                                SyntaxNodes::Containers(children),
-                            )
-                        };
-
-                        (SyntaxNode::new(definition.name(), range, children), lexer)
-                    }
+                    (
+                        SyntaxNode::new(
+                            definition.name(),
+                            range,
+                            SyntaxNodes::Containers(children),
+                        ),
+                        lexer,
+                    )
                 }
-            } else if let Some(syntax_node) = self.parse_new_row_token(lexer.begin_range()) {
-                // This is the only place where we can actually encounter things like fractions or roots
-                // So we hardcode the logic here
-                (syntax_node, lexer)
             } else {
                 // Consume one token and report an error
                 // TODO: Check if next node is maybe a (true, true) or (true, false) token. If so, we should instead report an error for the missing operator.
@@ -154,14 +142,7 @@ impl<'a> ParserRules<'a> {
                 let args;
                 (args, lexer) = definition.parse_arguments(lexer, self);
                 // Combine the left and right operand into a new left operand
-                let mut children = vec![
-                    left,
-                    operator_syntax_node(SyntaxLeafNode {
-                        node_type: LeafNodeType::Operator,
-                        range: token.range(),
-                        symbols: token.get_symbols(),
-                    }),
-                ];
+                let mut children = vec![left, definition.parse_starting_token(token, self)];
                 children.extend(args);
 
                 // Range that includes the left side, and the last child
