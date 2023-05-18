@@ -1,9 +1,9 @@
-import { ParseResult, hasSyntaxNodeChildren } from "../../core";
-import { Offset } from "../../math-layout/math-layout-offset";
-import { RowIndices } from "../../math-layout/math-layout-zipper";
-import { RenderResult, RenderedElement, RenderedPosition, RowIndicesAndOffset } from "../../rendering/render-result";
-import { ViewportCoordinate, ViewportMath } from "../../rendering/viewport-coordinate";
-import { assert } from "../../utils/assert";
+import { ParseResult, hasSyntaxNodeChildren } from "../core";
+import { Offset } from "../math-layout/math-layout-offset";
+import { RowIndices } from "../math-layout/math-layout-zipper";
+import { RenderResult, RenderedElement, RenderedPosition, RowIndicesAndOffset } from "../rendering/render-result";
+import { ViewportCoordinate, ViewportMath } from "../rendering/viewport-coordinate";
+import { assert } from "../utils/assert";
 
 export class MathMLRenderResult implements RenderResult<MathMLElement> {
   private readonly rootElement: RenderedElement<MathMLElement>;

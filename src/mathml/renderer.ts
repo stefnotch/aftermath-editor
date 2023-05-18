@@ -9,8 +9,8 @@ import {
 import { RowIndex } from "../math-layout/math-layout-zipper";
 import { RenderedElement, RenderResult, Renderer } from "../rendering/render-result";
 import { assert } from "../utils/assert";
-import { MathMLRenderResult } from "./renderer/render-result";
-import { SimpleContainerMathMLElement } from "./renderer/rendered-element";
+import { MathMLRenderResult } from "./render-result";
+import { SimpleContainerMathMLElement } from "./renderer/rendered-container-element";
 import { NothingMathMLElement } from "./renderer/rendered-nothing";
 import { RowsContainerMathMLElement } from "./renderer/rendered-rows-element";
 import { SymbolMathMLElement } from "./renderer/rendered-symbol-element";
@@ -114,9 +114,6 @@ if (mathIR.type === "table") {
       });
 
       // TODO: Table
-      builtIn.add("Table", (syntaxTree, rowIndex) => {
-        return new NothingMathMLElement({ ...syntaxTree, children: { Containers: [] } }, rowIndex);
-      });
     }
     {
       const core = this.rendererCollection("Core");

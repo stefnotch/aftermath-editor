@@ -3,13 +3,11 @@ import { RowIndex } from "../../math-layout/math-layout-zipper";
 import { RenderedElement, RenderedPosition, Renderer } from "../../rendering/render-result";
 import { ViewportRect } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
-import { MathMLTags, MathMLTagsExpectedChildrenCount } from "../mathml-spec";
-import { createMathElement, getElementBounds, wrapInMRow } from "./rendered-element";
-import { getFontSize } from "./rendered-symbol-element";
+import { MathMLTags } from "../mathml-spec";
+import { RenderedMathML, createMathElement } from "./rendered-element";
 
 export class RowsContainerMathMLElement implements RenderedElement<MathMLElement> {
-  element: MathMLElement;
-  children: RenderedElement<MathMLElement>[] = [];
+  element: RenderedMathML;
   startBaselineReader: MathMLElement;
   endBaselineReader: MathMLElement;
 
@@ -20,19 +18,19 @@ export class RowsContainerMathMLElement implements RenderedElement<MathMLElement
     renderer: Renderer<MathMLElement>
   ) {
     assert(syntaxTree.children.NewRows.length > 0, "Needs at least one child");
-    this.element = createMathElement(elementName, []);
+    this.element = new RenderedMathML(createMathElement(elementName, []));
     this.startBaselineReader = createMathElement("mphantom", []);
     this.endBaselineReader = createMathElement("mphantom", []);
 
-    this.setChildren(
-      elementName,
+    this.element.setChildren(
       syntaxTree.children.NewRows.map(([coreRowIndex, c]) => renderer.render(c, fromCoreRowIndex(coreRowIndex)))
     );
-    assert(this.children.length > 0, "Needs at least one rendered child");
+    assert(this.element.getChildren().length === this.syntaxTree.children.NewRows.length, "Invalid number of children");
+    assert(this.element.getChildren().length > 0, "Needs at least one rendered child");
   }
 
   getBounds(): ViewportRect {
-    return getElementBounds(this.element);
+    return this.element.getBounds();
   }
 
   getViewportPosition(offset: number): RenderedPosition {
@@ -53,7 +51,7 @@ export class RowsContainerMathMLElement implements RenderedElement<MathMLElement
     }
 
     let { x, y } = positionReader.getBoundingClientRect();
-    const caretSize = getFontSize(this.element);
+    const caretSize = this.element.getFontSize();
 
     return {
       position: {
@@ -67,21 +65,10 @@ export class RowsContainerMathMLElement implements RenderedElement<MathMLElement
 
   getElements(): MathMLElement[] {
     // Or wrap the element in an extra mrow?
-    return [this.startBaselineReader, this.element, this.endBaselineReader];
+    return [this.startBaselineReader, this.element.element, this.endBaselineReader];
   }
 
-  private setChildren(elementName: MathMLTags, children: RenderedElement<MathMLElement>[]): void {
-    assert(
-      MathMLTagsExpectedChildrenCount[elementName] === null || MathMLTagsExpectedChildrenCount[elementName] === children.length,
-      "Invalid number of children for " + elementName
-    );
-
-    assert(children.length === this.syntaxTree.children.NewRows.length, "Invalid number of children");
-    this.children = children;
-    this.element.append(...children.map((v) => wrapInMRow(v.getElements())));
-  }
-
-  getChildren(): RenderedElement<MathMLElement>[] {
-    return this.children;
+  getChildren() {
+    return this.element.getChildren();
   }
 }

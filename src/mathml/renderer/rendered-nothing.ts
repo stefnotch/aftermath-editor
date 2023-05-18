@@ -2,12 +2,11 @@ import { SyntaxNode } from "../../core";
 import { Offset } from "../../math-layout/math-layout-offset";
 import { RowIndex } from "../../math-layout/math-layout-zipper";
 import { RenderedElement, RenderedPosition } from "../../rendering/render-result";
-import { ViewportRect, ViewportValue } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
-import { createMathElement, createPlaceholder, getElementBounds } from "./rendered-element";
+import { RenderedMathML, createMathElement, createPlaceholder } from "./rendered-element";
 
 export class NothingMathMLElement implements RenderedElement<MathMLElement> {
-  element: MathMLElement;
+  element: RenderedMathML;
   private baselineReaderElement: MathMLElement;
 
   constructor(public syntaxTree: SyntaxNode, public rowIndex: RowIndex | null) {
@@ -19,19 +18,19 @@ export class NothingMathMLElement implements RenderedElement<MathMLElement> {
       assert(syntaxTree.children.Containers.length === 0);
     }
 
-    this.element = createMathElement("mrow", [this.baselineReaderElement, createPlaceholder()]);
+    this.element = new RenderedMathML(createMathElement("mrow", [this.baselineReaderElement, createPlaceholder()]));
   }
-  getBounds(): ViewportRect {
-    return getElementBounds(this.element);
+  getBounds() {
+    return this.element.getBounds();
   }
   getViewportPosition(offset: Offset): RenderedPosition {
     assert(offset === 0, "NothingMathMLElement only supports offset 0");
     // The baseline isn't exposed as a property, so we have this workaround https://github.com/w3c/mathml-core/issues/38
     // https://jsfiddle.net/se6n81rg/1/
     const baseline = this.baselineReaderElement.getBoundingClientRect().bottom;
-    const caretSize = getFontSize(this.element);
+    const caretSize = this.element.getFontSize();
 
-    const boundingBox = this.element.getBoundingClientRect();
+    const boundingBox = this.element.element.getBoundingClientRect();
 
     return {
       position: {
@@ -42,19 +41,10 @@ export class NothingMathMLElement implements RenderedElement<MathMLElement> {
       depth: caretSize * 0.2,
     };
   }
-  getElements(): MathMLElement[] {
-    return [this.element];
+  getElements() {
+    return this.element.getElements();
   }
-  getChildren(): RenderedElement<MathMLElement>[] {
-    return [];
+  getChildren() {
+    return this.element.getChildren();
   }
-}
-
-/**
- * @returns The font size of the given element, used for calculating how large the caret should be.
- */
-function getFontSize(element: Element): ViewportValue {
-  const fontSize = +globalThis.getComputedStyle(element).getPropertyValue("font-size").replace("px", "");
-  assert(!isNaN(fontSize) && fontSize > 0);
-  return fontSize;
 }
