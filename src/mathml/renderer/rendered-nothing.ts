@@ -1,5 +1,6 @@
 import { SyntaxNode } from "../../core";
 import { Offset } from "../../math-layout/math-layout-offset";
+import { RowIndex } from "../../math-layout/math-layout-zipper";
 import { RenderedElement, RenderedPosition } from "../../rendering/render-result";
 import { ViewportRect, ViewportValue } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
@@ -9,7 +10,7 @@ export class NothingMathMLElement implements RenderedElement<MathMLElement> {
   element: MathMLElement;
   private baselineReaderElement: MathMLElement;
 
-  constructor(public syntaxTree: SyntaxNode) {
+  constructor(public syntaxTree: SyntaxNode, public rowIndex: RowIndex | null) {
     this.baselineReaderElement = createMathElement("mphantom", []);
     if ("Leaves" in syntaxTree.children) {
       assert(syntaxTree.children.Leaves.length === 0);

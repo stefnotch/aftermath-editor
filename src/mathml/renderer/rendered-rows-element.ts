@@ -1,4 +1,5 @@
-import { SyntaxNode } from "../../core";
+import { SyntaxNode, fromCoreRowIndex } from "../../core";
+import { RowIndex } from "../../math-layout/math-layout-zipper";
 import { RenderedElement, RenderedPosition, Renderer } from "../../rendering/render-result";
 import { ViewportRect } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
@@ -13,22 +14,19 @@ export class RowsContainerMathMLElement implements RenderedElement<MathMLElement
   endBaselineReader: MathMLElement;
 
   constructor(
-    public syntaxTree: SyntaxNode<{ Containers: SyntaxNode[] }>,
+    public syntaxTree: SyntaxNode<"NewRows">,
+    public rowIndex: RowIndex | null,
     elementName: MathMLTags,
     renderer: Renderer<MathMLElement>
   ) {
-    assert(syntaxTree.children.Containers.length > 0, "Needs at least one child");
-    assert(
-      syntaxTree.children.Containers.every((v) => v.row_index !== undefined),
-      "Can only deal with elements that have row_index children"
-    );
+    assert(syntaxTree.children.NewRows.length > 0, "Needs at least one child");
     this.element = createMathElement(elementName, []);
     this.startBaselineReader = createMathElement("mphantom", []);
     this.endBaselineReader = createMathElement("mphantom", []);
 
     this.setChildren(
       elementName,
-      syntaxTree.children.Containers.map((c) => renderer.render(c))
+      syntaxTree.children.NewRows.map(([coreRowIndex, c]) => renderer.render(c, fromCoreRowIndex(coreRowIndex)))
     );
     assert(this.children.length > 0, "Needs at least one rendered child");
   }
@@ -78,7 +76,7 @@ export class RowsContainerMathMLElement implements RenderedElement<MathMLElement
       "Invalid number of children for " + elementName
     );
 
-    assert(children.length === this.syntaxTree.children.Containers.length, "Invalid number of children");
+    assert(children.length === this.syntaxTree.children.NewRows.length, "Invalid number of children");
     this.children = children;
     this.element.append(...children.map((v) => wrapInMRow(v.getElements())));
   }

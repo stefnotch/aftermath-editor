@@ -15,6 +15,7 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 /// - Child ranges are non-overlapping
 /// - Child ranges are contiguous, we don't skip any tokens
 /// - Child range rules only apply if they are on the same row (see row_index)
+/// - For now, either all child ranges will have a new_row, or none of them will
 ///
 /// indices reference the input tree
 #[derive(Debug, Serialize)]
@@ -23,8 +24,6 @@ pub struct SyntaxNode {
     pub name: NodeIdentifier,
     /// children of the node, including the operator token(s)
     pub children: SyntaxNodes,
-    /// When this syntax node actually starts a new row in the input tree.
-    new_row: Option<(RowIndex, Range<usize>)>,
     /// value, especially for constants
     /// stored as bytes, and interpreted according to the name
     pub value: Vec<u8>,
@@ -63,12 +62,18 @@ fn is_identifier(value: &str) -> bool {
 #[derive(Debug, Serialize)]
 pub enum SyntaxNodes {
     Containers(Vec<SyntaxNode>),
+    /// When this syntax node actually starts a new row in the input tree.
+    NewRows(Vec<(RowIndex, SyntaxNode)>),
+    NewTable(Vec<(RowIndex, SyntaxNode)>, u32),
     Leaves(Vec<SyntaxLeafNode>),
 }
 impl SyntaxNodes {
     fn is_empty(&self) -> bool {
         match self {
             SyntaxNodes::Containers(children) => children.is_empty(),
+            SyntaxNodes::NewRows(children) | SyntaxNodes::NewTable(children, _) => {
+                children.is_empty()
+            }
             SyntaxNodes::Leaves(children) => children.is_empty(),
         }
     }
@@ -103,7 +108,6 @@ impl SyntaxNode {
             name,
             children,
             range,
-            new_row: None,
             value: vec![],
         }
     }
@@ -114,6 +118,7 @@ impl SyntaxNode {
             SyntaxNodes::Containers(children) => {
                 children.iter().map(|v| v.range()).collect::<Vec<_>>()
             }
+            SyntaxNodes::NewRows(_) | SyntaxNodes::NewTable(_, _) => vec![],
             SyntaxNodes::Leaves(children) => children.iter().map(|v| v.range()).collect(),
         };
         let mut child_iter = binding.iter();
@@ -130,24 +135,8 @@ impl SyntaxNode {
         }
     }
 
-    pub fn with_new_row(mut self, new_row_index: RowIndex, new_row_range: Range<usize>) -> Self {
-        self.new_row = Some((new_row_index, new_row_range));
-        self
-    }
-
     pub fn range(&self) -> Range<usize> {
         self.range.clone()
-    }
-
-    pub fn wrap_in_new_row(
-        mut self,
-        parent_range: Range<usize>,
-        row_index: RowIndex,
-    ) -> SyntaxNode {
-        let new_row_range = self.range;
-        self.new_row = Some((row_index, new_row_range));
-        self.range = parent_range;
-        self
     }
 }
 

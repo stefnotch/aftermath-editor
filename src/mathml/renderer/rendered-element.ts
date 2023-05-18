@@ -1,4 +1,5 @@
 import { SyntaxNode } from "../../core";
+import { RowIndex } from "../../math-layout/math-layout-zipper";
 import { RenderedElement, RenderedPosition, Renderer } from "../../rendering/render-result";
 import { ViewportRect } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
@@ -9,20 +10,17 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
   children: RenderedElement<MathMLElement>[] = [];
 
   constructor(
-    public syntaxTree: SyntaxNode<{ Containers: SyntaxNode[] }>,
+    public syntaxTree: SyntaxNode<"Containers">,
+    public rowIndex: RowIndex | null,
     elementName: MathMLTags,
     renderer: Renderer<MathMLElement>
   ) {
     assert(syntaxTree.children.Containers.length > 0, "Needs at least one child");
-    assert(
-      syntaxTree.children.Containers.every((v) => v.row_index === undefined),
-      "Cannot deal with row_index"
-    );
     this.element = createMathElement(elementName, []);
 
     this.setChildren(
       elementName,
-      syntaxTree.children.Containers.map((c) => renderer.render(c))
+      syntaxTree.children.Containers.map((c) => renderer.render(c, null))
     );
     assert(this.children.length > 0, "Needs at least one rendered child");
   }
@@ -34,9 +32,7 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
   getViewportPosition(offset: number): RenderedPosition {
     assert(this.syntaxTree.range.start <= offset && offset <= this.syntaxTree.range.end, "Invalid offset");
     // Don't look at children that are on a new row
-    const child = this.children.find(
-      (c) => c.syntaxTree.row_index === undefined && c.syntaxTree.range.start <= offset && offset <= c.syntaxTree.range.end
-    );
+    const child = this.children.find((c) => c.syntaxTree.range.start <= offset && offset <= c.syntaxTree.range.end);
     if (child) {
       return child.getViewportPosition(offset);
     } else {
@@ -49,6 +45,8 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
   }
 
   private setChildren(elementName: MathMLTags, children: RenderedElement<MathMLElement>[]): void {
+    // TODO: Create a "RenderedMathML" class that wraps this bit of logic. It should be then used in every other rendered- class
+    // It should have an element and children
     assert(
       MathMLTagsExpectedChildrenCount[elementName] === null || MathMLTagsExpectedChildrenCount[elementName] === children.length,
       "Invalid number of children for " + elementName

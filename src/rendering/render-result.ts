@@ -1,6 +1,6 @@
 import { NodeIdentifier, ParseResult, SyntaxNode } from "../core";
 import { Offset } from "../math-layout/math-layout-offset";
-import { RowIndices } from "../math-layout/math-layout-zipper";
+import { RowIndex, RowIndices } from "../math-layout/math-layout-zipper";
 import { ViewportCoordinate, ViewportRect, ViewportValue } from "./viewport-coordinate";
 
 export interface Renderer<T> {
@@ -8,7 +8,7 @@ export interface Renderer<T> {
 
   renderAll(parsed: ParseResult): RenderResult<T>;
 
-  render(syntaxTree: SyntaxNode): RenderedElement<T>;
+  render(syntaxTree: SyntaxNode, rowIndex: RowIndex | null): RenderedElement<T>;
 }
 
 /**
@@ -51,6 +51,8 @@ export interface RenderedElement<T> {
    * It's easier to walk down the render results if they know their syntax tree element.
    */
   syntaxTree: SyntaxNode;
+
+  rowIndex: RowIndex | null;
 
   /**
    * The actual underlying DOM nodes

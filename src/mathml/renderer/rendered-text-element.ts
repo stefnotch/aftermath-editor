@@ -1,5 +1,6 @@
-import { SyntaxLeafNode, SyntaxNode, offsetInRange } from "../../core";
+import { SyntaxNode, offsetInRange } from "../../core";
 import { Offset } from "../../math-layout/math-layout-offset";
+import { RowIndex } from "../../math-layout/math-layout-zipper";
 import { RenderedElement, RenderedPosition } from "../../rendering/render-result";
 import { ViewportRect, ViewportValue } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
@@ -14,7 +15,7 @@ export class TextMathMLElement implements RenderedElement<MathMLElement> {
   element: MathMLElement;
   private textElements: LeafMathMLElement[];
 
-  constructor(public syntaxTree: SyntaxNode<{ Leaves: SyntaxLeafNode[] }>, elementName: MathMLTags) {
+  constructor(public syntaxTree: SyntaxNode<"Leaves">, public rowIndex: RowIndex | null, elementName: MathMLTags) {
     this.textElements = syntaxTree.children.Leaves.map((v) => new LeafMathMLElement(v));
     let children: Text[] = [];
     for (let textElement of this.textElements) {

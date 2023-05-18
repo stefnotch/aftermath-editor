@@ -1,6 +1,6 @@
-import { ParseResult } from "../../core";
+import { ParseResult, hasSyntaxNodeChildren } from "../../core";
 import { Offset } from "../../math-layout/math-layout-offset";
-import { RowIndex, RowIndices } from "../../math-layout/math-layout-zipper";
+import { RowIndices } from "../../math-layout/math-layout-zipper";
 import { RenderResult, RenderedElement, RenderedPosition, RowIndicesAndOffset } from "../../rendering/render-result";
 import { ViewportCoordinate, ViewportMath } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
@@ -23,8 +23,8 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
       let [indexOfContainer, indexOfRow] = rowIndex;
       assert(element.syntaxTree.range.start <= indexOfContainer && indexOfContainer < element.syntaxTree.range.end);
 
-      const childElement = getChildElementWithIndex(element, indexOfContainer);
-      const rowChildElement = childElement.getChildren().find((c) => c.syntaxTree.row_index?.[1] === BigInt(indexOfRow));
+      const childElement = getChildWithContainerIndex(element, indexOfContainer);
+      const rowChildElement = childElement.getChildren().find((c) => c.rowIndex?.[1] === indexOfRow);
       assert(rowChildElement, `Couldn't find row ${indexOfRow} in ${childElement.syntaxTree.name}`);
       element = rowChildElement;
     }
@@ -81,9 +81,10 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
 
       // Go down the tree, and check all children that are on a new row
       // Note: This could be kinda inefficient for large tables, but that's a problem for another day
-      getChildrenWithRowIndex(renderedElement).forEach((v) =>
-        roots.push({ renderedElement: v.element, rowIndices: rowIndices.concat([v.rowIndex]) })
-      );
+      getNewRowsChildren(renderedElement).forEach((v) => {
+        assert(v.rowIndex !== null);
+        roots.push({ renderedElement: v, rowIndices: rowIndices.concat([v.rowIndex]) });
+      });
     }
 
     // Helper functions
@@ -114,27 +115,12 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
       return closest.renderedPosition;
     }
 
-    function getChildrenWithRowIndex(
-      element: RenderedElement<MathMLElement>
-    ): { element: RenderedElement<MathMLElement>; rowIndex: RowIndex }[] {
-      const childrenWithRowIndex: { element: RenderedElement<MathMLElement>; rowIndex: RowIndex }[] = [];
-
-      // Go down the tree, and collect all children that have a row_index
-      const children = element.getChildren().slice();
-      while (children.length > 0) {
-        const child = children.pop();
-        assert(child !== undefined);
-        if (child.syntaxTree.row_index) {
-          childrenWithRowIndex.push({
-            element: child,
-            rowIndex: [Number(child.syntaxTree.row_index[0]), Number(child.syntaxTree.row_index[1])],
-          });
-        } else {
-          children.push(...child.getChildren());
-        }
-      }
-
-      return childrenWithRowIndex;
+    /**
+     * Go down the tree, and collect all children that start a new row
+     */
+    function getNewRowsChildren(element: RenderedElement<MathMLElement>): RenderedElement<MathMLElement>[] {
+      // We could also write this as a one-liner using a Y-combinator
+      return element.getChildren().flatMap((c) => (c.rowIndex ? c : getNewRowsChildren(c)));
     }
 
     assert(closest.indicesAndOffset !== null);
@@ -148,19 +134,17 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
  * @param indexOfContainer The offset in the input tree row.
  * @returns The deepest child element that contains the given index.
  */
-function getChildElementWithIndex(
+function getChildWithContainerIndex(
   element: RenderedElement<MathMLElement>,
   indexOfContainer: Offset
 ): RenderedElement<MathMLElement> {
-  for (let childElement of element.getChildren()) {
-    // Skip the children that are on a new row
-    if (childElement.syntaxTree.row_index) {
-      continue;
-    }
-
-    // If we find a better matching child, we go deeper
-    if (childElement.syntaxTree.range.start <= indexOfContainer && indexOfContainer < childElement.syntaxTree.range.end) {
-      return getChildElementWithIndex(childElement, indexOfContainer);
+  // Only walk down if we're still on the same row
+  if (hasSyntaxNodeChildren(element.syntaxTree, "Containers")) {
+    for (let childElement of element.getChildren()) {
+      // If we find a better matching child, we go deeper. Notice how the end bound, aka length, is exclusive.
+      if (childElement.syntaxTree.range.start <= indexOfContainer && indexOfContainer < childElement.syntaxTree.range.end) {
+        return getChildWithContainerIndex(childElement, indexOfContainer);
+      }
     }
   }
 

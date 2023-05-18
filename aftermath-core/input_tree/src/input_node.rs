@@ -24,7 +24,7 @@ pub enum InputNode {
     /// And the rendering part makes it look like you're selecting the table.
     Table {
         cells: Vec<InputRow>,
-        row_width: usize,
+        row_width: u32,
     },
     // leaf
     /// Stores a NFD-normalized grapheme cluster.

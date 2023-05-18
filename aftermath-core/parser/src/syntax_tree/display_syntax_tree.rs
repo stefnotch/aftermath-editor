@@ -15,6 +15,23 @@ impl fmt::Display for SyntaxNodes {
                     }
                 }
             }
+            SyntaxNodes::NewRows(children) => {
+                if let Some(((_, first), tail)) = children.split_first() {
+                    write!(f, "{}", first)?;
+                    for (_, child) in tail {
+                        write!(f, " {}", child)?;
+                    }
+                }
+            }
+            SyntaxNodes::NewTable(children, _) => {
+                // TODO: Maybe print the table differently?
+                if let Some(((_, first), tail)) = children.split_first() {
+                    write!(f, "{}", first)?;
+                    for (_, child) in tail {
+                        write!(f, " {}", child)?;
+                    }
+                }
+            }
             SyntaxNodes::Leaves(children) => {
                 if let Some((first, tail)) = children.split_first() {
                     write!(f, "{}", first)?;

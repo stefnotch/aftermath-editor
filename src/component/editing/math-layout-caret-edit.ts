@@ -167,7 +167,11 @@ export type CaretInsertCommand =
 // Because when we hit backspace, it should change back and stuff like that.
 // So we should at least somehow keep track of what the currently inserted stuff is (and clear that when we click away with the caret or something)
 //
-export function insertAtCaret(caret: MathLayoutPosition, value: CaretInsertCommand, layout: MathmlLayout): CaretEdit {
+export function insertAtCaret<T>(
+  caret: MathLayoutPosition,
+  value: CaretInsertCommand,
+  renderResult: RenderResult<T>
+): CaretEdit {
   return null as any;
 }
 

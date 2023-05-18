@@ -1,6 +1,7 @@
 import init, { MathParser } from "../../aftermath-core/pkg";
 import { MathLayoutRow } from "../math-layout/math-layout";
 import { Offset } from "../math-layout/math-layout-offset";
+import { RowIndex } from "../math-layout/math-layout-zipper";
 
 // Yay, top level await is neat https://v8.dev/features/top-level-await
 await init();
@@ -58,6 +59,10 @@ function toCore(row: MathLayoutRow): CoreRow {
   };
 }
 
+export function fromCoreRowIndex(row_index: [bigint, bigint]): RowIndex {
+  return [Number(row_index[0]), Number(row_index[1])];
+}
+
 // TODO:
 // We're maintaining the types by hand for now, since we tried out mostly everything else.
 // Directly using WASM-bindgen's Typescript stuff doesn't work, because they don't support enums. https://github.com/rustwasm/wasm-bindgen/issues/2407
@@ -88,18 +93,28 @@ export type SyntaxNodes =
       Containers: SyntaxNode[];
     }
   | {
+      NewRows: [[bigint, bigint], SyntaxNode][];
+    }
+  | {
+      NewTable: [[[bigint, bigint], SyntaxNode][], number];
+    }
+  | {
       Leaves: SyntaxLeafNode[];
     };
+
+type SyntaxNodesKeys = "Containers" | "NewRows" | "NewTable" | "Leaves";
+type SyntaxNodesMatcher<T extends SyntaxNodesKeys> = {
+  [X in T]: Extract<SyntaxNodes, { [P in X]: any }>;
+}[T];
 
 export type Range<T> = {
   start: T;
   end: T;
 };
 
-export type SyntaxNode<T extends SyntaxNodes = SyntaxNodes> = {
+export type SyntaxNode<T extends SyntaxNodesKeys = SyntaxNodesKeys> = {
   name: string[];
-  children: T;
-  row_index?: [bigint, bigint];
+  children: SyntaxNodesMatcher<T>;
   value: any; // TODO:
   range: Range<bigint>;
 };
@@ -116,11 +131,8 @@ export type ParseError = {
   range: any;
 };
 
-export function hasContainersChildren(node: SyntaxNode): node is SyntaxNode<{ Containers: SyntaxNode[] }> {
-  return "Containers" in node.children;
-}
-export function hasLeavesChildren(node: SyntaxNode): node is SyntaxNode<{ Leaves: SyntaxLeafNode[] }> {
-  return "Leaves" in node.children;
+export function hasSyntaxNodeChildren<T extends SyntaxNodesKeys>(node: SyntaxNode, childType: T): node is SyntaxNode<T> {
+  return childType in node.children;
 }
 
 export function offsetInRange(offset: Offset, range: Range<bigint>): boolean {

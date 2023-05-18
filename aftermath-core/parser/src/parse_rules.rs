@@ -375,30 +375,33 @@ impl TokenDefinition {
                 if let Some(node_identifier) = Self::get_new_row_token_name(input_node) {
                     let token_index = token.range().start;
 
-                    // TODO: We're losing the table row_width information here.
-                    return SyntaxNode::new(
-                        node_identifier,
-                        token.range(),
-                        SyntaxNodes::Containers(
-                            input_node
-                                .rows()
-                                .iter()
-                                .enumerate()
-                                .map(|(row_index, row)| {
-                                    let row_parse_result = parse_row(row, parser_rules);
-                                    // TODO: Bubble up the row_parse_result.errors
-                                    let mut syntax_tree = row_parse_result.value;
+                    let children = input_node
+                        .rows()
+                        .iter()
+                        .enumerate()
+                        .map(|(row_index, row)| {
+                            let row_parse_result = parse_row(row, parser_rules);
+                            // TODO: Bubble up the row_parse_result.errors
+                            let syntax_tree = row_parse_result.value;
+                            (RowIndex(token_index, row_index), syntax_tree)
+                        })
+                        .collect();
 
-                                    syntax_tree = syntax_tree.wrap_in_new_row(
-                                        // We're pretending that the new row is a zero width token
-                                        token.range().end..token.range().end,
-                                        RowIndex(token_index, row_index),
-                                    );
-                                    syntax_tree
-                                })
-                                .collect(),
+                    // TODO: We're losing the table row_width information here.
+                    return match input_node {
+                        InputNode::Table { row_width, .. } => SyntaxNode::new(
+                            node_identifier,
+                            // We're wrapping the new row in a token with a proper width
+                            token.range(),
+                            SyntaxNodes::NewTable(children, *row_width),
                         ),
-                    );
+                        _ => SyntaxNode::new(
+                            node_identifier,
+                            // We're wrapping the new row in a token with a proper width
+                            token.range(),
+                            SyntaxNodes::NewRows(children),
+                        ),
+                    };
                 }
             }
             _ => {}

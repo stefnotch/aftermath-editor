@@ -57,13 +57,6 @@ pub enum MatchIf {
 }
 
 impl MatchIf {
-    fn matches_all(matcher: &NFA, values: &[InputNode]) -> bool {
-        match matcher.matches(values) {
-            Ok(result) => result.get_length() == values.len(),
-            Err(_) => false,
-        }
-    }
-
     fn matches(&self, value: &InputNode) -> bool {
         match (self, value) {
             (MatchIf::GraphemeCluster(matcher), InputNode::Symbol(a)) => matcher.matches(a),
