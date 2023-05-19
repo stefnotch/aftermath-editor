@@ -239,6 +239,7 @@ fn test_parser_empty_squareroot() {
     );
 }
 
+// TODO: Add tests for tables
 // TODO: Fix those tests to actually do something instead of printing stuff
 #[test]
 fn test_parser_symbol_and_close_bracket() {

@@ -130,8 +130,6 @@ TODO:
 // mmultiscripts won't be modeled for now
  */
 
-// TODO: Placeholder symbol: ⬚
-
 // Parsing maths 101
 // Info:
 // - Defined variables/functions
@@ -168,4 +166,4 @@ TODO:
 // TODO: Might be an operator
 // ⊥  is both a symbol (false) and an operator (A perpendicular B)
 
-// TODO: bracket pairs are to be resolved during inputting (pairs, ghost close bracket, esc and space, set builder |, |abs|, ||norm||, {x| |x| < 3})
+// TODO: bracket pairs are to be resolved during parsing (pairs, ghost close bracket, esc and space, set builder |, |abs|, ||norm||, {x| |x| < 3})

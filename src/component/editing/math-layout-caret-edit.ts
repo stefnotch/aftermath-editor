@@ -1,4 +1,4 @@
-import { MathLayoutElement } from "../../math-layout/math-layout";
+import { MathLayoutElement, MathLayoutRow } from "../../math-layout/math-layout";
 import { MathLayoutPosition } from "../../math-layout/math-layout-position";
 import {
   MathLayoutContainerZipper,
@@ -147,32 +147,29 @@ function serializeCollapsedCaret(zipper: MathLayoutRowZipper, offset: number): S
   return MathLayoutCaret.serialize(zipper, offset, offset);
 }
 
-export type CaretInsertCommand =
-  | {
-      type: "sup";
-    }
-  | {
-      type: "sub";
-    }
-  | {
-      type: "fraction";
-    }
-  | { type: "symbol"; value: string };
-// TODO: This definitely needs access to the *parsed* stuff, not just the layout
-// (I don't think the removeAtCaret function needs it, but the insertAtCaret function does)
+export function insertAtCaret(caret: MathLayoutCaret, value: MathLayoutRow): CaretEdit {
+  if (caret.isCollapsed) {
+    return insertAtPosition(new MathLayoutPosition(caret.zipper, caret.start), value);
+  } else {
+    const removeExisting = removeRange(caret);
+    const insertAfterRemoval = insertAtPosition(new MathLayoutPosition(caret.zipper, caret.start), value);
+    return {
+      edits: removeExisting.edits.concat(insertAfterRemoval.edits),
+      caret: insertAfterRemoval.caret,
+    };
+  }
+}
 
-// TODO: Would some sort of fancy "tree pattern matching" work here?
-
-// TODO: The hardest short term thing is the multi-character shortcuts, like forall -> ∀
-// Because when we hit backspace, it should change back and stuff like that.
-// So we should at least somehow keep track of what the currently inserted stuff is (and clear that when we click away with the caret or something)
-//
-export function insertAtCaret<T>(
-  caret: MathLayoutPosition,
-  value: CaretInsertCommand,
-  renderResult: RenderResult<T>
-): CaretEdit {
-  return null as any;
+function insertAtPosition(position: MathLayoutPosition, value: MathLayoutRow): CaretEdit {
+  return {
+    edits: value.values.map((v, i) => ({
+      type: "insert" as const,
+      zipper: getRowIndices(position.zipper),
+      offset: position.offset + i,
+      value: v,
+    })),
+    caret: serializeCollapsedCaret(position.zipper, position.offset + value.values.length),
+  };
 }
 
 /**

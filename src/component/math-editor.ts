@@ -1,6 +1,6 @@
 import { assert } from "../utils/assert";
 import { MathLayoutElement, MathLayoutRow } from "../math-layout/math-layout";
-import { fromElement as fromMathMLElement } from "../mathml/parsing";
+import { fromElement as fromMathMLElement, unicodeSplit } from "../mathml/parsing";
 import arrayUtils from "../utils/array-utils";
 import { endingBrackets, startingBrackets } from "../mathml/mathml-spec";
 import { mathLayoutWithWidth } from "../math-layout/math-layout-utils";
@@ -13,7 +13,7 @@ import { MathLayoutCaret, moveCaret } from "./editing/math-layout-caret";
 import { MathLayoutRowZipper, fromRowIndices, getRowIndices } from "../math-layout/math-layout-zipper";
 import { applyEdit, inverseEdit, MathLayoutEdit } from "./editing/math-layout-edit";
 import { UndoRedoManager } from "./editing/undo-redo-manager";
-import { CaretEdit, removeAtCaret } from "./editing/math-layout-caret-edit";
+import { CaretEdit, insertAtCaret, removeAtCaret } from "./editing/math-layout-caret-edit";
 import { MathLayoutPosition } from "../math-layout/math-layout-position";
 import { Offset } from "../math-layout/math-layout-offset";
 
@@ -300,10 +300,33 @@ export class MathEditor extends HTMLElement {
           this.saveEdit(edit);
           this.applyEdit(edit);
         } else if (ev.inputType === "insertText") {
+          // TODO: This definitely needs access to the *parsed* stuff, not just the layout
+          // (I don't think the removeAtCaret function needs it, but the insertAtCaret function does)
+
+          // TODO: Would some sort of fancy "tree pattern matching" work here?
+
+          // TODO: The hardest short term thing is the multi-character shortcuts, like forall -> ∀
+          // Because when we hit backspace, it should change back and stuff like that.
+          // So we should at least somehow keep track of what the currently inserted stuff is (and clear that when we click away with the caret or something)
+          //
+          // TODO: Table editing
           const data = ev.data;
-          // TODO:
           if (data != null) {
-            this.carets.map((caret) => this.insertAtCaret(caret, data));
+            const characters = unicodeSplit(data);
+            const edit = this.recordEdit(
+              this.carets.map((v) =>
+                insertAtCaret(
+                  v.caret,
+                  mathLayoutWithWidth({
+                    type: "row",
+                    values: characters.map((v) => mathLayoutWithWidth({ type: "symbol", value: v, width: 0 })),
+                    width: 0,
+                  })
+                )
+              )
+            );
+            this.saveEdit(edit);
+            this.applyEdit(edit);
           }
         } else if (ev.inputType === "historyUndo") {
           // TODO: https://stackoverflow.com/questions/27027833/is-it-possible-to-edit-a-text-input-with-javascript-and-add-to-the-undo-stack
@@ -481,12 +504,9 @@ export class MathEditor extends HTMLElement {
 
   /**
    * User typed some text
-   */
+   
   insertAtCaret(caret: MathCaret, text: string) {
-    return;
-    /**
-     * Used for "placeholders"
-     */
+    return;     
     function takeElementOrBracket(mathAst: MathAst, caret: MathCaret, direction: "left" | "right"): MathLayoutRow | null {
       if (caret.row.type == "row") {
         const elementIndex = caret.offset + (direction == "left" ? -1 : 0);
@@ -583,5 +603,5 @@ export class MathEditor extends HTMLElement {
       caret.row.value = caret.row.value.slice(0, caret.offset) + text + caret.row.value.slice(caret.offset);
       caret.offset += text.length;
     }
-  }
+  }*/
 }

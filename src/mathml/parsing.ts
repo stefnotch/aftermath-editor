@@ -230,7 +230,7 @@ function getText(element: Element) {
   return (element.textContent + "").trim();
 }
 
-function unicodeSplit(text: string) {
+export function unicodeSplit(text: string) {
   // TODO: For text use https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Segmenter
   // TODO: https://stackoverflow.com/a/73802453/3492994
   return [...text];
