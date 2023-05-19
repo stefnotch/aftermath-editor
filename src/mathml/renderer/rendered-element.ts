@@ -29,13 +29,20 @@ export class RenderedMathML {
   }
 
   setChildren(children: RenderedElement<MathMLElement>[]): void {
+    this.setChildrenCustom(
+      children,
+      children.map((v) => wrapInMRow(v.getElements()))
+    );
+  }
+
+  setChildrenCustom(children: RenderedElement<MathMLElement>[], childElements: readonly Node[]): void {
     assert(
       MathMLTagsExpectedChildrenCount[this.elementName] === null ||
         MathMLTagsExpectedChildrenCount[this.elementName] === children.length,
       "Invalid number of children for " + this.elementName
     );
     this.children = children;
-    this.element.append(...children.map((v) => wrapInMRow(v.getElements())));
+    this.element.append(...childElements);
   }
 
   getChildren(): ReadonlyArray<RenderedElement<MathMLElement>> {

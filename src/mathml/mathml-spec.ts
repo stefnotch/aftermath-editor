@@ -68,8 +68,8 @@ export const MathMLTagsExpectedChildrenCount: Record<MathMLTags, number | null> 
   none: "TODO:" as any as number,
   mprescripts: "TODO:" as any as number,
   mtable: null,
-  mtr: "TODO:" as any as number,
-  mtd: "TODO:" as any as number,
+  mtr: null,
+  mtd: null,
 };
 
 // See https://www.w3.org/TR/mathml-core/#operator-dictionary

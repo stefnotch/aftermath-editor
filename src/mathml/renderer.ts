@@ -14,6 +14,7 @@ import { SimpleContainerMathMLElement } from "./renderer/rendered-container-elem
 import { NothingMathMLElement } from "./renderer/rendered-nothing";
 import { RowsContainerMathMLElement } from "./renderer/rendered-rows-element";
 import { SymbolMathMLElement } from "./renderer/rendered-symbol-element";
+import { TableMathMLElement } from "./renderer/rendered-table-element";
 import { TextMathMLElement } from "./renderer/rendered-text-element";
 
 export class MathMLRenderer implements Renderer<MathMLElement> {
@@ -112,8 +113,10 @@ if (mathIR.type === "table") {
         syntaxTree.children.NewRows.reverse();
         return new RowsContainerMathMLElement(syntaxTree, rowIndex, "mroot", this);
       });
-
-      // TODO: Table
+      builtIn.add("Table", (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "NewTable"));
+        return new TableMathMLElement(syntaxTree, rowIndex, this);
+      });
     }
     {
       const core = this.rendererCollection("Core");
