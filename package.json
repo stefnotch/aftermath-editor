@@ -1,6 +1,6 @@
 {
   "name": "aftermath-editor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "source": "src/main.ts",
   "type": "module",
   "types": "dist/types.d.ts",

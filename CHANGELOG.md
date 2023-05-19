@@ -1,4 +1,6 @@
-# next
+# v0.1.1
+
+- simplistic editing
 
 # v0.1.0
 
