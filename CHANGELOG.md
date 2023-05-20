@@ -1,6 +1,7 @@
 # v0.1.1
 
 - simplistic editing
+- better error reporting
 
 # v0.1.0
 

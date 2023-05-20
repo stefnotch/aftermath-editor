@@ -26,3 +26,11 @@ mtd {
   border-radius: 8px;
   box-shadow: 0 1px 0 rgba(255, 0, 0, 0.425);
 }
+
+merror {
+  font-weight: initial;
+  font-size: initial;
+  font-family: inherit;
+  margin: 0;
+  padding: 0;
+}

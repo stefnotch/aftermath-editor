@@ -31,22 +31,13 @@ impl BuiltInRules {
         )
     }
 
-    fn error_missing_operator_name() -> NodeIdentifier {
-        BuiltInRules::rule_name("ErrorMissingOperator")
-    }
-
-    // TODO: Or merge this into "error_missing_token"?
     pub fn error_missing_operator(
         range: Range<usize>,
         child_a: SyntaxNode,
         child_b: SyntaxNode,
     ) -> SyntaxNode {
-        let nothing_node = Self::nothing_node(child_a.range().end..child_b.range().start);
-        let missing_operator_node = SyntaxNode::new(
-            BuiltInRules::error_missing_operator_name(),
-            nothing_node.range(),
-            SyntaxNodes::Containers(vec![nothing_node]),
-        );
+        let missing_operator_node =
+            BuiltInRules::error_missing_token(child_a.range().end..child_b.range().start, None);
         BuiltInRules::error_container_node(range, vec![child_a, missing_operator_node, child_b])
     }
 
@@ -74,6 +65,7 @@ impl BuiltInRules {
         BuiltInRules::rule_name("ErrorMissingToken")
     }
 
+    /// Either an operator or an operand token is missing.
     pub fn error_missing_token(
         range: Range<usize>,
         expected_tokens: Option<Vec<SyntaxLeafNode>>,
@@ -215,7 +207,6 @@ impl ParseRuleCollection for BuiltInRules {
     fn get_extra_rule_names() -> Vec<NodeIdentifier> {
         vec![
             Self::error_container_name(),
-            Self::error_missing_operator_name(),
             Self::error_unknown_token_name(),
             Self::error_missing_token_name(),
             Self::nothing_name(),

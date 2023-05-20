@@ -67,17 +67,33 @@ if (mathIR.type === "table") {
       builtIn.add("Nothing", (syntaxTree, rowIndex) => {
         return new NothingMathMLElement(syntaxTree, rowIndex);
       });
-      builtIn.add("Error", (syntaxTree, rowIndex) => {
+      builtIn.add("ErrorContainer", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
-        const element = new SimpleContainerMathMLElement(syntaxTree, rowIndex, "merror", this);
-        console.warn("Rendering error", syntaxTree, element);
-        return element;
+        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });
-      builtIn.add("ErrorMessage", (syntaxTree, rowIndex) => {
+      builtIn.add("ErrorUnknownToken", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaves"));
-        const element = new TextMathMLElement(syntaxTree, rowIndex, "merror");
-        console.warn("Rendering error", syntaxTree, element);
-        return element;
+        return new SymbolMathMLElement(syntaxTree, rowIndex, "merror");
+      });
+      builtIn.add("ErrorMissingToken", (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Leaves"));
+
+        // Dirty little patch to render missing tokens
+        if (syntaxTree.children.Leaves.length === 0) {
+          return new SymbolMathMLElement(
+            {
+              ...syntaxTree,
+              children: {
+                Leaves: [{ node_type: "Leaf", range: syntaxTree.range, symbols: ["?"] }],
+              },
+            },
+            rowIndex,
+            "merror"
+          );
+        } else {
+          return new SymbolMathMLElement(syntaxTree, rowIndex, "merror");
+        }
+        //return new NothingMathMLElement(syntaxTree, rowIndex);
       });
       builtIn.add("Operator", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaves"));
