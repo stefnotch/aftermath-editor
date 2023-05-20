@@ -35,6 +35,7 @@ impl BuiltInRules {
         BuiltInRules::rule_name("ErrorMissingOperator")
     }
 
+    // TODO: Or merge this into "error_missing_token"?
     pub fn error_missing_operator(
         range: Range<usize>,
         child_a: SyntaxNode,
@@ -216,6 +217,7 @@ impl ParseRuleCollection for BuiltInRules {
             Self::error_container_name(),
             Self::error_missing_operator_name(),
             Self::error_unknown_token_name(),
+            Self::error_missing_token_name(),
             Self::nothing_name(),
             Self::operator_name(),
         ]
