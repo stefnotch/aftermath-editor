@@ -18,29 +18,73 @@ impl BuiltInRules {
         NodeIdentifier::new(vec!["BuiltIn".into(), name.into()])
     }
 
-    /// A parse error.
-    fn error_name() -> NodeIdentifier {
-        BuiltInRules::rule_name("Error")
+    /// An error is somewhere inside of this.
+    fn error_container_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("ErrorContainer")
     }
 
-    /// A error message.
-    fn error_message_name() -> NodeIdentifier {
-        BuiltInRules::rule_name("ErrorMessage")
-    }
-
-    pub fn parse_error_node(range: Range<usize>, children: Vec<SyntaxNode>) -> SyntaxNode {
+    pub fn error_container_node(range: Range<usize>, children: Vec<SyntaxNode>) -> SyntaxNode {
         SyntaxNode::new(
-            BuiltInRules::error_name(),
+            BuiltInRules::error_container_name(),
             range,
             SyntaxNodes::Containers(children),
         )
     }
 
-    pub fn error_message_node(range: Range<usize>, children: Vec<SyntaxLeafNode>) -> SyntaxNode {
+    fn error_missing_operator_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("ErrorMissingOperator")
+    }
+
+    pub fn error_missing_operator(
+        range: Range<usize>,
+        child_a: SyntaxNode,
+        child_b: SyntaxNode,
+    ) -> SyntaxNode {
+        let nothing_node = Self::nothing_node(child_a.range().end..child_b.range().start);
+        let missing_operator_node = SyntaxNode::new(
+            BuiltInRules::error_missing_operator_name(),
+            nothing_node.range(),
+            SyntaxNodes::Containers(vec![nothing_node]),
+        );
+        BuiltInRules::error_container_node(range, vec![child_a, missing_operator_node, child_b])
+    }
+
+    fn error_unknown_token_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("ErrorUnknownToken")
+    }
+
+    pub fn error_unknown_next_token(
+        range: Range<usize>,
+        child_a: SyntaxNode,
+        unknown_token: SyntaxLeafNode,
+    ) -> SyntaxNode {
+        let children: Vec<SyntaxNode> = vec![
+            child_a,
+            SyntaxNode::new(
+                BuiltInRules::error_unknown_token_name(),
+                unknown_token.range(),
+                SyntaxNodes::Leaves(vec![unknown_token]),
+            ),
+        ];
+        BuiltInRules::error_container_node(range, children)
+    }
+
+    fn error_missing_token_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("ErrorMissingToken")
+    }
+
+    pub fn error_missing_token(
+        range: Range<usize>,
+        expected_tokens: Option<Vec<SyntaxLeafNode>>,
+    ) -> SyntaxNode {
+        assert!(range.is_empty());
+        for expected_token in expected_tokens.iter().flatten() {
+            assert!(expected_token.range().is_empty());
+        }
         SyntaxNode::new(
-            BuiltInRules::error_message_name(),
+            BuiltInRules::error_missing_token_name(),
             range,
-            SyntaxNodes::Leaves(children),
+            SyntaxNodes::Leaves(expected_tokens.unwrap_or_else(|| vec![])),
         )
     }
 
@@ -54,8 +98,17 @@ impl BuiltInRules {
     }
 
     /// An empty node, this happens when a row is empty.
-    pub fn nothing_name() -> NodeIdentifier {
+    fn nothing_name() -> NodeIdentifier {
         BuiltInRules::rule_name("Nothing")
+    }
+
+    pub fn nothing_node(range: Range<usize>) -> SyntaxNode {
+        assert!(range.is_empty());
+        SyntaxNode::new(
+            BuiltInRules::nothing_name(),
+            range,
+            SyntaxNodes::Leaves(vec![]),
+        )
     }
 
     /// An operator node, this is a node that can be skipped in an abstract syntax tree.
@@ -160,8 +213,9 @@ impl ParseRuleCollection for BuiltInRules {
 
     fn get_extra_rule_names() -> Vec<NodeIdentifier> {
         vec![
-            Self::error_name(),
-            Self::error_message_name(),
+            Self::error_container_name(),
+            Self::error_missing_operator_name(),
+            Self::error_unknown_token_name(),
             Self::nothing_name(),
             Self::operator_name(),
         ]

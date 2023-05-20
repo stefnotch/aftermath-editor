@@ -267,8 +267,9 @@ impl Argument {
                 } else {
                     let token = lexer.begin_range().end_range();
                     // TODO: Report this error properly
+                    // TODO: Pass an "expected" parameter to the error
                     TokenArgumentParseResult {
-                        argument: BuiltInRules::error_message_node(token.range(), vec![]),
+                        argument: BuiltInRules::error_missing_token(token.range(), None),
                         lexer,
                     }
                 }
@@ -387,7 +388,6 @@ impl TokenDefinition {
                         })
                         .collect();
 
-                    // TODO: We're losing the table row_width information here.
                     return match input_node {
                         InputNode::Table { row_width, .. } => SyntaxNode::new(
                             node_identifier,

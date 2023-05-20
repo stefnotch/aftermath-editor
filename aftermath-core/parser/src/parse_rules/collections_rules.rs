@@ -1,8 +1,4 @@
-use crate::{
-    nfa_builder::NFABuilder,
-    parse_rules::{StartingTokenMatcher, TokenMatcher},
-    syntax_tree::{LeafNodeType, NodeIdentifier},
-};
+use crate::{parse_rules::StartingTokenMatcher, syntax_tree::NodeIdentifier};
 
 use super::TokenDefinition;
 
