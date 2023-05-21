@@ -15,7 +15,31 @@ export interface Renderer<T> {
  * Position of a caret on a row. `y` is the baseline of the row.
  * Height and depth are relative to the baseline of the row.
  */
-export type RenderedPosition = { position: ViewportCoordinate; height: ViewportValue; depth: ViewportValue };
+export class RenderedCaret {
+  /**
+   * Positive, and relative to the baseline of the row.
+   */
+  private height: ViewportValue;
+  /**
+   * Positive, and relative to the baseline of the row.
+   */
+  private depth: ViewportValue;
+  private baselinePosition: ViewportCoordinate;
+  constructor(baselinePosition: ViewportCoordinate, caretHeight: ViewportValue) {
+    this.baselinePosition = baselinePosition;
+    this.height = caretHeight * 0.9;
+    this.depth = caretHeight * 0.1;
+  }
+
+  get bottomPosition(): ViewportCoordinate {
+    const { x, y } = this.baselinePosition;
+    return { x, y: y + this.depth };
+  }
+
+  get caretHeight(): ViewportValue {
+    return this.height + this.depth;
+  }
+}
 export type RowIndicesAndOffset = { indices: RowIndices; offset: Offset };
 export interface RenderResult<T> {
   /**
@@ -29,7 +53,7 @@ export interface RenderResult<T> {
   /**
    * For getting the caret position (and the positions for the selections)
    */
-  getViewportPosition(layoutPosition: RowIndicesAndOffset): RenderedPosition;
+  getViewportPosition(layoutPosition: RowIndicesAndOffset): RenderedCaret;
 
   /**
    * For clicking somewhere in the viewport and getting the caret position.
@@ -67,7 +91,7 @@ export interface RenderedElement<T> {
   /**
    * @param offset The offset in the input tree row.
    */
-  getViewportPosition(offset: Offset): RenderedPosition;
+  getViewportPosition(offset: Offset): RenderedCaret;
 
   /**
    * Gets the bounding box of the element.

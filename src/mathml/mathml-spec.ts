@@ -31,7 +31,6 @@ export type MathMLTags =
   | "mtr"
   | "mtd";
 
-// TODO: Fill this
 /**
  * How many children are expected for each MathML tag.
  * null means any number of children is allowed.
@@ -39,7 +38,7 @@ export type MathMLTags =
  * Note that MathML itself doesn't place any restrictions on the number of children, but we do.
  */
 export const MathMLTagsExpectedChildrenCount: Record<MathMLTags, number | null> = {
-  math: "TODO:" as any as number,
+  math: null,
   semantics: "TODO:" as any as number,
   annotation: "TODO:" as any as number,
   "annotation-xml": "TODO:" as any as number,
@@ -61,8 +60,8 @@ export const MathMLTagsExpectedChildrenCount: Record<MathMLTags, number | null> 
   msub: 2,
   msup: 2,
   msubsup: "TODO:" as any as number,
-  munder: "TODO:" as any as number,
-  mover: "TODO:" as any as number,
+  munder: 2,
+  mover: 2,
   munderover: "TODO:" as any as number,
   mmultiscripts: "TODO:" as any as number,
   none: "TODO:" as any as number,
@@ -109,11 +108,7 @@ const ambigousBracketsList: [string, string][] = [
   ["⦙", "⦙"], // U+2999, U+2999
 ];
 
-// Source: https://stackoverflow.com/a/22015930/3492994
-function zipWith<T>(a: T[], b: T[]) {
-  return Array.from(Array(Math.max(a.length, b.length)), (_, i) => [a[i], b[i]]);
-}
-
+// @ts-ignore
 const parseUnicode = (v: string) => String.fromCodePoint(parseInt(v.trim().replace(/U\+([a-zA-Z0-9]+)/, "$1"), 16));
 
 export const startingBrackets = new Map<string, string>(bracketsList);

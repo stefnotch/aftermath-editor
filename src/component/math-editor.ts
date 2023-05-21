@@ -8,11 +8,11 @@ import caretStyles from "./caret-styles.css?inline";
 import mathEditorStyles from "./math-editor-styles.css?inline";
 import inputHandlerStyles from "./input-handler-style.css?inline";
 import { createCaret, CaretElement } from "./caret-element";
-import { createInputHandler, MathmlInputHandler } from "./input-handler-element";
+import { InputHandlerElement } from "./input-handler-element";
 import { MathLayoutCaret, moveCaret } from "./editing/math-layout-caret";
 import { MathLayoutRowZipper, fromRowIndices, getRowIndices } from "../math-layout/math-layout-zipper";
-import { applyEdit, inverseEdit, MathLayoutEdit } from "./editing/math-layout-edit";
-import { UndoRedoManager } from "./editing/undo-redo-manager";
+import { applyEdit, inverseEdit, MathLayoutEdit } from "../editing/math-layout-edit";
+import { UndoRedoManager } from "../editing/undo-redo-manager";
 import { CaretEdit, insertAtCaret, removeAtCaret } from "./editing/math-layout-caret-edit";
 import { MathLayoutPosition } from "../math-layout/math-layout-position";
 import { Offset } from "../math-layout/math-layout-offset";
@@ -128,7 +128,7 @@ class RenderTaskQueue {
 
 export class MathEditor extends HTMLElement {
   carets: MathEditorCarets;
-  inputHandler: MathmlInputHandler;
+  inputHandler: InputHandlerElement;
 
   inputTree: MathLayoutRowZipper = new MathLayoutRowZipper(
     mathLayoutWithWidth({ type: "row", values: [], width: 0 }),
@@ -162,7 +162,7 @@ export class MathEditor extends HTMLElement {
 
     // Click to focus
     container.addEventListener("focus", () => {
-      this.inputHandler.inputElement.focus();
+      this.inputHandler.focus();
     });
 
     this.carets = new MathEditorCarets(caretContainer);
@@ -258,9 +258,10 @@ export class MathEditor extends HTMLElement {
     // Input handler container
     const inputContainer = document.createElement("span");
     inputContainer.style.position = "absolute";
-    this.inputHandler = createInputHandler(inputContainer);
+    this.inputHandler = new InputHandlerElement();
+    inputContainer.appendChild(this.inputHandler.element);
 
-    this.inputHandler.inputElement.addEventListener("keydown", (ev) => {
+    this.inputHandler.element.addEventListener("keydown", (ev) => {
       // console.info("keydown", ev);
       if (ev.key === "ArrowUp") {
         this.carets.map((caret) => this.moveCaret(caret, "up"));
@@ -287,7 +288,7 @@ export class MathEditor extends HTMLElement {
       }
     });
 
-    this.inputHandler.inputElement.addEventListener("beforeinput", (ev) => {
+    this.inputHandler.element.addEventListener("beforeinput", (ev) => {
       console.info("beforeinput", ev);
       // Woah, apparently running this code later fixes a Firefox textarea bug
       this.renderTaskQueue.add(() => {
@@ -437,12 +438,12 @@ export class MathEditor extends HTMLElement {
   }
 
   renderCaret(caret: MathCaret) {
-    const layout = this.renderResult.getViewportPosition({
+    const renderedCaret = this.renderResult.getViewportPosition({
       indices: getRowIndices(caret.caret.zipper),
       offset: caret.caret.end,
     });
-    caret.element.setPosition(layout.position.x, layout.position.y);
-    caret.element.setHeight(layout.height);
+    caret.element.setPosition(renderedCaret.bottomPosition.x, renderedCaret.bottomPosition.y);
+    caret.element.setHeight(renderedCaret.caretHeight);
 
     const container = this.renderResult.getElement(getRowIndices(caret.caret.zipper));
     caret.element.setHighlightContainer(container.getElements());
@@ -458,9 +459,13 @@ export class MathEditor extends HTMLElement {
         offset: caret.caret.rightOffset,
       });
 
-      const width = rangeLayoutRight.position.x - rangeLayoutLeft.position.x;
-      const height = rangeLayoutLeft.height;
-      caret.element.addSelection(rangeLayoutLeft.position.x, rangeLayoutLeft.position.y, width, height);
+      const width = rangeLayoutRight.bottomPosition.x - rangeLayoutLeft.bottomPosition.x;
+      caret.element.addSelection(
+        rangeLayoutLeft.bottomPosition.x,
+        rangeLayoutLeft.bottomPosition.y,
+        width,
+        rangeLayoutLeft.caretHeight
+      );
     }
   }
 

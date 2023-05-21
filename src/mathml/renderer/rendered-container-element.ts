@@ -1,6 +1,6 @@
 import { SyntaxNode } from "../../core";
 import { RowIndex } from "../../math-layout/math-layout-zipper";
-import { RenderedElement, RenderedPosition, Renderer } from "../../rendering/render-result";
+import { RenderedElement, RenderedCaret, Renderer } from "../../rendering/render-result";
 import { assert } from "../../utils/assert";
 import { MathMLTags } from "../mathml-spec";
 import { RenderedMathML, createMathElement } from "./rendered-element";
@@ -26,7 +26,7 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
     return this.element.getBounds();
   }
 
-  getViewportPosition(offset: number): RenderedPosition {
+  getViewportPosition(offset: number): RenderedCaret {
     assert(this.syntaxTree.range.start <= offset && offset <= this.syntaxTree.range.end, "Invalid offset");
     // Don't look at children that are on a new row
     const child = this.element

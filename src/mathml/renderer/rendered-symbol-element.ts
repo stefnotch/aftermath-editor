@@ -1,7 +1,7 @@
 import { SyntaxNode, offsetInRange } from "../../core";
 import { Offset } from "../../math-layout/math-layout-offset";
 import { RowIndex } from "../../math-layout/math-layout-zipper";
-import { RenderedElement, RenderedPosition } from "../../rendering/render-result";
+import { RenderedElement, RenderedCaret } from "../../rendering/render-result";
 import { assert } from "../../utils/assert";
 import { MathMLTags } from "../mathml-spec";
 import { RenderedMathML, createMathElement } from "./rendered-element";
@@ -29,7 +29,7 @@ export class SymbolMathMLElement implements RenderedElement<MathMLElement> {
     return this.element.getBounds();
   }
 
-  getViewportPosition(offset: Offset): RenderedPosition {
+  getViewportPosition(offset: Offset): RenderedCaret {
     assert(offsetInRange(offset, this.syntaxTree.range), "Invalid offset");
 
     const atEnd = offset >= Number(this.syntaxTree.range.end);
@@ -46,12 +46,7 @@ export class SymbolMathMLElement implements RenderedElement<MathMLElement> {
     // https://jsfiddle.net/se6n81rg/1/
 
     const baseline = textElement?.getBaseline(offset).y ?? this.element.element.getBoundingClientRect().bottom;
-
-    return {
-      position: { x: x, y: baseline },
-      height: caretSize * 0.8,
-      depth: caretSize * 0.2,
-    };
+    return new RenderedCaret({ x: x, y: baseline }, caretSize);
   }
   getElements() {
     return this.element.getElements();

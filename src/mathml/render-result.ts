@@ -1,7 +1,7 @@
 import { ParseResult, hasSyntaxNodeChildren } from "../core";
 import { Offset } from "../math-layout/math-layout-offset";
 import { RowIndices } from "../math-layout/math-layout-zipper";
-import { RenderResult, RenderedElement, RenderedPosition, RowIndicesAndOffset } from "../rendering/render-result";
+import { RenderResult, RenderedElement, RenderedCaret, RowIndicesAndOffset } from "../rendering/render-result";
 import { ViewportCoordinate, ViewportMath } from "../rendering/viewport-coordinate";
 import { assert } from "../utils/assert";
 
@@ -12,7 +12,7 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
     this.rootElement = rootElement;
     this.parsed = parsed;
   }
-  getViewportPosition(layoutPosition: RowIndicesAndOffset): RenderedPosition {
+  getViewportPosition(layoutPosition: RowIndicesAndOffset): RenderedCaret {
     return this.getElement(layoutPosition.indices).getViewportPosition(layoutPosition.offset);
   }
 
@@ -91,9 +91,9 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
     function getClosestPositionInRow(
       element: RenderedElement<MathMLElement>,
       position: ViewportCoordinate
-    ): { position: RenderedPosition; offset: Offset } | null {
+    ): { position: RenderedCaret; offset: Offset } | null {
       let closest: Readonly<{
-        renderedPosition: { position: RenderedPosition; offset: Offset } | null;
+        renderedPosition: { position: RenderedCaret; offset: Offset } | null;
         distance: number;
       }> = {
         renderedPosition: null,
@@ -155,9 +155,9 @@ function getChildWithContainerIndex(
 /**
  * Gets the distance between a position and a caret's bounding box.
  */
-function distanceToRenderedPosition(position: ViewportCoordinate, renderedPosition: RenderedPosition) {
+function distanceToRenderedPosition(position: ViewportCoordinate, renderedPosition: RenderedCaret) {
   return ViewportMath.distanceToSegment(position, {
-    a: { x: renderedPosition.position.x, y: renderedPosition.position.y + renderedPosition.depth },
-    b: { x: renderedPosition.position.x, y: renderedPosition.position.y - renderedPosition.height },
+    a: { x: renderedPosition.bottomPosition.x, y: renderedPosition.bottomPosition.y },
+    b: { x: renderedPosition.bottomPosition.x, y: renderedPosition.bottomPosition.y - renderedPosition.caretHeight },
   });
 }

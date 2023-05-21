@@ -1,8 +1,6 @@
 import { assert } from "../utils/assert";
 import { MathLayoutElement, MathLayoutRow, MathLayoutSymbol } from "../math-layout/math-layout";
 import { mathLayoutWithWidth, wrapInRow } from "../math-layout/math-layout-utils";
-import { tagIs } from "../utils/dom-utils";
-
 /**
  * Takes a MathML DOM tree and returns a MathLayout
  */
@@ -214,7 +212,7 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
   }
 }
 
-export function expectNChildren(element: Element, n: number): (MathLayoutSymbol & { type: "error" }) | null {
+function expectNChildren(element: Element, n: number): (MathLayoutSymbol & { type: "error" }) | null {
   if (element.children.length != n) {
     return mathLayoutWithWidth({
       type: "error",
@@ -234,4 +232,11 @@ export function unicodeSplit(text: string) {
   // TODO: For text use https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Segmenter
   // TODO: https://stackoverflow.com/a/73802453/3492994
   return [...text];
+}
+
+/**
+ * Checks if an element has a given tag name
+ */
+function tagIs(element: Element, ...tagNames: string[]): boolean {
+  return tagNames.includes(element.tagName.toLowerCase());
 }

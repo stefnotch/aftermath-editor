@@ -10,7 +10,7 @@ import {
 import { RenderResult } from "../../rendering/render-result";
 import arrayUtils from "../../utils/array-utils";
 import { MathLayoutCaret, moveCaret, SerializedCaret } from "./math-layout-caret";
-import { MathLayoutSimpleEdit } from "./math-layout-edit";
+import { MathLayoutSimpleEdit } from "../../editing/math-layout-edit";
 
 export type CaretEdit = {
   /**

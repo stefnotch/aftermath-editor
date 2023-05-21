@@ -65,6 +65,12 @@ export default {
     }
   },
   /**
+   * Source: https://stackoverflow.com/a/22015930/3492994
+   */
+  zipWith: function <T>(a: T[], b: T[]) {
+    return Array.from(Array(Math.max(a.length, b.length)), (_, i) => [a[i], b[i]]);
+  },
+  /**
    * An exclusive range function
    */
   range: function (start: number, end: number) {

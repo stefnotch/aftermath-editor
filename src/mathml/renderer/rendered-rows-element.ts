@@ -1,6 +1,6 @@
 import { SyntaxNode, fromCoreRowIndex } from "../../core";
 import { RowIndex } from "../../math-layout/math-layout-zipper";
-import { RenderedElement, RenderedPosition, Renderer } from "../../rendering/render-result";
+import { RenderedElement, RenderedCaret, Renderer } from "../../rendering/render-result";
 import { ViewportRect } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
 import { MathMLTags } from "../mathml-spec";
@@ -33,7 +33,7 @@ export class RowsContainerMathMLElement implements RenderedElement<MathMLElement
     return this.element.getBounds();
   }
 
-  getViewportPosition(offset: number): RenderedPosition {
+  getViewportPosition(offset: number): RenderedCaret {
     assert(this.syntaxTree.range.start <= offset && offset <= this.syntaxTree.range.end, "Invalid offset");
 
     // The baseline isn't exposed as a property, so we have this questionable workaround
@@ -52,15 +52,7 @@ export class RowsContainerMathMLElement implements RenderedElement<MathMLElement
 
     let { x, y } = positionReader.getBoundingClientRect();
     const caretSize = this.element.getFontSize();
-
-    return {
-      position: {
-        x: x,
-        y: y,
-      },
-      height: caretSize * 0.8,
-      depth: caretSize * 0.2,
-    };
+    return new RenderedCaret({ x: x, y: y }, caretSize);
   }
 
   getElements(): MathMLElement[] {

@@ -96,13 +96,13 @@ export function moveCaret<T>(
   const newPosition = movePositionRecursive(
     layoutPosition,
     direction,
-    [viewportPosition.position.x, viewportPosition.position.y],
+    [viewportPosition.bottomPosition.x, viewportPosition.bottomPosition.y],
     (layoutPosition) => {
       const position = renderResult.getViewportPosition({
         indices: getRowIndices(layoutPosition.zipper),
         offset: layoutPosition.offset,
       });
-      return [position.position.x, position.position.y];
+      return [position.bottomPosition.x, position.bottomPosition.y];
     }
   );
 

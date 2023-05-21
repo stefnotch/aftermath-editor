@@ -2,6 +2,7 @@ import init, { MathParser } from "../../aftermath-core/pkg";
 import { MathLayoutRow } from "../math-layout/math-layout";
 import { Offset } from "../math-layout/math-layout-offset";
 import { RowIndex } from "../math-layout/math-layout-zipper";
+import { customError } from "../utils/error-utils";
 
 // Yay, top level await is neat https://v8.dev/features/top-level-await
 await init();
@@ -51,9 +52,7 @@ function toCore(row: MathLayoutRow): CoreRow {
         const value = v.value.normalize("NFD");
         return { Symbol: value };
       } else {
-        throw new Error("Unknown type", {
-          cause: v,
-        });
+        throw customError("Unknown type", { type: v.type });
       }
     }),
   };

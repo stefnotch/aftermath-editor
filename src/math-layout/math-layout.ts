@@ -1,12 +1,7 @@
 /**
- * Merely a Typescript hint to make sure that I don't miss any cases
+ * Typescript hint to make sure that I don't miss any cases
  */
 function typecheckIsNever(_: never) {}
-
-// TODO: Get rid of this, you almost always want a MathLayoutRow instead
-export type MathLayout = MathLayoutRow | MathLayoutElement;
-
-// Could be wrapped with interfaces and stuff
 
 /**
  * See Rust for source.
@@ -130,14 +125,7 @@ TODO:
 // mmultiscripts won't be modeled for now
  */
 
-// Parsing maths 101
-// Info:
-// - Defined variables/functions
-// - Defined operators (may overlap with variables)
-// Parser:
-// Recursive descent
-
-// Minus sign can mean multiple things (infix and prefix)
+// Parsing notes:
 // Multi character stuff (like == or lim)
 // Implicit multiply vs variable name
 // dx at the end of an integral
