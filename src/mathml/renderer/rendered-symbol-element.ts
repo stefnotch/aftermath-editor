@@ -29,11 +29,6 @@ export class SymbolMathMLElement implements RenderedElement<MathMLElement> {
     return this.element.getCaretSize();
   }
 
-  getContentBounds() {
-    // Avoid getting all the bounds of the children
-    return [this.element.getBounds()];
-  }
-
   getBounds() {
     return this.element.getBounds();
   }
@@ -53,7 +48,7 @@ export class SymbolMathMLElement implements RenderedElement<MathMLElement> {
     // https://github.com/w3c/mathml-core/issues/38
     // https://jsfiddle.net/se6n81rg/1/
 
-    const baseline = textElement?.getBaseline(offset).y ?? this.element.element.getBoundingClientRect().bottom;
+    const baseline = this.element.element.getBoundingClientRect().bottom;
     return { x: x, y: baseline };
   }
   getElements() {

@@ -39,11 +39,6 @@ export class TableMathMLElement implements RenderedElement<MathMLElement> {
     return this.element.getCaretSize();
   }
 
-  getContentBounds() {
-    // Avoid getting all the bounds of the children
-    return [this.element.getBounds()];
-  }
-
   getBounds() {
     return this.element.getBounds();
   }

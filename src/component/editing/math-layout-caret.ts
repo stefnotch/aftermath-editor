@@ -88,7 +88,7 @@ export function moveCaret<T>(
     caret.zipper,
     direction === "left" || direction === "up" ? caret.leftOffset : caret.rightOffset
   );
-  const [viewportPosition] = renderResult.getViewportSelection({
+  const viewportPosition = renderResult.getViewportSelection({
     indices: getRowIndices(layoutPosition.zipper),
     start: layoutPosition.offset,
     end: layoutPosition.offset,
@@ -99,7 +99,7 @@ export function moveCaret<T>(
     direction,
     [viewportPosition.rect.x, viewportPosition.baseline],
     (layoutPosition) => {
-      const [position] = renderResult.getViewportSelection({
+      const position = renderResult.getViewportSelection({
         indices: getRowIndices(layoutPosition.zipper),
         start: layoutPosition.offset,
         end: layoutPosition.offset,

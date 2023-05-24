@@ -26,9 +26,6 @@ export class TextMathMLElement implements RenderedElement<MathMLElement> {
   getCaretSize() {
     return this.element.getCaretSize();
   }
-  getContentBounds() {
-    return this.element.getContentBounds();
-  }
   getBounds() {
     return this.element.getBounds();
   }

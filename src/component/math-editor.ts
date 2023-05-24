@@ -427,21 +427,24 @@ export class MathEditor extends HTMLElement {
       start: caret.caret.leftOffset,
       end: caret.caret.rightOffset,
     });
-    const caretPosition = renderedCaret.at(caret.caret.isForwards ? -1 : 0);
-    assert(caretPosition, "Caret position is null");
     const caretSize = this.renderResult.getViewportCaretSize(getRowIndices(caret.caret.zipper));
-    caret.element.setPosition(caretPosition.rect.x + caretPosition.rect.width, caretPosition.baseline + caretSize * 0.1);
+    caret.element.setPosition(
+      renderedCaret.rect.x + (caret.caret.isForwards ? renderedCaret.rect.width : 0),
+      renderedCaret.baseline + caretSize * 0.1
+    );
     caret.element.setHeight(caretSize);
 
     const container = this.renderResult.getElement(getRowIndices(caret.caret.zipper));
     caret.element.setHighlightContainer(container.getElements());
 
     caret.element.clearSelections();
-    for (const selection of renderedCaret) {
-      if (selection.isCollapsed) {
-        continue;
-      }
-      caret.element.addSelection(selection.rect.x, selection.rect.y, selection.rect.width, selection.rect.height);
+    if (!caret.caret.isCollapsed) {
+      caret.element.addSelection(
+        renderedCaret.rect.x,
+        renderedCaret.rect.y,
+        renderedCaret.rect.width,
+        renderedCaret.rect.height
+      );
     }
   }
 

@@ -16,10 +16,6 @@ export class RenderedMathML {
     return getElementBounds(this.element);
   }
 
-  getContentBounds(): ViewportRect[] {
-    return getContentBounds(this.element);
-  }
-
   getElements(): MathMLElement[] {
     return [this.element];
   }
@@ -93,19 +89,6 @@ export function getElementBounds(element: Element): ViewportRect {
     width: bounds.width,
     height: bounds.height,
   };
-}
-
-/**
- * @returns The bounding boxes of the given element's content.
- */
-export function getContentBounds(element: Element): ViewportRect[] {
-  const bounds = [...element.getClientRects()];
-  return bounds.map((v) => ({
-    x: v.x,
-    y: v.y,
-    width: v.width,
-    height: v.height,
-  }));
 }
 
 /**

@@ -59,8 +59,6 @@ export function createCaret(container: HTMLElement): CaretElement {
     selection.style.top = `${y - parentPos.top}px`;
     selection.style.width = `${width}px`;
     selection.style.height = `${height}px`;
-    // Grow from the bottom
-    selection.style.marginTop = `${-height}px`;
     selectionsContainer.append(selection);
   }
 

@@ -134,6 +134,9 @@ export function hasSyntaxNodeChildren<T extends SyntaxNodesKeys>(node: SyntaxNod
   return childType in node.children;
 }
 
+/**
+ * Be careful when using this function, you don't want an off-by-one error.
+ */
 export function offsetInRange(offset: Offset, range: Range<bigint>): boolean {
   return range.start <= offset && offset <= range.end;
 }

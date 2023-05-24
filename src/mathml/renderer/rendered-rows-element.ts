@@ -35,10 +35,6 @@ export class RowsContainerMathMLElement implements RenderedElement<MathMLElement
   getCaretSize() {
     return this.element.getCaretSize();
   }
-  getContentBounds() {
-    // Avoid getting all the bounds of the children
-    return [this.element.getBounds()];
-  }
   getBounds(): ViewportRect {
     return this.element.getBounds();
   }

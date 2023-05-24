@@ -23,10 +23,8 @@ export interface RenderResult<T> {
 
   /**
    * For getting the position to render a given selection.
-   * Returns an array, because a row behaves like an inline-level element.
-   * Modeled after https://developer.mozilla.org/en-US/docs/Web/API/Element/getClientRects
    */
-  getViewportSelection(selection: RowIndicesAndRange): RenderedSelection[];
+  getViewportSelection(selection: RowIndicesAndRange): RenderedSelection;
 
   /**
    * For getting the position to render a given row selection.
@@ -87,10 +85,4 @@ export interface RenderedElement<T> {
    * Gets the full bounding box of the element.
    */
   getBounds(): ViewportRect;
-
-  /**
-   * Gets the bounding box of the element's contents.
-   * Modeled after https://developer.mozilla.org/en-US/docs/Web/API/Element/getClientRect
-   */
-  getContentBounds(): ViewportRect[];
 }

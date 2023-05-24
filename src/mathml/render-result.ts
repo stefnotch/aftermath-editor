@@ -3,7 +3,7 @@ import { Offset } from "../math-layout/math-layout-offset";
 import { RowIndices } from "../math-layout/math-layout-zipper";
 import { RenderResult, RenderedElement, RowIndicesAndOffset, RowIndicesAndRange } from "../rendering/render-result";
 import { RenderedSelection } from "../rendering/rendered-selection";
-import { ViewportCoordinate, ViewportMath } from "../rendering/viewport-coordinate";
+import { ViewportCoordinate, ViewportMath, ViewportValue } from "../rendering/viewport-coordinate";
 import { assert } from "../utils/assert";
 
 export class MathMLRenderResult implements RenderResult<MathMLElement> {
@@ -11,7 +11,7 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
   constructor(rootElement: RenderedElement<MathMLElement>) {
     this.rootElement = rootElement;
   }
-  getViewportSelection(selection: RowIndicesAndRange): RenderedSelection[] {
+  getViewportSelection(selection: RowIndicesAndRange): RenderedSelection {
     const row = this.getElement(selection.indices);
 
     // Copium option that only works because we don't have any line breaks in MathML Core.
@@ -19,31 +19,55 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
     // Depending on how line breaks are implemented, we might be able to do "line top + (baseline - first line top)"
     const baseline = row.getCaretPosition(0).y;
 
-    function getContentBounds(element: RenderedElement<MathMLElement>): RenderedSelection[] {
-      // Make sure to deal with the zero width selection case
-      // Selection has offsets, the syntax tree has indices TODO: deal with that
+    const start = row.getCaretPosition(selection.start);
+    const end = row.getCaretPosition(selection.end);
 
+    const emptyHeight = {
+      top: Infinity,
+      bottom: -Infinity,
+    };
+
+    function getSelectionHeight(element: RenderedElement<MathMLElement>): { top: ViewportValue; bottom: ViewportValue } {
+      // Assumes that the selection is not zero width.
       const isDisjoint =
-        BigInt(selection.end) < element.syntaxTree.range.start ||
-        (BigInt(selection.end) === element.syntaxTree.range.start && selection.start < selection.end) ||
-        element.syntaxTree.range.end < BigInt(selection.start) ||
-        (element.syntaxTree.range.end === BigInt(selection.start) && selection.start < selection.end);
+        BigInt(selection.end) <= element.syntaxTree.range.start || element.syntaxTree.range.end <= BigInt(selection.start);
       if (isDisjoint) {
-        return [];
+        return emptyHeight;
       }
       const isFullyContained =
         BigInt(selection.start) <= element.syntaxTree.range.start && element.syntaxTree.range.end <= BigInt(selection.end);
+      // If it's just intersecting, try going deeper.
       const isIntersecting = !isDisjoint && !isFullyContained;
       const children = element.getChildren();
       if (isIntersecting && children.length > 0) {
-        return children.flatMap((v) => getContentBounds(v));
+        return children
+          .map((v) => getSelectionHeight(v))
+          .reduce(
+            (a, b) => ({
+              top: Math.min(a.top, b.top),
+              bottom: Math.max(a.bottom, b.bottom),
+            }),
+            emptyHeight
+          );
       }
 
-      const contentBounds = element.getContentBounds();
-      return contentBounds.map((v) => new RenderedSelection(v, baseline));
+      const elementBounds = element.getBounds();
+      return {
+        top: elementBounds.y,
+        bottom: elementBounds.y + elementBounds.height,
+      };
     }
-
-    return RenderedSelection.joinAdjacent(getContentBounds(row));
+    // y and height depend on what is inside the selection.
+    const contentHeight = selection.start != selection.end ? getSelectionHeight(row) : { top: start.y, bottom: start.y };
+    return new RenderedSelection(
+      {
+        x: start.x,
+        y: contentHeight.top,
+        width: end.x - start.x,
+        height: contentHeight.bottom - contentHeight.top,
+      },
+      baseline
+    );
   }
   getViewportRowSelection(row: RowIndices) {
     return this.getElement(row).getBounds();

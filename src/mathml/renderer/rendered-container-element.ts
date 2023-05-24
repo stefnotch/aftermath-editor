@@ -1,7 +1,7 @@
 import { SyntaxNode } from "../../core";
 import { RowIndex } from "../../math-layout/math-layout-zipper";
 import { RenderedElement, Renderer } from "../../rendering/render-result";
-import { ViewportCoordinate, ViewportRect } from "../../rendering/viewport-coordinate";
+import { ViewportCoordinate } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
 import { MathMLTags } from "../mathml-spec";
 import { RenderedMathML, createMathElement } from "./rendered-element";
@@ -27,9 +27,6 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
   }
   getCaretSize(): number {
     return this.element.getCaretSize();
-  }
-  getContentBounds(): ViewportRect[] {
-    return this.element.getContentBounds();
   }
 
   getBounds() {
