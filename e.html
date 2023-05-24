@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<head>
+  <style>
+    .overlay {
+      pointer-events: none;
+      background: red;
+      position: absolute;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div>Selecting in this text updates values below.</div>
+  <div id="app">
+    <math data-editor="true" display="block" style="font-family: STIX Two">
+      <mo>-</mo>
+      <mn>2</mn>
+      <mi>x</mi>
+      <mo>+</mo>
+      <mi>y</mi>
+      <mo>*</mo>
+      <mn>2</mn>
+    </math>
+    <br />
+    <br />
+
+    <math data-editor="true" display="block" style="font-family: STIX Two">
+      <msqrt>
+        <msqrt>
+          <mi>x</mi>
+          <mi>x</mi>
+          <mi>x</mi>
+        </msqrt>
+        <mi>a</mi>
+      </msqrt>
+      <mfrac>
+        <mi>b</mi>
+        <mi>c</mi>
+      </mfrac>
+    </math>
+    <br />
+    <br />
+
+    <math data-editor="true">
+      <mn>-1214.3001</mn>
+      <mn>-1</mn>
+      <mn>.3</mn>
+
+      <mo>-</mo>
+      <mn>1.3</mn>
+    </math>
+    <br />
+    <br />
+    <math data-editor="true">
+      <mfrac>
+        <mn>1.22</mn>
+        <mtext>henlo</mtext>
+      </mfrac>
+    </math>
+    <br />
+    <br />
+
+    <math data-editor="true">
+      <mrow
+        ><mo>-</mo><msub><mi>x</mi><mn>2</mn></msub
+        ><mo>+</mo
+        ><msup
+          ><mi>y</mi
+          ><mfrac
+            ><mn>2</mn><mrow><mi>k</mi><mo>+</mo><mn>1</mn></mrow></mfrac
+          ></msup
+        ></mrow
+      >
+    </math>
+    <br />
+    <br />
+
+    <math data-editor="true">
+      <mrow>
+        <mo>-</mo>
+        <mrow>
+          <mrow><mn>2</mn></mrow>
+        </mrow>
+      </mrow>
+    </math>
+    <br />
+    <br />
+
+    <math data-editor="true">
+      <mfrac>
+        <mi>A</mi>
+        <mn>2</mn>
+      </mfrac>
+      <mo>=</mo>
+      <mrow>
+        <mo>(</mo>
+        <mtable>
+          <mtr>
+            <mtd><mn>1</mn></mtd>
+            <mtd><mn>2</mn></mtd>
+            <mtd><mn>3</mn></mtd>
+          </mtr>
+          <mtr>
+            <mtd><mn>4</mn></mtd>
+            <mtd><mn>5</mn></mtd>
+            <mtd><mn>6</mn></mtd>
+          </mtr>
+          <mtr>
+            <mtd><mn>7</mn></mtd>
+            <mtd><mn>8</mn></mtd>
+            <mtd><mn>9</mn></mtd>
+          </mtr>
+        </mtable>
+        <mo>)</mo>
+      </mrow>
+    </math>
+    <br />
+    <br />
+
+    <div style="width: 30em">
+      This is a formula with a big summation and the number pi
+      <math display="block" style="font-family: STIX Two" tabindex="0" data-editor="true">
+        <mrow>
+          <munderover>
+            <mo>∑</mo>
+            <mrow><mi>n</mi><mo>=</mo><mn>0</mn></mrow>
+            <mrow><mo>+</mo><mn>∞</mn></mrow>
+          </munderover>
+          <mfrac>
+            <mn>1</mn>
+            <msup><mi>n</mi><mn>2</mn></msup>
+          </mfrac>
+        </mrow>
+        <mo>=</mo>
+        <mfrac>
+          <msup><mi>π</mi><mn>2</mn></msup>
+          <mn>6</mn>
+        </mfrac>
+      </math>
+      This is a test
+      <math display="block" style="font-family: STIX Two" tabindex="0" data-editor="true">
+        <munderover>
+          <mo>cat</mo>
+          <mn>27</mn>
+          <mn>∞</mn>
+        </munderover>
+        <mo>=</mo>
+        <mo>&lt;</mo>
+        <mo>&gt;</mo>
+        <mo>=</mo>
+        <munderover>
+          <mo>cat</mo>
+          <mn>27</mn>
+          <mn>∞</mn>
+        </munderover>
+      </math>
+
+      An annotated test case. <br />
+      The shiny new approach is to generate a list of valid caret positions.
+
+      <math data-editor="true">
+        <!--|-->
+        <mfrac>
+          <!--|--><msqrt>
+            <mi> <!--|-->π<!--|--> </mi>
+          </msqrt>
+          <!--|-->
+          <mn> <!--|-->6<!--|--> </mn>
+        </mfrac>
+        <!--|-->
+        <mo>+</mo>
+        <!--|-->
+        <mfrac>
+          <mi> <!--|-->π<!--|--> </mi>
+          <mn> <!--|-->6<!--|--> </mn>
+        </mfrac>
+        <!--|-->
+        <mo>+</mo>
+        <!--|-->
+        <msqrt>
+          <!--|-->
+          <msqrt>
+            <mstyle>
+              <mn> <!--|-->5<!--|--> </mn>
+            </mstyle>
+          </msqrt>
+          <!--|-->
+        </msqrt>
+        <!--|-->
+        <mo>+</mo>
+        <!--|-->
+        <mo>+</mo>
+        <!--|-->
+        <munderover>
+          <mo> <!--|-->c<!--|--> </mo>
+          <mn> <!--|-->2<!--|-->7<!--|--> </mn>
+          <mn> <!--|-->∞<!--|--> </mn>
+        </munderover>
+        <!--|-->
+      </math>
+
+      And a quick msup torture test <br />
+
+      <math data-editor="true">
+        <mo>-</mo>
+        <msup><mn>2</mn><mn>3</mn></msup>
+        <mo>+</mo>
+        <msup>
+          <mn>2</mn>
+          <msup><mn>4</mn><mn>8</mn></msup>
+        </msup>
+        <mo>*</mo>
+        <msup>
+          <msup><mn>2</mn><mn>3</mn></msup>
+          <mn>3</mn>
+        </msup>
+      </math>
+
+      <br />
+      And nested mrows are also fun
+      <br />
+
+      <math data-editor="true">
+        <mrow>
+          <mo>-</mo>
+          <mrow>
+            <mrow><mn>2</mn></mrow>
+          </mrow>
+        </mrow>
+      </math>
+      <br />
+      Mroot
+      <math data-editor="true">
+        <mroot>
+          <msqrt>
+            <mfrac>
+              <mn>1</mn>
+              <mn>2</mn>
+            </mfrac>
+            <mo>+</mo>
+            <mn>4</mn>
+          </msqrt>
+          <mn>3</mn>
+        </mroot>
+        <mo>+</mo>
+        <mn>0</mn>
+      </math>
+
+      Sqrt test. See HTML comments for preferred order
+      <math data-editor="true">
+        <!--1-->
+        <mroot>
+          <msqrt>
+            <!--4-->
+            <mn>b</mn>
+            <!--5-->
+          </msqrt>
+          <!--6-->
+          <mn>
+            <!--2 (should be outside of mn)-->
+            a
+            <!--3 (should be outside of mn)-->
+          </mn>
+        </mroot>
+      </math>
+    </div>
+  </div>
+
+  <div id="overlays"></div>
+
+  <script>
+    // This won't work for getting the baseline of stretchy elements.
+    setInterval(() => {
+      overlays.innerHTML = "";
+      let sel = window.getSelection();
+      for (let i = 0; i < sel.rangeCount; i++) {
+        let r = sel.getRangeAt(i).getClientRects();
+        for (let j = 0; j < r.length; j++) {
+          let overlayElement = document.createElement("div");
+          overlayElement.style.top = r[j].top + "px";
+          overlayElement.style.left = r[j].left + "px";
+          overlayElement.style.width = r[j].width + "px";
+          overlayElement.style.height = r[j].height + "px";
+          overlayElement.classList.add("overlay");
+          overlays.append(overlayElement);
+        }
+      }
+    }, 2000);
+  </script>
+</body>
