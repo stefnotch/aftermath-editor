@@ -68,6 +68,10 @@ class MathEditorCarets {
       caret.element.remove();
     });
     this.carets.clear();
+    this.pointerDownCarets.forEach((caret) => {
+      caret.element.remove();
+    });
+    this.pointerDownCarets.clear();
   }
 
   updateCaret(caret: MathCaret, newCaret: MathLayoutCaret | null) {
