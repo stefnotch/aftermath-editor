@@ -1,10 +1,15 @@
 import { hasSyntaxNodeChildren } from "../core";
 import { Offset } from "../math-layout/math-layout-offset";
-import { RowIndices } from "../math-layout/math-layout-zipper";
+import { RowIndices, addRowIndex } from "../math-layout/math-layout-zipper";
 import { RenderResult, RenderedElement, RowIndicesAndOffset, RowIndicesAndRange } from "../rendering/render-result";
 import { RenderedSelection } from "../rendering/rendered-selection";
 import { ViewportCoordinate, ViewportMath, ViewportValue } from "../rendering/viewport-coordinate";
 import { assert } from "../utils/assert";
+
+type ElementWithIndices = {
+  readonly element: RenderedElement<MathMLElement>;
+  readonly indices: RowIndices;
+};
 
 export class MathMLRenderResult implements RenderResult<MathMLElement> {
   private readonly rootElement: RenderedElement<MathMLElement>;
@@ -91,6 +96,35 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
     return element;
   }
 
+  /**
+   * Get the closest element to the given position.
+   */
+  getLayoutElement(position: ViewportCoordinate): ElementWithIndices {
+    function getLayoutElementContaining(
+      element: RenderedElement<MathMLElement>,
+      indices: RowIndices
+    ): ElementWithIndices | null {
+      if (ViewportMath.distanceToRectangle(position, element.getBounds()) > 0) {
+        return null;
+      } else {
+        for (const child of element.getChildren()) {
+          const v = getLayoutElementContaining(child, addRowIndex(indices, child.rowIndex));
+          if (v) {
+            return v;
+          }
+        }
+        return { element, indices };
+      }
+    }
+
+    return (
+      getLayoutElementContaining(this.rootElement, []) ?? {
+        element: this.rootElement,
+        indices: [],
+      }
+    );
+  }
+
   getLayoutPosition(position: ViewportCoordinate): RowIndicesAndOffset {
     // Algorithm idea:
     // We start at the top of a row
@@ -102,7 +136,9 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
     //   and check their bounding boxes (optimisation)
     //   and then repeat the slow "check every possible caret position in that row".
 
-    let roots = [{ renderedElement: this.rootElement, rowIndices: [] as RowIndices }];
+    const startingElement = this.getLayoutElement(position);
+
+    let roots: ElementWithIndices[] = [startingElement];
     let closest: Readonly<{
       indicesAndOffset: RowIndicesAndOffset | null;
       distance: number;
@@ -114,22 +150,22 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
     while (roots.length > 0) {
       const root = roots.pop();
       assert(root !== undefined);
-      const { renderedElement, rowIndices } = root;
+      const { element, indices } = root;
 
       // Ignore worse distances
-      if (ViewportMath.distanceToRectangle(renderedElement.getBounds(), position) > closest.distance) {
+      if (ViewportMath.distanceToRectangle(position, element.getBounds()) > closest.distance) {
         continue;
       }
 
       // Check all potential positions in this row
-      const potential = getClosestPositionInRow(renderedElement, position);
+      const potential = getClosestPositionInRow(element, position);
       if (potential === null) {
         continue;
       }
 
       const newClosest = {
         indicesAndOffset: {
-          indices: rowIndices,
+          indices: indices,
           offset: potential.offset,
         },
         distance: ViewportMath.distanceToPoint(position, potential.position),
@@ -141,9 +177,9 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
 
       // Go down the tree, and check all children that are on a new row
       // Note: This could be kinda inefficient for large tables, but that's a problem for another day
-      getNewRowsChildren(renderedElement).forEach((v) => {
+      getNewRowsChildren(element).forEach((v) => {
         assert(v.rowIndex !== null);
-        roots.push({ renderedElement: v, rowIndices: rowIndices.concat([v.rowIndex]) });
+        roots.push({ element: v, indices: addRowIndex(indices, v.rowIndex) });
       });
     }
 

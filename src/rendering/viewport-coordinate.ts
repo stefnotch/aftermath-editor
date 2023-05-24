@@ -37,7 +37,7 @@ export const ViewportMath = {
    * Minimum distance from a point to a rectangle. Returns 0 if the point is inside the rectangle.
    * Assumes the rectangle is axis-aligned.
    */
-  distanceToRectangle: (bounds: ViewportRect, position: ViewportCoordinate) => {
+  distanceToRectangle: (position: ViewportCoordinate, bounds: ViewportRect) => {
     // https://stackoverflow.com/q/30545052/3492994
 
     const dx = Math.max(bounds.x - position.x, position.x - (bounds.x + bounds.width));

@@ -345,6 +345,11 @@ export function getRowIndices(zipper: MathLayoutRowZipper): RowIndices {
   return ancestorIndices;
 }
 
+export function addRowIndex(indices: RowIndices, index: RowIndex | null): RowIndices {
+  if (index === null) return indices;
+  return indices.concat([index]);
+}
+
 export function fromRowIndices(root: MathLayoutRowZipper, indices: RowIndices) {
   let current = root;
   for (let i = 0; i < indices.length; i++) {
