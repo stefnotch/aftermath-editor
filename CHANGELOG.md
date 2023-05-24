@@ -1,3 +1,7 @@
+# v0.1.2
+
+- highlight token before caret
+
 # v0.1.1
 
 - simplistic editing
