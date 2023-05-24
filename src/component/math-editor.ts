@@ -1,8 +1,5 @@
 import { assert } from "../utils/assert";
-import { MathLayoutElement, MathLayoutRow } from "../math-layout/math-layout";
 import { fromElement as fromMathMLElement, unicodeSplit } from "../mathml/parsing";
-import arrayUtils from "../utils/array-utils";
-import { endingBrackets, startingBrackets } from "../mathml/mathml-spec";
 import { mathLayoutWithWidth } from "../math-layout/math-layout-utils";
 import caretStyles from "./caret-styles.css?inline";
 import mathEditorStyles from "./math-editor-styles.css?inline";
@@ -19,7 +16,7 @@ import { Offset } from "../math-layout/math-layout-offset";
 
 import "./../core";
 import { MathMLRenderer } from "../mathml/renderer";
-import { RenderResult } from "../rendering/render-result";
+import { RenderResult, RenderedElement } from "../rendering/render-result";
 import { getNodeIdentifiers, joinNodeIdentifier, parse } from "./../core";
 
 const debugSettings = {
@@ -210,21 +207,6 @@ export class MathEditor extends HTMLElement {
     });
     editorResizeObserver.observe(container, { box: "border-box" });
 
-    // Rendering
-    this.renderer = new MathMLRenderer();
-    getNodeIdentifiers().forEach((name) => {
-      assert(this.renderer.canRender(name), "Cannot render " + joinNodeIdentifier(name) + ".");
-    });
-
-    this.renderResult = this.renderer.renderAll({
-      errors: [],
-      value: {
-        name: ["BuiltIn", "Nothing"],
-        children: { Leaves: [] },
-        value: [],
-        range: { start: 0n, end: 0n },
-      },
-    });
     this.mathMlElement = document.createElement("math");
     container.append(this.mathMlElement);
 
@@ -262,7 +244,6 @@ export class MathEditor extends HTMLElement {
     inputContainer.appendChild(this.inputHandler.element);
 
     this.inputHandler.element.addEventListener("keydown", (ev) => {
-      // console.info("keydown", ev);
       if (ev.key === "ArrowUp") {
         this.carets.map((caret) => this.moveCaret(caret, "up"));
         this.renderCarets();
@@ -289,7 +270,6 @@ export class MathEditor extends HTMLElement {
     });
 
     this.inputHandler.element.addEventListener("beforeinput", (ev) => {
-      console.info("beforeinput", ev);
       // Woah, apparently running this code later fixes a Firefox textarea bug
       this.renderTaskQueue.add(() => {
         if (ev.inputType === "deleteContentBackward" || ev.inputType === "deleteWordBackward") {
@@ -329,7 +309,8 @@ export class MathEditor extends HTMLElement {
             this.saveEdit(edit);
             this.applyEdit(edit);
           }
-        } else if (ev.inputType === "historyUndo") {
+        } /*else
+         if (ev.inputType === "historyUndo") {
           // TODO: https://stackoverflow.com/questions/27027833/is-it-possible-to-edit-a-text-input-with-javascript-and-add-to-the-undo-stack
           // ^ Fix it using this slightly dirty hack
           // Doesn't reliably fire, ugh
@@ -341,8 +322,24 @@ export class MathEditor extends HTMLElement {
           // I might be able to hack around this by firing keyboard events such that the browser has something to redo
           // Or I could just wait for the Keyboard API to get implemented
           ev.preventDefault();
-        }
+        }*/
       });
+    });
+
+    // Rendering
+    this.renderer = new MathMLRenderer();
+    getNodeIdentifiers().forEach((name) => {
+      assert(this.renderer.canRender(name), "Cannot render " + joinNodeIdentifier(name) + ".");
+    });
+
+    this.renderResult = this.renderer.renderAll({
+      errors: [],
+      value: {
+        name: ["BuiltIn", "Nothing"],
+        children: { Leaves: [] },
+        value: [],
+        range: { start: 0n, end: 0n },
+      },
     });
 
     const styles = document.createElement("style");
@@ -412,60 +409,39 @@ export class MathEditor extends HTMLElement {
 
     if (import.meta.env.DEV) {
       if (debugSettings.debugRenderRows) {
-        function debugRenderRow(domTranslator: typeof lastLayout.domTranslator) {
-          domTranslator.element.classList.add("row-debug");
-
-          domTranslator.children.forEach((child) => {
-            if (child.value.type === "symbol") {
-              // Do nothing
-            } else if (
-              child.value.type === "fraction" ||
-              child.value.type === "root" ||
-              child.value.type === "under" ||
-              child.value.type === "over" ||
-              child.value.type === "sup" ||
-              child.value.type === "sub" ||
-              child.value.type === "table"
-            ) {
-              child.children.forEach((row) => debugRenderRow(row));
-            }
-          });
+        function debugRenderRows(renderedElement: RenderedElement<MathMLElement>) {
+          if (renderedElement.rowIndex) {
+            renderedElement.getElements().forEach((v) => v.classList.add("row-debug"));
+          }
+          renderedElement.getChildren().forEach((child) => debugRenderRows(child));
         }
 
-        // TODO: debugRenderRow(lastLayout.domTranslator);
+        debugRenderRows(this.renderResult.getElement([]));
       }
     }
   }
 
   renderCaret(caret: MathCaret) {
-    const renderedCaret = this.renderResult.getViewportPosition({
+    const renderedCaret = this.renderResult.getViewportSelection({
       indices: getRowIndices(caret.caret.zipper),
-      offset: caret.caret.end,
+      start: caret.caret.leftOffset,
+      end: caret.caret.rightOffset,
     });
-    caret.element.setPosition(renderedCaret.bottomPosition.x, renderedCaret.bottomPosition.y);
-    caret.element.setHeight(renderedCaret.caretHeight);
+    const caretPosition = renderedCaret.at(caret.caret.isForwards ? -1 : 0);
+    assert(caretPosition, "Caret position is null");
+    const caretSize = this.renderResult.getViewportCaretSize(getRowIndices(caret.caret.zipper));
+    caret.element.setPosition(caretPosition.rect.x + caretPosition.rect.width, caretPosition.baseline + caretSize * 0.1);
+    caret.element.setHeight(caretSize);
 
     const container = this.renderResult.getElement(getRowIndices(caret.caret.zipper));
     caret.element.setHighlightContainer(container.getElements());
 
     caret.element.clearSelections();
-    if (!caret.caret.isCollapsed) {
-      const rangeLayoutLeft = this.renderResult.getViewportPosition({
-        indices: getRowIndices(caret.caret.zipper),
-        offset: caret.caret.leftOffset,
-      });
-      const rangeLayoutRight = this.renderResult.getViewportPosition({
-        indices: getRowIndices(caret.caret.zipper),
-        offset: caret.caret.rightOffset,
-      });
-
-      const width = rangeLayoutRight.bottomPosition.x - rangeLayoutLeft.bottomPosition.x;
-      caret.element.addSelection(
-        rangeLayoutLeft.bottomPosition.x,
-        rangeLayoutLeft.bottomPosition.y,
-        width,
-        rangeLayoutLeft.caretHeight
-      );
+    for (const selection of renderedCaret) {
+      if (selection.isCollapsed) {
+        continue;
+      }
+      caret.element.addSelection(selection.rect.x, selection.rect.y, selection.rect.width, selection.rect.height);
     }
   }
 

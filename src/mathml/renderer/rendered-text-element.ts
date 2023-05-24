@@ -1,7 +1,8 @@
 import { SyntaxNode, offsetInRange } from "../../core";
 import { Offset } from "../../math-layout/math-layout-offset";
 import { RowIndex } from "../../math-layout/math-layout-zipper";
-import { RenderedElement, RenderedCaret } from "../../rendering/render-result";
+import { RenderedElement } from "../../rendering/render-result";
+import { ViewportCoordinate } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
 import { MathMLTags } from "../mathml-spec";
 import { RenderedMathML, createMathElement } from "./rendered-element";
@@ -22,14 +23,19 @@ export class TextMathMLElement implements RenderedElement<MathMLElement> {
     }
     this.element = new RenderedMathML(createMathElement(elementName, children));
   }
+  getCaretSize() {
+    return this.element.getCaretSize();
+  }
+  getContentBounds() {
+    return this.element.getContentBounds();
+  }
   getBounds() {
     return this.element.getBounds();
   }
-  getViewportPosition(offset: Offset): RenderedCaret {
+  getCaretPosition(offset: Offset): ViewportCoordinate {
     assert(offsetInRange(offset, this.syntaxTree.range), "Invalid offset");
 
     const atEnd = offset >= Number(this.syntaxTree.range.end);
-    const caretSize = this.element.getFontSize();
 
     const textElement = this.textElements.find((v) => offsetInRange(offset, v.syntaxTree.range));
     const x =
@@ -37,7 +43,7 @@ export class TextMathMLElement implements RenderedElement<MathMLElement> {
       (atEnd ? this.element.element.getBoundingClientRect().right : this.element.element.getBoundingClientRect().left);
     const baseline = textElement?.getBaseline(offset).y ?? this.element.element.getBoundingClientRect().bottom;
 
-    return new RenderedCaret({ x: x, y: baseline }, caretSize);
+    return { x: x, y: baseline };
   }
   getElements() {
     return this.element.getElements();

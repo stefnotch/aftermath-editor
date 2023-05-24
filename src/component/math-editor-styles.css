@@ -5,6 +5,7 @@
 math {
   display: inline;
   font-family: math, "STIX Two";
+  white-space: nowrap;
 }
 
 /** So that there's a visible space after the square root */

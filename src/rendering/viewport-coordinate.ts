@@ -9,11 +9,30 @@ export type ViewportCoordinate = { x: ViewportValue; y: ViewportValue };
 export type ViewportRect = {
   readonly x: ViewportValue;
   readonly y: ViewportValue;
+  /**
+   * Positive value
+   */
   readonly width: ViewportValue;
+  /**
+   * Positive value
+   */
   readonly height: ViewportValue;
 };
 
 export const ViewportMath = {
+  joinRectangles: (a: ViewportRect, b: ViewportRect): ViewportRect => {
+    const top = Math.min(a.y, b.y);
+    const left = Math.min(a.x, b.x);
+    const bottom = Math.max(a.y + a.height, b.y + b.height);
+    const right = Math.max(a.x + a.width, b.x + b.width);
+    return {
+      x: left,
+      y: top,
+      width: right - left,
+      height: bottom - top,
+    };
+  },
+
   /**
    * Minimum distance from a point to a rectangle. Returns 0 if the point is inside the rectangle.
    * Assumes the rectangle is axis-aligned.

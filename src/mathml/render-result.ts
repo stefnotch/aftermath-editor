@@ -1,19 +1,55 @@
-import { ParseResult, hasSyntaxNodeChildren } from "../core";
+import { hasSyntaxNodeChildren } from "../core";
 import { Offset } from "../math-layout/math-layout-offset";
 import { RowIndices } from "../math-layout/math-layout-zipper";
-import { RenderResult, RenderedElement, RenderedCaret, RowIndicesAndOffset } from "../rendering/render-result";
+import { RenderResult, RenderedElement, RowIndicesAndOffset, RowIndicesAndRange } from "../rendering/render-result";
+import { RenderedSelection } from "../rendering/rendered-selection";
 import { ViewportCoordinate, ViewportMath } from "../rendering/viewport-coordinate";
 import { assert } from "../utils/assert";
 
 export class MathMLRenderResult implements RenderResult<MathMLElement> {
   private readonly rootElement: RenderedElement<MathMLElement>;
-  private readonly parsed: ParseResult;
-  constructor(rootElement: RenderedElement<MathMLElement>, parsed: ParseResult) {
+  constructor(rootElement: RenderedElement<MathMLElement>) {
     this.rootElement = rootElement;
-    this.parsed = parsed;
   }
-  getViewportPosition(layoutPosition: RowIndicesAndOffset): RenderedCaret {
-    return this.getElement(layoutPosition.indices).getViewportPosition(layoutPosition.offset);
+  getViewportSelection(selection: RowIndicesAndRange): RenderedSelection[] {
+    const row = this.getElement(selection.indices);
+
+    // Copium option that only works because we don't have any line breaks in MathML Core.
+    // Since we don't have line breaks, we can get the baseline from the first character.
+    // Depending on how line breaks are implemented, we might be able to do "line top + (baseline - first line top)"
+    const baseline = row.getCaretPosition(0).y;
+
+    function getContentBounds(element: RenderedElement<MathMLElement>): RenderedSelection[] {
+      // Make sure to deal with the zero width selection case
+      // Selection has offsets, the syntax tree has indices TODO: deal with that
+
+      const isDisjoint =
+        BigInt(selection.end) < element.syntaxTree.range.start ||
+        (BigInt(selection.end) === element.syntaxTree.range.start && selection.start < selection.end) ||
+        element.syntaxTree.range.end < BigInt(selection.start) ||
+        (element.syntaxTree.range.end === BigInt(selection.start) && selection.start < selection.end);
+      if (isDisjoint) {
+        return [];
+      }
+      const isFullyContained =
+        BigInt(selection.start) <= element.syntaxTree.range.start && element.syntaxTree.range.end <= BigInt(selection.end);
+      const isIntersecting = !isDisjoint && !isFullyContained;
+      const children = element.getChildren();
+      if (isIntersecting && children.length > 0) {
+        return children.flatMap((v) => getContentBounds(v));
+      }
+
+      const contentBounds = element.getContentBounds();
+      return contentBounds.map((v) => new RenderedSelection(v, baseline));
+    }
+
+    return RenderedSelection.joinAdjacent(getContentBounds(row));
+  }
+  getViewportRowSelection(row: RowIndices) {
+    return this.getElement(row).getBounds();
+  }
+  getViewportCaretSize(row: RowIndices): number {
+    return this.getElement(row).getCaretSize();
   }
 
   getElement(indices: RowIndices): RenderedElement<MathMLElement> {
@@ -72,7 +108,7 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
           indices: rowIndices,
           offset: potential.offset,
         },
-        distance: distanceToRenderedPosition(position, potential.position),
+        distance: ViewportMath.distanceToPoint(position, potential.position),
       };
 
       if (newClosest.distance < closest.distance) {
@@ -91,9 +127,9 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
     function getClosestPositionInRow(
       element: RenderedElement<MathMLElement>,
       position: ViewportCoordinate
-    ): { position: RenderedCaret; offset: Offset } | null {
+    ): { position: ViewportCoordinate; offset: Offset } | null {
       let closest: Readonly<{
-        renderedPosition: { position: RenderedCaret; offset: Offset } | null;
+        renderedPosition: { position: ViewportCoordinate; offset: Offset } | null;
         distance: number;
       }> = {
         renderedPosition: null,
@@ -101,8 +137,8 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
       };
 
       for (let i = Number(element.syntaxTree.range.start); i <= Number(element.syntaxTree.range.end); i++) {
-        const renderedPosition = element.getViewportPosition(i);
-        const distance = distanceToRenderedPosition(position, renderedPosition);
+        const renderedPosition = element.getCaretPosition(i);
+        const distance = ViewportMath.distanceToPoint(position, renderedPosition);
 
         if (distance < closest.distance) {
           closest = {
@@ -150,14 +186,4 @@ function getChildWithContainerIndex(
 
   // Giving up, returning the current element
   return element;
-}
-
-/**
- * Gets the distance between a position and a caret's bounding box.
- */
-function distanceToRenderedPosition(position: ViewportCoordinate, renderedPosition: RenderedCaret) {
-  return ViewportMath.distanceToSegment(position, {
-    a: { x: renderedPosition.bottomPosition.x, y: renderedPosition.bottomPosition.y },
-    b: { x: renderedPosition.bottomPosition.x, y: renderedPosition.bottomPosition.y - renderedPosition.caretHeight },
-  });
 }

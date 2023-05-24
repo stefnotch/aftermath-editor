@@ -242,7 +242,7 @@ if (mathIR.type === "table") {
   renderAll(parsed: ParseResult): RenderResult<MathMLElement> {
     // TODO: Rendering errors is like rendering non-semantic annotations
     const element = this.render(parsed.value, null);
-    return new MathMLRenderResult(element, parsed);
+    return new MathMLRenderResult(element);
   }
 
   render(syntaxTree: SyntaxNode, rowIndex: RowIndex | null): RenderedElement<MathMLElement> {

@@ -1,7 +1,8 @@
 import { SyntaxNode } from "../../core";
 import { Offset } from "../../math-layout/math-layout-offset";
 import { RowIndex } from "../../math-layout/math-layout-zipper";
-import { RenderedElement, RenderedCaret } from "../../rendering/render-result";
+import { RenderedElement } from "../../rendering/render-result";
+import { ViewportCoordinate, ViewportRect } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
 import { RenderedMathML, createMathElement, createPlaceholder } from "./rendered-element";
 
@@ -20,19 +21,24 @@ export class NothingMathMLElement implements RenderedElement<MathMLElement> {
 
     this.element = new RenderedMathML(createMathElement("mrow", [this.baselineReaderElement, createPlaceholder()]));
   }
+  getCaretSize(): number {
+    return this.element.getCaretSize();
+  }
+  getContentBounds(): ViewportRect[] {
+    return this.element.getContentBounds();
+  }
   getBounds() {
     return this.element.getBounds();
   }
-  getViewportPosition(offset: Offset): RenderedCaret {
+  getCaretPosition(offset: Offset): ViewportCoordinate {
     assert(offset === 0, "NothingMathMLElement only supports offset 0");
     // The baseline isn't exposed as a property, so we have this workaround https://github.com/w3c/mathml-core/issues/38
     // https://jsfiddle.net/se6n81rg/1/
     const baseline = this.baselineReaderElement.getBoundingClientRect().bottom;
-    const caretSize = this.element.getFontSize();
 
     const boundingBox = this.element.element.getBoundingClientRect();
     const x = (boundingBox.left + boundingBox.right) / 2;
-    return new RenderedCaret({ x: x, y: baseline }, caretSize);
+    return { x: x, y: baseline };
   }
   getElements() {
     return this.element.getElements();

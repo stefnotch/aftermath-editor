@@ -1,6 +1,7 @@
 import { SyntaxNode, fromCoreRowIndex } from "../../core";
 import { RowIndex } from "../../math-layout/math-layout-zipper";
-import { RenderedElement, RenderedCaret, Renderer } from "../../rendering/render-result";
+import { RenderedElement, Renderer } from "../../rendering/render-result";
+import { ViewportCoordinate } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
 import { RenderedMathML, createMathElement, wrapInMRow } from "./rendered-element";
 
@@ -34,11 +35,20 @@ export class TableMathMLElement implements RenderedElement<MathMLElement> {
     assert(this.element.getChildren().length > 0, "Needs at least one rendered child");
   }
 
+  getCaretSize() {
+    return this.element.getCaretSize();
+  }
+
+  getContentBounds() {
+    // Avoid getting all the bounds of the children
+    return [this.element.getBounds()];
+  }
+
   getBounds() {
     return this.element.getBounds();
   }
 
-  getViewportPosition(offset: number): RenderedCaret {
+  getCaretPosition(offset: number): ViewportCoordinate {
     assert(this.syntaxTree.range.start <= offset && offset <= this.syntaxTree.range.end, "Invalid offset");
 
     // The baseline isn't exposed as a property, so we have this questionable workaround
@@ -56,8 +66,7 @@ export class TableMathMLElement implements RenderedElement<MathMLElement> {
     }
 
     let { x, y } = positionReader.getBoundingClientRect();
-    const caretSize = this.element.getFontSize();
-    return new RenderedCaret({ x: x, y: y }, caretSize);
+    return { x: x, y: y };
   }
 
   getElements() {

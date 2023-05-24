@@ -57,6 +57,7 @@ export function getTextBoundingBox(t: Text) {
 }
 
 /** Gets information about a text node on the screen */
+// @ts-ignore
 function getTextLayout(t: Text, index: number) {
   function getCharacterBoundingBox(t: Text, index: number) {
     const range = document.createRange();

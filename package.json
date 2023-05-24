@@ -8,6 +8,7 @@
   "scripts": {
     "start": "vite",
     "dev": "vite --open",
+    "check": "tsc",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "deploy": "vite build --base=/aftermath-editor/ && node utils/publish.js",

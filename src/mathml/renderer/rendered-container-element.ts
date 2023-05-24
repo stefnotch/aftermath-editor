@@ -1,10 +1,14 @@
 import { SyntaxNode } from "../../core";
 import { RowIndex } from "../../math-layout/math-layout-zipper";
-import { RenderedElement, RenderedCaret, Renderer } from "../../rendering/render-result";
+import { RenderedElement, Renderer } from "../../rendering/render-result";
+import { ViewportCoordinate, ViewportRect } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
 import { MathMLTags } from "../mathml-spec";
 import { RenderedMathML, createMathElement } from "./rendered-element";
 
+/**
+ * Renders something on the same row.
+ */
 export class SimpleContainerMathMLElement implements RenderedElement<MathMLElement> {
   element: RenderedMathML;
 
@@ -21,19 +25,25 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
     assert(this.element.getChildren().length === this.syntaxTree.children.Containers.length, "Invalid number of children");
     assert(this.element.getChildren().length > 0, "Needs at least one rendered child");
   }
+  getCaretSize(): number {
+    return this.element.getCaretSize();
+  }
+  getContentBounds(): ViewportRect[] {
+    return this.element.getContentBounds();
+  }
 
   getBounds() {
     return this.element.getBounds();
   }
 
-  getViewportPosition(offset: number): RenderedCaret {
+  getCaretPosition(offset: number): ViewportCoordinate {
     assert(this.syntaxTree.range.start <= offset && offset <= this.syntaxTree.range.end, "Invalid offset");
     // Don't look at children that are on a new row
     const child = this.element
       .getChildren()
       .find((c) => c.syntaxTree.range.start <= offset && offset <= c.syntaxTree.range.end);
     if (child) {
-      return child.getViewportPosition(offset);
+      return child.getCaretPosition(offset);
     } else {
       throw new Error("Should not happen");
     }

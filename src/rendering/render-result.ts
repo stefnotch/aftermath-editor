@@ -1,6 +1,7 @@
 import { NodeIdentifier, ParseResult, SyntaxNode } from "../core";
 import { Offset } from "../math-layout/math-layout-offset";
 import { RowIndex, RowIndices } from "../math-layout/math-layout-zipper";
+import { RenderedSelection } from "./rendered-selection";
 import { ViewportCoordinate, ViewportRect, ViewportValue } from "./viewport-coordinate";
 
 export interface Renderer<T> {
@@ -11,36 +12,8 @@ export interface Renderer<T> {
   render(syntaxTree: SyntaxNode, rowIndex: RowIndex | null): RenderedElement<T>;
 }
 
-/**
- * Position of a caret on a row. `y` is the baseline of the row.
- * Height and depth are relative to the baseline of the row.
- */
-export class RenderedCaret {
-  /**
-   * Positive, and relative to the baseline of the row.
-   */
-  private height: ViewportValue;
-  /**
-   * Positive, and relative to the baseline of the row.
-   */
-  private depth: ViewportValue;
-  private baselinePosition: ViewportCoordinate;
-  constructor(baselinePosition: ViewportCoordinate, caretHeight: ViewportValue) {
-    this.baselinePosition = baselinePosition;
-    this.height = caretHeight * 0.9;
-    this.depth = caretHeight * 0.1;
-  }
-
-  get bottomPosition(): ViewportCoordinate {
-    const { x, y } = this.baselinePosition;
-    return { x, y: y + this.depth };
-  }
-
-  get caretHeight(): ViewportValue {
-    return this.height + this.depth;
-  }
-}
 export type RowIndicesAndOffset = { indices: RowIndices; offset: Offset };
+export type RowIndicesAndRange = { indices: RowIndices; start: Offset; end: Offset };
 export interface RenderResult<T> {
   /**
    *  For highlighting the element that contains the caret.
@@ -48,12 +21,23 @@ export interface RenderResult<T> {
    */
   getElement(indices: RowIndices): RenderedElement<T>;
 
-  // TODO: https://github.com/stefnotch/aftermath-editor/issues/19
+  /**
+   * For getting the position to render a given selection.
+   * Returns an array, because a row behaves like an inline-level element.
+   * Modeled after https://developer.mozilla.org/en-US/docs/Web/API/Element/getClientRects
+   */
+  getViewportSelection(selection: RowIndicesAndRange): RenderedSelection[];
 
   /**
-   * For getting the caret position (and the positions for the selections)
+   * For getting the position to render a given row selection.
+   * This can be used for highlighting a table cell.
    */
-  getViewportPosition(layoutPosition: RowIndicesAndOffset): RenderedCaret;
+  getViewportRowSelection(row: RowIndices): ViewportRect;
+
+  /**
+   * For getting the caret size at a specific position.
+   */
+  getViewportCaretSize(row: RowIndices): ViewportValue;
 
   /**
    * For clicking somewhere in the viewport and getting the caret position.
@@ -90,11 +74,23 @@ export interface RenderedElement<T> {
 
   /**
    * @param offset The offset in the input tree row.
+   * @returns The position of the baseline.
    */
-  getViewportPosition(offset: Offset): RenderedCaret;
+  getCaretPosition(offset: Offset): ViewportCoordinate;
 
   /**
-   * Gets the bounding box of the element.
+   * For getting the caret size at a specific position.
+   */
+  getCaretSize(): ViewportValue;
+
+  /**
+   * Gets the full bounding box of the element.
    */
   getBounds(): ViewportRect;
+
+  /**
+   * Gets the bounding box of the element's contents.
+   * Modeled after https://developer.mozilla.org/en-US/docs/Web/API/Element/getClientRect
+   */
+  getContentBounds(): ViewportRect[];
 }
