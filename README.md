@@ -10,6 +10,7 @@ There are a lot of existing formula editors out there, but none of them solved m
 
 - I want to be able to input formulas _naturally_, without having to learn to read and write a new syntax. This means that I want to be able to write `1/2` and have it be a fraction $\frac{1}{2}$.
 - I want to build a calculator on top of it, so the editor should understand the _semantics_ of the formulas. For example, the formulas $ax^4 + bx^3 + cx^2 +dx + e = 0$ and $\frac{d}{dx} e^x = e^x$ both have a $dx$ and a $e$ in them. Yet, in the first formula, $dx$ is a coefficient and $e$ is a constant, while in the second formula, $dx$ is a differential and $e$ is Euler's number.
+- I really miss my favourite IDE features, such as autocomplete, syntax checking, documentation popups and more.
 
 Thus, the goals are
 
