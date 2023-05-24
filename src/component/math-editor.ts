@@ -18,17 +18,7 @@ import "./../core";
 import { MathMLRenderer } from "../mathml/renderer";
 import { RenderResult, RenderedElement } from "../rendering/render-result";
 import { getNodeIdentifiers, joinNodeIdentifier, parse } from "./../core";
-
-const debugSettings = {
-  debugRenderRows: true,
-};
-
-if (import.meta.env.DEV) {
-  import("lil-gui").then((GUI) => {
-    const gui = new GUI.GUI();
-    gui.add(debugSettings, "debugRenderRows");
-  });
-}
+import { DebugSettings } from "./debug-settings";
 
 export interface MathCaret {
   /**
@@ -412,7 +402,7 @@ export class MathEditor extends HTMLElement {
     this.carets.map((v) => this.renderCaret(v));
 
     if (import.meta.env.DEV) {
-      if (debugSettings.debugRenderRows) {
+      if (DebugSettings.renderRows) {
         function debugRenderRows(renderedElement: RenderedElement<MathMLElement>) {
           if (renderedElement.rowIndex) {
             renderedElement.getElements().forEach((v) => v.classList.add("row-debug"));
