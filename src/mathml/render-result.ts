@@ -1,4 +1,4 @@
-import { hasSyntaxNodeChildren } from "../core";
+import { hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
 import { Offset } from "../math-layout/math-layout-offset";
 import { RowIndices, addRowIndex } from "../math-layout/math-layout-zipper";
 import { RenderResult, RenderedElement, RowIndicesAndOffset, RowIndicesAndRange } from "../rendering/render-result";
@@ -90,7 +90,7 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
 
       const childElement = getChildWithContainerIndex(element, indexOfContainer);
       const rowChildElement = childElement.getChildren().find((c) => c.rowIndex?.[1] === indexOfRow);
-      assert(rowChildElement, `Couldn't find row ${indexOfRow} in ${childElement.syntaxTree.name}`);
+      assert(rowChildElement, `Couldn't find row ${indexOfRow} in ${joinNodeIdentifier(childElement.syntaxTree.name)}`);
       element = rowChildElement;
     }
     return element;
@@ -227,12 +227,12 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
 /**
  *
  * @param element A rendered element
- * @param indexOfContainer The offset in the input tree row.
+ * @param indexOfContainer The index in the input tree row.
  * @returns The deepest child element that contains the given index.
  */
 function getChildWithContainerIndex(
   element: RenderedElement<MathMLElement>,
-  indexOfContainer: Offset
+  indexOfContainer: number
 ): RenderedElement<MathMLElement> {
   // Only walk down if we're still on the same row
   if (hasSyntaxNodeChildren(element.syntaxTree, "Containers")) {

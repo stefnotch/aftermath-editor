@@ -1,10 +1,12 @@
-import { ViewportValue } from "../rendering/viewport-coordinate";
+import { RenderedSelection } from "../rendering/rendered-selection";
+import { ViewportRect, ViewportValue } from "../rendering/viewport-coordinate";
 
 export interface CaretElement {
   setPosition(x: number, y: number): void;
   setHeight(v: number): void;
+  addSelection(rect: ViewportRect): void;
   setHighlightContainer(elements: ReadonlyArray<Element>): void;
-  addSelection(x: number, y: number, width: number, height: number): void;
+  setToken(selection: RenderedSelection): void;
   clearSelections(): void;
   remove(): void;
 }
@@ -29,6 +31,10 @@ export function createCaret(container: HTMLElement): CaretElement {
   selectionsContainer.style.left = "0px";
   container.append(selectionsContainer);
 
+  const tokenHighlighter = document.createElement("div");
+  tokenHighlighter.className = "caret-token-highlighter";
+  container.append(tokenHighlighter);
+
   let highlightContainers: ReadonlyArray<Element> = [];
 
   function setPosition(x: ViewportValue, y: ViewportValue) {
@@ -44,22 +50,35 @@ export function createCaret(container: HTMLElement): CaretElement {
     caretElement.style.marginTop = `${-v}px`;
   }
 
-  function setHighlightContainer(elements: ReadonlyArray<Element>) {
-    highlightContainers.forEach((v) => v.classList.remove("math-container-highlight"));
-    highlightContainers = elements;
-    highlightContainers.forEach((v) => v.classList.add("math-container-highlight"));
-  }
-
-  function addSelection(x: number, y: number, width: number, height: number) {
+  function addSelection(rect: ViewportRect) {
     const parentPos = container.getBoundingClientRect();
     const selection = document.createElement("span");
-    selection.className = "math-selection";
+    selection.className = "caret-selection";
     selection.style.position = "absolute";
-    selection.style.left = `${x - parentPos.left}px`;
-    selection.style.top = `${y - parentPos.top}px`;
-    selection.style.width = `${width}px`;
-    selection.style.height = `${height}px`;
+    selection.style.left = `${rect.x - parentPos.left}px`;
+    selection.style.top = `${rect.y - parentPos.top}px`;
+    selection.style.width = `${rect.width}px`;
+    selection.style.height = `${rect.height}px`;
     selectionsContainer.append(selection);
+  }
+
+  function setHighlightContainer(elements: ReadonlyArray<Element>) {
+    highlightContainers.forEach((v) => v.classList.remove("caret-container-highlight"));
+    highlightContainers = elements;
+    highlightContainers.forEach((v) => v.classList.add("caret-container-highlight"));
+  }
+
+  function setToken(selection: RenderedSelection) {
+    if (selection.isCollapsed) {
+      tokenHighlighter.style.display = "none";
+    } else {
+      tokenHighlighter.style.display = "block";
+      const parentPos = container.getBoundingClientRect();
+      tokenHighlighter.style.left = `${selection.rect.x - parentPos.left}px`;
+      tokenHighlighter.style.top = `${selection.rect.y - parentPos.top}px`;
+      tokenHighlighter.style.width = `${selection.rect.width}px`;
+      tokenHighlighter.style.height = `${selection.rect.height}px`;
+    }
   }
 
   function clearSelections() {
@@ -71,12 +90,14 @@ export function createCaret(container: HTMLElement): CaretElement {
     clearSelections();
     container.removeChild(caretElement);
     container.removeChild(selectionsContainer);
+    container.removeChild(tokenHighlighter);
   }
 
   return {
     setPosition,
     setHeight,
     setHighlightContainer,
+    setToken,
     addSelection,
     clearSelections,
     remove,

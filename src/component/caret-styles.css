@@ -1,10 +1,17 @@
-.math-container-highlight {
+.caret-container-highlight {
   background-color: #f2f2f2;
   border-radius: 3px;
 }
 
-.math-selection {
+.caret-selection {
   background-color: #1895f558;
   border-radius: 3px;
   pointer-events: none;
+}
+
+.caret-token-highlighter {
+  pointer-events: none;
+  position: absolute;
+  display: none;
+  border-bottom: 1px solid #21212189;
 }

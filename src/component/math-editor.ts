@@ -1,101 +1,27 @@
+import "./../core";
 import { assert } from "../utils/assert";
 import { fromElement as fromMathMLElement, unicodeSplit } from "../mathml/parsing";
 import { mathLayoutWithWidth } from "../math-layout/math-layout-utils";
 import caretStyles from "./caret-styles.css?inline";
 import mathEditorStyles from "./math-editor-styles.css?inline";
 import inputHandlerStyles from "./input-handler-style.css?inline";
-import { createCaret, CaretElement } from "./caret-element";
 import { InputHandlerElement } from "./input-handler-element";
-import { MathLayoutCaret, moveCaret } from "./editing/math-layout-caret";
+import { MathLayoutCaret } from "./editing/math-layout-caret";
 import { MathLayoutRowZipper, fromRowIndices, getRowIndices } from "../math-layout/math-layout-zipper";
 import { applyEdit, inverseEdit, MathLayoutEdit } from "../editing/math-layout-edit";
 import { UndoRedoManager } from "../editing/undo-redo-manager";
 import { CaretEdit, insertAtCaret, removeAtCaret } from "./editing/math-layout-caret-edit";
 import { MathLayoutPosition } from "../math-layout/math-layout-position";
-import { Offset } from "../math-layout/math-layout-offset";
-
-import "./../core";
 import { MathMLRenderer } from "../mathml/renderer";
 import { RenderResult, RenderedElement } from "../rendering/render-result";
-import { getNodeIdentifiers, joinNodeIdentifier, parse } from "./../core";
+import { SyntaxNode, getNodeIdentifiers, joinNodeIdentifier, parse } from "./../core";
 import { DebugSettings } from "./debug-settings";
-
-export interface MathCaret {
-  /**
-   * Where the user started the caret.
-   */
-  startPosition: MathLayoutPosition;
-  /**
-   * The current caret, which may be different from the start position if the user has selected a range.
-   */
-  caret: MathLayoutCaret;
-  element: CaretElement;
-}
+import { MathCaret, MathEditorCarets } from "./caret";
 
 function createElementFromHtml(html: string) {
   const template = document.createElement("template");
   template.innerHTML = html;
   return template.content.firstElementChild;
-}
-
-class MathEditorCarets {
-  carets: Set<MathCaret> = new Set<MathCaret>();
-  pointerDownCarets: Map<number, MathCaret> = new Map<number, MathCaret>();
-
-  constructor(private containerElement: HTMLElement) {}
-
-  add(layoutCaret: MathLayoutCaret) {
-    this.carets.add(this.createCaret(layoutCaret.zipper, layoutCaret.start, layoutCaret.end));
-  }
-
-  remove(caret: MathCaret) {
-    caret.element.remove();
-    this.carets.delete(caret);
-  }
-
-  clearCarets() {
-    this.carets.forEach((caret) => {
-      caret.element.remove();
-    });
-    this.carets.clear();
-    this.pointerDownCarets.forEach((caret) => {
-      caret.element.remove();
-    });
-    this.pointerDownCarets.clear();
-  }
-
-  updateCaret(caret: MathCaret, newCaret: MathLayoutCaret | null) {
-    if (newCaret) {
-      caret.caret = newCaret;
-    }
-  }
-
-  addPointerDownCaret(pointerId: number, zipper: MathLayoutRowZipper, offset: number) {
-    this.pointerDownCarets.set(pointerId, this.createCaret(zipper, offset, offset));
-  }
-
-  removePointerDownCaret(pointerId: number) {
-    this.pointerDownCarets.delete(pointerId);
-  }
-
-  finishPointerDownCaret(pointerId: number) {
-    const caret = this.pointerDownCarets.get(pointerId) ?? null;
-    if (caret === null) return;
-    this.pointerDownCarets.delete(pointerId);
-    this.carets.add(caret);
-  }
-
-  map<T>(fn: (caret: MathCaret) => T): T[] {
-    return Array.from(this.carets).concat(Array.from(this.pointerDownCarets.values())).map(fn);
-  }
-
-  private createCaret(zipper: MathLayoutRowZipper, startOffset: Offset, endOffset: Offset) {
-    return {
-      startPosition: new MathLayoutPosition(zipper, startOffset),
-      caret: new MathLayoutCaret(zipper, startOffset, endOffset),
-      element: createCaret(this.containerElement),
-    };
-  }
 }
 
 class RenderTaskQueue {
@@ -127,6 +53,8 @@ export class MathEditor extends HTMLElement {
     0,
     0
   );
+
+  syntaxTree: SyntaxNode;
 
   renderer: MathMLRenderer;
   renderResult: RenderResult<MathMLElement>;
@@ -239,16 +167,16 @@ export class MathEditor extends HTMLElement {
 
     this.inputHandler.element.addEventListener("keydown", (ev) => {
       if (ev.key === "ArrowUp") {
-        this.carets.map((caret) => this.moveCaret(caret, "up"));
+        this.carets.map((caret) => caret.moveCaret(this.renderResult, "up"));
         this.renderCarets();
       } else if (ev.key === "ArrowDown") {
-        this.carets.map((caret) => this.moveCaret(caret, "down"));
+        this.carets.map((caret) => caret.moveCaret(this.renderResult, "down"));
         this.renderCarets();
       } else if (ev.key === "ArrowLeft") {
-        this.carets.map((caret) => this.moveCaret(caret, "left"));
+        this.carets.map((caret) => caret.moveCaret(this.renderResult, "left"));
         this.renderCarets();
       } else if (ev.key === "ArrowRight") {
-        this.carets.map((caret) => this.moveCaret(caret, "right"));
+        this.carets.map((caret) => caret.moveCaret(this.renderResult, "right"));
         this.renderCarets();
       } else if (ev.code === "KeyZ" && ev.ctrlKey) {
         const undoAction = this.undoRedoStack.undo();
@@ -326,14 +254,15 @@ export class MathEditor extends HTMLElement {
       assert(this.renderer.canRender(name), "Cannot render " + joinNodeIdentifier(name) + ".");
     });
 
+    this.syntaxTree = {
+      name: ["BuiltIn", "Nothing"],
+      children: { Leaves: [] },
+      value: [],
+      range: { start: 0n, end: 0n },
+    };
     this.renderResult = this.renderer.renderAll({
       errors: [],
-      value: {
-        name: ["BuiltIn", "Nothing"],
-        children: { Leaves: [] },
-        value: [],
-        range: { start: 0n, end: 0n },
-      },
+      value: this.syntaxTree,
     });
 
     const styles = document.createElement("style");
@@ -383,6 +312,7 @@ export class MathEditor extends HTMLElement {
 
     const parsed = parse(this.inputTree.value);
     console.log("Parsed", parsed);
+    this.syntaxTree = parsed.value;
     this.renderResult = this.renderer.renderAll(parsed);
     console.log("Rendered", this.renderResult);
 
@@ -421,6 +351,7 @@ export class MathEditor extends HTMLElement {
       start: caret.caret.leftOffset,
       end: caret.caret.rightOffset,
     });
+    // Render caret itself
     const caretSize = this.renderResult.getViewportCaretSize(getRowIndices(caret.caret.zipper));
     caret.element.setPosition(
       renderedCaret.rect.x + (caret.caret.isForwards ? renderedCaret.rect.width : 0),
@@ -428,18 +359,19 @@ export class MathEditor extends HTMLElement {
     );
     caret.element.setHeight(caretSize);
 
+    // Render selection
+    caret.element.clearSelections();
+    if (!caret.caret.isCollapsed) {
+      caret.element.addSelection(renderedCaret.rect);
+    }
+
+    // Highlight container (for the caret)
     const container = this.renderResult.getElement(getRowIndices(caret.caret.zipper));
     caret.element.setHighlightContainer(container.getElements());
 
-    caret.element.clearSelections();
-    if (!caret.caret.isCollapsed) {
-      caret.element.addSelection(
-        renderedCaret.rect.x,
-        renderedCaret.rect.y,
-        renderedCaret.rect.width,
-        renderedCaret.rect.height
-      );
-    }
+    // Highlight token at the caret
+
+    caret.element.setToken(this.renderResult.getViewportSelection(caret.getTokenAtCaret(this.syntaxTree)));
   }
 
   recordEdit(edits: readonly CaretEdit[]): MathLayoutEdit {
@@ -468,16 +400,6 @@ export class MathEditor extends HTMLElement {
     // TODO: Deduplicate carets
     result.carets.forEach((v) => this.carets.add(v));
     this.renderCarets();
-  }
-
-  /**
-   * Note: Make sure to re-render the caret after moving it
-   */
-  moveCaret(caret: MathCaret, direction: "up" | "down" | "left" | "right") {
-    const newCaret = moveCaret(caret.caret, direction, this.renderResult);
-    if (newCaret) {
-      caret.caret = newCaret;
-    }
   }
 
   /**

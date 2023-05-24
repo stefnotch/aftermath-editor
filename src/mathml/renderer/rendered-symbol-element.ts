@@ -36,19 +36,23 @@ export class SymbolMathMLElement implements RenderedElement<MathMLElement> {
   getCaretPosition(offset: Offset): ViewportCoordinate {
     assert(offsetInRange(offset, this.syntaxTree.range), "Invalid offset");
 
-    const atEnd = offset >= Number(this.syntaxTree.range.end);
-
-    const textElement = this.textElements.find((v) => offsetInRange(offset, v.syntaxTree.range));
-    const x =
-      textElement?.getViewportXPosition(offset)?.x ??
-      (atEnd ? this.element.element.getBoundingClientRect().right : this.element.element.getBoundingClientRect().left);
+    const boundingRect = this.element.element.getBoundingClientRect();
+    let x: number;
+    if (offset <= Number(this.syntaxTree.range.start)) {
+      x = boundingRect.left;
+    } else if (offset >= Number(this.syntaxTree.range.end)) {
+      x = boundingRect.right;
+    } else {
+      const textElement = this.textElements.find((v) => offsetInRange(offset, v.syntaxTree.range));
+      x = textElement?.getViewportXPosition(offset)?.x ?? boundingRect.x + boundingRect.width / 2;
+    }
 
     // Symbol elements might be stretchy, in which case they can become pretty large.
     // The baseline isn't exposed as a property, so we have this questionable workaround
     // https://github.com/w3c/mathml-core/issues/38
     // https://jsfiddle.net/se6n81rg/1/
 
-    const baseline = this.element.element.getBoundingClientRect().bottom;
+    const baseline = boundingRect.bottom;
     return { x: x, y: baseline };
   }
   getElements() {

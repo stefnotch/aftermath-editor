@@ -1,7 +1,8 @@
 import init, { MathParser } from "../../aftermath-core/pkg";
 import { MathLayoutRow } from "../math-layout/math-layout";
 import { Offset } from "../math-layout/math-layout-offset";
-import { RowIndex } from "../math-layout/math-layout-zipper";
+import { RowIndex, RowIndices } from "../math-layout/math-layout-zipper";
+import { assert } from "../utils/assert";
 import { customError } from "../utils/error-utils";
 
 // Yay, top level await is neat https://v8.dev/features/top-level-await
@@ -112,7 +113,7 @@ export type Range<T> = {
 };
 
 export type SyntaxNode<T extends SyntaxNodesKeys = SyntaxNodesKeys> = {
-  name: string[];
+  name: NodeIdentifier;
   children: SyntaxNodesMatcher<T>;
   value: any; // TODO:
   range: Range<bigint>;
@@ -139,4 +140,41 @@ export function hasSyntaxNodeChildren<T extends SyntaxNodesKeys>(node: SyntaxNod
  */
 export function offsetInRange(offset: Offset, range: Range<bigint>): boolean {
   return range.start <= offset && offset <= range.end;
+}
+
+export function getRowNode(node: SyntaxNode, indices: RowIndices) {
+  // Note that similar code exists in render-result.ts
+  for (let rowIndex of indices) {
+    let [indexOfContainer, indexOfRow] = rowIndex;
+    assert(node.range.start <= indexOfContainer && indexOfContainer < node.range.end);
+
+    const childNode = getChildWithContainerIndex(node, indexOfContainer);
+    let rowChildElement: SyntaxNode | undefined;
+    if (hasSyntaxNodeChildren(childNode, "NewRows")) {
+      rowChildElement = childNode.children.NewRows.find(([rowIndex, _]) => Number(rowIndex[1]) === indexOfRow)?.[1];
+    } else if (hasSyntaxNodeChildren(childNode, "NewTable")) {
+      rowChildElement = childNode.children.NewTable[0].find(([rowIndex, _]) => Number(rowIndex[1]) === indexOfRow)?.[1];
+    } else {
+      assert(false, "Expected to find NewRows or NewTable");
+    }
+    assert(rowChildElement, `Couldn't find row ${indexOfRow} in ${joinNodeIdentifier(node.name)}`);
+    node = rowChildElement;
+  }
+
+  function getChildWithContainerIndex(node: SyntaxNode, indexOfContainer: number): SyntaxNode<"NewRows" | "NewTable"> {
+    // Only walk down if we're still on the same row
+    if (hasSyntaxNodeChildren(node, "Containers")) {
+      for (let childElement of node.children.Containers) {
+        // If we find a better matching child, we go deeper. Notice how the end bound, aka length, is exclusive.
+        if (childElement.range.start <= indexOfContainer && indexOfContainer < childElement.range.end) {
+          return getChildWithContainerIndex(childElement, indexOfContainer);
+        }
+      }
+    }
+
+    assert(hasSyntaxNodeChildren(node, "NewRows") || hasSyntaxNodeChildren(node, "NewTable"));
+    return node;
+  }
+
+  return node;
 }
