@@ -34,13 +34,12 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
 
     function getSelectionHeight(element: RenderedElement<MathMLElement>): { top: ViewportValue; bottom: ViewportValue } {
       // Assumes that the selection is not zero width.
-      const isDisjoint =
-        BigInt(selection.end) <= element.syntaxTree.range.start || element.syntaxTree.range.end <= BigInt(selection.start);
+      const isDisjoint = selection.end <= element.syntaxTree.range.start || element.syntaxTree.range.end <= selection.start;
       if (isDisjoint) {
         return emptyHeight;
       }
       const isFullyContained =
-        BigInt(selection.start) <= element.syntaxTree.range.start && element.syntaxTree.range.end <= BigInt(selection.end);
+        selection.start <= element.syntaxTree.range.start && element.syntaxTree.range.end <= selection.end;
       // If it's just intersecting, try going deeper.
       const isIntersecting = !isDisjoint && !isFullyContained;
       const children = element.getChildren();
@@ -196,7 +195,7 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
         distance: Infinity,
       };
 
-      for (let i = Number(element.syntaxTree.range.start); i <= Number(element.syntaxTree.range.end); i++) {
+      for (let i = element.syntaxTree.range.start; i <= element.syntaxTree.range.end; i++) {
         const renderedPosition = element.getCaretPosition(i);
         const distance = ViewportMath.distanceToPoint(position, renderedPosition);
 

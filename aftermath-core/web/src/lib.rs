@@ -37,8 +37,8 @@ impl MathParser {
     pub fn new() -> Self {
         Self {
             parser_rules: ParserRules::default(),
-            serializer: serde_wasm_bindgen::Serializer::new()
-                .serialize_large_number_types_as_bigints(true),
+            // Do note that large numbers won't be serialized correctly, because JS doesn't have 64 bit integers.
+            serializer: serde_wasm_bindgen::Serializer::new(),
         }
     }
 

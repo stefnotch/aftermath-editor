@@ -24,7 +24,7 @@ export class LeafMathMLElement {
   }
 
   private getTextNodeAt(offset: Offset) {
-    const graphemeOffset = offset - Number(this.syntaxTree.range.start);
+    const graphemeOffset = offset - this.syntaxTree.range.start;
     const atEnd = graphemeOffset >= this.textElements.length;
     const graphemeText = this.textElements[atEnd ? this.textElements.length - 1 : graphemeOffset];
     return { graphemeText, atEnd };

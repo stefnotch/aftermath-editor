@@ -22,6 +22,36 @@ impl InputRow {
     }
 }
 
+// TODO: Refactor to use this
+pub struct InputRows {
+  pub values: Grid<Vec<InputNode>>,
+}
+
+/// A proper grid of values.
+pub struct Grid<T> {
+    values: Vec<Vec<T>>,
+}
+
+impl<T> Grid<T> {
+    pub fn new(values: Vec<Vec<T>>) -> Self {
+        if let Some(first) = values.first() {
+            let width = first.len();
+            for row in values.iter() {
+                assert_eq!(row.len(), width);
+            }
+        }
+        Grid { values }
+    }
+
+    pub fn width(&self) -> usize {
+        self.values.first().map(|row| row.len()).unwrap_or(0)
+    }
+
+    pub fn height(&self) -> usize {
+        self.values.len()
+    }
+}
+
 /// Points at a given row
 pub struct RowIndices(Vec<RowIndex>);
 

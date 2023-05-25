@@ -118,6 +118,7 @@ impl<'a> ParserRules<'a> {
 impl<'a> ParserRules<'a> {
     pub fn default() -> ParserRules<'a> {
         // TODO: Add more default tokens
+        // Parse || abs || and their escaped \|| variants
         // 4. Parser for whitespace
         // 5. Parser for chains of < <=, which could be treated as a "domain restriction"
 

@@ -38,9 +38,9 @@ export class SymbolMathMLElement implements RenderedElement<MathMLElement> {
 
     const boundingRect = this.element.element.getBoundingClientRect();
     let x: number;
-    if (offset <= Number(this.syntaxTree.range.start)) {
+    if (offset <= this.syntaxTree.range.start) {
       x = boundingRect.left;
-    } else if (offset >= Number(this.syntaxTree.range.end)) {
+    } else if (offset >= this.syntaxTree.range.end) {
       x = boundingRect.right;
     } else {
       const textElement = this.textElements.find((v) => offsetInRange(offset, v.syntaxTree.range));

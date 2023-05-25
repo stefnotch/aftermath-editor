@@ -1,4 +1,4 @@
-import { SyntaxNode, fromCoreRowIndex } from "../../core";
+import { SyntaxNode } from "../../core";
 import { RowIndex } from "../../math-layout/math-layout-zipper";
 import { RenderedElement, Renderer } from "../../rendering/render-result";
 import { ViewportCoordinate } from "../../rendering/viewport-coordinate";
@@ -16,9 +16,7 @@ export class TableMathMLElement implements RenderedElement<MathMLElement> {
     this.startBaselineReader = createMathElement("mphantom", []);
     this.endBaselineReader = createMathElement("mphantom", []);
 
-    const tableCells = syntaxTree.children.NewTable[0].map(([coreRowIndex, c]) =>
-      renderer.render(c, fromCoreRowIndex(coreRowIndex))
-    );
+    const tableCells = syntaxTree.children.NewTable[0].map(([rowIndex, c]) => renderer.render(c, rowIndex));
     const tableWidth = syntaxTree.children.NewTable[1];
     const children: MathMLElement[] = [];
     for (let i = 0; i < tableCells.length; i += tableWidth) {
@@ -52,9 +50,9 @@ export class TableMathMLElement implements RenderedElement<MathMLElement> {
 
     let positionReader: MathMLElement;
 
-    if (offset == Number(this.syntaxTree.range.start)) {
+    if (offset == this.syntaxTree.range.start) {
       positionReader = this.startBaselineReader;
-    } else if (offset == Number(this.syntaxTree.range.end)) {
+    } else if (offset == this.syntaxTree.range.end) {
       positionReader = this.endBaselineReader;
     } else {
       throw new Error("Don't know how to deal with this offset");

@@ -370,8 +370,9 @@ export class MathEditor extends HTMLElement {
     caret.element.setHighlightContainer(container.getElements());
 
     // Highlight token at the caret
+    const tokenAtCaret = caret.getTokenAtCaret(this.syntaxTree);
 
-    caret.element.setToken(this.renderResult.getViewportSelection(caret.getTokenAtCaret(this.syntaxTree)));
+    caret.element.setToken(this.renderResult.getViewportSelection(tokenAtCaret));
   }
 
   recordEdit(edits: readonly CaretEdit[]): MathLayoutEdit {

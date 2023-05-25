@@ -50,7 +50,7 @@ export class MathCaret {
         if (!hasSyntaxNodeChildren(node, "Containers")) break;
         // Caret inside or to the left of the child
         let newNode = node.children.Containers.find(
-          (child) => Number(child.range.start) < caretOffset && caretOffset <= Number(child.range.end)
+          (child) => child.range.start < caretOffset && caretOffset <= child.range.end
         );
         if (newNode) {
           node = newNode;
@@ -60,7 +60,7 @@ export class MathCaret {
       }
       return {
         indices,
-        start: Number(node.range.start),
+        start: node.range.start,
         end: this.caret.end,
       };
     } else if (hasSyntaxNodeChildren(row, "Leaves")) {
@@ -70,7 +70,7 @@ export class MathCaret {
         end: this.caret.end,
       };
     } else if (hasSyntaxNodeChildren(row, "NewTable") || hasSyntaxNodeChildren(row, "NewRows")) {
-      assert(Number(row.range.start) === this.caret.end || Number(row.range.end) === this.caret.end);
+      assert(row.range.start === this.caret.end || row.range.end === this.caret.end);
       return {
         indices,
         start: 0,

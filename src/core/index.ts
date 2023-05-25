@@ -59,10 +59,6 @@ function toCore(row: MathLayoutRow): CoreRow {
   };
 }
 
-export function fromCoreRowIndex(row_index: [bigint, bigint]): RowIndex {
-  return [Number(row_index[0]), Number(row_index[1])];
-}
-
 // TODO:
 // We're maintaining the types by hand for now, since we tried out mostly everything else.
 // Directly using WASM-bindgen's Typescript stuff doesn't work, because they don't support enums. https://github.com/rustwasm/wasm-bindgen/issues/2407
@@ -93,10 +89,10 @@ export type SyntaxNodes =
       Containers: SyntaxNode[];
     }
   | {
-      NewRows: [[bigint, bigint], SyntaxNode][];
+      NewRows: [RowIndex, SyntaxNode][];
     }
   | {
-      NewTable: [[[bigint, bigint], SyntaxNode][], number];
+      NewTable: [[RowIndex, SyntaxNode][], number];
     }
   | {
       Leaves: SyntaxLeafNode[];
@@ -116,12 +112,12 @@ export type SyntaxNode<T extends SyntaxNodesKeys = SyntaxNodesKeys> = {
   name: NodeIdentifier;
   children: SyntaxNodesMatcher<T>;
   value: any; // TODO:
-  range: Range<bigint>;
+  range: Range<number>;
 };
 
 export type SyntaxLeafNode = {
   node_type: "Operator" | "Leaf";
-  range: Range<bigint>;
+  range: Range<number>;
   symbols: string[];
 };
 
@@ -138,7 +134,7 @@ export function hasSyntaxNodeChildren<T extends SyntaxNodesKeys>(node: SyntaxNod
 /**
  * Be careful when using this function, you don't want an off-by-one error.
  */
-export function offsetInRange(offset: Offset, range: Range<bigint>): boolean {
+export function offsetInRange(offset: Offset, range: Range<number>): boolean {
   return range.start <= offset && offset <= range.end;
 }
 
@@ -151,9 +147,9 @@ export function getRowNode(node: SyntaxNode, indices: RowIndices) {
     const childNode = getChildWithContainerIndex(node, indexOfContainer);
     let rowChildElement: SyntaxNode | undefined;
     if (hasSyntaxNodeChildren(childNode, "NewRows")) {
-      rowChildElement = childNode.children.NewRows.find(([rowIndex, _]) => Number(rowIndex[1]) === indexOfRow)?.[1];
+      rowChildElement = childNode.children.NewRows.find(([rowIndex, _]) => rowIndex[1] === indexOfRow)?.[1];
     } else if (hasSyntaxNodeChildren(childNode, "NewTable")) {
-      rowChildElement = childNode.children.NewTable[0].find(([rowIndex, _]) => Number(rowIndex[1]) === indexOfRow)?.[1];
+      rowChildElement = childNode.children.NewTable[0].find(([rowIndex, _]) => rowIndex[1] === indexOfRow)?.[1];
     } else {
       assert(false, "Expected to find NewRows or NewTable");
     }

@@ -32,7 +32,7 @@ export class TextMathMLElement implements RenderedElement<MathMLElement> {
   getCaretPosition(offset: Offset): ViewportCoordinate {
     assert(offsetInRange(offset, this.syntaxTree.range), "Invalid offset");
 
-    const atEnd = offset >= Number(this.syntaxTree.range.end);
+    const atEnd = offset >= this.syntaxTree.range.end;
 
     const textElement = this.textElements.find((v) => offsetInRange(offset, v.syntaxTree.range));
     const x =
