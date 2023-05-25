@@ -1,57 +1,64 @@
 import { RenderedSelection } from "../rendering/rendered-selection";
 import { ViewportRect, ViewportValue } from "../rendering/viewport-coordinate";
 
-export interface CaretElement {
-  setPosition(x: number, y: number): void;
-  setHeight(v: number): void;
-  addSelection(rect: ViewportRect): void;
-  setHighlightContainer(elements: ReadonlyArray<Element>): void;
-  setToken(selection: RenderedSelection): void;
-  clearSelections(): void;
-  remove(): void;
-}
+export class CaretElement {
+  #element: HTMLElement;
 
-export function createCaret(container: HTMLElement): CaretElement {
-  const caretElement = document.createElement("span");
-  caretElement.style.userSelect = "none";
-  caretElement.style.position = "absolute";
-  caretElement.style.height = "10px";
-  caretElement.style.width = "0px";
-  caretElement.style.margin = "0px";
-  caretElement.style.borderRightWidth = "0px";
-  caretElement.style.boxShadow = "0px 0px 0px 0.6px rgba(50, 50, 230, 50%)";
-  caretElement.style.top = "0px";
-  // Maybe add some cute blinking
-  caretElement.className = "math-caret";
-  container.append(caretElement);
+  #caretElement: HTMLElement;
+  #selectionsContainer: HTMLElement;
+  #tokenHighlighter: HTMLElement;
 
-  const selectionsContainer = document.createElement("div");
-  selectionsContainer.style.position = "absolute";
-  selectionsContainer.style.top = "0px";
-  selectionsContainer.style.left = "0px";
-  container.append(selectionsContainer);
+  constructor() {
+    const containerElement = document.createElement("div");
+    containerElement.style.position = "absolute";
 
-  const tokenHighlighter = document.createElement("div");
-  tokenHighlighter.className = "caret-token-highlighter";
-  container.append(tokenHighlighter);
+    const caretElement = document.createElement("span");
+    caretElement.style.userSelect = "none";
+    caretElement.style.position = "absolute";
+    caretElement.style.height = "10px";
+    caretElement.style.width = "0px";
+    caretElement.style.margin = "0px";
+    caretElement.style.borderRightWidth = "0px";
+    caretElement.style.boxShadow = "0px 0px 0px 0.6px rgba(50, 50, 230, 50%)";
+    caretElement.style.top = "0px";
+    // TODO: Maybe add some cute blinking
+    caretElement.className = "math-caret";
+    this.#caretElement = caretElement;
+    containerElement.append(caretElement);
 
-  let highlightContainers: ReadonlyArray<Element> = [];
+    const selectionsContainer = document.createElement("div");
+    selectionsContainer.style.position = "absolute";
+    selectionsContainer.style.top = "0px";
+    selectionsContainer.style.left = "0px";
+    this.#selectionsContainer = selectionsContainer;
+    containerElement.append(selectionsContainer);
 
-  function setPosition(x: ViewportValue, y: ViewportValue) {
-    const parentPos = container.getBoundingClientRect();
+    const tokenHighlighter = document.createElement("div");
+    tokenHighlighter.className = "caret-token-highlighter";
+    this.#tokenHighlighter = tokenHighlighter;
+    containerElement.append(tokenHighlighter);
 
-    caretElement.style.left = `${x - parentPos.left}px`;
-    caretElement.style.top = `${y - parentPos.top}px`;
+    this.#element = containerElement;
   }
 
-  function setHeight(v: number) {
-    caretElement.style.height = `${v}px`;
+  get element(): HTMLElement {
+    return this.#element;
+  }
+
+  setPosition(x: ViewportValue, y: ViewportValue) {
+    const parentPos = this.#element.getBoundingClientRect();
+    this.#caretElement.style.left = `${x - parentPos.left}px`;
+    this.#caretElement.style.top = `${y - parentPos.top}px`;
+  }
+
+  setHeight(v: number) {
+    this.#caretElement.style.height = `${v}px`;
     // Grow from the bottom
-    caretElement.style.marginTop = `${-v}px`;
+    this.#caretElement.style.marginTop = `${-v}px`;
   }
 
-  function addSelection(rect: ViewportRect) {
-    const parentPos = container.getBoundingClientRect();
+  addSelection(rect: ViewportRect) {
+    const parentPos = this.#element.getBoundingClientRect();
     const selection = document.createElement("span");
     selection.className = "caret-selection";
     selection.style.position = "absolute";
@@ -59,47 +66,23 @@ export function createCaret(container: HTMLElement): CaretElement {
     selection.style.top = `${rect.y - parentPos.top}px`;
     selection.style.width = `${rect.width}px`;
     selection.style.height = `${rect.height}px`;
-    selectionsContainer.append(selection);
+    this.#selectionsContainer.append(selection);
   }
 
-  function setHighlightContainer(elements: ReadonlyArray<Element>) {
-    highlightContainers.forEach((v) => v.classList.remove("caret-container-highlight"));
-    highlightContainers = elements;
-    highlightContainers.forEach((v) => v.classList.add("caret-container-highlight"));
-  }
-
-  function setToken(selection: RenderedSelection) {
+  setToken(selection: RenderedSelection) {
     if (selection.isCollapsed) {
-      tokenHighlighter.style.display = "none";
+      this.#tokenHighlighter.style.display = "none";
     } else {
-      tokenHighlighter.style.display = "block";
-      const parentPos = container.getBoundingClientRect();
-      tokenHighlighter.style.left = `${selection.rect.x - parentPos.left}px`;
-      tokenHighlighter.style.top = `${selection.rect.y - parentPos.top}px`;
-      tokenHighlighter.style.width = `${selection.rect.width}px`;
-      tokenHighlighter.style.height = `${selection.rect.height}px`;
+      this.#tokenHighlighter.style.display = "block";
+      const parentPos = this.#element.getBoundingClientRect();
+      this.#tokenHighlighter.style.left = `${selection.rect.x - parentPos.left}px`;
+      this.#tokenHighlighter.style.top = `${selection.rect.y - parentPos.top}px`;
+      this.#tokenHighlighter.style.width = `${selection.rect.width}px`;
+      this.#tokenHighlighter.style.height = `${selection.rect.height}px`;
     }
   }
 
-  function clearSelections() {
-    selectionsContainer.replaceChildren();
+  clearSelections() {
+    this.#selectionsContainer.replaceChildren();
   }
-
-  function remove() {
-    setHighlightContainer([]);
-    clearSelections();
-    container.removeChild(caretElement);
-    container.removeChild(selectionsContainer);
-    container.removeChild(tokenHighlighter);
-  }
-
-  return {
-    setPosition,
-    setHeight,
-    setHighlightContainer,
-    setToken,
-    addSelection,
-    clearSelections,
-    remove,
-  };
 }

@@ -1,10 +1,10 @@
-import { SyntaxLeafNode, SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
+import { SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
 import { Offset } from "../math-layout/math-layout-offset";
 import { MathLayoutPosition } from "../math-layout/math-layout-position";
 import { MathLayoutRowZipper, getRowIndices } from "../math-layout/math-layout-zipper";
 import { RenderResult, RowIndicesAndRange } from "../rendering/render-result";
 import { assert } from "../utils/assert";
-import { CaretElement, createCaret } from "./caret-element";
+import { CaretElement } from "./caret-element";
 import { MathLayoutCaret, moveCaret } from "./editing/math-layout-caret";
 
 export class MathCaret {
@@ -18,10 +18,17 @@ export class MathCaret {
   caret: MathLayoutCaret;
   element: CaretElement;
 
-  constructor(opts: { startPosition: MathLayoutPosition; caret: MathLayoutCaret; element: CaretElement }) {
+  highlightedElements: ReadonlyArray<Element> = [];
+
+  constructor(
+    public container: HTMLElement,
+    opts: { startPosition: MathLayoutPosition; caret: MathLayoutCaret; element: CaretElement }
+  ) {
     this.startPosition = opts.startPosition;
     this.caret = opts.caret;
     this.element = opts.element;
+
+    container.append(this.element.element);
   }
 
   /**
@@ -36,6 +43,10 @@ export class MathCaret {
 
   /**
    * Get the token to the left of the caret. Can also return a partial token if the caret is in the middle of a token.
+   * TODO: Return an array with all tokens that the caret is to the left of.
+   * For example x1 is parsed roughly as (Error (Identifier x) (Number 1)). If the caret is at the end of x1|, then we should
+   * be able to show autocomplete suggestions for both (Number 1) and (Error ...).
+   * The error would show the "did you mean x_1" autocomplete suggestion.
    */
   getTokenAtCaret(syntaxTree: SyntaxNode): RowIndicesAndRange {
     const indices = getRowIndices(this.caret.zipper);
@@ -108,30 +119,51 @@ export class MathCaret {
 
     return getLeaves(node);
   }
+
+  setHighlightedElements(elements: ReadonlyArray<Element>) {
+    this.highlightedElements.forEach((v) => v.classList.remove("caret-container-highlight"));
+    this.highlightedElements = elements;
+    this.highlightedElements.forEach((v) => v.classList.add("caret-container-highlight"));
+  }
+
+  remove() {
+    this.container.removeChild(this.element.element);
+    this.setHighlightedElements([]);
+  }
 }
 
 export class MathEditorCarets {
   carets: Set<MathCaret> = new Set<MathCaret>();
   pointerDownCarets: Map<number, MathCaret> = new Map<number, MathCaret>();
+  #containerElement: HTMLElement;
 
-  constructor(private containerElement: HTMLElement) {}
+  constructor() {
+    this.#containerElement = document.createElement("div");
+    this.#containerElement.style.position = "absolute";
+  }
+
+  get element() {
+    return this.#containerElement;
+  }
 
   add(layoutCaret: MathLayoutCaret) {
+    // TODO: Always guarantee that carets are non-overlapping
     this.carets.add(this.createCaret(layoutCaret.zipper, layoutCaret.start, layoutCaret.end));
   }
 
   remove(caret: MathCaret) {
-    caret.element.remove();
+    caret.remove();
+    this.#containerElement.removeChild(caret.element.element);
     this.carets.delete(caret);
   }
 
   clearCarets() {
     this.carets.forEach((caret) => {
-      caret.element.remove();
+      caret.remove();
     });
     this.carets.clear();
     this.pointerDownCarets.forEach((caret) => {
-      caret.element.remove();
+      caret.remove();
     });
     this.pointerDownCarets.clear();
   }
@@ -162,10 +194,10 @@ export class MathEditorCarets {
   }
 
   private createCaret(zipper: MathLayoutRowZipper, startOffset: Offset, endOffset: Offset) {
-    return new MathCaret({
+    return new MathCaret(this.#containerElement, {
       startPosition: new MathLayoutPosition(zipper, startOffset),
       caret: new MathLayoutCaret(zipper, startOffset, endOffset),
-      element: createCaret(this.containerElement),
+      element: new CaretElement(),
     });
   }
 }

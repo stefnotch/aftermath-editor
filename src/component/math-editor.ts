@@ -68,10 +68,6 @@ export class MathEditor extends HTMLElement {
     super();
     const shadowRoot = this.attachShadow({ mode: "open" });
 
-    // Position carets absolutely, relative to the math formula
-    const caretContainer = document.createElement("span");
-    caretContainer.style.position = "absolute";
-
     // Container for math formula
     const container = document.createElement("span");
     container.style.display = "inline-block"; // Needed for the resize observer
@@ -84,7 +80,8 @@ export class MathEditor extends HTMLElement {
       this.inputHandler.focus();
     });
 
-    this.carets = new MathEditorCarets(caretContainer);
+    this.carets = new MathEditorCarets();
+    container.append(this.carets.element);
 
     container.addEventListener("pointerdown", (e) => {
       const newCaret = this.renderResult.getLayoutPosition({ x: e.clientX, y: e.clientY });
@@ -137,22 +134,16 @@ export class MathEditor extends HTMLElement {
     // https://w3c.github.io/uievents/tools/key-event-viewer.html
     // https://tkainrad.dev/posts/why-keyboard-shortcuts-dont-work-on-non-us-keyboard-layouts-and-how-to-fix-it/
 
+    // TODO: Cut-copy-paste go through special code, which also handles all symbols like / ^ _ { } etc.
+
     // Register keyboard handlers
     // TODO:
     // - special symbols (sum, for, forall, ...) ( https://github.com/arnog/mathlive/search?q=forall )
     // - autocomplete popup
-    // - brackets and non-brackets
     // - better placeholders, don't grab binary operators, but grab multiple symbols and unary operators if possible (like if you have 1+|34 and hit /, the result should be 1+\frac{}{|34})
     // - space to move to the right (but only in some cases)
-    // - Letters and numbers
-    // - quotes to type "strings"?
     // - Shift+arrow keys to select
     // - Shortcuts system (import a lib)
-    // - undo and redo
-
-    // Register mouse handlers
-    // - Click (put cursor)
-    // - Drag (selection)
 
     // Multi-caret support
     // TODO:
@@ -195,11 +186,11 @@ export class MathEditor extends HTMLElement {
       // Woah, apparently running this code later fixes a Firefox textarea bug
       this.renderTaskQueue.add(() => {
         if (ev.inputType === "deleteContentBackward" || ev.inputType === "deleteWordBackward") {
-          const edit = this.recordEdit(this.carets.map((v) => removeAtCaret(v.caret, "left", this.renderResult)));
+          const edit = this.recordEdits(this.carets.map((v) => removeAtCaret(v.caret, "left", this.renderResult)));
           this.saveEdit(edit);
           this.applyEdit(edit);
         } else if (ev.inputType === "deleteContentForward" || ev.inputType === "deleteWordForward") {
-          const edit = this.recordEdit(this.carets.map((v) => removeAtCaret(v.caret, "right", this.renderResult)));
+          const edit = this.recordEdits(this.carets.map((v) => removeAtCaret(v.caret, "right", this.renderResult)));
           this.saveEdit(edit);
           this.applyEdit(edit);
         } else if (ev.inputType === "insertText") {
@@ -216,7 +207,7 @@ export class MathEditor extends HTMLElement {
           const data = ev.data;
           if (data != null) {
             const characters = unicodeSplit(data);
-            const edit = this.recordEdit(
+            const edit = this.recordEdits(
               this.carets.map((v) =>
                 insertAtCaret(
                   v.caret,
@@ -229,11 +220,6 @@ export class MathEditor extends HTMLElement {
               )
             );
             this.saveEdit(edit);
-
-            // To make symbol shortcuts compatible with undo/redo, we simply record a new edit for them
-            // TODO: Get tokens at carets
-            // If tokens are of a certain type, then we forcibly do that shortcut
-
             this.applyEdit(edit);
           }
         } /*else
@@ -272,7 +258,7 @@ export class MathEditor extends HTMLElement {
 
     const styles = document.createElement("style");
     styles.textContent = `${mathEditorStyles}\n ${inputHandlerStyles}\n ${caretStyles}`;
-    shadowRoot.append(styles, caretContainer, inputContainer, container);
+    shadowRoot.append(styles, inputContainer, container);
 
     // Math formula
     this.setInputTree(this.inputTree, []);
@@ -373,7 +359,7 @@ export class MathEditor extends HTMLElement {
 
     // Highlight container (for the caret)
     const container = this.renderResult.getElement(getRowIndices(caret.caret.zipper));
-    caret.element.setHighlightContainer(container.getElements());
+    caret.setHighlightedElements(container.getElements());
 
     // Highlight token at the caret
     const tokenAtCaret = caret.getTokenAtCaret(this.syntaxTree);
@@ -382,15 +368,28 @@ export class MathEditor extends HTMLElement {
     const symbolsAtCaret = MathCaret.getSymbolsAt(this.syntaxTree, tokenAtCaret);
   }
 
-  recordEdit(edits: readonly CaretEdit[]): MathLayoutEdit {
+  recordEdits(edits: readonly CaretEdit[]): MathLayoutEdit {
     const caretsBefore = this.carets.map((v) => MathLayoutCaret.serialize(v.caret.zipper, v.caret.start, v.caret.end));
 
-    return {
+    // TODO: Deduplicate carets/remove overlapping carets
+    const edit: MathLayoutEdit = {
       type: "multi",
       edits: edits.flatMap((v) => v.edits),
       caretsBefore,
       caretsAfter: edits.map((v) => v.caret),
     };
+
+    // Handle symbol shortcuts
+    const result = applyEdit(this.inputTree, edit);
+    const parsed = parse(result.root.value);
+    // 1. Get shortcut symbols in syntax tree (bottom to top?)
+    // 2. Get the ranges of the operator symbols and ranges of arguments
+    // 3. Delete the ranges
+    // 4. Insert the new symbol
+
+    // TODO: If I have those contiguous indices, does the "shift indices after insert/remove" become very easy? Or does it have cursed edge cases?
+
+    return edit;
   }
 
   saveEdit(edit: MathLayoutEdit) {
