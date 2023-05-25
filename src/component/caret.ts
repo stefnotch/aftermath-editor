@@ -1,4 +1,4 @@
-import { SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
+import { SyntaxLeafNode, SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
 import { Offset } from "../math-layout/math-layout-offset";
 import { MathLayoutPosition } from "../math-layout/math-layout-position";
 import { MathLayoutRowZipper, getRowIndices } from "../math-layout/math-layout-zipper";
@@ -79,6 +79,34 @@ export class MathCaret {
     } else {
       throw new Error("Unexpected row type " + joinNodeIdentifier(row.name));
     }
+  }
+
+  static getSymbolsAt(syntaxTree: SyntaxNode, indicesAndRange: RowIndicesAndRange): string[] {
+    const node = getRowNode(syntaxTree, indicesAndRange.indices);
+
+    function getLeaves(node: SyntaxNode): string[] {
+      const isDisjoint = node.range.end <= indicesAndRange.start || indicesAndRange.end <= node.range.start;
+      if (isDisjoint) return [];
+
+      if (hasSyntaxNodeChildren(node, "Leaves")) {
+        let symbols: string[] = [];
+        for (const leaf of node.children.Leaves) {
+          symbols = symbols.concat(
+            leaf.symbols.slice(Math.max(leaf.range.start, indicesAndRange.start), Math.min(leaf.range.end, indicesAndRange.end))
+          );
+        }
+        return symbols;
+      } else if (hasSyntaxNodeChildren(node, "Containers")) {
+        return node.children.Containers.flatMap((v) => getLeaves(v));
+      } else if (hasSyntaxNodeChildren(node, "NewTable") || hasSyntaxNodeChildren(node, "NewRows")) {
+        // Maybe return some dummy symbols here?
+        return [];
+      } else {
+        throw new Error("Unexpected row type " + joinNodeIdentifier(node.name));
+      }
+    }
+
+    return getLeaves(node);
   }
 }
 

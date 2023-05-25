@@ -229,6 +229,11 @@ export class MathEditor extends HTMLElement {
               )
             );
             this.saveEdit(edit);
+
+            // To make symbol shortcuts compatible with undo/redo, we simply record a new edit for them
+            // TODO: Get tokens at carets
+            // If tokens are of a certain type, then we forcibly do that shortcut
+
             this.applyEdit(edit);
           }
         } /*else
@@ -270,14 +275,12 @@ export class MathEditor extends HTMLElement {
     shadowRoot.append(styles, caretContainer, inputContainer, container);
 
     // Math formula
-    this.setInputTree(this.inputTree);
-    this.renderCarets();
+    this.setInputTree(this.inputTree, []);
   }
 
   connectedCallback() {
     // Try to initialize the math element
     this.attributeChangedCallback("mathml", "", this.getAttribute("mathml") ?? "");
-    this.renderCarets();
   }
 
   disconnectedCallback() {
@@ -289,11 +292,8 @@ export class MathEditor extends HTMLElement {
       const mathMlElement = createElementFromHtml(newValue || "<math></math>");
       assert(mathMlElement instanceof MathMLElement, "Mathml attribute must be a valid mathml element");
 
-      this.carets.clearCarets();
-      this.setInputTree(new MathLayoutRowZipper(fromMathMLElement(mathMlElement), null, 0, 0));
-      this.carets.add(new MathLayoutCaret(this.inputTree, 0, 0));
-
-      console.log(this.inputTree);
+      const inputTree = new MathLayoutRowZipper(fromMathMLElement(mathMlElement), null, 0, 0);
+      this.setInputTree(inputTree, []);
     } else {
       console.log("Attribute changed", name, oldValue, newValue);
     }
@@ -305,26 +305,32 @@ export class MathEditor extends HTMLElement {
 
   /**
    * Updates the user input. Then reparses and rerenders the math formula.
-   * Note: Does not rerender the carets.
+   * Also updates the carets.
    */
-  setInputTree(inputTree: MathLayoutRowZipper) {
+  setInputTree(inputTree: MathLayoutRowZipper, newCarets: MathLayoutCaret[]) {
     this.inputTree = inputTree;
+    this.carets.clearCarets();
+    newCarets.forEach((v) => {
+      assert(v.zipper.value === inputTree.value);
+      this.carets.add(v);
+    });
 
     const parsed = parse(this.inputTree.value);
-    console.log("Parsed", parsed);
     this.syntaxTree = parsed.value;
+    console.log("Parsed", parsed);
+
     this.renderResult = this.renderer.renderAll(parsed);
     console.log("Rendered", this.renderResult);
 
     // The MathML elements directly under the <math> tag
-    const setMathMl = (elements: readonly MathMLElement[]) => {
-      for (const element of elements) {
-        assert(element instanceof MathMLElement);
-      }
-      this.mathMlElement.replaceChildren(...elements);
-    };
+    const mathMlElements = this.renderResult.getElement([]).getElements();
+    for (const element of mathMlElements) {
+      assert(element instanceof MathMLElement);
+    }
+    this.mathMlElement.replaceChildren(...mathMlElements);
 
-    setMathMl(this.renderResult.getElement([]).getElements());
+    // Rerender the carets
+    this.renderCarets();
   }
 
   renderCarets() {
@@ -371,8 +377,9 @@ export class MathEditor extends HTMLElement {
 
     // Highlight token at the caret
     const tokenAtCaret = caret.getTokenAtCaret(this.syntaxTree);
-
     caret.element.setToken(this.renderResult.getViewportSelection(tokenAtCaret));
+    // TODO: Use symbols for autocomplete
+    const symbolsAtCaret = MathCaret.getSymbolsAt(this.syntaxTree, tokenAtCaret);
   }
 
   recordEdit(edits: readonly CaretEdit[]): MathLayoutEdit {
@@ -393,14 +400,9 @@ export class MathEditor extends HTMLElement {
   }
 
   applyEdit(edit: MathLayoutEdit) {
-    this.carets.clearCarets();
-
     const result = applyEdit(this.inputTree, edit);
-    this.setInputTree(result.root);
-
     // TODO: Deduplicate carets
-    result.carets.forEach((v) => this.carets.add(v));
-    this.renderCarets();
+    this.setInputTree(result.root, result.carets);
   }
 
   /**

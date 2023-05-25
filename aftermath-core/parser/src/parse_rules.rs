@@ -118,6 +118,7 @@ impl<'a> ParserRules<'a> {
 impl<'a> ParserRules<'a> {
     pub fn default() -> ParserRules<'a> {
         // TODO: Add more default tokens
+        // Document that \x basically means "this has a very specific meaning", such as \| always being a | symbol, and \sum always being a sum symbol.
         // Parse || abs || and their escaped \|| variants
         // 4. Parser for whitespace
         // 5. Parser for chains of < <=, which could be treated as a "domain restriction"

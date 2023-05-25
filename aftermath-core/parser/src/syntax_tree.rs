@@ -16,6 +16,7 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 /// - Child ranges are contiguous, we don't skip any tokens
 /// - Child range rules only apply if they are on the same row (see row_index)
 /// - For now, either all child ranges will have a new_row, or none of them will
+/// - Leaf nodes always have a nonzero range
 ///
 /// indices reference the input tree
 #[derive(Debug, Serialize)]
@@ -85,7 +86,7 @@ pub struct SyntaxLeafNode {
     /// Type of the leaf node
     pub node_type: LeafNodeType,
     /// The range of this in the input tree row.
-    /// The range can be empty.
+    /// The range may not be empty. TODO: Verify this
     pub range: Range<usize>,
     /// The symbols that make up this node, stored as a list of grapheme clusters.
     pub symbols: Vec<String>,

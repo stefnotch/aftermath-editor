@@ -50,6 +50,10 @@ impl<T> Grid<T> {
     pub fn height(&self) -> usize {
         self.values.len()
     }
+
+    pub fn get(&self, x: usize, y: usize) -> Option<&T> {
+        self.values.get(y).and_then(|row| row.get(x))
+    }
 }
 
 /// Points at a given row
