@@ -1,9 +1,9 @@
 import { SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
 import { Offset } from "../math-layout/math-layout-offset";
 import { MathLayoutPosition } from "../math-layout/math-layout-position";
-import { MathLayoutRowZipper, RowIndices, getRowIndices } from "../math-layout/math-layout-zipper";
+import { MathLayoutRowZipper, getRowIndices } from "../math-layout/math-layout-zipper";
 import { RenderResult, RowIndicesAndRange } from "../rendering/render-result";
-import { assert, assertUnreachable } from "../utils/assert";
+import { assert } from "../utils/assert";
 import { CaretElement, createCaret } from "./caret-element";
 import { MathLayoutCaret, moveCaret } from "./editing/math-layout-caret";
 

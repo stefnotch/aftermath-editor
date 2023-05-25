@@ -258,7 +258,7 @@ export class MathEditor extends HTMLElement {
       name: ["BuiltIn", "Nothing"],
       children: { Leaves: [] },
       value: [],
-      range: { start: 0n, end: 0n },
+      range: { start: 0, end: 0 },
     };
     this.renderResult = this.renderer.renderAll({
       errors: [],
