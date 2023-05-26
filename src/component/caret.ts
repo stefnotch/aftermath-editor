@@ -1,7 +1,7 @@
 import { SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
 import { Offset } from "../input-tree/math-layout-offset";
 import { MathLayoutPosition } from "../input-tree/math-layout-position";
-import { MathLayoutRowZipper, getRowIndices } from "../input-tree/math-layout-zipper";
+import { InputRowZipper, getRowIndices } from "../input-tree/math-layout-zipper";
 import { RenderResult, RowIndicesAndRange } from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { CaretElement } from "./caret-element";
@@ -172,7 +172,7 @@ export class MathEditorCarets {
     }
   }
 
-  addPointerDownCaret(pointerId: number, zipper: MathLayoutRowZipper, offset: number) {
+  addPointerDownCaret(pointerId: number, zipper: InputRowZipper, offset: number) {
     this.pointerDownCarets.set(pointerId, this.createCaret(zipper, offset, offset));
   }
 
@@ -191,7 +191,7 @@ export class MathEditorCarets {
     return Array.from(this.carets).concat(Array.from(this.pointerDownCarets.values())).map(fn);
   }
 
-  private createCaret(zipper: MathLayoutRowZipper, startOffset: Offset, endOffset: Offset) {
+  private createCaret(zipper: InputRowZipper, startOffset: Offset, endOffset: Offset) {
     return new MathCaret(this.#containerElement, {
       startPosition: new MathLayoutPosition(zipper, startOffset),
       caret: new MathLayoutCaret(zipper, startOffset, endOffset),

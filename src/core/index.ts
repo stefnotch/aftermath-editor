@@ -1,16 +1,16 @@
 import init, { MathParser } from "../../aftermath-core/pkg";
-import { MathLayoutRow } from "../input-tree/math-layout";
+import { InputNodeContainer } from "../input-tree/input-node";
 import { Offset } from "../input-tree/math-layout-offset";
 import { RowIndices } from "../input-tree/math-layout-zipper";
+import { InputRow } from "../input-tree/row";
 import { assert } from "../utils/assert";
-import { customError } from "../utils/error-utils";
 
 // Yay, top level await is neat https://v8.dev/features/top-level-await
 await init();
 
 const parser = MathParser.new();
 
-export function parse(row: MathLayoutRow): ParseResult {
+export function parse(row: InputRow): ParseResult {
   let result: ParseResult = parser.parse(toCore(row));
 
   return result;
@@ -27,63 +27,21 @@ export function joinNodeIdentifier(nodeIdentifier: NodeIdentifier): NodeIdentifi
   return nodeIdentifier.join("::");
 }
 
-function toCore(row: MathLayoutRow): CoreRow {
+function toCore(row: InputRow): CoreRow {
   const values: CoreElement[] = row.values.map((v) => {
-    // Uh oh, now I'm also maintaining invariants in two places.
-    if (v.type === "fraction") {
+    if (v instanceof InputNodeContainer) {
       return {
         Container: {
-          container_type: "Fraction",
-          rows: { values: [toCore(v.values[0]), toCore(v.values[1])], width: 1 },
+          container_type: v.containerType,
+          rows: { values: v.rows.values.map((row) => toCore(row)), width: v.rows.width },
           offset_count: v.offsetCount,
         },
       };
-    } else if (v.type === "root") {
-      return {
-        Container: {
-          container_type: "Root",
-          rows: { values: [toCore(v.values[0]), toCore(v.values[1])], width: 2 },
-          offset_count: v.offsetCount,
-        },
-      };
-    } else if (v.type === "under") {
-      return {
-        Container: {
-          container_type: "Under",
-          rows: { values: [toCore(v.values[0]), toCore(v.values[1])], width: 1 },
-          offset_count: v.offsetCount,
-        },
-      };
-    } else if (v.type === "over") {
-      return {
-        Container: {
-          container_type: "Over",
-          rows: { values: [toCore(v.values[0]), toCore(v.values[1])], width: 1 },
-          offset_count: v.offsetCount,
-        },
-      };
-    } else if (v.type === "sup") {
-      return {
-        Container: { container_type: "Sup", rows: { values: [toCore(v.values[0])], width: 1 }, offset_count: v.offsetCount },
-      };
-    } else if (v.type === "sub") {
-      return {
-        Container: { container_type: "Sub", rows: { values: [toCore(v.values[0])], width: 1 }, offset_count: v.offsetCount },
-      };
-    } else if (v.type === "table") {
-      return {
-        Container: {
-          container_type: "Table",
-          rows: { values: v.values.map((row) => toCore(row)), width: v.rowWidth },
-          offset_count: v.offsetCount,
-        },
-      };
-    } else if (v.type === "symbol") {
-      const value = v.value.normalize("NFD");
-      return { Symbol: value };
     } else {
-      throw customError("Unknown type", { type: v.type });
+      const value = v.symbol.normalize("NFD");
+      return { Symbol: value };
     }
+    // Uh oh, now I'm also maintaining invariants in two places.
   });
 
   return { values, offset_count: row.offsetCount };

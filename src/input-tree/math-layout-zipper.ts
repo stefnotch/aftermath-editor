@@ -1,51 +1,28 @@
 import { assert } from "../utils/assert";
-import {
-  MathLayoutRow,
-  MathLayoutContainer,
-  MathLayoutTable,
-  MathLayoutSymbol,
-  isMathLayoutSymbol,
-  isMathLayoutTable,
-  MathLayoutElement,
-} from "./math-layout";
-import { Offset } from "./math-layout-offset";
-import { mathLayoutWithWidth } from "./math-layout-utils";
+import { InputNode, InputNodeContainer, InputNodeSymbol } from "./input-node";
+import { InputRow } from "./row";
+import { AbsoluteOffset, Offset } from "./math-layout-offset";
 
 /**
  * A red-green tree: https://blog.yaakov.online/red-green-trees/
  * A zipper is a pointer to a node in a tree, with a reference to the parent node.
  * See also: http://learnyouahaskell.com/zippers
  */
-interface MathLayoutZipper<ChildType extends MathLayoutZipper<any>> {
-  readonly type: MathLayoutRow["type"] | MathLayoutElement["type"];
-  readonly root: MathLayoutRowZipper;
+interface InputZipper<ChildType extends InputZipper<any>> {
+  readonly root: InputRowZipper;
   readonly indexInParent: number;
   readonly children: ChildType[];
   readonly value: any;
+  readonly startAbsoluteOffset: AbsoluteOffset;
+  readonly parent: InputZipper<any> | null;
   // That is an *absolute* offset
-  readonly startAbsoluteOffset: Offset;
-  readonly parent: MathLayoutZipper<any> | null;
-  // That is an *absolute* offset
-  containsAbsoluteOffset(absoluteOffset: Offset): boolean;
+  containsAbsoluteOffset(absoluteOffset: AbsoluteOffset): boolean;
 }
 
-/**
- * TODO:
-For a full implementation, we would still need some further details such as:
-
-    Equality and HashCode overrides so that two identical RedNode<T>s are considered equal.
-    Utility methods to easily replace part of a RedGreenTree<T>, which would return a new RedGreenTree<T> (since they're immutable) sharing the remaining nodes with the old tree object.
-
-    TODO: Performance maybe
-    https://github.com/KirillOsenkov/Bliki/wiki/Roslyn-Immutable-Trees
- */
-
-export class MathLayoutRowZipper
-  implements MathLayoutZipper<MathLayoutContainerZipper | MathLayoutSymbolZipper | MathLayoutTableZipper>
-{
+export class InputRowZipper implements InputZipper<InputNodeContainerZipper | InputSymbolZipper> {
   constructor(
-    public readonly value: MathLayoutRow,
-    public readonly parent: MathLayoutContainerZipper | MathLayoutTableZipper | null,
+    public readonly value: InputRow,
+    public readonly parent: InputNodeContainerZipper | null,
     public readonly indexInParent: number,
     public readonly startAbsoluteOffset: Offset
   ) {}
@@ -54,14 +31,11 @@ export class MathLayoutRowZipper
    * Only makes sense if they share the same root.
    * Row zippers have a unique range.
    */
-  equals(other: MathLayoutRowZipper): boolean {
+  equals(other: InputRowZipper): boolean {
+    assert(this.root === other.root, "zippers must share the same root");
     const thisEndOffset = this.startAbsoluteOffset + this.value.offsetCount;
     const otherEndOffset = other.startAbsoluteOffset + other.value.offsetCount;
     return this.startAbsoluteOffset === other.startAbsoluteOffset && thisEndOffset === otherEndOffset;
-  }
-
-  get type(): MathLayoutRow["type"] {
-    return this.value.type;
   }
 
   get children() {
@@ -69,21 +43,19 @@ export class MathLayoutRowZipper
     return this.value.values.map((v, i) => {
       const childStartOffset = startOffset + 1;
       startOffset = startOffset + v.offsetCount + 1;
-      if (isMathLayoutSymbol(v)) {
-        return new MathLayoutSymbolZipper(v, this, i, childStartOffset);
-      } else if (isMathLayoutTable(v)) {
-        return new MathLayoutTableZipper(v, this, i, childStartOffset);
+      if (v instanceof InputNodeSymbol) {
+        return new InputSymbolZipper(v, this, i, childStartOffset);
       } else {
-        return new MathLayoutContainerZipper(v, this, i, childStartOffset);
+        return new InputNodeContainerZipper(v, this, i, childStartOffset);
       }
     });
   }
 
-  get root(): MathLayoutRowZipper {
+  get root(): InputRowZipper {
     return this.parent?.root ?? this;
   }
 
-  getZipperAtOffset(absoluteOffset: Offset): MathLayoutRowZipper {
+  getZipperAtOffset(absoluteOffset: Offset): InputRowZipper {
     assert(this.containsAbsoluteOffset(absoluteOffset), "offset out of range");
 
     const childWithOffset = this.children.find((c) => c.containsAbsoluteOffset(absoluteOffset)) ?? null;
@@ -100,18 +72,12 @@ export class MathLayoutRowZipper
     return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.offsetCount;
   }
 
-  insert(offset: Offset, newChild: MathLayoutElement) {
+  insert(offset: Offset, newChild: InputNode) {
     assert(offset >= 0 && offset <= this.value.values.length, "offset out of range");
     const values = this.value.values.slice();
     values.splice(offset, 0, newChild);
 
-    const newZipper = this.replaceSelf(
-      mathLayoutWithWidth({
-        type: this.value.type,
-        values,
-        offsetCount: 0,
-      })
-    );
+    const newZipper = this.replaceSelf(new InputRow(values));
     return {
       newRoot: newZipper.root,
       newZipper,
@@ -120,14 +86,8 @@ export class MathLayoutRowZipper
 
   remove(index: number) {
     assert(index >= 0 && index < this.value.values.length, "index out of range");
-
-    const newZipper = this.replaceSelf(
-      mathLayoutWithWidth({
-        type: this.value.type,
-        values: [...this.value.values.slice(0, index), ...this.value.values.slice(index + 1)],
-        offsetCount: 0,
-      })
-    );
+    const values = [...this.value.values.slice(0, index), ...this.value.values.slice(index + 1)];
+    const newZipper = this.replaceSelf(new InputRow(values));
     return {
       newRoot: newZipper.root,
       newZipper,
@@ -137,8 +97,8 @@ export class MathLayoutRowZipper
   /**
    * Mostly internal method, use insert and remove instead
    */
-  replaceSelf(newValue: MathLayoutRow) {
-    return new MathLayoutRowZipper(
+  replaceSelf(newValue: InputRow) {
+    return new InputRowZipper(
       newValue,
       this.parent?.replaceChild(this.indexInParent, newValue) ?? null,
       this.indexInParent,
@@ -149,44 +109,38 @@ export class MathLayoutRowZipper
   /**
    * Mostly internal method, use insert and remove instead
    */
-  replaceChild(index: number, newChild: MathLayoutElement): MathLayoutRowZipper {
+  replaceChild(index: number, newChild: InputNode): InputRowZipper {
     assert(index >= 0 && index < this.value.values.length, "index out of range");
 
     const values = this.value.values.slice();
     values[index] = newChild;
-    const newValue: MathLayoutRow = mathLayoutWithWidth({
-      type: this.value.type,
-      values,
-      offsetCount: 0,
-    });
-
-    return this.replaceSelf(newValue);
+    return this.replaceSelf(new InputRow(values));
   }
 }
 
-export class MathLayoutContainerZipper implements MathLayoutZipper<MathLayoutRowZipper> {
+export class InputNodeContainerZipper implements InputZipper<InputRowZipper> {
   constructor(
-    public readonly value: MathLayoutContainer,
-    public readonly parent: MathLayoutRowZipper,
+    public readonly value: InputNodeContainer,
+    public readonly parent: InputRowZipper,
     public readonly indexInParent: number,
     public readonly startAbsoluteOffset: Offset
   ) {}
 
-  get type(): MathLayoutContainer["type"] {
-    return this.value.type;
+  get type(): InputNodeContainer["containerType"] {
+    return this.value.containerType;
   }
 
   get children() {
     let startOffset = this.startAbsoluteOffset;
-    return this.value.values.map((v, i) => {
+    return this.value.rows.values.map((v, i) => {
       // Different logic here because a container doesn't have extra places for the caret to go
       const childStartOffset = startOffset;
       startOffset = startOffset + v.offsetCount;
-      return new MathLayoutRowZipper(v, this, i, childStartOffset);
+      return new InputRowZipper(v, this, i, childStartOffset);
     });
   }
 
-  get root(): MathLayoutRowZipper {
+  get root(): InputRowZipper {
     return this.parent.root;
   }
 
@@ -194,8 +148,8 @@ export class MathLayoutContainerZipper implements MathLayoutZipper<MathLayoutRow
     return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.offsetCount;
   }
 
-  replaceSelf(newValue: MathLayoutContainer) {
-    return new MathLayoutContainerZipper(
+  replaceSelf(newValue: InputNodeContainer) {
+    return new InputNodeContainerZipper(
       newValue,
       this.parent?.replaceChild(this.indexInParent, newValue),
       this.indexInParent,
@@ -203,93 +157,29 @@ export class MathLayoutContainerZipper implements MathLayoutZipper<MathLayoutRow
     );
   }
 
-  // TODO: lots of almost code duplication, not just the signatures but also the implementation
-  replaceChild(index: number, newChild: MathLayoutRow) {
-    assert(index >= 0 && index < this.value.values.length, "index out of range");
+  replaceChild(index: number, newChild: InputRow) {
+    assert(index >= 0 && index < this.value.rows.values.length, "index out of range");
 
-    const values = this.value.values.slice();
+    const values = this.value.rows.values.slice();
     values[index] = newChild;
-    const newValue = mathLayoutWithWidth({
-      type: this.value.type,
-      values: values as any, // TODO: Type safety would be nice
-      offsetCount: 0,
-    });
 
-    return this.replaceSelf(newValue);
+    return this.replaceSelf(this.value.withNewValues(values));
   }
 }
 
-export class MathLayoutTableZipper implements MathLayoutZipper<MathLayoutRowZipper> {
+export class InputSymbolZipper implements InputZipper<never> {
   constructor(
-    public readonly value: MathLayoutTable,
-    public readonly parent: MathLayoutRowZipper,
+    public readonly value: InputNodeSymbol,
+    public readonly parent: InputRowZipper,
     public readonly indexInParent: number,
     public readonly startAbsoluteOffset: Offset
   ) {}
-
-  get type(): MathLayoutTable["type"] {
-    return this.value.type;
-  }
-
-  get children() {
-    let startOffset = this.startAbsoluteOffset;
-    return this.value.values.map((v, i) => {
-      const childStartOffset = startOffset;
-      startOffset = startOffset + v.offsetCount;
-      return new MathLayoutRowZipper(v, this, i, childStartOffset);
-    });
-  }
-
-  get root(): MathLayoutRowZipper {
-    return this.parent.root;
-  }
-
-  containsAbsoluteOffset(absoluteOffset: Offset): boolean {
-    return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.offsetCount;
-  }
-
-  replaceSelf(newValue: MathLayoutTable) {
-    return new MathLayoutTableZipper(
-      newValue,
-      this.parent?.replaceChild(this.indexInParent, newValue),
-      this.indexInParent,
-      this.startAbsoluteOffset
-    );
-  }
-
-  replaceChild(index: number, newChild: MathLayoutRow) {
-    assert(index >= 0 && index < this.value.values.length, "index out of range");
-
-    const values = this.value.values.slice();
-    values[index] = newChild;
-    const newValue = mathLayoutWithWidth({
-      type: this.value.type,
-      rowWidth: this.value.rowWidth,
-      values: values,
-      offsetCount: 0,
-    });
-
-    return this.replaceSelf(newValue);
-  }
-}
-
-export class MathLayoutSymbolZipper implements MathLayoutZipper<never> {
-  constructor(
-    public readonly value: MathLayoutSymbol,
-    public readonly parent: MathLayoutRowZipper,
-    public readonly indexInParent: number,
-    public readonly startAbsoluteOffset: Offset
-  ) {}
-
-  get type(): MathLayoutSymbol["type"] {
-    return this.value.type;
-  }
 
   get children() {
     return [];
   }
 
-  get root(): MathLayoutRowZipper {
+  get root(): InputRowZipper {
     return this.parent.root;
   }
 
@@ -297,8 +187,8 @@ export class MathLayoutSymbolZipper implements MathLayoutZipper<never> {
     return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.offsetCount;
   }
 
-  replaceSelf(newValue: MathLayoutSymbol) {
-    return new MathLayoutSymbolZipper(
+  replaceSelf(newValue: InputNodeSymbol) {
+    return new InputSymbolZipper(
       newValue,
       this.parent?.replaceChild(this.indexInParent, newValue),
       this.indexInParent,
@@ -308,14 +198,7 @@ export class MathLayoutSymbolZipper implements MathLayoutZipper<never> {
 
   replaceChild(index: number, newChild: string) {
     assert(index >= 0 && index < 1, "index out of range");
-
-    const newValue = mathLayoutWithWidth({
-      type: this.value.type,
-      value: newChild,
-      offsetCount: 0,
-    });
-
-    return this.replaceSelf(newValue);
+    return this.replaceSelf(new InputNodeSymbol(newChild));
   }
 }
 
@@ -331,7 +214,7 @@ export type RowIndices = readonly RowIndex[];
  * Gets the indices of the given zipper in the tree.
  * As in, every "indexInParent" of every element that has a parent, including the starting one.
  */
-export function getRowIndices(zipper: MathLayoutRowZipper): RowIndices {
+export function getRowIndices(zipper: InputRowZipper): RowIndices {
   const ancestorIndices: [number, number][] = [];
   let current = zipper;
   while (true) {
@@ -350,7 +233,7 @@ export function addRowIndex(indices: RowIndices, index: RowIndex | null): RowInd
   return indices.concat([index]);
 }
 
-export function fromRowIndices(root: MathLayoutRowZipper, indices: RowIndices) {
+export function fromRowIndices(root: InputRowZipper, indices: RowIndices) {
   let current = root;
   for (let i = 0; i < indices.length; i++) {
     const [firstIndex, secondIndex] = indices[i];

@@ -1,11 +1,11 @@
-import { MathLayoutElement, MathLayoutRow } from "../../input-tree/math-layout";
+import { InputNode } from "../../input-tree/input-node";
+import { InputRow } from "../../input-tree/row";
 import { MathLayoutPosition } from "../../input-tree/math-layout-position";
 import {
-  MathLayoutContainerZipper,
-  MathLayoutTableZipper,
-  MathLayoutSymbolZipper,
+  InputNodeContainerZipper,
+  InputSymbolZipper,
   getRowIndices,
-  MathLayoutRowZipper,
+  InputRowZipper,
 } from "../../input-tree/math-layout-zipper";
 import { RenderResult } from "../../rendering/render-result";
 import arrayUtils from "../../utils/array-utils";
@@ -51,9 +51,7 @@ function removeAtPosition<T>(
   };
 
   // Remove a zipper and its children
-  const removeAction = (
-    zipper: MathLayoutContainerZipper | MathLayoutTableZipper | MathLayoutSymbolZipper
-  ): MathLayoutSimpleEdit => ({
+  const removeAction = (zipper: InputNodeContainerZipper | InputSymbolZipper): MathLayoutSimpleEdit => ({
     type: "remove" as const,
     zipper: getRowIndices(zipper.parent),
     index: zipper.indexInParent,
@@ -61,10 +59,7 @@ function removeAtPosition<T>(
   });
 
   // Removes a zipper, and then inserts new elements at the same position
-  const replaceActions = (
-    zipper: MathLayoutContainerZipper | MathLayoutTableZipper,
-    values: readonly MathLayoutElement[]
-  ): MathLayoutSimpleEdit[] =>
+  const replaceActions = (zipper: InputNodeContainerZipper, values: readonly InputNode[]): MathLayoutSimpleEdit[] =>
     [removeAction(zipper)].concat(
       values.map((v, i) => ({
         type: "insert" as const,
@@ -82,22 +77,25 @@ function removeAtPosition<T>(
     const { parent: parentZipper, indexInParent } = zipper;
     if (parentZipper == null) return { caret: serializeCollapsedCaret(position.zipper, position.offset), edits: [] };
     const parentValue = parentZipper.value;
-    if (parentValue.type === "fraction" || parentValue.type === "root") {
+    if (parentValue.containerType === "Fraction" || parentValue.containerType === "Root") {
       if ((indexInParent === 0 && direction === "left") || (indexInParent === 1 && direction === "right")) {
         return move();
       } else {
         // Delete the fraction but keep its contents
-        const parentContents = parentValue.values.flatMap((v) => v.values);
+        const parentContents = parentValue.rows.values.flatMap((v) => v.values);
         const actions = replaceActions(parentZipper, parentContents);
 
         return {
           edits: actions,
-          caret: serializeCollapsedCaret(parentZipper.parent, parentZipper.indexInParent + parentValue.values[0].values.length),
+          caret: serializeCollapsedCaret(
+            parentZipper.parent,
+            parentZipper.indexInParent + (parentValue.rows.get(0, 0)?.values?.length ?? 0)
+          ),
         };
       }
-    } else if ((parentValue.type === "sup" || parentValue.type === "sub") && direction === "left") {
+    } else if ((parentValue.containerType === "Sup" || parentValue.containerType === "Sub") && direction === "left") {
       // Delete the superscript/subscript but keep its contents
-      const parentContents = parentValue.values.flatMap((v) => v.values);
+      const parentContents = parentValue.rows.values.flatMap((v) => v.values);
       const actions = replaceActions(parentZipper, parentContents);
 
       return {
@@ -107,16 +105,16 @@ function removeAtPosition<T>(
     } else {
       return move();
     }
-  } else if (atCaret.type === "symbol" || atCaret.type === "error") {
+  } else if (atCaret instanceof InputSymbolZipper) {
     const actions = [removeAction(atCaret)];
     return {
       edits: actions,
       caret: serializeCollapsedCaret(zipper, position.offset + (direction === "left" ? -1 : 0)),
     };
-  } else if ((atCaret.type === "sup" || atCaret.type === "sub") && direction === "right") {
+  } else if ((atCaret.type === "Sup" || atCaret.type === "Sub") && direction === "right") {
     // Delete the superscript/subscript but keep its contents
     // cat|^3 becomes cat|3
-    const subSupContents = atCaret.value.values.flatMap((v) => v.values);
+    const subSupContents = atCaret.value.rows.values.flatMap((v) => v.values);
     const actions = replaceActions(atCaret, subSupContents);
 
     return {
@@ -143,11 +141,11 @@ function removeRange(caret: MathLayoutCaret): CaretEdit {
   };
 }
 
-function serializeCollapsedCaret(zipper: MathLayoutRowZipper, offset: number): SerializedCaret {
+function serializeCollapsedCaret(zipper: InputRowZipper, offset: number): SerializedCaret {
   return MathLayoutCaret.serialize(zipper, offset, offset);
 }
 
-export function insertAtCaret(caret: MathLayoutCaret, value: MathLayoutRow): CaretEdit {
+export function insertAtCaret(caret: MathLayoutCaret, value: InputRow): CaretEdit {
   if (caret.isCollapsed) {
     return insertAtPosition(new MathLayoutPosition(caret.zipper, caret.start), value);
   } else {
@@ -160,7 +158,7 @@ export function insertAtCaret(caret: MathLayoutCaret, value: MathLayoutRow): Car
   }
 }
 
-function insertAtPosition(position: MathLayoutPosition, value: MathLayoutRow): CaretEdit {
+function insertAtPosition(position: MathLayoutPosition, value: InputRow): CaretEdit {
   return {
     edits: value.values.map((v, i) => ({
       type: "insert" as const,
@@ -178,7 +176,7 @@ function insertAtPosition(position: MathLayoutPosition, value: MathLayoutRow): C
 function getAdjacentZipper(
   caret: MathLayoutPosition,
   direction: "left" | "right"
-): MathLayoutContainerZipper | MathLayoutTableZipper | MathLayoutSymbolZipper | null {
+): InputNodeContainerZipper | InputSymbolZipper | null {
   const index = caret.offset + (direction === "left" ? -1 : 0);
   const adjacentZipper = arrayUtils.get(caret.zipper.children, index);
   return adjacentZipper ?? null;

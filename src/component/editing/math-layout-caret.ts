@@ -1,15 +1,14 @@
 import { match } from "ts-pattern";
 import { Offset } from "../../input-tree/math-layout-offset";
 import { MathLayoutPosition } from "../../input-tree/math-layout-position";
-import { tableIndexToPosition, tablePositionToIndex } from "../../input-tree/math-layout-utils";
 import {
   RowIndices,
   fromRowIndices,
   getRowIndices,
   getSharedRowIndices,
-  MathLayoutContainerZipper,
-  MathLayoutRowZipper,
-  MathLayoutTableZipper,
+  InputNodeContainerZipper,
+  InputRowZipper,
+  InputSymbolZipper,
 } from "../../input-tree/math-layout-zipper";
 import { assert, assertUnreachable } from "../../utils/assert";
 import { ViewportValue } from "../../rendering/viewport-coordinate";
@@ -27,7 +26,7 @@ const KeepXPosition = false;
 export class MathLayoutCaret {
   public readonly isCollapsed: boolean;
   public readonly isForwards: boolean;
-  constructor(public readonly zipper: MathLayoutRowZipper, public readonly start: Offset, public readonly end: Offset) {
+  constructor(public readonly zipper: InputRowZipper, public readonly start: Offset, public readonly end: Offset) {
     assert(start >= 0 && start <= zipper.value.values.length, "Offset must be within the row");
     assert(end >= 0 && end <= zipper.value.values.length, "Offset must be within the row");
     this.isCollapsed = this.start === this.end;
@@ -42,11 +41,11 @@ export class MathLayoutCaret {
     return this.isForwards ? this.end : this.start;
   }
 
-  static serialize(zipper: MathLayoutRowZipper, start: Offset, end: Offset): SerializedCaret {
+  static serialize(zipper: InputRowZipper, start: Offset, end: Offset): SerializedCaret {
     return { zipper: getRowIndices(zipper), start, end };
   }
 
-  static deserialize(root: MathLayoutRowZipper, serialized: SerializedCaret): MathLayoutCaret {
+  static deserialize(root: InputRowZipper, serialized: SerializedCaret): MathLayoutCaret {
     const zipper = fromRowIndices(root, serialized.zipper);
     return new MathLayoutCaret(zipper, serialized.start, serialized.end);
   }
@@ -117,7 +116,7 @@ export function moveCaret<T>(
  * Move up and down
  */
 function moveVertical(
-  zipper: MathLayoutRowZipper,
+  zipper: InputRowZipper,
   direction: "up" | "down",
   desiredXPosition: ViewportValue,
   getCaretPosition: (layoutPosition: MathLayoutPosition) => [ViewportValue, ViewportValue]
@@ -126,23 +125,23 @@ function moveVertical(
   if (parent === null) return null;
 
   if (
-    parent.type == "fraction" ||
-    parent.type == "root" ||
-    parent.type == "under" ||
-    parent.type == "over" ||
-    parent.type === "table"
+    parent.type == "Fraction" ||
+    parent.type == "Root" ||
+    parent.type == "Under" ||
+    parent.type == "Over" ||
+    parent.type === "Table"
   ) {
     let newIndexInParent;
-    if (parent.type === "table") {
-      const position = tableIndexToPosition(parent.value, zipper.indexInParent);
-      const newY = position[1] + (direction === "up" ? -1 : 1);
-      newIndexInParent = tablePositionToIndex(parent.value, [position[0], newY]);
+    if (parent.type === "Table") {
+      const position = parent.value.rows.indexToXY(zipper.indexInParent);
+      const newY = position.y + (direction === "up" ? -1 : 1);
+      newIndexInParent = parent.value.rows.xyToIndex(position.x, newY);
     } else {
       // Those MathLayout containers are set up such that the first child is above the second child
       newIndexInParent = zipper.indexInParent + (direction == "up" ? -1 : 1);
     }
 
-    if (newIndexInParent < 0 || newIndexInParent >= parent.value.values.length) {
+    if (newIndexInParent < 0 || newIndexInParent >= parent.value.rows.values.length) {
       // Reached the top/bottom
       const grandParent = parent.parent;
       if (grandParent == null) return null;
@@ -158,12 +157,12 @@ function moveVertical(
         return new MathLayoutPosition(newZipper, offset);
       }
     }
-  } else if (parent.type == "sup" || parent.type == "sub") {
+  } else if (parent.type == "Sup" || parent.type == "Sub") {
     // We're in a subscript or superscript, so we'll try to leave it
     const grandParent = parent.parent;
     if (grandParent == null) return null;
 
-    if ((parent.type == "sup" && direction == "down") || (parent.type == "sub" && direction == "up")) {
+    if ((parent.type == "Sup" && direction == "down") || (parent.type == "Sub" && direction == "up")) {
       return new MathLayoutPosition(grandParent, parent.indexInParent);
     } else {
       return moveVertical(grandParent, direction, desiredXPosition, getCaretPosition);
@@ -177,7 +176,7 @@ function moveVertical(
  * Repeatedly move the caret towards the target position, until we're close enough.
  */
 function moveVerticalClosestPosition(
-  newZipper: MathLayoutRowZipper,
+  newZipper: InputRowZipper,
   desiredXPosition: number,
   getCaretPosition: (layoutPosition: MathLayoutPosition) => [ViewportValue, ViewportValue]
 ) {
@@ -199,10 +198,8 @@ function moveVerticalClosestPosition(
       // Try moving into a nested element: 0 is right, -1 is left
       const childZipper = newZipper.children[offset + (caretX < desiredXPosition ? 0 : -1)];
       assert(childZipper !== undefined);
-      if (childZipper.type === "symbol") {
+      if (childZipper instanceof InputSymbolZipper) {
         break; // We can't go any further
-      } else if (childZipper.type === "table") {
-        // TODO: Implement
       } else {
         // TODO: Implement
       }
@@ -211,7 +208,7 @@ function moveVerticalClosestPosition(
   return new MathLayoutPosition(newZipper, offset);
 }
 
-function offsetInBounds(zipper: MathLayoutRowZipper, offset: number) {
+function offsetInBounds(zipper: InputRowZipper, offset: number) {
   return 0 <= offset && offset <= zipper.value.values.length;
 }
 
@@ -220,20 +217,20 @@ function offsetInBounds(zipper: MathLayoutRowZipper, offset: number) {
  * Make sure to first check `this.isTouchingEdge(direction)` before calling this function.
  */
 function moveHorizontalBeyondEdge(
-  zipper: MathLayoutRowZipper | MathLayoutContainerZipper | MathLayoutTableZipper,
+  zipper: InputRowZipper | InputNodeContainerZipper,
   direction: "left" | "right"
 ): MathLayoutPosition | null {
   const parent = zipper.parent;
   if (!parent) return null;
 
-  if (parent.type === "row") {
+  if (parent instanceof InputRowZipper) {
     // We're done once we've found a row as a parent
     const offset = zipper.indexInParent + (direction === "left" ? 0 : 1);
     return new MathLayoutPosition(parent, offset);
-  } else if (zipper.type === "row") {
+  } else if (zipper instanceof InputRowZipper) {
     // If we found a decent adjacent element, like in a fraction or a table, we can try moving to the next spot
     const adjacentIndex = zipper.indexInParent + (direction === "left" ? -1 : 1);
-    if (adjacentIndex < 0 || adjacentIndex >= parent.value.values.length) {
+    if (adjacentIndex < 0 || adjacentIndex >= parent.value.rows.values.length) {
       // We're at the very edge of the element, so we'll try to move to the parent
       return moveHorizontalBeyondEdge(parent, direction);
     } else {
@@ -252,23 +249,23 @@ function moveHorizontalBeyondEdge(
  * Move to the left or right, but always attempt to move into a nested element if there is one.
  */
 function moveHorizontalInto(
-  zipper: MathLayoutRowZipper,
+  zipper: InputRowZipper,
   caretOffset: Offset,
   direction: "left" | "right"
 ): MathLayoutPosition | null {
   // Carets are always inbetween elements. Hence element[caretOffset] is the element to the right of the caret.
   const adjacentChild = zipper.children[caretOffset + (direction === "left" ? -1 : 0)];
 
-  if (adjacentChild.type === "symbol" || adjacentChild.type === "error") {
+  if (adjacentChild instanceof InputSymbolZipper) {
     return null;
   } else if (
-    adjacentChild.type === "table" ||
-    adjacentChild.type === "fraction" ||
-    adjacentChild.type === "root" ||
-    adjacentChild.type === "under" ||
-    adjacentChild.type === "over" ||
-    adjacentChild.type === "sup" ||
-    adjacentChild.type === "sub"
+    adjacentChild.type === "Table" ||
+    adjacentChild.type === "Fraction" ||
+    adjacentChild.type === "Root" ||
+    adjacentChild.type === "Under" ||
+    adjacentChild.type === "Over" ||
+    adjacentChild.type === "Sup" ||
+    adjacentChild.type === "Sub"
   ) {
     const adjacentRow =
       direction === "left" ? adjacentChild.children[adjacentChild.children.length - 1] : adjacentChild.children[0];

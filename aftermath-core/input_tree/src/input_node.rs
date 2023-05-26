@@ -10,6 +10,11 @@ pub enum InputNode {
     Container {
         container_type: InputNodeContainer,
         rows: Grid<InputRow>,
+        /**
+         * If there's one element, then the width is 2.
+         * And the offsets are [0, 1].
+         * Notice how this gives you an exclusive upper bound.
+         */
         /// The number of valid offsets in all children combined.
         offset_count: u64,
     },

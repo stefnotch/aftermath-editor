@@ -59,8 +59,15 @@ impl<T> Grid<T> {
         if x >= self.width() || y >= self.height() {
             return None;
         }
-        let index = y * self.width() + x;
-        self.values.get(index)
+        self.values.get(self.xy_to_index(x, y))
+    }
+
+    pub fn index_to_xy(&self, index: usize) -> (usize, usize) {
+        (index % self.width, index / self.width)
+    }
+
+    pub fn xy_to_index(&self, x: usize, y: usize) -> usize {
+        y * self.width + x
     }
 
     pub fn values(&self) -> &[T] {

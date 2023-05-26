@@ -1,13 +1,12 @@
 import "./../core";
 import { assert } from "../utils/assert";
 import { fromElement as fromMathMLElement, unicodeSplit } from "../mathml/parsing";
-import { mathLayoutWithWidth } from "../input-tree/math-layout-utils";
 import caretStyles from "./caret-styles.css?inline";
 import mathEditorStyles from "./math-editor-styles.css?inline";
 import inputHandlerStyles from "./input-handler-style.css?inline";
 import { InputHandlerElement } from "./input-handler-element";
 import { MathLayoutCaret } from "./editing/math-layout-caret";
-import { MathLayoutRowZipper, fromRowIndices, getRowIndices } from "../input-tree/math-layout-zipper";
+import { InputRowZipper, fromRowIndices, getRowIndices } from "../input-tree/math-layout-zipper";
 import { applyEdit, inverseEdit, MathLayoutEdit } from "../editing/math-layout-edit";
 import { UndoRedoManager } from "../editing/undo-redo-manager";
 import { CaretEdit, insertAtCaret, removeAtCaret } from "./editing/math-layout-caret-edit";
@@ -17,6 +16,8 @@ import { RenderResult, RenderedElement } from "../rendering/render-result";
 import { SyntaxNode, getNodeIdentifiers, joinNodeIdentifier, parse } from "./../core";
 import { DebugSettings } from "./debug-settings";
 import { MathCaret, MathEditorCarets } from "./caret";
+import { InputRow } from "../input-tree/row";
+import { InputNodeSymbol } from "../input-tree/input-node";
 
 function createElementFromHtml(html: string) {
   const template = document.createElement("template");
@@ -47,12 +48,7 @@ export class MathEditor extends HTMLElement {
   carets: MathEditorCarets;
   inputHandler: InputHandlerElement;
 
-  inputTree: MathLayoutRowZipper = new MathLayoutRowZipper(
-    mathLayoutWithWidth({ type: "row", values: [], offsetCount: 0 }),
-    null,
-    0,
-    0
-  );
+  inputTree: InputRowZipper = new InputRowZipper(new InputRow([]), null, 0, 0);
 
   syntaxTree: SyntaxNode;
 
@@ -208,16 +204,7 @@ export class MathEditor extends HTMLElement {
           if (data != null) {
             const characters = unicodeSplit(data);
             const edit = this.recordEdits(
-              this.carets.map((v) =>
-                insertAtCaret(
-                  v.caret,
-                  mathLayoutWithWidth({
-                    type: "row",
-                    values: characters.map((v) => mathLayoutWithWidth({ type: "symbol", value: v, offsetCount: 0 })),
-                    offsetCount: 0,
-                  })
-                )
-              )
+              this.carets.map((v) => insertAtCaret(v.caret, new InputRow(characters.map((v) => new InputNodeSymbol(v)))))
             );
             this.saveEdit(edit);
             this.applyEdit(edit);
@@ -278,7 +265,12 @@ export class MathEditor extends HTMLElement {
       const mathMlElement = createElementFromHtml(newValue || "<math></math>");
       assert(mathMlElement instanceof MathMLElement, "Mathml attribute must be a valid mathml element");
 
-      const inputTree = new MathLayoutRowZipper(fromMathMLElement(mathMlElement), null, 0, 0);
+      const parsedInput = fromMathMLElement(mathMlElement);
+      // TODO: Properly report errors
+      if (parsedInput.errors.length > 0) {
+        console.warn("Parsed input has errors", parsedInput.errors);
+      }
+      const inputTree = new InputRowZipper(parsedInput.inputTree, null, 0, 0);
       this.setInputTree(inputTree, []);
     } else {
       console.log("Attribute changed", name, oldValue, newValue);
@@ -293,7 +285,7 @@ export class MathEditor extends HTMLElement {
    * Updates the user input. Then reparses and rerenders the math formula.
    * Also updates the carets.
    */
-  setInputTree(inputTree: MathLayoutRowZipper, newCarets: MathLayoutCaret[]) {
+  setInputTree(inputTree: InputRowZipper, newCarets: MathLayoutCaret[]) {
     this.inputTree = inputTree;
     this.carets.clearCarets();
     newCarets.forEach((v) => {
