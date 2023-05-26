@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use input_tree::input_node::InputNodeType;
+use input_tree::input_node::InputNodeContainer;
 
 use crate::{
     nfa_builder::NFABuilder,
@@ -145,7 +145,7 @@ impl ParseRuleCollection for BuiltInRules {
                 Self::rule_name("Fraction"),
                 (None, None),
                 StartingTokenMatcher::Token(TokenMatcher {
-                    symbol: NFABuilder::match_input_node(InputNodeType::Fraction).build(),
+                    symbol: NFABuilder::match_input_node(InputNodeContainer::Fraction).build(),
                     symbol_type: LeafNodeType::Symbol,
                 }),
             ),
@@ -153,7 +153,7 @@ impl ParseRuleCollection for BuiltInRules {
                 Self::rule_name("Root"),
                 (None, None),
                 StartingTokenMatcher::Token(TokenMatcher {
-                    symbol: NFABuilder::match_input_node(InputNodeType::Root).build(),
+                    symbol: NFABuilder::match_input_node(InputNodeContainer::Root).build(),
                     symbol_type: LeafNodeType::Symbol,
                 }),
             ),
@@ -161,7 +161,7 @@ impl ParseRuleCollection for BuiltInRules {
                 Self::rule_name("Under"),
                 (None, None),
                 StartingTokenMatcher::Token(TokenMatcher {
-                    symbol: NFABuilder::match_input_node(InputNodeType::Under).build(),
+                    symbol: NFABuilder::match_input_node(InputNodeContainer::Under).build(),
                     symbol_type: LeafNodeType::Symbol,
                 }),
             ),
@@ -169,7 +169,7 @@ impl ParseRuleCollection for BuiltInRules {
                 Self::rule_name("Over"),
                 (None, None),
                 StartingTokenMatcher::Token(TokenMatcher {
-                    symbol: NFABuilder::match_input_node(InputNodeType::Over).build(),
+                    symbol: NFABuilder::match_input_node(InputNodeContainer::Over).build(),
                     symbol_type: LeafNodeType::Symbol,
                 }),
             ),
@@ -179,7 +179,7 @@ impl ParseRuleCollection for BuiltInRules {
                 Self::rule_name("Sup"),
                 (Some(1000), None),
                 StartingTokenMatcher::Token(TokenMatcher {
-                    symbol: NFABuilder::match_input_node(InputNodeType::Sup).build(),
+                    symbol: NFABuilder::match_input_node(InputNodeContainer::Sup).build(),
                     symbol_type: LeafNodeType::Operator,
                 }),
             ),
@@ -187,7 +187,7 @@ impl ParseRuleCollection for BuiltInRules {
                 Self::rule_name("Sub"),
                 (Some(1000), None),
                 StartingTokenMatcher::Token(TokenMatcher {
-                    symbol: NFABuilder::match_input_node(InputNodeType::Sub).build(),
+                    symbol: NFABuilder::match_input_node(InputNodeContainer::Sub).build(),
                     symbol_type: LeafNodeType::Operator,
                 }),
             ),
@@ -196,7 +196,7 @@ impl ParseRuleCollection for BuiltInRules {
                 Self::rule_name("Table"),
                 (None, None),
                 StartingTokenMatcher::Token(TokenMatcher {
-                    symbol: NFABuilder::match_input_node(InputNodeType::Table).build(),
+                    symbol: NFABuilder::match_input_node(InputNodeContainer::Table).build(),
                     symbol_type: LeafNodeType::Symbol,
                 }),
             ),

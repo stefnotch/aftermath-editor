@@ -104,7 +104,7 @@ mod tests {
     fn test_lexer_slicing() {
         let layout = InputRow::new(vec![
             InputNode::Symbol("a".to_string()),
-            InputNode::Fraction([
+            InputNode::fraction([
                 InputRow::new(vec![InputNode::Symbol("b".to_string())]),
                 InputRow::new(vec![InputNode::Symbol("c".to_string())]),
             ]),
@@ -127,7 +127,7 @@ mod tests {
         );
         assert_eq!(
             lexer_range.get_next_slice().get(0),
-            Some(&InputNode::Fraction([
+            Some(&InputNode::fraction([
                 InputRow::new(vec![InputNode::Symbol("b".to_string())]),
                 InputRow::new(vec![InputNode::Symbol("c".to_string())]),
             ]))
@@ -139,7 +139,7 @@ mod tests {
     fn test_lexer_token() {
         let layout = InputRow::new(vec![
             InputNode::Symbol("a".to_string()),
-            InputNode::Fraction([
+            InputNode::fraction([
                 InputRow::new(vec![InputNode::Symbol("b".to_string())]),
                 InputRow::new(vec![InputNode::Symbol("c".to_string())]),
             ]),
@@ -155,7 +155,7 @@ mod tests {
         );
         assert_eq!(
             lexer.get_next_value(),
-            Some(&InputNode::Fraction([
+            Some(&InputNode::fraction([
                 InputRow::new(vec![InputNode::Symbol("b".to_string())]),
                 InputRow::new(vec![InputNode::Symbol("c".to_string())]),
             ]))

@@ -1,3 +1,8 @@
+# next
+
+- Refactor InputNodes to have Grids instead of simple arrays of rows.
+- Use widths for InputNodes, so that I can work with absolute positions
+
 # v0.1.2
 
 - highlight token before caret

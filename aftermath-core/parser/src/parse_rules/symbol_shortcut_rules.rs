@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use input_tree::input_node::InputNodeType;
+use input_tree::input_node::InputNodeContainer;
 
 use crate::{
     nfa_builder::NFABuilder,
@@ -22,21 +22,21 @@ impl SymbolShortcutRules {
 impl ParseRuleCollection for SymbolShortcutRules {
     fn get_rules() -> Vec<TokenDefinition> {
         vec![
-          TokenDefinition::new(
-              ArithmeticRules::rule_name("Fraction"),
-              (Some(200), Some(201)),
-              StartingTokenMatcher::operator_from_character('/'),
-          ),
-          TokenDefinition::new(
-              ArithmeticRules::rule_name("Sub"),
-              (Some(850), None), // Dunno really
-              StartingTokenMatcher::operator_from_character('_'),
-          ),
-          TokenDefinition::new(
-              ArithmeticRules::rule_name("Sup"),
-              (Some(850), None),
-              StartingTokenMatcher::operator_from_character('^'),
-          ),
+            TokenDefinition::new(
+                ArithmeticRules::rule_name("Fraction"),
+                (Some(200), Some(201)),
+                StartingTokenMatcher::operator_from_character('/'),
+            ),
+            TokenDefinition::new(
+                ArithmeticRules::rule_name("Sub"),
+                (Some(850), None), // Dunno really
+                StartingTokenMatcher::operator_from_character('_'),
+            ),
+            TokenDefinition::new(
+                ArithmeticRules::rule_name("Sup"),
+                (Some(850), None),
+                StartingTokenMatcher::operator_from_character('^'),
+            ),
         ]
     }
 }

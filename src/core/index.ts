@@ -30,24 +30,34 @@ export function joinNodeIdentifier(nodeIdentifier: NodeIdentifier): NodeIdentifi
 function toCore(row: MathLayoutRow): CoreRow {
   return {
     values: row.values.map((v) => {
+      // Uh oh, now I'm also maintaining invariants in two places.
       if (v.type === "fraction") {
-        return { Fraction: [toCore(v.values[0]), toCore(v.values[1])] };
+        return {
+          Container: { container_type: "Fraction", rows: { values: [toCore(v.values[0]), toCore(v.values[1])], width: 1 } },
+        };
       } else if (v.type === "root") {
-        return { Root: [toCore(v.values[0]), toCore(v.values[1])] };
+        return {
+          Container: { container_type: "Root", rows: { values: [toCore(v.values[0]), toCore(v.values[1])], width: 2 } },
+        };
       } else if (v.type === "under") {
-        return { Under: [toCore(v.values[0]), toCore(v.values[1])] };
+        return {
+          Container: { container_type: "Under", rows: { values: [toCore(v.values[0]), toCore(v.values[1])], width: 1 } },
+        };
       } else if (v.type === "over") {
-        return { Over: [toCore(v.values[0]), toCore(v.values[1])] };
+        return {
+          Container: { container_type: "Over", rows: { values: [toCore(v.values[0]), toCore(v.values[1])], width: 1 } },
+        };
       } else if (v.type === "sup") {
-        return { Sup: toCore(v.values[0]) };
+        return {
+          Container: { container_type: "Sup", rows: { values: [toCore(v.values[0])], width: 1 } },
+        };
       } else if (v.type === "sub") {
-        return { Sub: toCore(v.values[0]) };
+        return {
+          Container: { container_type: "Sub", rows: { values: [toCore(v.values[0])], width: 1 } },
+        };
       } else if (v.type === "table") {
         return {
-          Table: {
-            cells: v.values.map((row) => toCore(row)),
-            row_width: v.rowWidth,
-          },
+          Container: { container_type: "Table", rows: { values: v.values.map((row) => toCore(row)), width: v.rowWidth } },
         };
       } else if (v.type === "symbol") {
         const value = v.value.normalize("NFD");
@@ -70,14 +80,17 @@ function toCore(row: MathLayoutRow): CoreRow {
 
 type CoreRow = { values: CoreElement[] };
 type CoreElement =
-  | { Fraction: [CoreRow, CoreRow] }
-  | { Root: [CoreRow, CoreRow] }
-  | { Under: [CoreRow, CoreRow] }
-  | { Over: [CoreRow, CoreRow] }
-  | { Sup: CoreRow }
-  | { Sub: CoreRow }
-  | { Table: { cells: CoreRow[]; row_width: number } }
+  | {
+      Container: {
+        container_type: CoreContainer;
+        rows: CoreGrid<CoreRow>;
+      };
+    }
   | { Symbol: string };
+
+type CoreContainer = "Fraction" | "Root" | "Under" | "Over" | "Sup" | "Sub" | "Table";
+
+type CoreGrid<T> = { values: T[]; width: number };
 
 export type ParseResult = {
   value: SyntaxNode;

@@ -7,7 +7,10 @@ pub mod string_rules;
 
 use std::collections::HashMap;
 
-use input_tree::{input_node::InputNode, row::RowIndex};
+use input_tree::{
+    input_node::{InputNode, InputNodeContainer},
+    row::RowIndex,
+};
 
 use crate::{
     lexer::{LexerRange, LexerToken},
@@ -356,13 +359,34 @@ impl TokenDefinition {
 
     fn get_new_row_token_name(token: &InputNode) -> Option<NodeIdentifier> {
         match token {
-            InputNode::Fraction(_) => Some(BuiltInRules::fraction_rule_name()),
-            InputNode::Root(_) => Some(BuiltInRules::root_rule_name()),
-            InputNode::Under(_) => Some(BuiltInRules::under_rule_name()),
-            InputNode::Over(_) => Some(BuiltInRules::over_rule_name()),
-            InputNode::Sup(_) => Some(BuiltInRules::row_rule_name()),
-            InputNode::Sub(_) => Some(BuiltInRules::row_rule_name()),
-            InputNode::Table { .. } => Some(BuiltInRules::table_rule_name()),
+            InputNode::Container {
+                container_type: InputNodeContainer::Fraction,
+                ..
+            } => Some(BuiltInRules::fraction_rule_name()),
+            InputNode::Container {
+                container_type: InputNodeContainer::Root,
+                ..
+            } => Some(BuiltInRules::root_rule_name()),
+            InputNode::Container {
+                container_type: InputNodeContainer::Under,
+                ..
+            } => Some(BuiltInRules::under_rule_name()),
+            InputNode::Container {
+                container_type: InputNodeContainer::Over,
+                ..
+            } => Some(BuiltInRules::over_rule_name()),
+            InputNode::Container {
+                container_type: InputNodeContainer::Sup,
+                ..
+            } => Some(BuiltInRules::row_rule_name()),
+            InputNode::Container {
+                container_type: InputNodeContainer::Sub,
+                ..
+            } => Some(BuiltInRules::row_rule_name()),
+            InputNode::Container {
+                container_type: InputNodeContainer::Table,
+                ..
+            } => Some(BuiltInRules::table_rule_name()),
             InputNode::Symbol(_) => None,
         }
     }
@@ -391,11 +415,15 @@ impl TokenDefinition {
                         .collect();
 
                     return match input_node {
-                        InputNode::Table { row_width, .. } => SyntaxNode::new(
+                        InputNode::Container {
+                            container_type: InputNodeContainer::Table,
+                            rows,
+                            ..
+                        } => SyntaxNode::new(
                             node_identifier,
                             // We're wrapping the new row in a token with a proper width
                             token.range(),
-                            SyntaxNodes::NewTable(children, *row_width),
+                            SyntaxNodes::NewTable(children, rows.width() as u32),
                         ),
                         _ => SyntaxNode::new(
                             node_identifier,

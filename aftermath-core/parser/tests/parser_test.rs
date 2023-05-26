@@ -39,7 +39,7 @@ fn test_postfix() {
 fn test_sub() {
     let layout = InputRow::new(vec![
         InputNode::Symbol("a".to_string()),
-        InputNode::Sub(InputRow::new(vec![InputNode::Symbol("1".to_string())])),
+        InputNode::sub(InputRow::new(vec![InputNode::Symbol("1".to_string())])),
     ]);
     let context = ParserRules::default();
     let parsed = parse_row(&layout, &context);
@@ -54,8 +54,8 @@ fn test_sub() {
 fn test_sup_sub() {
     let layout = InputRow::new(vec![
         InputNode::Symbol("a".to_string()),
-        InputNode::Sup(InputRow::new(vec![InputNode::Symbol("1".to_string())])),
-        InputNode::Sub(InputRow::new(vec![InputNode::Symbol("2".to_string())])),
+        InputNode::sup(InputRow::new(vec![InputNode::Symbol("1".to_string())])),
+        InputNode::sub(InputRow::new(vec![InputNode::Symbol("2".to_string())])),
     ]);
     let context = ParserRules::default();
     let parsed = parse_row(&layout, &context);
@@ -195,7 +195,7 @@ fn test_parser_fraction() {
         InputNode::Symbol("(".to_string()),
         InputNode::Symbol("a".to_string()),
         InputNode::Symbol("+".to_string()),
-        InputNode::Fraction([
+        InputNode::fraction([
             InputRow::new(vec![InputNode::Symbol("b".to_string())]),
             InputRow::new(vec![InputNode::Symbol("c".to_string())]),
         ]),
@@ -226,7 +226,7 @@ fn test_parser_empty_input() {
 fn test_parser_empty_squareroot() {
     // A square root is one of the few places in mathematics, where a default value exists
     // $ \sqrt{a} = \sqrt[2]{a}$
-    let layout = InputRow::new(vec![InputNode::Root([
+    let layout = InputRow::new(vec![InputNode::root([
         InputRow::new(vec![]),
         InputRow::new(vec![InputNode::Symbol("a".to_string())]),
     ])]);

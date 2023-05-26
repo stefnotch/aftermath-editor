@@ -35,7 +35,7 @@ pub fn parse_row(input: &InputRow, context: &ParserRules) -> ParseResult<SyntaxN
         // So to fix that, we'll just parse the rest of the input repeatedly.
 
         while !lexer.eof() {
-            let mut next_node;
+            let next_node;
             (next_node, lexer) = context.parse_bp(lexer, 0);
             if next_node.range().is_empty() {
                 let next_node;
