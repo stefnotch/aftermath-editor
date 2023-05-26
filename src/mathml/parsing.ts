@@ -228,10 +228,14 @@ function getText(element: Element) {
   return (element.textContent + "").trim();
 }
 
+const intlSegmenter = globalThis?.Intl?.Segmenter ? new Intl.Segmenter("en", { granularity: "grapheme" }) : null;
+
 export function unicodeSplit(text: string) {
-  // TODO: For text use https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Segmenter
-  // TODO: https://stackoverflow.com/a/73802453/3492994
-  return [...text];
+  if (intlSegmenter) {
+    return Array.from(intlSegmenter.segment(text), ({ segment }) => segment);
+  } else {
+    return [...text];
+  }
 }
 
 /**
