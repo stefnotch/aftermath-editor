@@ -80,7 +80,7 @@ export class MathCaret {
         start: 0,
         end: this.caret.end,
       };
-    } else if (hasSyntaxNodeChildren(row, "NewTable") || hasSyntaxNodeChildren(row, "NewRows")) {
+    } else if (hasSyntaxNodeChildren(row, "NewRows")) {
       assert(row.range.start === this.caret.end || row.range.end === this.caret.end);
       return {
         indices,
@@ -107,7 +107,7 @@ export class MathCaret {
         );
       } else if (hasSyntaxNodeChildren(node, "Containers")) {
         return node.children.Containers.flatMap((v) => getLeaves(v));
-      } else if (hasSyntaxNodeChildren(node, "NewTable") || hasSyntaxNodeChildren(node, "NewRows")) {
+      } else if (hasSyntaxNodeChildren(node, "NewRows")) {
         // Maybe return some dummy symbols here?
         return [];
       } else {

@@ -1,7 +1,7 @@
 import { SyntaxNode } from "../../core";
 import { RowIndex } from "../../math-layout/math-layout-zipper";
 import { RenderedElement, Renderer } from "../../rendering/render-result";
-import { ViewportCoordinate, ViewportRect } from "../../rendering/viewport-coordinate";
+import { ViewportCoordinate } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
 import { MathMLTags } from "../mathml-spec";
 import { RenderedMathML, createMathElement } from "./rendered-element";
@@ -20,20 +20,24 @@ export class RowsContainerMathMLElement implements RenderedElement<MathMLElement
     elementName: MathMLTags,
     renderer: Renderer<MathMLElement>
   ) {
-    assert(syntaxTree.children.NewRows.length > 0, "Needs at least one child");
+    assert(syntaxTree.children.NewRows.values.length > 0, "Needs at least one child");
     this.element = new RenderedMathML(createMathElement(elementName, []));
     this.startBaselineReader = createMathElement("mphantom", []);
     this.endBaselineReader = createMathElement("mphantom", []);
+    const indexOfContainer = this.syntaxTree.range.start;
+    assert(this.syntaxTree.range.start + 1 === this.syntaxTree.range.end, "Invalid range for a row container");
 
-    this.element.setChildren(syntaxTree.children.NewRows.map(([rowIndex, c]) => renderer.render(c, rowIndex)));
-    assert(this.element.getChildren().length === this.syntaxTree.children.NewRows.length, "Invalid number of children");
+    this.element.setChildren(
+      syntaxTree.children.NewRows.values.map((c, rowIndex) => renderer.render(c, [indexOfContainer, rowIndex]))
+    );
+    assert(this.element.getChildren().length === this.syntaxTree.children.NewRows.values.length, "Invalid number of children");
     assert(this.element.getChildren().length > 0, "Needs at least one rendered child");
   }
 
   getCaretSize() {
     return this.element.getCaretSize();
   }
-  getBounds(): ViewportRect {
+  getBounds() {
     return this.element.getBounds();
   }
 

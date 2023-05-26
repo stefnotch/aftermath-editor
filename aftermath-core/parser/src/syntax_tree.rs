@@ -5,7 +5,7 @@ use std::ops::Range;
 use serde::Serialize;
 
 pub use display_syntax_tree::*;
-use input_tree::row::RowIndex;
+use input_tree::row::Grid;
 use unicode_ident::{is_xid_continue, is_xid_start};
 
 /// A node in a concrete syntax tree that contains other nodes.
@@ -28,7 +28,7 @@ pub struct SyntaxNode {
     /// value, especially for constants
     /// stored as bytes, and interpreted according to the name
     pub value: Vec<u8>,
-    /// The range of this in the input tree row.
+    /// The range, expressed in absolute offsets. TODO:
     range: Range<usize>,
 }
 
@@ -64,17 +64,15 @@ fn is_identifier(value: &str) -> bool {
 pub enum SyntaxNodes {
     Containers(Vec<SyntaxNode>),
     /// When this syntax node actually starts a new row in the input tree.
-    NewRows(Vec<(RowIndex, SyntaxNode)>),
-    NewTable(Vec<(RowIndex, SyntaxNode)>, u32),
+    /// TODO: Maybe verify that this has a range of 1?
+    NewRows(Grid<SyntaxNode>),
     Leaf(SyntaxLeafNode),
 }
 impl SyntaxNodes {
     fn is_empty(&self) -> bool {
         match self {
             SyntaxNodes::Containers(children) => children.is_empty(),
-            SyntaxNodes::NewRows(children) | SyntaxNodes::NewTable(children, _) => {
-                children.is_empty()
-            }
+            SyntaxNodes::NewRows(children) => children.is_empty(),
             SyntaxNodes::Leaf(_) => false,
         }
     }
@@ -138,7 +136,7 @@ impl SyntaxNode {
             SyntaxNodes::Containers(children) => {
                 children.iter().map(|v| v.range()).collect::<Vec<_>>()
             }
-            SyntaxNodes::NewRows(_) | SyntaxNodes::NewTable(_, _) => vec![],
+            SyntaxNodes::NewRows(_) => vec![],
             SyntaxNodes::Leaf(child) => vec![child.range()],
         };
         let mut child_iter = binding.iter();

@@ -12,6 +12,7 @@ import { assert } from "../utils/assert";
 import { MathMLRenderResult } from "./render-result";
 import { SimpleContainerMathMLElement } from "./renderer/rendered-container-element";
 import { NothingMathMLElement } from "./renderer/rendered-nothing";
+import { RootMathMLElement } from "./renderer/rendered-root-element";
 import { RowsContainerMathMLElement } from "./renderer/rendered-rows-element";
 import { SymbolMathMLElement } from "./renderer/rendered-symbol-element";
 import { TableMathMLElement } from "./renderer/rendered-table-element";
@@ -110,13 +111,11 @@ if (mathIR.type === "table") {
         return new RowsContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });
       builtIn.add("Root", (syntaxTree, rowIndex) => {
-        // We have to switch the arguments here, because MathML uses the second argument as the root
         assert(hasSyntaxNodeChildren(syntaxTree, "NewRows"));
-        syntaxTree.children.NewRows.reverse();
-        return new RowsContainerMathMLElement(syntaxTree, rowIndex, "mroot", this);
+        return new RootMathMLElement(syntaxTree, rowIndex, "mroot", this);
       });
       builtIn.add("Table", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "NewTable"));
+        assert(hasSyntaxNodeChildren(syntaxTree, "NewRows"));
         return new TableMathMLElement(syntaxTree, rowIndex, this);
       });
     }

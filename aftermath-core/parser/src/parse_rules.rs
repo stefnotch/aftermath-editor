@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use input_tree::{
     input_node::{InputNode, InputNodeContainer},
-    row::RowIndex,
+    row::Grid,
 };
 
 use crate::{
@@ -357,37 +357,15 @@ impl TokenDefinition {
         (arguments, lexer)
     }
 
-    fn get_new_row_token_name(token: &InputNode) -> Option<NodeIdentifier> {
+    fn get_new_row_token_name(token: &InputNodeContainer) -> NodeIdentifier {
         match token {
-            InputNode::Container {
-                container_type: InputNodeContainer::Fraction,
-                ..
-            } => Some(BuiltInRules::fraction_rule_name()),
-            InputNode::Container {
-                container_type: InputNodeContainer::Root,
-                ..
-            } => Some(BuiltInRules::root_rule_name()),
-            InputNode::Container {
-                container_type: InputNodeContainer::Under,
-                ..
-            } => Some(BuiltInRules::under_rule_name()),
-            InputNode::Container {
-                container_type: InputNodeContainer::Over,
-                ..
-            } => Some(BuiltInRules::over_rule_name()),
-            InputNode::Container {
-                container_type: InputNodeContainer::Sup,
-                ..
-            } => Some(BuiltInRules::row_rule_name()),
-            InputNode::Container {
-                container_type: InputNodeContainer::Sub,
-                ..
-            } => Some(BuiltInRules::row_rule_name()),
-            InputNode::Container {
-                container_type: InputNodeContainer::Table,
-                ..
-            } => Some(BuiltInRules::table_rule_name()),
-            InputNode::Symbol(_) => None,
+            InputNodeContainer::Fraction => BuiltInRules::fraction_rule_name(),
+            InputNodeContainer::Root => BuiltInRules::root_rule_name(),
+            InputNodeContainer::Under => BuiltInRules::under_rule_name(),
+            InputNodeContainer::Over => BuiltInRules::over_rule_name(),
+            InputNodeContainer::Sup => BuiltInRules::row_rule_name(),
+            InputNodeContainer::Sub => BuiltInRules::row_rule_name(),
+            InputNodeContainer::Table => BuiltInRules::table_rule_name(),
         }
     }
 
@@ -399,39 +377,33 @@ impl TokenDefinition {
         // Hardcoded for now
         match token.value {
             [input_node] => {
-                if let Some(node_identifier) = Self::get_new_row_token_name(input_node) {
-                    let token_index = token.range().start;
-
-                    let children = input_node
-                        .rows()
-                        .iter()
-                        .enumerate()
-                        .map(|(row_index, row)| {
-                            let row_parse_result = parse_row(row, parser_rules);
-                            // TODO: Bubble up the row_parse_result.errors
-                            let syntax_tree = row_parse_result.value;
-                            (RowIndex(token_index, row_index), syntax_tree)
-                        })
-                        .collect();
-
-                    return match input_node {
-                        InputNode::Container {
-                            container_type: InputNodeContainer::Table,
-                            rows,
-                            ..
-                        } => SyntaxNode::new(
-                            node_identifier,
-                            // We're wrapping the new row in a token with a proper width
-                            token.range(),
-                            SyntaxNodes::NewTable(children, rows.width() as u32),
-                        ),
-                        _ => SyntaxNode::new(
-                            node_identifier,
+                match input_node {
+                    InputNode::Container {
+                        container_type,
+                        rows,
+                        offset_count: _,
+                    } => {
+                        let children = Grid::from_one_dimensional(
+                            input_node
+                                .rows()
+                                .iter()
+                                .map(|row| {
+                                    let row_parse_result = parse_row(row, parser_rules);
+                                    // TODO: Bubble up the row_parse_result.errors
+                                    let syntax_tree = row_parse_result.value;
+                                    syntax_tree
+                                })
+                                .collect(),
+                            rows.width(),
+                        );
+                        return SyntaxNode::new(
+                            Self::get_new_row_token_name(container_type),
                             // We're wrapping the new row in a token with a proper width
                             token.range(),
                             SyntaxNodes::NewRows(children),
-                        ),
-                    };
+                        );
+                    }
+                    InputNode::Symbol(_) => {}
                 }
             }
             _ => {}

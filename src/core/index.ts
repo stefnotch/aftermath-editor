@@ -1,7 +1,7 @@
 import init, { MathParser } from "../../aftermath-core/pkg";
 import { MathLayoutRow } from "../math-layout/math-layout";
 import { Offset } from "../math-layout/math-layout-offset";
-import { RowIndex, RowIndices } from "../math-layout/math-layout-zipper";
+import { RowIndices } from "../math-layout/math-layout-zipper";
 import { assert } from "../utils/assert";
 import { customError } from "../utils/error-utils";
 
@@ -103,7 +103,7 @@ type CoreElement =
   | {
       Container: {
         container_type: CoreContainer;
-        rows: CoreGrid<CoreRow>;
+        rows: Grid<CoreRow>;
         offset_count: number;
       };
     }
@@ -111,7 +111,7 @@ type CoreElement =
 
 type CoreContainer = "Fraction" | "Root" | "Under" | "Over" | "Sup" | "Sub" | "Table";
 
-type CoreGrid<T> = { values: T[]; width: number };
+type Grid<T> = { values: T[]; width: number };
 
 export type ParseResult = {
   value: SyntaxNode;
@@ -123,16 +123,13 @@ export type SyntaxNodes =
       Containers: SyntaxNode[];
     }
   | {
-      NewRows: [RowIndex, SyntaxNode][];
-    }
-  | {
-      NewTable: [[RowIndex, SyntaxNode][], number];
+      NewRows: Grid<SyntaxNode>;
     }
   | {
       Leaf: SyntaxLeafNode;
     };
 
-type SyntaxNodesKeys = "Containers" | "NewRows" | "NewTable" | "Leaf";
+type SyntaxNodesKeys = "Containers" | "NewRows" | "Leaf";
 type SyntaxNodesMatcher<T extends SyntaxNodesKeys> = {
   [X in T]: Extract<SyntaxNodes, { [P in X]: any }>;
 }[T];
@@ -181,17 +178,15 @@ export function getRowNode(node: SyntaxNode, indices: RowIndices) {
     const childNode = getChildWithContainerIndex(node, indexOfContainer);
     let rowChildElement: SyntaxNode | undefined;
     if (hasSyntaxNodeChildren(childNode, "NewRows")) {
-      rowChildElement = childNode.children.NewRows.find(([rowIndex, _]) => rowIndex[1] === indexOfRow)?.[1];
-    } else if (hasSyntaxNodeChildren(childNode, "NewTable")) {
-      rowChildElement = childNode.children.NewTable[0].find(([rowIndex, _]) => rowIndex[1] === indexOfRow)?.[1];
+      rowChildElement = childNode.children.NewRows.values[indexOfRow];
     } else {
-      assert(false, "Expected to find NewRows or NewTable");
+      assert(false, "Expected to find NewRows");
     }
     assert(rowChildElement, `Couldn't find row ${indexOfRow} in ${joinNodeIdentifier(node.name)}`);
     node = rowChildElement;
   }
 
-  function getChildWithContainerIndex(node: SyntaxNode, indexOfContainer: number): SyntaxNode<"NewRows" | "NewTable"> {
+  function getChildWithContainerIndex(node: SyntaxNode, indexOfContainer: number): SyntaxNode<"NewRows"> {
     // Only walk down if we're still on the same row
     if (hasSyntaxNodeChildren(node, "Containers")) {
       for (let childElement of node.children.Containers) {
@@ -202,7 +197,7 @@ export function getRowNode(node: SyntaxNode, indices: RowIndices) {
       }
     }
 
-    assert(hasSyntaxNodeChildren(node, "NewRows") || hasSyntaxNodeChildren(node, "NewTable"));
+    assert(hasSyntaxNodeChildren(node, "NewRows"));
     return node;
   }
 

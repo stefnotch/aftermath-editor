@@ -66,6 +66,10 @@ impl<T> Grid<T> {
     pub fn values(&self) -> &[T] {
         &self.values
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
 }
 
 /// Points at a given row
