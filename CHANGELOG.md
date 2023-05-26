@@ -1,6 +1,7 @@
-# next
+# v0.2.0
 
 - Refactor InputNodes to have Grids instead of simple arrays of rows.
+- Reduce number of different InputNodes
 - Use widths for InputNodes, so that I can work with absolute positions
 
 # v0.1.2
