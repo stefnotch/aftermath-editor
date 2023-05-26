@@ -55,8 +55,8 @@ export class MathLayoutRowZipper
    * Row zippers have a unique range.
    */
   equals(other: MathLayoutRowZipper): boolean {
-    const thisEndOffset = this.startAbsoluteOffset + this.value.width;
-    const otherEndOffset = other.startAbsoluteOffset + other.value.width;
+    const thisEndOffset = this.startAbsoluteOffset + this.value.offsetCount;
+    const otherEndOffset = other.startAbsoluteOffset + other.value.offsetCount;
     return this.startAbsoluteOffset === other.startAbsoluteOffset && thisEndOffset === otherEndOffset;
   }
 
@@ -68,7 +68,7 @@ export class MathLayoutRowZipper
     let startOffset = this.startAbsoluteOffset;
     return this.value.values.map((v, i) => {
       const childStartOffset = startOffset + 1;
-      startOffset = startOffset + v.width + 1;
+      startOffset = startOffset + v.offsetCount + 1;
       if (isMathLayoutSymbol(v)) {
         return new MathLayoutSymbolZipper(v, this, i, childStartOffset);
       } else if (isMathLayoutTable(v)) {
@@ -97,7 +97,7 @@ export class MathLayoutRowZipper
   }
 
   containsAbsoluteOffset(absoluteOffset: Offset): boolean {
-    return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.width;
+    return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.offsetCount;
   }
 
   insert(offset: Offset, newChild: MathLayoutElement) {
@@ -181,7 +181,7 @@ export class MathLayoutContainerZipper implements MathLayoutZipper<MathLayoutRow
     return this.value.values.map((v, i) => {
       // Different logic here because a container doesn't have extra places for the caret to go
       const childStartOffset = startOffset;
-      startOffset = startOffset + v.width;
+      startOffset = startOffset + v.offsetCount;
       return new MathLayoutRowZipper(v, this, i, childStartOffset);
     });
   }
@@ -191,7 +191,7 @@ export class MathLayoutContainerZipper implements MathLayoutZipper<MathLayoutRow
   }
 
   containsAbsoluteOffset(absoluteOffset: Offset): boolean {
-    return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.width;
+    return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.offsetCount;
   }
 
   replaceSelf(newValue: MathLayoutContainer) {
@@ -212,7 +212,7 @@ export class MathLayoutContainerZipper implements MathLayoutZipper<MathLayoutRow
     const newValue = mathLayoutWithWidth({
       type: this.value.type,
       values: values as any, // TODO: Type safety would be nice
-      width: 0,
+      offsetCount: 0,
     });
 
     return this.replaceSelf(newValue);
@@ -235,7 +235,7 @@ export class MathLayoutTableZipper implements MathLayoutZipper<MathLayoutRowZipp
     let startOffset = this.startAbsoluteOffset;
     return this.value.values.map((v, i) => {
       const childStartOffset = startOffset;
-      startOffset = startOffset + v.width;
+      startOffset = startOffset + v.offsetCount;
       return new MathLayoutRowZipper(v, this, i, childStartOffset);
     });
   }

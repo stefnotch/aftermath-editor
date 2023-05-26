@@ -10,14 +10,10 @@ export class NothingMathMLElement implements RenderedElement<MathMLElement> {
   element: RenderedMathML;
   private baselineReaderElement: MathMLElement;
 
-  constructor(public syntaxTree: SyntaxNode, public rowIndex: RowIndex | null) {
+  constructor(public syntaxTree: SyntaxNode<"Containers">, public rowIndex: RowIndex | null) {
     this.baselineReaderElement = createMathElement("mphantom", []);
-    if ("Leaves" in syntaxTree.children) {
-      assert(syntaxTree.children.Leaves.length === 0);
-    } else {
-      assert("Containers" in syntaxTree.children);
-      assert(syntaxTree.children.Containers.length === 0);
-    }
+    assert(syntaxTree.children.Containers.length === 0);
+    assert(syntaxTree.range.start === syntaxTree.range.end);
 
     this.element = new RenderedMathML(createMathElement("mrow", [this.baselineReaderElement, createPlaceholder()]));
   }
@@ -28,7 +24,7 @@ export class NothingMathMLElement implements RenderedElement<MathMLElement> {
     return this.element.getBounds();
   }
   getCaretPosition(offset: Offset): ViewportCoordinate {
-    assert(offset === 0, "NothingMathMLElement only supports offset 0");
+    assert(offset === this.syntaxTree.range.start);
     // The baseline isn't exposed as a property, so we have this workaround https://github.com/w3c/mathml-core/issues/38
     // https://jsfiddle.net/se6n81rg/1/
     const baseline = this.baselineReaderElement.getBoundingClientRect().bottom;

@@ -40,22 +40,22 @@ export function tablePositionToIndex(table: MathLayoutTable, position: [number, 
 }
 
 function calculateMathLayoutWidth(values: readonly MathLayoutRow[] | readonly MathLayoutElement[]): number {
-  return values.map((v) => v.width).reduce((a, b) => a + b, 0);
+  return values.map((v) => v.offsetCount).reduce((a, b) => a + b, 0);
 }
 export function mathLayoutWithWidth<T extends MathLayoutRow | MathLayoutElement>(value: T): T {
   if (isMathLayoutSymbol(value)) {
-    return { ...value, width: 0 };
+    return { ...value, offsetCount: 0 };
   } else if (isMathLayoutRow(value)) {
     const numberOfOffsets = value.values.length + 1;
-    return { ...value, width: numberOfOffsets + calculateMathLayoutWidth(value.values) };
+    return { ...value, offsetCount: numberOfOffsets + calculateMathLayoutWidth(value.values) };
   } else {
-    return { ...value, width: calculateMathLayoutWidth(value.values) };
+    return { ...value, offsetCount: calculateMathLayoutWidth(value.values) };
   }
 }
 
 export function isSame(a: MathLayoutRow | MathLayoutElement, b: MathLayoutRow | MathLayoutElement): boolean {
   if (a.type !== b.type) return false;
-  if (a.width !== b.width) return false;
+  if (a.offsetCount !== b.offsetCount) return false;
 
   if (a.type === "row") {
     assert(b.type === a.type);

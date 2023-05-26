@@ -10,12 +10,11 @@ export type MathLayoutRow = {
   readonly type: "row";
   readonly values: readonly MathLayoutElement[];
   /**
-   * TODO: Rename to offsetCount
    * If there's one element, then the width is 2.
    * And the offsets are [0, 1].
    * Notice how this gives you an exclusive upper bound.
    */
-  readonly width: number;
+  readonly offsetCount: number;
 };
 
 export function isMathLayoutRow(value: MathLayoutRow | MathLayoutElement): value is MathLayoutRow {
@@ -43,32 +42,32 @@ export type MathLayoutContainer =
   | {
       readonly type: "fraction";
       readonly values: readonly [MathLayoutRow, MathLayoutRow];
-      readonly width: number;
+      readonly offsetCount: number;
     }
   | {
       readonly type: "root";
       readonly values: readonly [MathLayoutRow, MathLayoutRow];
-      readonly width: number;
+      readonly offsetCount: number;
     }
   | {
       readonly type: "under";
       readonly values: readonly [MathLayoutRow, MathLayoutRow];
-      readonly width: number;
+      readonly offsetCount: number;
     }
   | {
       readonly type: "over";
       readonly values: readonly [MathLayoutRow, MathLayoutRow];
-      readonly width: number;
+      readonly offsetCount: number;
     }
   | {
       readonly type: "sup";
       readonly values: readonly [MathLayoutRow];
-      readonly width: number;
+      readonly offsetCount: number;
     }
   | {
       readonly type: "sub";
       readonly values: readonly [MathLayoutRow];
-      readonly width: number;
+      readonly offsetCount: number;
     };
 export function isMathLayoutContainer(value: MathLayoutRow | MathLayoutElement): value is MathLayoutContainer {
   const { type } = value as MathLayoutContainer;

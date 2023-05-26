@@ -48,7 +48,7 @@ export class MathEditor extends HTMLElement {
   inputHandler: InputHandlerElement;
 
   inputTree: MathLayoutRowZipper = new MathLayoutRowZipper(
-    mathLayoutWithWidth({ type: "row", values: [], width: 0 }),
+    mathLayoutWithWidth({ type: "row", values: [], offsetCount: 0 }),
     null,
     0,
     0
@@ -214,7 +214,7 @@ export class MathEditor extends HTMLElement {
                   mathLayoutWithWidth({
                     type: "row",
                     values: characters.map((v) => mathLayoutWithWidth({ type: "symbol", value: v, width: 0 })),
-                    width: 0,
+                    offsetCount: 0,
                   })
                 )
               )
@@ -247,7 +247,7 @@ export class MathEditor extends HTMLElement {
 
     this.syntaxTree = {
       name: ["BuiltIn", "Nothing"],
-      children: { Leaves: [] },
+      children: { Containers: [] },
       value: [],
       range: { start: 0, end: 0 },
     };
@@ -297,7 +297,7 @@ export class MathEditor extends HTMLElement {
     this.inputTree = inputTree;
     this.carets.clearCarets();
     newCarets.forEach((v) => {
-      assert(v.zipper.value === inputTree.value);
+      assert(v.zipper.root.value === inputTree.value);
       this.carets.add(v);
     });
 
@@ -380,8 +380,8 @@ export class MathEditor extends HTMLElement {
     };
 
     // Handle symbol shortcuts
-    const result = applyEdit(this.inputTree, edit);
-    const parsed = parse(result.root.value);
+    //const result = applyEdit(this.inputTree, edit);
+    //const parsed = parse(result.root.value);
     // 1. Get shortcut symbols in syntax tree (nested stuff - indices will change no matter what I do)
     // 2. Get the ranges of the operator symbols and ranges of arguments
     // 3. Delete the ranges

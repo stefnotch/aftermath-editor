@@ -65,7 +65,7 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
       mathLayoutWithWidth({
         type: "fraction",
         values: children.map((c) => wrapInRow(toMathLayout(c))) as [MathLayoutRow, MathLayoutRow],
-        width: 0,
+        offsetCount: 0,
       })
     );
   } else if (tagIs(element, "msqrt")) {
@@ -81,7 +81,7 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
         ),
         wrapInRow(children.flatMap((c) => toMathLayout(c))),
       ],
-      width: 0,
+      offsetCount: 0,
     });
   } else if (tagIs(element, "mroot")) {
     return (
@@ -89,7 +89,7 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
       mathLayoutWithWidth({
         type: "root",
         values: [wrapInRow(toMathLayout(children[1])), wrapInRow(toMathLayout(children[0]))],
-        width: 0,
+        offsetCount: 0,
       })
     );
   } else if (tagIs(element, "msub")) {
@@ -103,7 +103,7 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
         mathLayoutWithWidth({
           type: "sub",
           values: [wrapInRow(toMathLayout(children[1]))],
-          width: 0,
+          offsetCount: 0,
         }),
       ]
     );
@@ -118,7 +118,7 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
         mathLayoutWithWidth({
           type: "sup",
           values: [wrapInRow(toMathLayout(children[1]))],
-          width: 0,
+          offsetCount: 0,
         }),
       ]
     );
@@ -133,12 +133,12 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
         mathLayoutWithWidth({
           type: "sub",
           values: [wrapInRow(toMathLayout(children[1]))],
-          width: 0,
+          offsetCount: 0,
         }),
         mathLayoutWithWidth({
           type: "sup",
           values: [wrapInRow(toMathLayout(children[2]))],
-          width: 0,
+          offsetCount: 0,
         }),
       ]
     );
@@ -148,7 +148,7 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
       mathLayoutWithWidth({
         type: "under",
         values: [wrapInRow(toMathLayout(children[0])), wrapInRow(toMathLayout(children[1]))],
-        width: 0,
+        offsetCount: 0,
       })
     );
   } else if (tagIs(element, "mover")) {
@@ -157,7 +157,7 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
       mathLayoutWithWidth({
         type: "over",
         values: [wrapInRow(toMathLayout(children[0])), wrapInRow(toMathLayout(children[1]))],
-        width: 0,
+        offsetCount: 0,
       })
     );
   } else if (tagIs(element, "munderover")) {
@@ -170,12 +170,12 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
             mathLayoutWithWidth({
               type: "under",
               values: [wrapInRow(toMathLayout(children[0])), wrapInRow(toMathLayout(children[1]))],
-              width: 0,
+              offsetCount: 0,
             })
           ),
           wrapInRow(toMathLayout(children[2])),
         ],
-        width: 0,
+        offsetCount: 0,
       })
     );
   } else if (tagIs(element, "mtable")) {

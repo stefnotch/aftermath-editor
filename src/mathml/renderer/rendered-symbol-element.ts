@@ -13,14 +13,11 @@ import { LeafMathMLElement } from "./rendered-leaf";
  */
 export class SymbolMathMLElement implements RenderedElement<MathMLElement> {
   element: RenderedMathML;
-  private textElements: LeafMathMLElement[];
+  private textElement: LeafMathMLElement;
 
-  constructor(public syntaxTree: SyntaxNode<"Leaves">, public rowIndex: RowIndex | null, elementName: MathMLTags) {
-    this.textElements = syntaxTree.children.Leaves.map((v) => new LeafMathMLElement(v));
-    let children: Text[] = [];
-    for (let textElement of this.textElements) {
-      children.push(...textElement.getElements());
-    }
+  constructor(public syntaxTree: SyntaxNode<"Leaf">, public rowIndex: RowIndex | null, elementName: MathMLTags) {
+    this.textElement = new LeafMathMLElement(syntaxTree.children.Leaf);
+    let children: Text[] = this.textElement.getElements();
     const mathElement = createMathElement(elementName, children);
     mathElement.style.whiteSpace = "nowrap";
     this.element = new RenderedMathML(mathElement);
@@ -43,8 +40,7 @@ export class SymbolMathMLElement implements RenderedElement<MathMLElement> {
     } else if (offset >= this.syntaxTree.range.end) {
       x = boundingRect.right;
     } else {
-      const textElement = this.textElements.find((v) => offsetInRange(offset, v.syntaxTree.range));
-      x = textElement?.getViewportXPosition(offset)?.x ?? boundingRect.x + boundingRect.width / 2;
+      x = this.textElement.getViewportXPosition(offset).x;
     }
 
     // Symbol elements might be stretchy, in which case they can become pretty large.
