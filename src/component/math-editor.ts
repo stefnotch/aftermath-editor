@@ -213,7 +213,7 @@ export class MathEditor extends HTMLElement {
                   v.caret,
                   mathLayoutWithWidth({
                     type: "row",
-                    values: characters.map((v) => mathLayoutWithWidth({ type: "symbol", value: v, width: 0 })),
+                    values: characters.map((v) => mathLayoutWithWidth({ type: "symbol", value: v, offsetCount: 0 })),
                     offsetCount: 0,
                   })
                 )

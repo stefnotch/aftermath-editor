@@ -75,7 +75,7 @@ function toCore(row: MathLayoutRow): CoreRow {
         Container: {
           container_type: "Table",
           rows: { values: v.values.map((row) => toCore(row)), width: v.rowWidth },
-          offset_count: v.width,
+          offset_count: v.offsetCount,
         },
       };
     } else if (v.type === "symbol") {

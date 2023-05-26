@@ -28,19 +28,19 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
       mathLayoutWithWidth({
         type: "symbol",
         value: '"',
-        width: 0,
+        offsetCount: 0,
       }),
       ...unicodeSplit(getText(element)).map((v) =>
         mathLayoutWithWidth({
           type: "symbol",
           value: v,
-          width: 0,
+          offsetCount: 0,
         })
       ),
       mathLayoutWithWidth({
         type: "symbol",
         value: '"',
-        width: 0,
+        offsetCount: 0,
       }),
     ];
   } else if (tagIs(element, "mi", "mn")) {
@@ -48,7 +48,7 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
       mathLayoutWithWidth({
         type: "symbol",
         value: v,
-        width: 0,
+        offsetCount: 0,
       })
     );
   } else if (tagIs(element, "mo")) {
@@ -56,7 +56,7 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
       return mathLayoutWithWidth({
         type: "symbol",
         value: v,
-        width: 0,
+        offsetCount: 0,
       });
     });
   } else if (tagIs(element, "mfrac")) {
@@ -76,7 +76,7 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
           mathLayoutWithWidth({
             type: "symbol",
             value: "2",
-            width: 0,
+            offsetCount: 0,
           })
         ),
         wrapInRow(children.flatMap((c) => toMathLayout(c))),
@@ -183,7 +183,7 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
       return mathLayoutWithWidth({
         type: "error",
         value: "Unexpected children " + element,
-        width: 0,
+        offsetCount: 0,
       });
     }
 
@@ -193,7 +193,7 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
       Array.from({ length: tableWidth }, (_, i) =>
         i < c.children.length
           ? wrapInRow(toMathLayout(c.children[i]))
-          : mathLayoutWithWidth({ type: "row", values: [], width: 0 })
+          : mathLayoutWithWidth({ type: "row", values: [], offsetCount: 0 })
       )
     );
 
@@ -201,13 +201,13 @@ function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (
       type: "table",
       rowWidth: tableWidth,
       values: tableCells,
-      width: 0,
+      offsetCount: 0,
     });
   } else {
     return mathLayoutWithWidth({
       type: "error",
       value: "Unknown element " + element,
-      width: 0,
+      offsetCount: 0,
     });
   }
 }
@@ -217,7 +217,7 @@ function expectNChildren(element: Element, n: number): (MathLayoutSymbol & { typ
     return mathLayoutWithWidth({
       type: "error",
       value: `Expected ${n} children in ${element.tagName.toLowerCase()}`,
-      width: 0,
+      offsetCount: 0,
     });
   }
   return null;

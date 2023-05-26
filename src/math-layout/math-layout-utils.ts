@@ -8,7 +8,7 @@ export function wrapInRow(
   mathLayout: (MathLayoutRow | MathLayoutElement) | (MathLayoutRow | MathLayoutElement)[] | null
 ): MathLayoutRow {
   if (mathLayout == null) {
-    return mathLayoutWithWidth({ type: "row", values: [], width: 0 });
+    return mathLayoutWithWidth({ type: "row", values: [], offsetCount: 0 });
   }
 
   if (!Array.isArray(mathLayout)) {
@@ -27,7 +27,7 @@ export function wrapInRow(
         return v;
       }
     }),
-    width: 0,
+    offsetCount: 0,
   });
 }
 

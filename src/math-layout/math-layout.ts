@@ -83,7 +83,7 @@ export type MathLayoutTable = {
   readonly type: "table";
   readonly rowWidth: number;
   readonly values: MathLayoutRow[];
-  readonly width: number;
+  readonly offsetCount: number;
 };
 export function isMathLayoutTable(value: MathLayoutRow | MathLayoutElement): value is MathLayoutTable {
   const { type } = value as MathLayoutTable;
@@ -99,12 +99,12 @@ export type MathLayoutSymbol =
   | {
       readonly type: "symbol";
       readonly value: string;
-      readonly width: number;
+      readonly offsetCount: number;
     }
   | {
       readonly type: "error";
       readonly value: string;
-      readonly width: number;
+      readonly offsetCount: number;
     };
 
 export function isMathLayoutSymbol(value: MathLayoutRow | MathLayoutElement): value is MathLayoutSymbol {

@@ -109,7 +109,7 @@ export class MathLayoutRowZipper
       mathLayoutWithWidth({
         type: this.value.type,
         values,
-        width: 0,
+        offsetCount: 0,
       })
     );
     return {
@@ -125,7 +125,7 @@ export class MathLayoutRowZipper
       mathLayoutWithWidth({
         type: this.value.type,
         values: [...this.value.values.slice(0, index), ...this.value.values.slice(index + 1)],
-        width: 0,
+        offsetCount: 0,
       })
     );
     return {
@@ -157,7 +157,7 @@ export class MathLayoutRowZipper
     const newValue: MathLayoutRow = mathLayoutWithWidth({
       type: this.value.type,
       values,
-      width: 0,
+      offsetCount: 0,
     });
 
     return this.replaceSelf(newValue);
@@ -245,7 +245,7 @@ export class MathLayoutTableZipper implements MathLayoutZipper<MathLayoutRowZipp
   }
 
   containsAbsoluteOffset(absoluteOffset: Offset): boolean {
-    return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.width;
+    return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.offsetCount;
   }
 
   replaceSelf(newValue: MathLayoutTable) {
@@ -266,7 +266,7 @@ export class MathLayoutTableZipper implements MathLayoutZipper<MathLayoutRowZipp
       type: this.value.type,
       rowWidth: this.value.rowWidth,
       values: values,
-      width: 0,
+      offsetCount: 0,
     });
 
     return this.replaceSelf(newValue);
@@ -294,7 +294,7 @@ export class MathLayoutSymbolZipper implements MathLayoutZipper<never> {
   }
 
   containsAbsoluteOffset(absoluteOffset: Offset): boolean {
-    return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.width;
+    return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.offsetCount;
   }
 
   replaceSelf(newValue: MathLayoutSymbol) {
@@ -312,7 +312,7 @@ export class MathLayoutSymbolZipper implements MathLayoutZipper<never> {
     const newValue = mathLayoutWithWidth({
       type: this.value.type,
       value: newChild,
-      width: 0,
+      offsetCount: 0,
     });
 
     return this.replaceSelf(newValue);
