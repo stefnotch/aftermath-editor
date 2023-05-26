@@ -37,7 +37,7 @@ impl BuiltInRules {
         child_b: SyntaxNode,
     ) -> SyntaxNode {
         let missing_operator_node =
-            BuiltInRules::error_missing_token(child_a.range().end..child_b.range().start, None);
+            BuiltInRules::error_missing_token(child_a.range().end..child_b.range().start);
         BuiltInRules::error_container_node(range, vec![child_a, missing_operator_node, child_b])
     }
 
@@ -55,7 +55,7 @@ impl BuiltInRules {
             SyntaxNode::new(
                 BuiltInRules::error_unknown_token_name(),
                 unknown_token.range(),
-                SyntaxNodes::Leaves(vec![unknown_token]),
+                SyntaxNodes::Leaf(unknown_token),
             ),
         ];
         BuiltInRules::error_container_node(range, children)
@@ -66,18 +66,12 @@ impl BuiltInRules {
     }
 
     /// Either an operator or an operand token is missing.
-    pub fn error_missing_token(
-        range: Range<usize>,
-        expected_tokens: Option<Vec<SyntaxLeafNode>>,
-    ) -> SyntaxNode {
+    pub fn error_missing_token(range: Range<usize>) -> SyntaxNode {
         assert!(range.is_empty());
-        for expected_token in expected_tokens.iter().flatten() {
-            assert!(expected_token.range().is_empty());
-        }
         SyntaxNode::new(
             BuiltInRules::error_missing_token_name(),
             range,
-            SyntaxNodes::Leaves(expected_tokens.unwrap_or_else(|| vec![])),
+            SyntaxNodes::Containers(vec![]),
         )
     }
 
@@ -86,7 +80,7 @@ impl BuiltInRules {
         SyntaxNode::new(
             BuiltInRules::operator_name(),
             leaf_node.range(),
-            SyntaxNodes::Leaves(vec![leaf_node]),
+            SyntaxNodes::Leaf(leaf_node),
         )
     }
 
@@ -100,7 +94,7 @@ impl BuiltInRules {
         SyntaxNode::new(
             BuiltInRules::nothing_name(),
             range,
-            SyntaxNodes::Leaves(vec![]),
+            SyntaxNodes::Containers(vec![]),
         )
     }
 

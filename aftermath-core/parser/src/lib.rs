@@ -113,7 +113,7 @@ impl<'a> ParserRules<'a> {
                 {
                     // Missing operand
                     // TODO: report what token is missing (or put a nothing token there)
-                    BuiltInRules::error_missing_token(lexer.begin_range().end_range().range(), None)
+                    BuiltInRules::error_missing_token(lexer.begin_range().end_range().range())
                 }
                 _ => {
                     // Nothing can be parsed here, so we exit this parse call
@@ -171,11 +171,7 @@ fn force_consume_one(mut lexer: Lexer) -> (SyntaxLeafNode, Lexer) {
     starting_range.consume_n(1);
     let token = starting_range.end_range();
     (
-        SyntaxLeafNode {
-            node_type: LeafNodeType::Symbol,
-            range: token.range(),
-            symbols: token.get_symbols(),
-        },
+        SyntaxLeafNode::new(LeafNodeType::Symbol, token.range(), token.get_symbols()),
         lexer,
     )
 }

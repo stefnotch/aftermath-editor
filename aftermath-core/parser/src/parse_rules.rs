@@ -258,11 +258,11 @@ impl Argument {
                     context.get_symbol(lexer.begin_range(), symbol)
                 {
                     let token = lexer_range.end_range();
-                    let argument = SyntaxLeafNode {
-                        node_type: symbol_type.clone(),
-                        range: token.range.clone(),
-                        symbols: token.get_symbols(),
-                    };
+                    let argument = SyntaxLeafNode::new(
+                        symbol_type.clone(),
+                        token.range.clone(),
+                        token.get_symbols(),
+                    );
                     TokenArgumentParseResult {
                         // TODO: This might sometimes be wrong, whenever an argument is actually a value
                         // ArgumentParserType::NextToken should probably have a parameter for this
@@ -274,7 +274,7 @@ impl Argument {
                     // TODO: Report this error properly
                     // TODO: Pass an "expected" parameter to the error
                     TokenArgumentParseResult {
-                        argument: BuiltInRules::error_missing_token(token.range(), None),
+                        argument: BuiltInRules::error_missing_token(token.range()),
                         lexer,
                     }
                 }
@@ -437,20 +437,18 @@ impl TokenDefinition {
             _ => {}
         };
 
-        let leaf_node = SyntaxLeafNode {
-            node_type: match &self.starting_parser {
+        let leaf_node = SyntaxLeafNode::new(
+            match &self.starting_parser {
                 StartingTokenMatcher::Token(v) => v.symbol_type.clone(),
             },
-            range: token.range(),
-            symbols: token.get_symbols(),
-        };
+            token.range(),
+            token.get_symbols(),
+        );
 
         match (self.token_type(), &leaf_node.node_type) {
-            (TokenType::Starting, LeafNodeType::Symbol) => SyntaxNode::new(
-                self.name(),
-                token.range(),
-                SyntaxNodes::Leaves(vec![leaf_node]),
-            ),
+            (TokenType::Starting, LeafNodeType::Symbol) => {
+                SyntaxNode::new(self.name(), token.range(), SyntaxNodes::Leaf(leaf_node))
+            }
             (TokenType::Starting, LeafNodeType::Operator) => BuiltInRules::operator_node(leaf_node),
             (TokenType::Continue, LeafNodeType::Symbol) => {
                 panic!("symbol node in continue token")

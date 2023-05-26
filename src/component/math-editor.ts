@@ -382,7 +382,7 @@ export class MathEditor extends HTMLElement {
     // Handle symbol shortcuts
     const result = applyEdit(this.inputTree, edit);
     const parsed = parse(result.root.value);
-    // 1. Get shortcut symbols in syntax tree (bottom to top?)
+    // 1. Get shortcut symbols in syntax tree (nested stuff - indices will change no matter what I do)
     // 2. Get the ranges of the operator symbols and ranges of arguments
     // 3. Delete the ranges
     // 4. Insert the new symbol

@@ -32,13 +32,8 @@ impl fmt::Display for SyntaxNodes {
                     }
                 }
             }
-            SyntaxNodes::Leaves(children) => {
-                if let Some((first, tail)) = children.split_first() {
-                    write!(f, "{}", first)?;
-                    for child in tail {
-                        write!(f, " {}", child)?;
-                    }
-                }
+            SyntaxNodes::Leaf(child) => {
+                write!(f, "{}", child)?;
             }
         };
         Ok(())

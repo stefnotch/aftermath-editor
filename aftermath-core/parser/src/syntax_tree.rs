@@ -66,7 +66,7 @@ pub enum SyntaxNodes {
     /// When this syntax node actually starts a new row in the input tree.
     NewRows(Vec<(RowIndex, SyntaxNode)>),
     NewTable(Vec<(RowIndex, SyntaxNode)>, u32),
-    Leaves(Vec<SyntaxLeafNode>),
+    Leaf(SyntaxLeafNode),
 }
 impl SyntaxNodes {
     fn is_empty(&self) -> bool {
@@ -75,21 +75,40 @@ impl SyntaxNodes {
             SyntaxNodes::NewRows(children) | SyntaxNodes::NewTable(children, _) => {
                 children.is_empty()
             }
-            SyntaxNodes::Leaves(children) => children.is_empty(),
+            SyntaxNodes::Leaf(_) => false,
         }
     }
 }
 
 /// A leaf node in a concrete syntax tree.
+/// The range of this node is always non-empty.
 #[derive(Debug, Serialize)]
 pub struct SyntaxLeafNode {
     /// Type of the leaf node
     pub node_type: LeafNodeType,
     /// The range of this in the input tree row.
-    /// The range may not be empty. TODO: Verify this
-    pub range: Range<usize>,
+    range: Range<usize>,
     /// The symbols that make up this node, stored as a list of grapheme clusters.
     pub symbols: Vec<String>,
+}
+
+impl SyntaxLeafNode {
+    pub fn new(
+        node_type: LeafNodeType,
+        range: Range<usize>,
+        symbols: Vec<String>,
+    ) -> SyntaxLeafNode {
+        assert!(range.start < range.end);
+        SyntaxLeafNode {
+            node_type,
+            range,
+            symbols,
+        }
+    }
+
+    pub fn range(&self) -> Range<usize> {
+        self.range.clone()
+    }
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, Clone)]
@@ -120,7 +139,7 @@ impl SyntaxNode {
                 children.iter().map(|v| v.range()).collect::<Vec<_>>()
             }
             SyntaxNodes::NewRows(_) | SyntaxNodes::NewTable(_, _) => vec![],
-            SyntaxNodes::Leaves(children) => children.iter().map(|v| v.range()).collect(),
+            SyntaxNodes::Leaf(child) => vec![child.range()],
         };
         let mut child_iter = binding.iter();
         if let Some(first) = child_iter.next() {
@@ -144,10 +163,4 @@ impl SyntaxNode {
 pub fn get_child_range_end(children: &[SyntaxNode]) -> usize {
     assert!(children.len() > 0);
     children.last().unwrap().range().end
-}
-
-impl SyntaxLeafNode {
-    pub fn range(&self) -> Range<usize> {
-        self.range.clone()
-    }
 }

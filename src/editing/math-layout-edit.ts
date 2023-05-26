@@ -15,6 +15,9 @@ export type MathLayoutEdit = {
 /**
  * Useless note: A MathLayoutSimpleEdit[] together with the .concat() method forms an algebraic group.
  * It is associative, has an identity element ([]) and can be inverted.
+ *
+ * When applying multiple disjoint edits, I recommend applying them bottom to top, right to left.
+ * That way, one edit doesn't afftect the indices of the other edits.
  */
 export type MathLayoutSimpleEdit =
   | {
