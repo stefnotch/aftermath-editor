@@ -1,18 +1,18 @@
 import { Offset } from "./math-layout-offset";
-import { getRowIndices, MathLayoutRowZipper } from "./math-layout-zipper";
+import { getRowIndices, InputRowZipper } from "./math-layout-zipper";
 
 export class MathLayoutPosition {
-  constructor(public readonly zipper: MathLayoutRowZipper, public readonly offset: Offset) {}
+  constructor(public readonly zipper: InputRowZipper, public readonly offset: Offset) {}
 
   equals(other: MathLayoutPosition): boolean {
     return this.zipper.equals(other.zipper) && this.offset === other.offset;
   }
 
-  static toAbsoluteOffset(zipper: MathLayoutRowZipper, offset: Offset): Offset {
+  static toAbsoluteOffset(zipper: InputRowZipper, offset: Offset): Offset {
     return zipper.startAbsoluteOffset + offset;
   }
 
-  static fromAbsoluteOffset(root: MathLayoutRowZipper, absoluteOffset: Offset): MathLayoutPosition {
+  static fromAbsoluteOffset(root: InputRowZipper, absoluteOffset: Offset): MathLayoutPosition {
     const zipper = root.getZipperAtOffset(absoluteOffset);
     return new MathLayoutPosition(zipper, absoluteOffset - zipper.startAbsoluteOffset);
   }

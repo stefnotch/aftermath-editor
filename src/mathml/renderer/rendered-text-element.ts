@@ -1,6 +1,6 @@
 import { SyntaxNode, offsetInRange } from "../../core";
-import { Offset } from "../../math-layout/math-layout-offset";
-import { RowIndex } from "../../math-layout/math-layout-zipper";
+import { Offset } from "../../input-tree/math-layout-offset";
+import { RowIndex } from "../../input-tree/math-layout-zipper";
 import { RenderedElement } from "../../rendering/render-result";
 import { ViewportCoordinate } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
@@ -13,14 +13,11 @@ import { LeafMathMLElement } from "./rendered-leaf";
  */
 export class TextMathMLElement implements RenderedElement<MathMLElement> {
   element: RenderedMathML;
-  private textElements: LeafMathMLElement[];
+  private textElement: LeafMathMLElement;
 
-  constructor(public syntaxTree: SyntaxNode<"Leaves">, public rowIndex: RowIndex | null, elementName: MathMLTags) {
-    this.textElements = syntaxTree.children.Leaves.map((v) => new LeafMathMLElement(v));
-    let children: Text[] = [];
-    for (let textElement of this.textElements) {
-      children.push(...textElement.getElements());
-    }
+  constructor(public syntaxTree: SyntaxNode<"Leaf">, public rowIndex: RowIndex | null, elementName: MathMLTags) {
+    this.textElement = new LeafMathMLElement(syntaxTree.children.Leaf);
+    let children: Text[] = this.textElement.getElements();
     this.element = new RenderedMathML(createMathElement(elementName, children));
   }
   getCaretSize() {
@@ -32,14 +29,17 @@ export class TextMathMLElement implements RenderedElement<MathMLElement> {
   getCaretPosition(offset: Offset): ViewportCoordinate {
     assert(offsetInRange(offset, this.syntaxTree.range), "Invalid offset");
 
-    const atEnd = offset >= this.syntaxTree.range.end;
+    const boundingRect = this.element.element.getBoundingClientRect();
+    let x: number;
+    if (offset <= this.syntaxTree.range.start) {
+      x = boundingRect.left;
+    } else if (offset >= this.syntaxTree.range.end) {
+      x = boundingRect.right;
+    } else {
+      x = this.textElement.getViewportXPosition(offset).x;
+    }
 
-    const textElement = this.textElements.find((v) => offsetInRange(offset, v.syntaxTree.range));
-    const x =
-      textElement?.getViewportXPosition(offset)?.x ??
-      (atEnd ? this.element.element.getBoundingClientRect().right : this.element.element.getBoundingClientRect().left);
-    const baseline = textElement?.getBaseline(offset).y ?? this.element.element.getBoundingClientRect().bottom;
-
+    const baseline = this.textElement.getBaseline(offset).y;
     return { x: x, y: baseline };
   }
   getElements() {

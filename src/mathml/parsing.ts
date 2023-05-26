@@ -1,224 +1,131 @@
 import { assert } from "../utils/assert";
-import { MathLayoutElement, MathLayoutRow, MathLayoutSymbol } from "../math-layout/math-layout";
-import { mathLayoutWithWidth, wrapInRow } from "../math-layout/math-layout-utils";
+import { InputNode, InputNodeContainer, InputNodeSymbol } from "../input-tree/input-node";
+import { InputRow } from "../input-tree/row";
+import { wrapInRow } from "../input-tree/math-layout-utils";
 /**
  * Takes a MathML DOM tree and returns a MathLayout
+ * TODO: A parser should specify which syntax it emits. (e.g. Emits quoted strings)
  */
-export function fromElement(element: HTMLElement | MathMLElement): MathLayoutRow {
+export function fromElement(element: HTMLElement | MathMLElement): { inputTree: InputRow; errors: Error[] } {
   assert(tagIs(element, "math"));
-  const mathLayout = toMathLayout(element);
-  assert(!Array.isArray(mathLayout));
-  assert(mathLayout.type == "row");
+  const errors: Error[] = [];
+  const inputTree = toMathLayout(element, errors);
+  assert(!Array.isArray(inputTree));
+  assert(inputTree instanceof InputRow);
 
-  return mathLayout;
+  return { inputTree, errors };
 }
 
 // Time to iterate over the MathML and create a cute little tree
-// Doesn't deal with horrible MathML yet (so stuff like unnecessary nested mrows is bad, maybe that should be a post-processing step?)
-function toMathLayout(element: Element): (MathLayoutRow | MathLayoutElement) | (MathLayoutRow | MathLayoutElement)[] {
+// Probably doesn't deal with bad MathML yet
+function toMathLayout(element: Element, errors: Error[]): (InputRow | InputNode) | (InputRow | InputNode)[] {
   let children = [...element.children];
 
   if (tagIs(element, "math", "mrow", "mtd")) {
     // Uses flatMap so that msub can return two elements...
-    return wrapInRow(children.flatMap((c) => toMathLayout(c)));
+    return wrapInRow(children.flatMap((c) => toMathLayout(c, errors)));
   } else if (tagIs(element, "semantics") && children.length > 0) {
-    return toMathLayout(children[0]);
+    return toMathLayout(children[0], errors);
   } else if (tagIs(element, "mtext", "ms")) {
     return [
-      mathLayoutWithWidth({
-        type: "symbol",
-        value: '"',
-        width: 0,
-      }),
-      ...unicodeSplit(getText(element)).map((v) =>
-        mathLayoutWithWidth({
-          type: "symbol",
-          value: v,
-          width: 0,
-        })
-      ),
-      mathLayoutWithWidth({
-        type: "symbol",
-        value: '"',
-        width: 0,
-      }),
+      new InputNodeSymbol('"'),
+      ...unicodeSplit(getText(element)).map((v) => new InputNodeSymbol(v)),
+      new InputNodeSymbol('"'),
     ];
   } else if (tagIs(element, "mi", "mn")) {
-    return unicodeSplit(getText(element)).map((v) =>
-      mathLayoutWithWidth({
-        type: "symbol",
-        value: v,
-        width: 0,
-      })
-    );
+    return unicodeSplit(getText(element)).map((v) => new InputNodeSymbol(v));
   } else if (tagIs(element, "mo")) {
-    return unicodeSplit(getText(element)).map((v) => {
-      return mathLayoutWithWidth({
-        type: "symbol",
-        value: v,
-        width: 0,
-      });
-    });
+    return unicodeSplit(getText(element)).map((v) => new InputNodeSymbol(v));
   } else if (tagIs(element, "mfrac")) {
     return (
-      expectNChildren(element, 2) ??
-      mathLayoutWithWidth({
-        type: "fraction",
-        values: children.map((c) => wrapInRow(toMathLayout(c))) as [MathLayoutRow, MathLayoutRow],
-        width: 0,
-      })
+      expectNChildren(element, 2, errors) ??
+      InputNodeContainer.fraction(children.map((c) => wrapInRow(toMathLayout(c, errors))) as [InputRow, InputRow])
     );
   } else if (tagIs(element, "msqrt")) {
-    return mathLayoutWithWidth({
-      type: "root",
-      values: [
-        wrapInRow(
-          mathLayoutWithWidth({
-            type: "symbol",
-            value: "2",
-            width: 0,
-          })
-        ),
-        wrapInRow(children.flatMap((c) => toMathLayout(c))),
-      ],
-      width: 0,
-    });
+    return InputNodeContainer.root([
+      wrapInRow(new InputNodeSymbol("2")),
+      wrapInRow(children.flatMap((c) => toMathLayout(c, errors))),
+    ]);
   } else if (tagIs(element, "mroot")) {
     return (
-      expectNChildren(element, 2) ??
-      mathLayoutWithWidth({
-        type: "root",
-        values: [wrapInRow(toMathLayout(children[1])), wrapInRow(toMathLayout(children[0]))],
-        width: 0,
-      })
+      expectNChildren(element, 2, errors) ??
+      InputNodeContainer.root([wrapInRow(toMathLayout(children[1], errors)), wrapInRow(toMathLayout(children[0], errors))])
     );
   } else if (tagIs(element, "msub")) {
-    let base = toMathLayout(children[0]);
+    let base = toMathLayout(children[0], errors);
     if (!Array.isArray(base)) {
       base = [base];
     }
     return (
-      expectNChildren(element, 2) ?? [
-        ...base,
-        mathLayoutWithWidth({
-          type: "sub",
-          values: [wrapInRow(toMathLayout(children[1]))],
-          width: 0,
-        }),
-      ]
+      expectNChildren(element, 2, errors) ?? [...base, InputNodeContainer.sub(wrapInRow(toMathLayout(children[1], errors)))]
     );
   } else if (tagIs(element, "msup")) {
-    let base = toMathLayout(children[0]);
+    let base = toMathLayout(children[0], errors);
     if (!Array.isArray(base)) {
       base = [base];
     }
     return (
-      expectNChildren(element, 2) ?? [
-        ...base,
-        mathLayoutWithWidth({
-          type: "sup",
-          values: [wrapInRow(toMathLayout(children[1]))],
-          width: 0,
-        }),
-      ]
+      expectNChildren(element, 2, errors) ?? [...base, InputNodeContainer.sup(wrapInRow(toMathLayout(children[1], errors)))]
     );
   } else if (tagIs(element, "msubsup")) {
-    let base = toMathLayout(children[0]);
+    let base = toMathLayout(children[0], errors);
     if (!Array.isArray(base)) {
       base = [base];
     }
     return (
-      expectNChildren(element, 3) ?? [
+      expectNChildren(element, 3, errors) ?? [
         ...base,
-        mathLayoutWithWidth({
-          type: "sub",
-          values: [wrapInRow(toMathLayout(children[1]))],
-          width: 0,
-        }),
-        mathLayoutWithWidth({
-          type: "sup",
-          values: [wrapInRow(toMathLayout(children[2]))],
-          width: 0,
-        }),
+        InputNodeContainer.sub(wrapInRow(toMathLayout(children[1], errors))),
+        InputNodeContainer.sup(wrapInRow(toMathLayout(children[2], errors))),
       ]
     );
   } else if (tagIs(element, "munder")) {
     return (
-      expectNChildren(element, 2) ??
-      mathLayoutWithWidth({
-        type: "under",
-        values: [wrapInRow(toMathLayout(children[0])), wrapInRow(toMathLayout(children[1]))],
-        width: 0,
-      })
+      expectNChildren(element, 2, errors) ??
+      InputNodeContainer.under([wrapInRow(toMathLayout(children[0], errors)), wrapInRow(toMathLayout(children[1], errors))])
     );
   } else if (tagIs(element, "mover")) {
     return (
-      expectNChildren(element, 2) ??
-      mathLayoutWithWidth({
-        type: "over",
-        values: [wrapInRow(toMathLayout(children[0])), wrapInRow(toMathLayout(children[1]))],
-        width: 0,
-      })
+      expectNChildren(element, 2, errors) ??
+      InputNodeContainer.over([wrapInRow(toMathLayout(children[0], errors)), wrapInRow(toMathLayout(children[1], errors))])
     );
   } else if (tagIs(element, "munderover")) {
     return (
-      expectNChildren(element, 3) ??
-      mathLayoutWithWidth({
-        type: "over",
-        values: [
-          wrapInRow(
-            mathLayoutWithWidth({
-              type: "under",
-              values: [wrapInRow(toMathLayout(children[0])), wrapInRow(toMathLayout(children[1]))],
-              width: 0,
-            })
-          ),
-          wrapInRow(toMathLayout(children[2])),
-        ],
-        width: 0,
-      })
+      expectNChildren(element, 3, errors) ??
+      InputNodeContainer.over([
+        wrapInRow(
+          InputNodeContainer.under([wrapInRow(toMathLayout(children[0], errors)), wrapInRow(toMathLayout(children[1], errors))])
+        ),
+        wrapInRow(toMathLayout(children[2], errors)),
+      ])
     );
   } else if (tagIs(element, "mtable")) {
     if (!children.every((c) => tagIs(c, "mtr") && [...c.children].every((cc) => tagIs(cc, "mtd")))) {
-      return mathLayoutWithWidth({
-        type: "error",
-        value: "Unexpected children " + element,
-        width: 0,
-      });
+      errors.push(new Error("Unexpected children " + element));
+      return new InputNodeSymbol("Error");
     }
 
     const tableWidth = children.map((c) => c.children.length).reduce((a, b) => Math.max(a, b), 0);
 
     const tableCells = children.flatMap((c) =>
       Array.from({ length: tableWidth }, (_, i) =>
-        i < c.children.length
-          ? wrapInRow(toMathLayout(c.children[i]))
-          : mathLayoutWithWidth({ type: "row", values: [], width: 0 })
+        i < c.children.length ? wrapInRow(toMathLayout(c.children[i], errors)) : new InputRow([])
       )
     );
 
-    return mathLayoutWithWidth({
-      type: "table",
-      rowWidth: tableWidth,
-      values: tableCells,
-      width: 0,
-    });
+    return InputNodeContainer.table(tableCells, tableWidth);
+  } else if (tagIs(element, "mstyle")) {
+    return [];
   } else {
-    return mathLayoutWithWidth({
-      type: "error",
-      value: "Unknown element " + element,
-      width: 0,
-    });
+    errors.push(new Error("Unknown element " + element.tagName));
+    return new InputNodeSymbol("Error");
   }
 }
 
-function expectNChildren(element: Element, n: number): (MathLayoutSymbol & { type: "error" }) | null {
+function expectNChildren(element: Element, n: number, errors: Error[]): InputNodeSymbol | null {
   if (element.children.length != n) {
-    return mathLayoutWithWidth({
-      type: "error",
-      value: `Expected ${n} children in ${element.tagName.toLowerCase()}`,
-      width: 0,
-    });
+    errors.push(new Error(`Expected ${n} children in ${element.tagName.toLowerCase()}`));
+    return new InputNodeSymbol("Error");
   }
   return null;
 }
@@ -228,10 +135,14 @@ function getText(element: Element) {
   return (element.textContent + "").trim();
 }
 
+const intlSegmenter = globalThis?.Intl?.Segmenter ? new Intl.Segmenter("en", { granularity: "grapheme" }) : null;
+
 export function unicodeSplit(text: string) {
-  // TODO: For text use https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Segmenter
-  // TODO: https://stackoverflow.com/a/73802453/3492994
-  return [...text];
+  if (intlSegmenter) {
+    return Array.from(intlSegmenter.segment(text), ({ segment }) => segment);
+  } else {
+    return [...text];
+  }
 }
 
 /**

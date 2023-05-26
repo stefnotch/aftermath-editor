@@ -1,8 +1,8 @@
-import { MathLayoutElement } from "../math-layout/math-layout";
-import { Offset } from "../math-layout/math-layout-offset";
-import { RowIndices, fromRowIndices, MathLayoutRowZipper } from "../math-layout/math-layout-zipper";
+import { Offset } from "../input-tree/math-layout-offset";
+import { RowIndices, fromRowIndices, InputRowZipper } from "../input-tree/math-layout-zipper";
 import { assertUnreachable } from "../utils/assert";
 import { MathLayoutCaret, SerializedCaret } from "../component/editing/math-layout-caret";
+import { InputNode } from "../input-tree/input-node";
 
 export type MathLayoutEdit = {
   readonly type: "multi";
@@ -15,6 +15,9 @@ export type MathLayoutEdit = {
 /**
  * Useless note: A MathLayoutSimpleEdit[] together with the .concat() method forms an algebraic group.
  * It is associative, has an identity element ([]) and can be inverted.
+ *
+ * When applying multiple disjoint edits, I recommend applying them bottom to top, right to left.
+ * That way, one edit doesn't afftect the indices of the other edits.
  */
 export type MathLayoutSimpleEdit =
   | {
@@ -24,7 +27,7 @@ export type MathLayoutSimpleEdit =
       /**
        * The value that was inserted.
        */
-      readonly value: MathLayoutElement;
+      readonly value: InputNode;
     }
   | {
       readonly type: "remove";
@@ -33,13 +36,10 @@ export type MathLayoutSimpleEdit =
       /**
        * The value that was removed, used for undo.
        */
-      readonly value: MathLayoutElement;
+      readonly value: InputNode;
     };
 
-export function applyEdit(
-  root: MathLayoutRowZipper,
-  edit: MathLayoutEdit
-): { root: MathLayoutRowZipper; carets: MathLayoutCaret[] } {
+export function applyEdit(root: InputRowZipper, edit: MathLayoutEdit): { root: InputRowZipper; carets: MathLayoutCaret[] } {
   if (edit.type === "multi") {
     let newRoot = root;
     for (const subEdit of edit.edits) {
@@ -54,7 +54,7 @@ export function applyEdit(
   }
 }
 
-function applySimpleEdit(root: MathLayoutRowZipper, edit: MathLayoutSimpleEdit): MathLayoutRowZipper {
+function applySimpleEdit(root: InputRowZipper, edit: MathLayoutSimpleEdit): InputRowZipper {
   if (edit.type === "insert") {
     const zipper = fromRowIndices(root, edit.zipper);
     const result = zipper.insert(edit.offset, edit.value);

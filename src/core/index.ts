@@ -1,16 +1,16 @@
 import init, { MathParser } from "../../aftermath-core/pkg";
-import { MathLayoutRow } from "../math-layout/math-layout";
-import { Offset } from "../math-layout/math-layout-offset";
-import { RowIndex, RowIndices } from "../math-layout/math-layout-zipper";
+import { InputNodeContainer } from "../input-tree/input-node";
+import { Offset } from "../input-tree/math-layout-offset";
+import { RowIndices } from "../input-tree/math-layout-zipper";
+import { InputRow } from "../input-tree/row";
 import { assert } from "../utils/assert";
-import { customError } from "../utils/error-utils";
 
 // Yay, top level await is neat https://v8.dev/features/top-level-await
 await init();
 
 const parser = MathParser.new();
 
-export function parse(row: MathLayoutRow): ParseResult {
+export function parse(row: InputRow): ParseResult {
   let result: ParseResult = parser.parse(toCore(row));
 
   return result;
@@ -27,36 +27,24 @@ export function joinNodeIdentifier(nodeIdentifier: NodeIdentifier): NodeIdentifi
   return nodeIdentifier.join("::");
 }
 
-function toCore(row: MathLayoutRow): CoreRow {
-  return {
-    values: row.values.map((v) => {
-      if (v.type === "fraction") {
-        return { Fraction: [toCore(v.values[0]), toCore(v.values[1])] };
-      } else if (v.type === "root") {
-        return { Root: [toCore(v.values[0]), toCore(v.values[1])] };
-      } else if (v.type === "under") {
-        return { Under: [toCore(v.values[0]), toCore(v.values[1])] };
-      } else if (v.type === "over") {
-        return { Over: [toCore(v.values[0]), toCore(v.values[1])] };
-      } else if (v.type === "sup") {
-        return { Sup: toCore(v.values[0]) };
-      } else if (v.type === "sub") {
-        return { Sub: toCore(v.values[0]) };
-      } else if (v.type === "table") {
-        return {
-          Table: {
-            cells: v.values.map((row) => toCore(row)),
-            row_width: v.rowWidth,
-          },
-        };
-      } else if (v.type === "symbol") {
-        const value = v.value.normalize("NFD");
-        return { Symbol: value };
-      } else {
-        throw customError("Unknown type", { type: v.type });
-      }
-    }),
-  };
+function toCore(row: InputRow): CoreRow {
+  const values: CoreElement[] = row.values.map((v) => {
+    if (v instanceof InputNodeContainer) {
+      return {
+        Container: {
+          container_type: v.containerType,
+          rows: { values: v.rows.values.map((row) => toCore(row)), width: v.rows.width },
+          offset_count: v.offsetCount,
+        },
+      };
+    } else {
+      const value = v.symbol.normalize("NFD");
+      return { Symbol: value };
+    }
+    // Uh oh, now I'm also maintaining invariants in two places.
+  });
+
+  return { values, offset_count: row.offsetCount };
 }
 
 // TODO:
@@ -68,16 +56,20 @@ function toCore(row: MathLayoutRow): CoreRow {
 //
 // Maybe in the future we can move to WebAssembly Interface Types, e.g. https://github.com/tauri-apps/tauri-bindgen
 
-type CoreRow = { values: CoreElement[] };
+type CoreRow = { values: CoreElement[]; offset_count: number };
 type CoreElement =
-  | { Fraction: [CoreRow, CoreRow] }
-  | { Root: [CoreRow, CoreRow] }
-  | { Under: [CoreRow, CoreRow] }
-  | { Over: [CoreRow, CoreRow] }
-  | { Sup: CoreRow }
-  | { Sub: CoreRow }
-  | { Table: { cells: CoreRow[]; row_width: number } }
+  | {
+      Container: {
+        container_type: CoreContainer;
+        rows: Grid<CoreRow>;
+        offset_count: number;
+      };
+    }
   | { Symbol: string };
+
+type CoreContainer = "Fraction" | "Root" | "Under" | "Over" | "Sup" | "Sub" | "Table";
+
+type Grid<T> = { values: T[]; width: number };
 
 export type ParseResult = {
   value: SyntaxNode;
@@ -89,16 +81,13 @@ export type SyntaxNodes =
       Containers: SyntaxNode[];
     }
   | {
-      NewRows: [RowIndex, SyntaxNode][];
+      NewRows: Grid<SyntaxNode>;
     }
   | {
-      NewTable: [[RowIndex, SyntaxNode][], number];
-    }
-  | {
-      Leaves: SyntaxLeafNode[];
+      Leaf: SyntaxLeafNode;
     };
 
-type SyntaxNodesKeys = "Containers" | "NewRows" | "NewTable" | "Leaves";
+type SyntaxNodesKeys = "Containers" | "NewRows" | "Leaf";
 type SyntaxNodesMatcher<T extends SyntaxNodesKeys> = {
   [X in T]: Extract<SyntaxNodes, { [P in X]: any }>;
 }[T];
@@ -147,17 +136,15 @@ export function getRowNode(node: SyntaxNode, indices: RowIndices) {
     const childNode = getChildWithContainerIndex(node, indexOfContainer);
     let rowChildElement: SyntaxNode | undefined;
     if (hasSyntaxNodeChildren(childNode, "NewRows")) {
-      rowChildElement = childNode.children.NewRows.find(([rowIndex, _]) => rowIndex[1] === indexOfRow)?.[1];
-    } else if (hasSyntaxNodeChildren(childNode, "NewTable")) {
-      rowChildElement = childNode.children.NewTable[0].find(([rowIndex, _]) => rowIndex[1] === indexOfRow)?.[1];
+      rowChildElement = childNode.children.NewRows.values[indexOfRow];
     } else {
-      assert(false, "Expected to find NewRows or NewTable");
+      assert(false, "Expected to find NewRows");
     }
     assert(rowChildElement, `Couldn't find row ${indexOfRow} in ${joinNodeIdentifier(node.name)}`);
     node = rowChildElement;
   }
 
-  function getChildWithContainerIndex(node: SyntaxNode, indexOfContainer: number): SyntaxNode<"NewRows" | "NewTable"> {
+  function getChildWithContainerIndex(node: SyntaxNode, indexOfContainer: number): SyntaxNode<"NewRows"> {
     // Only walk down if we're still on the same row
     if (hasSyntaxNodeChildren(node, "Containers")) {
       for (let childElement of node.children.Containers) {
@@ -168,7 +155,7 @@ export function getRowNode(node: SyntaxNode, indices: RowIndices) {
       }
     }
 
-    assert(hasSyntaxNodeChildren(node, "NewRows") || hasSyntaxNodeChildren(node, "NewTable"));
+    assert(hasSyntaxNodeChildren(node, "NewRows"));
     return node;
   }
 

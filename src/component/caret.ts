@@ -1,7 +1,7 @@
 import { SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
-import { Offset } from "../math-layout/math-layout-offset";
-import { MathLayoutPosition } from "../math-layout/math-layout-position";
-import { MathLayoutRowZipper, getRowIndices } from "../math-layout/math-layout-zipper";
+import { Offset } from "../input-tree/math-layout-offset";
+import { MathLayoutPosition } from "../input-tree/math-layout-position";
+import { InputRowZipper, getRowIndices } from "../input-tree/math-layout-zipper";
 import { RenderResult, RowIndicesAndRange } from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { CaretElement } from "./caret-element";
@@ -74,13 +74,13 @@ export class MathCaret {
         start: node.range.start,
         end: this.caret.end,
       };
-    } else if (hasSyntaxNodeChildren(row, "Leaves")) {
+    } else if (hasSyntaxNodeChildren(row, "Leaf")) {
       return {
         indices,
         start: 0,
         end: this.caret.end,
       };
-    } else if (hasSyntaxNodeChildren(row, "NewTable") || hasSyntaxNodeChildren(row, "NewRows")) {
+    } else if (hasSyntaxNodeChildren(row, "NewRows")) {
       assert(row.range.start === this.caret.end || row.range.end === this.caret.end);
       return {
         indices,
@@ -99,17 +99,15 @@ export class MathCaret {
       const isDisjoint = node.range.end <= indicesAndRange.start || indicesAndRange.end <= node.range.start;
       if (isDisjoint) return [];
 
-      if (hasSyntaxNodeChildren(node, "Leaves")) {
-        let symbols: string[] = [];
-        for (const leaf of node.children.Leaves) {
-          symbols = symbols.concat(
-            leaf.symbols.slice(Math.max(leaf.range.start, indicesAndRange.start), Math.min(leaf.range.end, indicesAndRange.end))
-          );
-        }
-        return symbols;
+      if (hasSyntaxNodeChildren(node, "Leaf")) {
+        const leaf = node.children.Leaf;
+        return leaf.symbols.slice(
+          Math.max(leaf.range.start, indicesAndRange.start),
+          Math.min(leaf.range.end, indicesAndRange.end)
+        );
       } else if (hasSyntaxNodeChildren(node, "Containers")) {
         return node.children.Containers.flatMap((v) => getLeaves(v));
-      } else if (hasSyntaxNodeChildren(node, "NewTable") || hasSyntaxNodeChildren(node, "NewRows")) {
+      } else if (hasSyntaxNodeChildren(node, "NewRows")) {
         // Maybe return some dummy symbols here?
         return [];
       } else {
@@ -174,7 +172,7 @@ export class MathEditorCarets {
     }
   }
 
-  addPointerDownCaret(pointerId: number, zipper: MathLayoutRowZipper, offset: number) {
+  addPointerDownCaret(pointerId: number, zipper: InputRowZipper, offset: number) {
     this.pointerDownCarets.set(pointerId, this.createCaret(zipper, offset, offset));
   }
 
@@ -193,7 +191,7 @@ export class MathEditorCarets {
     return Array.from(this.carets).concat(Array.from(this.pointerDownCarets.values())).map(fn);
   }
 
-  private createCaret(zipper: MathLayoutRowZipper, startOffset: Offset, endOffset: Offset) {
+  private createCaret(zipper: InputRowZipper, startOffset: Offset, endOffset: Offset) {
     return new MathCaret(this.#containerElement, {
       startPosition: new MathLayoutPosition(zipper, startOffset),
       caret: new MathLayoutCaret(zipper, startOffset, endOffset),

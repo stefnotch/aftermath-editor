@@ -1,5 +1,5 @@
 import { SyntaxNode } from "../../core";
-import { RowIndex } from "../../math-layout/math-layout-zipper";
+import { RowIndex } from "../../input-tree/math-layout-zipper";
 import { RenderedElement, Renderer } from "../../rendering/render-result";
 import { ViewportCoordinate } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";

@@ -6,12 +6,13 @@ import {
   hasSyntaxNodeChildren,
   joinNodeIdentifier,
 } from "../core";
-import { RowIndex } from "../math-layout/math-layout-zipper";
+import { RowIndex } from "../input-tree/math-layout-zipper";
 import { RenderedElement, RenderResult, Renderer } from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { MathMLRenderResult } from "./render-result";
 import { SimpleContainerMathMLElement } from "./renderer/rendered-container-element";
 import { NothingMathMLElement } from "./renderer/rendered-nothing";
+import { RootMathMLElement } from "./renderer/rendered-root-element";
 import { RowsContainerMathMLElement } from "./renderer/rendered-rows-element";
 import { SymbolMathMLElement } from "./renderer/rendered-symbol-element";
 import { TableMathMLElement } from "./renderer/rendered-table-element";
@@ -65,6 +66,7 @@ if (mathIR.type === "table") {
     {
       const builtIn = this.rendererCollection("BuiltIn");
       builtIn.add("Nothing", (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
         return new NothingMathMLElement(syntaxTree, rowIndex);
       });
       builtIn.add("ErrorContainer", (syntaxTree, rowIndex) => {
@@ -72,31 +74,16 @@ if (mathIR.type === "table") {
         return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });
       builtIn.add("ErrorUnknownToken", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "Leaves"));
+        assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
         return new SymbolMathMLElement(syntaxTree, rowIndex, "merror");
       });
       builtIn.add("ErrorMissingToken", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "Leaves"));
-
+        assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
         // Dirty little patch to render missing tokens
-        if (syntaxTree.children.Leaves.length === 0) {
-          return new SymbolMathMLElement(
-            {
-              ...syntaxTree,
-              children: {
-                Leaves: [{ node_type: "Leaf", range: syntaxTree.range, symbols: ["?"] }],
-              },
-            },
-            rowIndex,
-            "merror"
-          );
-        } else {
-          return new SymbolMathMLElement(syntaxTree, rowIndex, "merror");
-        }
-        //return new NothingMathMLElement(syntaxTree, rowIndex);
+        return new NothingMathMLElement(syntaxTree, rowIndex);
       });
       builtIn.add("Operator", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "Leaves"));
+        assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
         return new SymbolMathMLElement(syntaxTree, rowIndex, "mo");
       });
       builtIn.add("Fraction", (syntaxTree, rowIndex) => {
@@ -124,20 +111,18 @@ if (mathIR.type === "table") {
         return new RowsContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });
       builtIn.add("Root", (syntaxTree, rowIndex) => {
-        // We have to switch the arguments here, because MathML uses the second argument as the root
         assert(hasSyntaxNodeChildren(syntaxTree, "NewRows"));
-        syntaxTree.children.NewRows.reverse();
-        return new RowsContainerMathMLElement(syntaxTree, rowIndex, "mroot", this);
+        return new RootMathMLElement(syntaxTree, rowIndex, "mroot", this);
       });
       builtIn.add("Table", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "NewTable"));
+        assert(hasSyntaxNodeChildren(syntaxTree, "NewRows"));
         return new TableMathMLElement(syntaxTree, rowIndex, this);
       });
     }
     {
       const core = this.rendererCollection("Core");
       core.add("Variable", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "Leaves"));
+        assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
         return new TextMathMLElement(syntaxTree, rowIndex, "mi");
       });
       core.add("RoundBrackets", (syntaxTree, rowIndex) => {
@@ -148,7 +133,7 @@ if (mathIR.type === "table") {
     {
       const arithmetic = this.rendererCollection("Arithmetic");
       arithmetic.add("Number", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "Leaves"));
+        assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
         return new TextMathMLElement(syntaxTree, rowIndex, "mn");
       });
       ["Add", "Subtract", "Multiply", "Divide"].forEach((name) => {
@@ -175,7 +160,7 @@ if (mathIR.type === "table") {
     {
       const string = this.rendererCollection("String");
       string.add("String", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "Leaves"));
+        assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
         return new TextMathMLElement(syntaxTree, rowIndex, "mtext");
       });
     }

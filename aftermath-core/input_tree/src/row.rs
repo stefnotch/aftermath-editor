@@ -14,45 +14,68 @@ use super::input_node::InputNode;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InputRow {
     pub values: Vec<InputNode>,
+    /// The number of valid offsets in all children combined.
+    offset_count: u64,
 }
 
 impl InputRow {
     pub fn new(values: Vec<InputNode>) -> Self {
-        InputRow { values }
+        let row_offsets = values.len() as u64 + 1;
+        let child_offsets = values.iter().map(|x| x.offset_count()).sum::<u64>();
+        InputRow {
+            values,
+            offset_count: row_offsets + child_offsets,
+        }
     }
-}
 
-// TODO: Refactor to use this
-pub struct InputRows {
-  pub values: Grid<Vec<InputNode>>,
+    pub fn offset_count(&self) -> u64 {
+        self.offset_count
+    }
 }
 
 /// A proper grid of values.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Grid<T> {
-    values: Vec<Vec<T>>,
+    values: Vec<T>,
+    width: usize,
 }
 
 impl<T> Grid<T> {
-    pub fn new(values: Vec<Vec<T>>) -> Self {
-        if let Some(first) = values.first() {
-            let width = first.len();
-            for row in values.iter() {
-                assert_eq!(row.len(), width);
-            }
-        }
-        Grid { values }
+    pub fn from_one_dimensional(values: Vec<T>, width: usize) -> Self {
+        assert!(width > 0);
+        assert_eq!(values.len() % width, 0);
+        Grid { values, width }
     }
 
     pub fn width(&self) -> usize {
-        self.values.first().map(|row| row.len()).unwrap_or(0)
+        self.width
     }
 
     pub fn height(&self) -> usize {
-        self.values.len()
+        self.values.len() / self.width
     }
 
     pub fn get(&self, x: usize, y: usize) -> Option<&T> {
-        self.values.get(y).and_then(|row| row.get(x))
+        if x >= self.width() || y >= self.height() {
+            return None;
+        }
+        self.values.get(self.xy_to_index(x, y))
+    }
+
+    pub fn index_to_xy(&self, index: usize) -> (usize, usize) {
+        (index % self.width, index / self.width)
+    }
+
+    pub fn xy_to_index(&self, x: usize, y: usize) -> usize {
+        y * self.width + x
+    }
+
+    pub fn values(&self) -> &[T] {
+        &self.values
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
     }
 }
 

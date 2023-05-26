@@ -3,39 +3,38 @@ import { RowIndex } from "../../input-tree/math-layout-zipper";
 import { RenderedElement, Renderer } from "../../rendering/render-result";
 import { ViewportCoordinate } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
+import { MathMLTags } from "../mathml-spec";
 import { RenderedMathML, createMathElement, wrapInMRow } from "./rendered-element";
 
-export class TableMathMLElement implements RenderedElement<MathMLElement> {
+/**
+ * Renders something that starts new rows, like a mfrac.
+ */
+export class RootMathMLElement implements RenderedElement<MathMLElement> {
   element: RenderedMathML;
   startBaselineReader: MathMLElement;
   endBaselineReader: MathMLElement;
 
-  constructor(public syntaxTree: SyntaxNode<"NewRows">, public rowIndex: RowIndex | null, renderer: Renderer<MathMLElement>) {
+  constructor(
+    public syntaxTree: SyntaxNode<"NewRows">,
+    public rowIndex: RowIndex | null,
+    elementName: MathMLTags,
+    renderer: Renderer<MathMLElement>
+  ) {
     assert(syntaxTree.children.NewRows.values.length > 0, "Needs at least one child");
-    this.element = new RenderedMathML(createMathElement("mtable", []));
+    this.element = new RenderedMathML(createMathElement(elementName, []));
     this.startBaselineReader = createMathElement("mphantom", []);
     this.endBaselineReader = createMathElement("mphantom", []);
     const indexOfContainer = this.syntaxTree.range.start;
     assert(this.syntaxTree.range.start + 1 === this.syntaxTree.range.end, "Invalid range for a row container");
 
-    const tableCells = syntaxTree.children.NewRows.values.map((c, rowIndex) =>
-      renderer.render(c, [indexOfContainer, rowIndex])
-    );
-    const tableWidth = syntaxTree.children.NewRows.width;
-    const children: MathMLElement[] = [];
-    for (let i = 0; i < tableCells.length; i += tableWidth) {
-      const tableRow = tableCells.slice(i, i + tableWidth);
-      children.push(
-        createMathElement(
-          "mtr",
-          tableRow.map((v) => createMathElement("mtd", [wrapInMRow(v.getElements())]))
-        )
-      );
-    }
-    this.element.setChildrenCustom(tableCells, children);
-    assert(
-      children.length === Math.floor(this.syntaxTree.children.NewRows.values.length / this.syntaxTree.children.NewRows.width),
-      "Invalid number of children"
+    // Gotta watch out for this order being reversed, because that's how mroot works
+    const children = syntaxTree.children.NewRows.values.map((c, rowIndex) => renderer.render(c, [indexOfContainer, rowIndex]));
+    this.element.setChildrenCustom(
+      children,
+      children
+        .slice()
+        .reverse()
+        .map((v) => wrapInMRow(v.getElements()))
     );
     assert(this.element.getChildren().length === this.syntaxTree.children.NewRows.values.length, "Invalid number of children");
     assert(this.element.getChildren().length > 0, "Needs at least one rendered child");
@@ -44,7 +43,6 @@ export class TableMathMLElement implements RenderedElement<MathMLElement> {
   getCaretSize() {
     return this.element.getCaretSize();
   }
-
   getBounds() {
     return this.element.getBounds();
   }
@@ -70,7 +68,7 @@ export class TableMathMLElement implements RenderedElement<MathMLElement> {
     return { x: x, y: y };
   }
 
-  getElements() {
+  getElements(): MathMLElement[] {
     // Or wrap the element in an extra mrow?
     return [this.startBaselineReader, this.element.element, this.endBaselineReader];
   }
