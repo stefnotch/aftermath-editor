@@ -1,7 +1,7 @@
 import { match } from "ts-pattern";
-import { Offset } from "../../math-layout/math-layout-offset";
-import { MathLayoutPosition } from "../../math-layout/math-layout-position";
-import { tableIndexToPosition, tablePositionToIndex } from "../../math-layout/math-layout-utils";
+import { Offset } from "../../input-tree/math-layout-offset";
+import { MathLayoutPosition } from "../../input-tree/math-layout-position";
+import { tableIndexToPosition, tablePositionToIndex } from "../../input-tree/math-layout-utils";
 import {
   RowIndices,
   fromRowIndices,
@@ -10,7 +10,7 @@ import {
   MathLayoutContainerZipper,
   MathLayoutRowZipper,
   MathLayoutTableZipper,
-} from "../../math-layout/math-layout-zipper";
+} from "../../input-tree/math-layout-zipper";
 import { assert, assertUnreachable } from "../../utils/assert";
 import { ViewportValue } from "../../rendering/viewport-coordinate";
 import { RenderResult } from "../../rendering/render-result";

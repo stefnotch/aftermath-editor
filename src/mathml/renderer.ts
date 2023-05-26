@@ -6,7 +6,7 @@ import {
   hasSyntaxNodeChildren,
   joinNodeIdentifier,
 } from "../core";
-import { RowIndex } from "../math-layout/math-layout-zipper";
+import { RowIndex } from "../input-tree/math-layout-zipper";
 import { RenderedElement, RenderResult, Renderer } from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { MathMLRenderResult } from "./render-result";

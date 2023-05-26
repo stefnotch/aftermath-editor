@@ -1,6 +1,6 @@
 import { assert } from "../utils/assert";
-import { MathLayoutElement, MathLayoutRow, MathLayoutSymbol } from "../math-layout/math-layout";
-import { mathLayoutWithWidth, wrapInRow } from "../math-layout/math-layout-utils";
+import { MathLayoutElement, MathLayoutRow, MathLayoutSymbol } from "../input-tree/math-layout";
+import { mathLayoutWithWidth, wrapInRow } from "../input-tree/math-layout-utils";
 /**
  * Takes a MathML DOM tree and returns a MathLayout
  */

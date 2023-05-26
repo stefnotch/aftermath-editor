@@ -1,7 +1,7 @@
 import { SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
-import { Offset } from "../math-layout/math-layout-offset";
-import { MathLayoutPosition } from "../math-layout/math-layout-position";
-import { MathLayoutRowZipper, getRowIndices } from "../math-layout/math-layout-zipper";
+import { Offset } from "../input-tree/math-layout-offset";
+import { MathLayoutPosition } from "../input-tree/math-layout-position";
+import { MathLayoutRowZipper, getRowIndices } from "../input-tree/math-layout-zipper";
 import { RenderResult, RowIndicesAndRange } from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { CaretElement } from "./caret-element";

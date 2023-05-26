@@ -1,6 +1,6 @@
 import { NodeIdentifier, ParseResult, SyntaxNode } from "../core";
-import { Offset } from "../math-layout/math-layout-offset";
-import { RowIndex, RowIndices } from "../math-layout/math-layout-zipper";
+import { Offset } from "../input-tree/math-layout-offset";
+import { RowIndex, RowIndices } from "../input-tree/math-layout-zipper";
 import { RenderedSelection } from "./rendered-selection";
 import { ViewportCoordinate, ViewportRect, ViewportValue } from "./viewport-coordinate";
 

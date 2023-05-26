@@ -1,12 +1,12 @@
-import { MathLayoutElement, MathLayoutRow } from "../../math-layout/math-layout";
-import { MathLayoutPosition } from "../../math-layout/math-layout-position";
+import { MathLayoutElement, MathLayoutRow } from "../../input-tree/math-layout";
+import { MathLayoutPosition } from "../../input-tree/math-layout-position";
 import {
   MathLayoutContainerZipper,
   MathLayoutTableZipper,
   MathLayoutSymbolZipper,
   getRowIndices,
   MathLayoutRowZipper,
-} from "../../math-layout/math-layout-zipper";
+} from "../../input-tree/math-layout-zipper";
 import { RenderResult } from "../../rendering/render-result";
 import arrayUtils from "../../utils/array-utils";
 import { MathLayoutCaret, moveCaret, SerializedCaret } from "./math-layout-caret";

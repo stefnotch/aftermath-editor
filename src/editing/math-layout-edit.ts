@@ -1,6 +1,6 @@
-import { MathLayoutElement } from "../math-layout/math-layout";
-import { Offset } from "../math-layout/math-layout-offset";
-import { RowIndices, fromRowIndices, MathLayoutRowZipper } from "../math-layout/math-layout-zipper";
+import { MathLayoutElement } from "../input-tree/math-layout";
+import { Offset } from "../input-tree/math-layout-offset";
+import { RowIndices, fromRowIndices, MathLayoutRowZipper } from "../input-tree/math-layout-zipper";
 import { assertUnreachable } from "../utils/assert";
 import { MathLayoutCaret, SerializedCaret } from "../component/editing/math-layout-caret";
 

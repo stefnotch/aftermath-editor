@@ -1,6 +1,6 @@
 import { SyntaxNode } from "../../core";
-import { Offset } from "../../math-layout/math-layout-offset";
-import { RowIndex } from "../../math-layout/math-layout-zipper";
+import { Offset } from "../../input-tree/math-layout-offset";
+import { RowIndex } from "../../input-tree/math-layout-zipper";
 import { RenderedElement } from "../../rendering/render-result";
 import { ViewportCoordinate } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";

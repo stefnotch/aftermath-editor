@@ -1,7 +1,7 @@
 import init, { MathParser } from "../../aftermath-core/pkg";
-import { MathLayoutRow } from "../math-layout/math-layout";
-import { Offset } from "../math-layout/math-layout-offset";
-import { RowIndices } from "../math-layout/math-layout-zipper";
+import { MathLayoutRow } from "../input-tree/math-layout";
+import { Offset } from "../input-tree/math-layout-offset";
+import { RowIndices } from "../input-tree/math-layout-zipper";
 import { assert } from "../utils/assert";
 import { customError } from "../utils/error-utils";
 
