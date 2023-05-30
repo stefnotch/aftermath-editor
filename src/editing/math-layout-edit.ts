@@ -1,4 +1,4 @@
-import { Offset } from "../input-tree/math-layout-offset";
+import { Offset } from "../input-tree/input-offset";
 import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
 import { assertUnreachable } from "../utils/assert";

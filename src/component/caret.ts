@@ -1,6 +1,6 @@
 import { SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
-import { Offset } from "../input-tree/math-layout-offset";
-import { InputRowPosition } from "../input-tree/math-layout-position";
+import { Offset } from "../input-tree/input-offset";
+import { InputRowPosition } from "../input-tree/input-row-position";
 import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
 import { RenderResult, RowIndicesAndRange } from "../rendering/render-result";

@@ -1,5 +1,5 @@
 import { hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
-import { Offset } from "../input-tree/math-layout-offset";
+import { Offset } from "../input-tree/input-offset";
 import { RowIndices } from "../input-tree/row-indices";
 import { RenderResult, RenderedElement, RowIndicesAndOffset, RowIndicesAndRange } from "../rendering/render-result";
 import { RenderedSelection } from "../rendering/rendered-selection";

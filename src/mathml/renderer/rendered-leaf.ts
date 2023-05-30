@@ -1,5 +1,5 @@
 import { SyntaxLeafNode, offsetInRange } from "../../core";
-import { Offset } from "../../input-tree/math-layout-offset";
+import { Offset } from "../../input-tree/input-offset";
 import { ViewportValue } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
 import { createPlaceholder } from "./rendered-element";

@@ -1,7 +1,7 @@
 import { assert } from "../utils/assert";
 import { InputNode, InputNodeContainer, InputNodeSymbol } from "./input-node";
 import { InputRow } from "./row";
-import { AbsoluteOffset, Offset } from "./math-layout-offset";
+import { AbsoluteOffset, Offset } from "./input-offset";
 import { RowIndices } from "./row-indices";
 
 /**

@@ -1,6 +1,6 @@
 import { InputNode } from "../../input-tree/input-node";
 import { InputRow } from "../../input-tree/row";
-import { InputRowPosition } from "../../input-tree/math-layout-position";
+import { InputRowPosition } from "../../input-tree/input-row-position";
 import { InputNodeContainerZipper, InputSymbolZipper, InputRowZipper } from "../../input-tree/input-zipper";
 import { RowIndices } from "../../input-tree/row-indices";
 import { RenderResult } from "../../rendering/render-result";

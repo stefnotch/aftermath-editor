@@ -11,7 +11,7 @@ import { RowIndices } from "../input-tree/row-indices";
 import { applyEdit, inverseEdit, MathLayoutEdit } from "../editing/math-layout-edit";
 import { UndoRedoManager } from "../editing/undo-redo-manager";
 import { CaretEdit, insertAtCaret, removeAtCaret } from "./editing/math-layout-caret-edit";
-import { InputRowPosition } from "../input-tree/math-layout-position";
+import { InputRowPosition } from "../input-tree/input-row-position";
 import { MathMLRenderer } from "../mathml/renderer";
 import { RenderResult, RenderedElement } from "../rendering/render-result";
 import { SyntaxNode, getNodeIdentifiers, joinNodeIdentifier, parse } from "./../core";

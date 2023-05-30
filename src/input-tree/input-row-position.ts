@@ -1,4 +1,4 @@
-import { Offset } from "./math-layout-offset";
+import { Offset } from "./input-offset";
 import { InputRowZipper } from "./input-zipper";
 import { RowIndices } from "./row-indices";
 

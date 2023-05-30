@@ -1,6 +1,6 @@
 import init, { MathParser } from "../../aftermath-core/pkg";
 import { InputNodeContainer } from "../input-tree/input-node";
-import { Offset } from "../input-tree/math-layout-offset";
+import { Offset } from "../input-tree/input-offset";
 import { RowIndices } from "../input-tree/row-indices";
 import { InputRow } from "../input-tree/row";
 import { assert } from "../utils/assert";

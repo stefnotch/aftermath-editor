@@ -1,5 +1,5 @@
 import { SyntaxNode, offsetInRange } from "../../core";
-import { Offset } from "../../input-tree/math-layout-offset";
+import { Offset } from "../../input-tree/input-offset";
 import { RowIndex } from "../../input-tree/row-indices";
 import { RenderedElement } from "../../rendering/render-result";
 import { ViewportCoordinate } from "../../rendering/viewport-coordinate";

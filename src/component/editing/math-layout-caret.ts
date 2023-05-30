@@ -1,6 +1,6 @@
 import { match } from "ts-pattern";
-import { Offset } from "../../input-tree/math-layout-offset";
-import { InputRowPosition } from "../../input-tree/math-layout-position";
+import { Offset } from "../../input-tree/input-offset";
+import { InputRowPosition } from "../../input-tree/input-row-position";
 import { InputNodeContainerZipper, InputRowZipper, InputSymbolZipper } from "../../input-tree/input-zipper";
 import { RowIndices, getSharedRowIndices } from "../../input-tree/row-indices";
 import { assert, assertUnreachable } from "../../utils/assert";
