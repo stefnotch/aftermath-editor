@@ -3,8 +3,6 @@ import { Offset } from "../../input-tree/math-layout-offset";
 import { MathLayoutPosition } from "../../input-tree/math-layout-position";
 import {
   RowIndices,
-  fromRowIndices,
-  getRowIndices,
   getSharedRowIndices,
   InputNodeContainerZipper,
   InputRowZipper,
@@ -42,11 +40,11 @@ export class MathLayoutCaret {
   }
 
   static serialize(zipper: InputRowZipper, start: Offset, end: Offset): SerializedCaret {
-    return { zipper: getRowIndices(zipper), start, end };
+    return { zipper: RowIndices.fromZipper(zipper), start, end };
   }
 
   static deserialize(root: InputRowZipper, serialized: SerializedCaret): MathLayoutCaret {
-    const zipper = fromRowIndices(root, serialized.zipper);
+    const zipper = InputRowZipper.fromRowIndices(root, serialized.zipper);
     return new MathLayoutCaret(zipper, serialized.start, serialized.end);
   }
 
@@ -54,10 +52,10 @@ export class MathLayoutCaret {
    * Gets a caret from two positions that might be in different rows.
    */
   static getSharedCaret(startPosition: MathLayoutPosition, endPosition: MathLayoutPosition): MathLayoutCaret {
-    const startAncestorIndices = getRowIndices(startPosition.zipper);
-    const endAncestorIndices = getRowIndices(endPosition.zipper);
+    const startAncestorIndices = RowIndices.fromZipper(startPosition.zipper);
+    const endAncestorIndices = RowIndices.fromZipper(endPosition.zipper);
     const sharedParentPart = getSharedRowIndices(startAncestorIndices, endAncestorIndices);
-    const sharedParent = fromRowIndices(startPosition.zipper.root, sharedParentPart);
+    const sharedParent = InputRowZipper.fromRowIndices(startPosition.zipper.root, sharedParentPart);
 
     // We need to know the direction of the selection to know whether the caret should be at the start or end of the row
     // We also have to handle edge cases like first caret is at top of fraction and second caret is at bottom of fraction
@@ -66,12 +64,12 @@ export class MathLayoutCaret {
     // And now that we know the direction, we can compute the actual start and end offsets
     const startOffset =
       sharedParentPart.length < startAncestorIndices.length
-        ? startAncestorIndices[sharedParentPart.length][0] + (isForwards ? 0 : 1)
+        ? startAncestorIndices.indices[sharedParentPart.length][0] + (isForwards ? 0 : 1)
         : startPosition.offset;
 
     const endOffset =
       sharedParentPart.length < endAncestorIndices.length
-        ? endAncestorIndices[sharedParentPart.length][0] + (isForwards ? 1 : 0)
+        ? endAncestorIndices.indices[sharedParentPart.length][0] + (isForwards ? 1 : 0)
         : endPosition.offset;
 
     return new MathLayoutCaret(sharedParent, startOffset, endOffset);
@@ -88,7 +86,7 @@ export function moveCaret<T>(
     direction === "left" || direction === "up" ? caret.leftOffset : caret.rightOffset
   );
   const viewportPosition = renderResult.getViewportSelection({
-    indices: getRowIndices(layoutPosition.zipper),
+    indices: RowIndices.fromZipper(layoutPosition.zipper),
     start: layoutPosition.offset,
     end: layoutPosition.offset,
   });
@@ -99,7 +97,7 @@ export function moveCaret<T>(
     [viewportPosition.rect.x, viewportPosition.baseline],
     (layoutPosition) => {
       const position = renderResult.getViewportSelection({
-        indices: getRowIndices(layoutPosition.zipper),
+        indices: RowIndices.fromZipper(layoutPosition.zipper),
         start: layoutPosition.offset,
         end: layoutPosition.offset,
       });

@@ -1,12 +1,7 @@
 import { InputNode } from "../../input-tree/input-node";
 import { InputRow } from "../../input-tree/row";
 import { MathLayoutPosition } from "../../input-tree/math-layout-position";
-import {
-  InputNodeContainerZipper,
-  InputSymbolZipper,
-  getRowIndices,
-  InputRowZipper,
-} from "../../input-tree/math-layout-zipper";
+import { InputNodeContainerZipper, InputSymbolZipper, InputRowZipper, RowIndices } from "../../input-tree/math-layout-zipper";
 import { RenderResult } from "../../rendering/render-result";
 import arrayUtils from "../../utils/array-utils";
 import { MathLayoutCaret, moveCaret, SerializedCaret } from "./math-layout-caret";
@@ -53,7 +48,7 @@ function removeAtPosition<T>(
   // Remove a zipper and its children
   const removeAction = (zipper: InputNodeContainerZipper | InputSymbolZipper): MathLayoutSimpleEdit => ({
     type: "remove" as const,
-    zipper: getRowIndices(zipper.parent),
+    zipper: RowIndices.fromZipper(zipper.parent),
     index: zipper.indexInParent,
     value: zipper.value,
   });
@@ -63,7 +58,7 @@ function removeAtPosition<T>(
     [removeAction(zipper)].concat(
       values.map((v, i) => ({
         type: "insert" as const,
-        zipper: getRowIndices(zipper.parent),
+        zipper: RowIndices.fromZipper(zipper.parent),
         offset: zipper.indexInParent + i,
         value: v,
       }))
@@ -127,7 +122,7 @@ function removeAtPosition<T>(
 }
 
 function removeRange(caret: MathLayoutCaret): CaretEdit {
-  const ancestorIndices = getRowIndices(caret.zipper);
+  const ancestorIndices = RowIndices.fromZipper(caret.zipper);
 
   return {
     edits: arrayUtils.range(caret.leftOffset, caret.rightOffset).map((i) => ({
@@ -162,7 +157,7 @@ function insertAtPosition(position: MathLayoutPosition, value: InputRow): CaretE
   return {
     edits: value.values.map((v, i) => ({
       type: "insert" as const,
-      zipper: getRowIndices(position.zipper),
+      zipper: RowIndices.fromZipper(position.zipper),
       offset: position.offset + i,
       value: v,
     })),

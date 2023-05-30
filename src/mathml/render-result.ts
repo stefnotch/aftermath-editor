@@ -1,6 +1,6 @@
 import { hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
 import { Offset } from "../input-tree/math-layout-offset";
-import { RowIndices, addRowIndex } from "../input-tree/math-layout-zipper";
+import { RowIndices } from "../input-tree/math-layout-zipper";
 import { RenderResult, RenderedElement, RowIndicesAndOffset, RowIndicesAndRange } from "../rendering/render-result";
 import { RenderedSelection } from "../rendering/rendered-selection";
 import { ViewportCoordinate, ViewportMath, ViewportValue } from "../rendering/viewport-coordinate";
@@ -107,7 +107,7 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
         return null;
       } else {
         for (const child of element.getChildren()) {
-          const v = getLayoutElementContaining(child, addRowIndex(indices, child.rowIndex));
+          const v = getLayoutElementContaining(child, indices.addRowIndex(child.rowIndex));
           if (v) {
             return v;
           }
@@ -117,9 +117,9 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
     }
 
     return (
-      getLayoutElementContaining(this.rootElement, []) ?? {
+      getLayoutElementContaining(this.rootElement, RowIndices.default()) ?? {
         element: this.rootElement,
-        indices: [],
+        indices: RowIndices.default(),
       }
     );
   }
@@ -178,7 +178,7 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
       // Note: This could be kinda inefficient for large tables, but that's a problem for another day
       getNewRowsChildren(element).forEach((v) => {
         assert(v.rowIndex !== null);
-        roots.push({ element: v, indices: addRowIndex(indices, v.rowIndex) });
+        roots.push({ element: v, indices: indices.addRowIndex(v.rowIndex) });
       });
     }
 

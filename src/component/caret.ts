@@ -1,7 +1,7 @@
 import { SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
 import { Offset } from "../input-tree/math-layout-offset";
 import { MathLayoutPosition } from "../input-tree/math-layout-position";
-import { InputRowZipper, getRowIndices } from "../input-tree/math-layout-zipper";
+import { InputRowZipper, RowIndices } from "../input-tree/math-layout-zipper";
 import { RenderResult, RowIndicesAndRange } from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { CaretElement } from "./caret-element";
@@ -49,7 +49,7 @@ export class MathCaret {
    * The error would show the "did you mean x_1" autocomplete suggestion.
    */
   getTokenAtCaret(syntaxTree: SyntaxNode): RowIndicesAndRange {
-    const indices = getRowIndices(this.caret.zipper);
+    const indices = RowIndices.fromZipper(this.caret.zipper);
     // Now we walked down the indices, so we should be at the row we want.
     const row = getRowNode(syntaxTree, indices);
     const caretOffset = this.caret.end;

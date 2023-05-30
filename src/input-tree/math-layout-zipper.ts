@@ -27,6 +27,20 @@ export class InputRowZipper implements InputZipper<InputNodeContainerZipper | In
     public readonly startAbsoluteOffset: Offset
   ) {}
 
+  static fromRowIndices(root: InputRowZipper, indices: RowIndices) {
+    let current = root;
+    for (let i = 0; i < indices.length; i++) {
+      const [firstIndex, secondIndex] = indices.indices[i];
+
+      const child = current.children.at(firstIndex);
+      const nextChild = child?.children.at(secondIndex);
+      assert(nextChild !== undefined, "Invalid ancestor indices");
+      current = nextChild;
+    }
+
+    return current;
+  }
+
   /**
    * Only makes sense if they share the same root.
    * Row zippers have a unique range.
@@ -208,50 +222,62 @@ export type RowIndex = [indexOfContainer: number, indexOfRow: number];
  * Indices of a row in the tree.
  * Order is "-> container -> row"
  */
-export type RowIndices = readonly RowIndex[];
+export class RowIndices {
+  indices: readonly RowIndex[];
 
-/**
- * Gets the indices of the given zipper in the tree.
- * As in, every "indexInParent" of every element that has a parent, including the starting one.
- */
-export function getRowIndices(zipper: InputRowZipper): RowIndices {
-  const ancestorIndices: [number, number][] = [];
-  let current = zipper;
-  while (true) {
-    const parent = current.parent;
-    if (parent === null) break;
-
-    ancestorIndices.push([parent.indexInParent, current.indexInParent]);
-    current = parent.parent;
-  }
-  ancestorIndices.reverse();
-  return ancestorIndices;
-}
-
-export function addRowIndex(indices: RowIndices, index: RowIndex | null): RowIndices {
-  if (index === null) return indices;
-  return indices.concat([index]);
-}
-
-export function fromRowIndices(root: InputRowZipper, indices: RowIndices) {
-  let current = root;
-  for (let i = 0; i < indices.length; i++) {
-    const [firstIndex, secondIndex] = indices[i];
-
-    const child = current.children.at(firstIndex);
-    const nextChild = child?.children.at(secondIndex);
-    assert(nextChild !== undefined, "Invalid ancestor indices");
-    current = nextChild;
+  constructor(indices: readonly RowIndex[]) {
+    this.indices = indices;
   }
 
-  return current;
+  /**
+   * Gets the indices of the given zipper in the tree.
+   * As in, every "indexInParent" of every element that has a parent, including the starting one.
+   */
+  static fromZipper(zipper: InputRowZipper): RowIndices {
+    const ancestorIndices: [number, number][] = [];
+    let current = zipper;
+    while (true) {
+      const parent = current.parent;
+      if (parent === null) break;
+
+      ancestorIndices.push([parent.indexInParent, current.indexInParent]);
+      current = parent.parent;
+    }
+    ancestorIndices.reverse();
+    return new RowIndices(ancestorIndices);
+  }
+
+  static default(): RowIndices {
+    return new RowIndices([]);
+  }
+
+  addRowIndex(index: RowIndex | null): RowIndices {
+    if (index === null) return this;
+    return new RowIndices(this.indices.concat([index]));
+  }
+
+  get length(): number {
+    return this.indices.length;
+  }
+
+  [Symbol.iterator](): Iterator<RowIndex> {
+    let i = 0;
+    return {
+      next: () => {
+        if (i >= this.indices.length) {
+          return { done: true, value: undefined };
+        }
+        return { done: false, value: this.indices[i++] };
+      },
+    };
+  }
 }
 
 export function getSharedRowIndices(indicesA: RowIndices, indicesB: RowIndices): RowIndices {
   const sharedAncestorIndices: [number, number][] = [];
-  for (let i = 0; i < indicesA.length && i < indicesB.length; i++) {
-    const a = indicesA[i];
-    const b = indicesB[i];
+  for (let i = 0; i < indicesA.indices.length && i < indicesB.indices.length; i++) {
+    const a = indicesA.indices[i];
+    const b = indicesB.indices[i];
     if (a[0] === b[0] && a[1] === b[1]) {
       sharedAncestorIndices.push([a[0], a[1]]);
     } else {
@@ -259,5 +285,5 @@ export function getSharedRowIndices(indicesA: RowIndices, indicesB: RowIndices):
     }
   }
 
-  return sharedAncestorIndices;
+  return new RowIndices(sharedAncestorIndices);
 }

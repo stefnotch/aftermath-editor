@@ -1,5 +1,5 @@
 import { Offset } from "./math-layout-offset";
-import { getRowIndices, InputRowZipper } from "./math-layout-zipper";
+import { InputRowZipper, RowIndices } from "./math-layout-zipper";
 
 export class MathLayoutPosition {
   constructor(public readonly zipper: InputRowZipper, public readonly offset: Offset) {}
@@ -18,8 +18,8 @@ export class MathLayoutPosition {
   }
 
   static isBeforeOrEqual(start: MathLayoutPosition, end: MathLayoutPosition) {
-    const startAncestorIndices = getRowIndices(start.zipper).flat();
-    const endAncestorIndices = getRowIndices(end.zipper).flat();
+    const startAncestorIndices = RowIndices.fromZipper(start.zipper).indices.flat();
+    const endAncestorIndices = RowIndices.fromZipper(end.zipper).indices.flat();
 
     // Plus one for the offsets comparison
     for (let i = 0; i < startAncestorIndices.length + 1 || i < endAncestorIndices.length + 1; i++) {

@@ -1,5 +1,5 @@
 import { Offset } from "../input-tree/math-layout-offset";
-import { RowIndices, fromRowIndices, InputRowZipper } from "../input-tree/math-layout-zipper";
+import { RowIndices, InputRowZipper } from "../input-tree/math-layout-zipper";
 import { assertUnreachable } from "../utils/assert";
 import { MathLayoutCaret, SerializedCaret } from "../component/editing/math-layout-caret";
 import { InputNode } from "../input-tree/input-node";
@@ -56,13 +56,13 @@ export function applyEdit(root: InputRowZipper, edit: MathLayoutEdit): { root: I
 
 function applySimpleEdit(root: InputRowZipper, edit: MathLayoutSimpleEdit): InputRowZipper {
   if (edit.type === "insert") {
-    const zipper = fromRowIndices(root, edit.zipper);
+    const zipper = InputRowZipper.fromRowIndices(root, edit.zipper);
     const result = zipper.insert(edit.offset, edit.value);
     return result.newRoot;
   } else if (edit.type === "remove") {
     console.log(edit);
 
-    const zipper = fromRowIndices(root, edit.zipper);
+    const zipper = InputRowZipper.fromRowIndices(root, edit.zipper);
     const result = zipper.remove(edit.index);
 
     return result.newRoot;

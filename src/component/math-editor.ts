@@ -6,7 +6,7 @@ import mathEditorStyles from "./math-editor-styles.css?inline";
 import inputHandlerStyles from "./input-handler-style.css?inline";
 import { InputHandlerElement } from "./input-handler-element";
 import { MathLayoutCaret } from "./editing/math-layout-caret";
-import { InputRowZipper, fromRowIndices, getRowIndices } from "../input-tree/math-layout-zipper";
+import { InputRowZipper, RowIndices } from "../input-tree/math-layout-zipper";
 import { applyEdit, inverseEdit, MathLayoutEdit } from "../editing/math-layout-edit";
 import { UndoRedoManager } from "../editing/undo-redo-manager";
 import { CaretEdit, insertAtCaret, removeAtCaret } from "./editing/math-layout-caret-edit";
@@ -88,7 +88,11 @@ export class MathEditor extends HTMLElement {
       // e.preventDefault();
 
       this.carets.clearCarets();
-      this.carets.addPointerDownCaret(e.pointerId, fromRowIndices(this.inputTree, newCaret.indices), newCaret.offset);
+      this.carets.addPointerDownCaret(
+        e.pointerId,
+        InputRowZipper.fromRowIndices(this.inputTree, newCaret.indices),
+        newCaret.offset
+      );
       this.renderCarets();
     });
     container.addEventListener("pointerup", (e) => {
@@ -111,7 +115,7 @@ export class MathEditor extends HTMLElement {
       // TODO: Table selections
       caret.caret = MathLayoutCaret.getSharedCaret(
         caret.startPosition,
-        new MathLayoutPosition(fromRowIndices(this.inputTree, newPosition.indices), newPosition.offset)
+        new MathLayoutPosition(InputRowZipper.fromRowIndices(this.inputTree, newPosition.indices), newPosition.offset)
       );
       this.renderCarets();
     });
@@ -301,7 +305,7 @@ export class MathEditor extends HTMLElement {
     console.log("Rendered", this.renderResult);
 
     // The MathML elements directly under the <math> tag
-    const mathMlElements = this.renderResult.getElement([]).getElements();
+    const mathMlElements = this.renderResult.getElement(RowIndices.default()).getElements();
     for (const element of mathMlElements) {
       assert(element instanceof MathMLElement);
     }
@@ -324,19 +328,19 @@ export class MathEditor extends HTMLElement {
           renderedElement.getChildren().forEach((child) => debugRenderRows(child));
         }
 
-        debugRenderRows(this.renderResult.getElement([]));
+        debugRenderRows(this.renderResult.getElement(RowIndices.default()));
       }
     }
   }
 
   renderCaret(caret: MathCaret) {
     const renderedCaret = this.renderResult.getViewportSelection({
-      indices: getRowIndices(caret.caret.zipper),
+      indices: RowIndices.fromZipper(caret.caret.zipper),
       start: caret.caret.leftOffset,
       end: caret.caret.rightOffset,
     });
     // Render caret itself
-    const caretSize = this.renderResult.getViewportCaretSize(getRowIndices(caret.caret.zipper));
+    const caretSize = this.renderResult.getViewportCaretSize(RowIndices.fromZipper(caret.caret.zipper));
     caret.element.setPosition(
       renderedCaret.rect.x + (caret.caret.isForwards ? renderedCaret.rect.width : 0),
       renderedCaret.baseline + caretSize * 0.1
@@ -350,7 +354,7 @@ export class MathEditor extends HTMLElement {
     }
 
     // Highlight container (for the caret)
-    const container = this.renderResult.getElement(getRowIndices(caret.caret.zipper));
+    const container = this.renderResult.getElement(RowIndices.fromZipper(caret.caret.zipper));
     caret.setHighlightedElements(container.getElements());
 
     // Highlight token at the caret
