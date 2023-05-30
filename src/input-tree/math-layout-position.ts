@@ -2,10 +2,10 @@ import { Offset } from "./math-layout-offset";
 import { InputRowZipper } from "./input-zipper";
 import { RowIndices } from "./row-indices";
 
-export class MathLayoutPosition {
+export class InputRowPosition {
   constructor(public readonly zipper: InputRowZipper, public readonly offset: Offset) {}
 
-  equals(other: MathLayoutPosition): boolean {
+  equals(other: InputRowPosition): boolean {
     return this.zipper.equals(other.zipper) && this.offset === other.offset;
   }
 
@@ -13,12 +13,12 @@ export class MathLayoutPosition {
     return zipper.startAbsoluteOffset + offset;
   }
 
-  static fromAbsoluteOffset(root: InputRowZipper, absoluteOffset: Offset): MathLayoutPosition {
+  static fromAbsoluteOffset(root: InputRowZipper, absoluteOffset: Offset): InputRowPosition {
     const zipper = root.getZipperAtOffset(absoluteOffset);
-    return new MathLayoutPosition(zipper, absoluteOffset - zipper.startAbsoluteOffset);
+    return new InputRowPosition(zipper, absoluteOffset - zipper.startAbsoluteOffset);
   }
 
-  static isBeforeOrEqual(start: MathLayoutPosition, end: MathLayoutPosition) {
+  static isBeforeOrEqual(start: InputRowPosition, end: InputRowPosition) {
     const startAncestorIndices = RowIndices.fromZipper(start.zipper).indices.flat();
     const endAncestorIndices = RowIndices.fromZipper(end.zipper).indices.flat();
 

@@ -11,7 +11,7 @@ import { RowIndices } from "../input-tree/row-indices";
 import { applyEdit, inverseEdit, MathLayoutEdit } from "../editing/math-layout-edit";
 import { UndoRedoManager } from "../editing/undo-redo-manager";
 import { CaretEdit, insertAtCaret, removeAtCaret } from "./editing/math-layout-caret-edit";
-import { MathLayoutPosition } from "../input-tree/math-layout-position";
+import { InputRowPosition } from "../input-tree/math-layout-position";
 import { MathMLRenderer } from "../mathml/renderer";
 import { RenderResult, RenderedElement } from "../rendering/render-result";
 import { SyntaxNode, getNodeIdentifiers, joinNodeIdentifier, parse } from "./../core";
@@ -116,7 +116,7 @@ export class MathEditor extends HTMLElement {
       // TODO: Table selections
       caret.caret = MathLayoutCaret.getSharedCaret(
         caret.startPosition,
-        new MathLayoutPosition(InputRowZipper.fromRowIndices(this.inputTree, newPosition.indices), newPosition.offset)
+        new InputRowPosition(InputRowZipper.fromRowIndices(this.inputTree, newPosition.indices), newPosition.offset)
       );
       this.renderCarets();
     });

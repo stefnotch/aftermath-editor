@@ -1,6 +1,6 @@
 import { InputNode } from "../../input-tree/input-node";
 import { InputRow } from "../../input-tree/row";
-import { MathLayoutPosition } from "../../input-tree/math-layout-position";
+import { InputRowPosition } from "../../input-tree/math-layout-position";
 import { InputNodeContainerZipper, InputSymbolZipper, InputRowZipper } from "../../input-tree/input-zipper";
 import { RowIndices } from "../../input-tree/row-indices";
 import { RenderResult } from "../../rendering/render-result";
@@ -25,14 +25,14 @@ export function removeAtCaret<T>(
   renderResult: RenderResult<T>
 ): CaretEdit {
   if (caret.isCollapsed) {
-    return removeAtPosition(new MathLayoutPosition(caret.zipper, caret.start), direction, renderResult);
+    return removeAtPosition(new InputRowPosition(caret.zipper, caret.start), direction, renderResult);
   } else {
     return removeRange(caret);
   }
 }
 
 function removeAtPosition<T>(
-  position: MathLayoutPosition,
+  position: InputRowPosition,
   direction: "left" | "right",
   renderResult: RenderResult<T>
 ): CaretEdit {
@@ -143,10 +143,10 @@ function serializeCollapsedCaret(zipper: InputRowZipper, offset: number): Serial
 
 export function insertAtCaret(caret: MathLayoutCaret, value: InputRow): CaretEdit {
   if (caret.isCollapsed) {
-    return insertAtPosition(new MathLayoutPosition(caret.zipper, caret.start), value);
+    return insertAtPosition(new InputRowPosition(caret.zipper, caret.start), value);
   } else {
     const removeExisting = removeRange(caret);
-    const insertAfterRemoval = insertAtPosition(new MathLayoutPosition(caret.zipper, caret.start), value);
+    const insertAfterRemoval = insertAtPosition(new InputRowPosition(caret.zipper, caret.start), value);
     return {
       edits: removeExisting.edits.concat(insertAfterRemoval.edits),
       caret: insertAfterRemoval.caret,
@@ -154,7 +154,7 @@ export function insertAtCaret(caret: MathLayoutCaret, value: InputRow): CaretEdi
   }
 }
 
-function insertAtPosition(position: MathLayoutPosition, value: InputRow): CaretEdit {
+function insertAtPosition(position: InputRowPosition, value: InputRow): CaretEdit {
   return {
     edits: value.values.map((v, i) => ({
       type: "insert" as const,
@@ -170,7 +170,7 @@ function insertAtPosition(position: MathLayoutPosition, value: InputRow): CaretE
  * Gets the zipper of the element that the caret is touching
  */
 function getAdjacentZipper(
-  caret: MathLayoutPosition,
+  caret: InputRowPosition,
   direction: "left" | "right"
 ): InputNodeContainerZipper | InputSymbolZipper | null {
   const index = caret.offset + (direction === "left" ? -1 : 0);

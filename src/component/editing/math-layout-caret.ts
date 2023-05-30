@@ -1,6 +1,6 @@
 import { match } from "ts-pattern";
 import { Offset } from "../../input-tree/math-layout-offset";
-import { MathLayoutPosition } from "../../input-tree/math-layout-position";
+import { InputRowPosition } from "../../input-tree/math-layout-position";
 import { InputNodeContainerZipper, InputRowZipper, InputSymbolZipper } from "../../input-tree/input-zipper";
 import { RowIndices, getSharedRowIndices } from "../../input-tree/row-indices";
 import { assert, assertUnreachable } from "../../utils/assert";
@@ -46,7 +46,7 @@ export class MathLayoutCaret {
   /**
    * Gets a caret from two positions that might be in different rows.
    */
-  static getSharedCaret(startPosition: MathLayoutPosition, endPosition: MathLayoutPosition): MathLayoutCaret {
+  static getSharedCaret(startPosition: InputRowPosition, endPosition: InputRowPosition): MathLayoutCaret {
     const startAncestorIndices = RowIndices.fromZipper(startPosition.zipper);
     const endAncestorIndices = RowIndices.fromZipper(endPosition.zipper);
     const sharedParentPart = getSharedRowIndices(startAncestorIndices, endAncestorIndices);
@@ -54,7 +54,7 @@ export class MathLayoutCaret {
 
     // We need to know the direction of the selection to know whether the caret should be at the start or end of the row
     // We also have to handle edge cases like first caret is at top of fraction and second caret is at bottom of fraction
-    const isForwards = MathLayoutPosition.isBeforeOrEqual(startPosition, endPosition);
+    const isForwards = InputRowPosition.isBeforeOrEqual(startPosition, endPosition);
 
     // And now that we know the direction, we can compute the actual start and end offsets
     const startOffset =
@@ -76,7 +76,7 @@ export function moveCaret<T>(
   direction: "up" | "down" | "left" | "right",
   renderResult: RenderResult<T>
 ): MathLayoutCaret | null {
-  const layoutPosition = new MathLayoutPosition(
+  const layoutPosition = new InputRowPosition(
     caret.zipper,
     direction === "left" || direction === "up" ? caret.leftOffset : caret.rightOffset
   );
@@ -112,8 +112,8 @@ function moveVertical(
   zipper: InputRowZipper,
   direction: "up" | "down",
   desiredXPosition: ViewportValue,
-  getCaretPosition: (layoutPosition: MathLayoutPosition) => [ViewportValue, ViewportValue]
-): MathLayoutPosition | null {
+  getCaretPosition: (layoutPosition: InputRowPosition) => [ViewportValue, ViewportValue]
+): InputRowPosition | null {
   const parent = zipper.parent;
   if (parent === null) return null;
 
@@ -147,7 +147,7 @@ function moveVertical(
         return moveVerticalClosestPosition(newZipper, desiredXPosition, getCaretPosition);
       } else {
         const offset = direction == "up" ? newZipper.value.values.length : 0;
-        return new MathLayoutPosition(newZipper, offset);
+        return new InputRowPosition(newZipper, offset);
       }
     }
   } else if (parent.type == "Sup" || parent.type == "Sub") {
@@ -156,7 +156,7 @@ function moveVertical(
     if (grandParent == null) return null;
 
     if ((parent.type == "Sup" && direction == "down") || (parent.type == "Sub" && direction == "up")) {
-      return new MathLayoutPosition(grandParent, parent.indexInParent);
+      return new InputRowPosition(grandParent, parent.indexInParent);
     } else {
       return moveVertical(grandParent, direction, desiredXPosition, getCaretPosition);
     }
@@ -171,17 +171,17 @@ function moveVertical(
 function moveVerticalClosestPosition(
   newZipper: InputRowZipper,
   desiredXPosition: number,
-  getCaretPosition: (layoutPosition: MathLayoutPosition) => [ViewportValue, ViewportValue]
+  getCaretPosition: (layoutPosition: InputRowPosition) => [ViewportValue, ViewportValue]
 ) {
   // TODO: Attempt to keep x-screen position. This is not trivial, especially with cases where the top fraction has some nested elements
   // Also do walk into nested elements if possible.
   let offset: Offset = 0;
   while (true) {
-    const caretX = getCaretPosition(new MathLayoutPosition(newZipper, offset))[0];
+    const caretX = getCaretPosition(new InputRowPosition(newZipper, offset))[0];
     const newOffset: Offset = offset + (caretX < desiredXPosition ? 1 : -1);
     if (!offsetInBounds(newZipper, newOffset)) break;
 
-    const newCaretX = getCaretPosition(new MathLayoutPosition(newZipper, newOffset))[0];
+    const newCaretX = getCaretPosition(new InputRowPosition(newZipper, newOffset))[0];
     const isBetter = Math.abs(newCaretX - desiredXPosition) < Math.abs(caretX - desiredXPosition);
 
     if (isBetter) {
@@ -198,7 +198,7 @@ function moveVerticalClosestPosition(
       }
     }
   }
-  return new MathLayoutPosition(newZipper, offset);
+  return new InputRowPosition(newZipper, offset);
 }
 
 function offsetInBounds(zipper: InputRowZipper, offset: number) {
@@ -212,14 +212,14 @@ function offsetInBounds(zipper: InputRowZipper, offset: number) {
 function moveHorizontalBeyondEdge(
   zipper: InputRowZipper | InputNodeContainerZipper,
   direction: "left" | "right"
-): MathLayoutPosition | null {
+): InputRowPosition | null {
   const parent = zipper.parent;
   if (!parent) return null;
 
   if (parent instanceof InputRowZipper) {
     // We're done once we've found a row as a parent
     const offset = zipper.indexInParent + (direction === "left" ? 0 : 1);
-    return new MathLayoutPosition(parent, offset);
+    return new InputRowPosition(parent, offset);
   } else if (zipper instanceof InputRowZipper) {
     // If we found a decent adjacent element, like in a fraction or a table, we can try moving to the next spot
     const adjacentIndex = zipper.indexInParent + (direction === "left" ? -1 : 1);
@@ -230,7 +230,7 @@ function moveHorizontalBeyondEdge(
       // We're in the middle of the table or fraction
       const adjacentZipper = parent.children[adjacentIndex];
       const offset = direction === "left" ? adjacentZipper.value.values.length : 0;
-      return new MathLayoutPosition(adjacentZipper, offset);
+      return new InputRowPosition(adjacentZipper, offset);
     }
   } else {
     // We're at the end, move up
@@ -241,11 +241,7 @@ function moveHorizontalBeyondEdge(
 /**
  * Move to the left or right, but always attempt to move into a nested element if there is one.
  */
-function moveHorizontalInto(
-  zipper: InputRowZipper,
-  caretOffset: Offset,
-  direction: "left" | "right"
-): MathLayoutPosition | null {
+function moveHorizontalInto(zipper: InputRowZipper, caretOffset: Offset, direction: "left" | "right"): InputRowPosition | null {
   // Carets are always inbetween elements. Hence element[caretOffset] is the element to the right of the caret.
   const adjacentChild = zipper.children[caretOffset + (direction === "left" ? -1 : 0)];
 
@@ -263,7 +259,7 @@ function moveHorizontalInto(
     const adjacentRow =
       direction === "left" ? adjacentChild.children[adjacentChild.children.length - 1] : adjacentChild.children[0];
     const offset = direction === "left" ? adjacentRow.value.values.length : 0;
-    return new MathLayoutPosition(adjacentRow, offset);
+    return new InputRowPosition(adjacentRow, offset);
   } else {
     assertUnreachable(adjacentChild.type);
   }
@@ -275,17 +271,17 @@ function moveHorizontalInto(
  * Uses the caret position for vertical movement, to keep the caret in the same x position.
  */
 function movePositionRecursive(
-  caret: MathLayoutPosition,
+  caret: InputRowPosition,
   direction: Direction,
   caretPosition: [ViewportValue, ViewportValue],
-  getCaretPosition: (layoutPosition: MathLayoutPosition) => [ViewportValue, ViewportValue]
-): MathLayoutPosition | null {
+  getCaretPosition: (layoutPosition: InputRowPosition) => [ViewportValue, ViewportValue]
+): InputRowPosition | null {
   if (direction === "right" || direction === "left") {
     if (isTouchingEdge(caret, direction)) {
       return moveHorizontalBeyondEdge(caret.zipper, direction);
     } else {
       const moveIntoChildTree = moveHorizontalInto(caret.zipper, caret.offset, direction);
-      return moveIntoChildTree ?? new MathLayoutPosition(caret.zipper, caret.offset + (direction === "left" ? -1 : +1));
+      return moveIntoChildTree ?? new InputRowPosition(caret.zipper, caret.offset + (direction === "left" ? -1 : +1));
     }
   } else if (direction === "up" || direction === "down") {
     return moveVertical(caret.zipper, direction, caretPosition[0], getCaretPosition);
@@ -297,7 +293,7 @@ function movePositionRecursive(
 /**
  * Checks if the caret is moving at the very edge of its container
  */
-function isTouchingEdge(position: MathLayoutPosition, direction: "left" | "right"): boolean {
+function isTouchingEdge(position: InputRowPosition, direction: "left" | "right"): boolean {
   return match(direction)
     .with("left", () => position.offset <= 0)
     .with("right", () => position.offset >= position.zipper.value.values.length)

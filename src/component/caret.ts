@@ -1,6 +1,6 @@
 import { SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
 import { Offset } from "../input-tree/math-layout-offset";
-import { MathLayoutPosition } from "../input-tree/math-layout-position";
+import { InputRowPosition } from "../input-tree/math-layout-position";
 import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
 import { RenderResult, RowIndicesAndRange } from "../rendering/render-result";
@@ -12,7 +12,7 @@ export class MathCaret {
   /**
    * Where the user started the caret.
    */
-  startPosition: MathLayoutPosition;
+  startPosition: InputRowPosition;
   /**
    * The current caret, which may be different from the start position if the user has selected a range.
    */
@@ -23,7 +23,7 @@ export class MathCaret {
 
   constructor(
     public container: HTMLElement,
-    opts: { startPosition: MathLayoutPosition; caret: MathLayoutCaret; element: CaretElement }
+    opts: { startPosition: InputRowPosition; caret: MathLayoutCaret; element: CaretElement }
   ) {
     this.startPosition = opts.startPosition;
     this.caret = opts.caret;
@@ -194,7 +194,7 @@ export class MathEditorCarets {
 
   private createCaret(zipper: InputRowZipper, startOffset: Offset, endOffset: Offset) {
     return new MathCaret(this.#containerElement, {
-      startPosition: new MathLayoutPosition(zipper, startOffset),
+      startPosition: new InputRowPosition(zipper, startOffset),
       caret: new MathLayoutCaret(zipper, startOffset, endOffset),
       element: new CaretElement(),
     });
