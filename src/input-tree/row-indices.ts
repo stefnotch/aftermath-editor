@@ -1,4 +1,4 @@
-import { InputRowZipper } from "./math-layout-zipper";
+import { InputRowZipper } from "./input-zipper";
 
 export type RowIndex = [indexOfContainer: number, indexOfRow: number];
 /**

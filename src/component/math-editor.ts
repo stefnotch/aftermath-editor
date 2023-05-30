@@ -6,7 +6,7 @@ import mathEditorStyles from "./math-editor-styles.css?inline";
 import inputHandlerStyles from "./input-handler-style.css?inline";
 import { InputHandlerElement } from "./input-handler-element";
 import { MathLayoutCaret } from "./editing/math-layout-caret";
-import { InputRowZipper } from "../input-tree/math-layout-zipper";
+import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
 import { applyEdit, inverseEdit, MathLayoutEdit } from "../editing/math-layout-edit";
 import { UndoRedoManager } from "../editing/undo-redo-manager";

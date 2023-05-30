@@ -1,7 +1,7 @@
 import { match } from "ts-pattern";
 import { Offset } from "../../input-tree/math-layout-offset";
 import { MathLayoutPosition } from "../../input-tree/math-layout-position";
-import { InputNodeContainerZipper, InputRowZipper, InputSymbolZipper } from "../../input-tree/math-layout-zipper";
+import { InputNodeContainerZipper, InputRowZipper, InputSymbolZipper } from "../../input-tree/input-zipper";
 import { RowIndices, getSharedRowIndices } from "../../input-tree/row-indices";
 import { assert, assertUnreachable } from "../../utils/assert";
 import { ViewportValue } from "../../rendering/viewport-coordinate";
