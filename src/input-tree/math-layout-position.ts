@@ -1,5 +1,6 @@
 import { Offset } from "./math-layout-offset";
-import { InputRowZipper, RowIndices } from "./math-layout-zipper";
+import { InputRowZipper } from "./math-layout-zipper";
+import { RowIndices } from "./row-indices";
 
 export class MathLayoutPosition {
   constructor(public readonly zipper: InputRowZipper, public readonly offset: Offset) {}

@@ -1,7 +1,8 @@
 import { InputNode } from "../../input-tree/input-node";
 import { InputRow } from "../../input-tree/row";
 import { MathLayoutPosition } from "../../input-tree/math-layout-position";
-import { InputNodeContainerZipper, InputSymbolZipper, InputRowZipper, RowIndices } from "../../input-tree/math-layout-zipper";
+import { InputNodeContainerZipper, InputSymbolZipper, InputRowZipper } from "../../input-tree/math-layout-zipper";
+import { RowIndices } from "../../input-tree/row-indices";
 import { RenderResult } from "../../rendering/render-result";
 import arrayUtils from "../../utils/array-utils";
 import { MathLayoutCaret, moveCaret, SerializedCaret } from "./math-layout-caret";

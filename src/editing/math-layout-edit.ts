@@ -1,5 +1,6 @@
 import { Offset } from "../input-tree/math-layout-offset";
-import { RowIndices, InputRowZipper } from "../input-tree/math-layout-zipper";
+import { InputRowZipper } from "../input-tree/math-layout-zipper";
+import { RowIndices } from "../input-tree/row-indices";
 import { assertUnreachable } from "../utils/assert";
 import { MathLayoutCaret, SerializedCaret } from "../component/editing/math-layout-caret";
 import { InputNode } from "../input-tree/input-node";
