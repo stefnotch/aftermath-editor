@@ -16,7 +16,7 @@ import { MathMLRenderer } from "../mathml/renderer";
 import { RenderResult, RenderedElement } from "../rendering/render-result";
 import { SyntaxNode, getNodeIdentifiers, joinNodeIdentifier, parse } from "./../core";
 import { DebugSettings } from "./debug-settings";
-import { MathCaret, MathEditorCarets } from "./caret";
+import { MathEditorCarets } from "./caret";
 import { InputRow } from "../input-tree/row";
 import { InputNodeSymbol } from "../input-tree/input-node";
 import { InputTree } from "../input-tree/input-tree";
@@ -107,17 +107,14 @@ export class MathEditor extends HTMLElement {
       this.renderCarets();
     });
     container.addEventListener("pointermove", (e) => {
-      const caret = this.carets.pointerDownCarets.get(e.pointerId);
-      if (!caret) return;
-
-      const newPosition = this.renderResult.getLayoutPosition({ x: e.clientX, y: e.clientY });
-      if (!newPosition) return;
-
-      // TODO: Table selections
-      caret.caret = CaretRange.getSharedCaret(
-        caret.startPosition,
-        new InputRowPosition(InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newPosition.indices), newPosition.offset)
+      const newPositionIndices = this.renderResult.getLayoutPosition({ x: e.clientX, y: e.clientY });
+      if (!newPositionIndices) return;
+      const newPosition = new InputRowPosition(
+        InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newPositionIndices.indices),
+        newPositionIndices.offset
       );
+
+      this.carets.updatePointerDownCaret(e.pointerId, newPosition);
       this.renderCarets();
     });
 
@@ -359,7 +356,7 @@ export class MathEditor extends HTMLElement {
 
   renderCarets() {
     if (!this.isConnected) return;
-    this.carets.map((v) => this.renderCaret(v));
+    this.carets.renderCarets(this.syntaxTree, this.renderResult);
 
     if (import.meta.env.DEV) {
       if (DebugSettings.renderRows) {
@@ -375,46 +372,15 @@ export class MathEditor extends HTMLElement {
     }
   }
 
-  renderCaret(caret: MathCaret) {
-    const caretIndices = RowIndices.fromZipper(caret.caret.range.zipper);
-    const renderedCaret = this.renderResult.getViewportSelection({
-      indices: caretIndices,
-      start: caret.caret.leftOffset,
-      end: caret.caret.rightOffset,
-    });
-    // Render caret itself
-    const caretSize = this.renderResult.getViewportCaretSize(caretIndices);
-    caret.element.setPosition(
-      renderedCaret.rect.x + (caret.caret.isForwards ? renderedCaret.rect.width : 0),
-      renderedCaret.baseline + caretSize * 0.1
-    );
-    caret.element.setHeight(caretSize);
-
-    // Render selection
-    caret.element.clearSelections();
-    if (!caret.caret.isCollapsed) {
-      caret.element.addSelection(renderedCaret.rect);
-    }
-
-    // Highlight container (for the caret)
-    const container = this.renderResult.getElement(caretIndices);
-    caret.setHighlightedElements(container.getElements());
-
-    // Highlight token at the caret
-    const tokenAtCaret = caret.getTokenAtCaret(this.syntaxTree);
-    caret.element.setToken(this.renderResult.getViewportSelection(tokenAtCaret));
-    // TODO: Use symbols for autocomplete
-    const symbolsAtCaret = MathCaret.getSymbolsAt(this.syntaxTree, tokenAtCaret);
-  }
-
   finalizeEdits(edits: readonly CaretEdit[]): MathLayoutEdit {
-    const caretsBefore = this.carets.map((v) => CaretRange.serialize(v.caret));
+    const caretsBefore = this.carets.serialize();
 
     // TODO: Deduplicate carets/remove overlapping carets
     const edit: MathLayoutEdit = {
       type: "multi",
       edits: edits.flatMap((v) => v.edits),
       caretsBefore,
+      // TODO: Is this correct?
       caretsAfter: edits.map((v) => v.caret),
     };
     return edit;
