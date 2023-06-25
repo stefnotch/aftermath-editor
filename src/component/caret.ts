@@ -1,12 +1,21 @@
 import { SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
+import { MathLayoutEdit, MathLayoutSimpleEdit } from "../editing/input-tree-edit";
 import { InputRowPosition } from "../input-position/input-row-position";
+import { InputTree } from "../input-tree/input-tree";
 import { RowIndices } from "../input-tree/row-indices";
 import { RenderResult, RowIndicesAndRange } from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { CaretDomElement } from "./caret-element";
-import { CaretRange, moveCaret } from "./editing/math-layout-caret";
+import { CaretRange, SerializedCaret, moveCaret } from "./editing/math-layout-caret";
+import { removeAtCaret } from "./editing/math-layout-caret-edit";
 
 export class MathEditorCarets {
+  // Currently limited to one caret
+  // TODO: Multi-caret support
+  //
+  // - move carets to the same spot (merge)
+  // - select and delete region that contains a caret
+
   #carets: Set<MathCaret> = new Set<MathCaret>();
   #pointerDownCarets: Map<number, MathCaret> = new Map<number, MathCaret>();
   #containerElement: HTMLElement;
@@ -21,15 +30,9 @@ export class MathEditorCarets {
   }
 
   add(layoutCaret: CaretRange) {
-    // TODO: Always guarantee that carets are non-overlapping
+    // Limited to one caret
     const newCaret = this.createCaret(layoutCaret);
     this.addAndMergeCarets(newCaret);
-  }
-
-  remove(caret: MathCaret) {
-    caret.remove();
-    this.#containerElement.removeChild(caret.element.element);
-    this.#carets.delete(caret);
   }
 
   clearCarets() {
@@ -43,11 +46,49 @@ export class MathEditorCarets {
     this.#pointerDownCarets.clear();
   }
 
+  moveCarets(direction: "up" | "down" | "left" | "right", renderResult: RenderResult<MathMLElement>) {
+    this.finishPointerDownCarets();
+    assert(this.#carets.size <= 1);
+    this.#carets.forEach((caret) => {
+      caret.moveCaret(renderResult, direction);
+    });
+  }
+
+  removeAtCarets(direction: "left" | "right", tree: InputTree, renderResult: RenderResult<MathMLElement>): MathLayoutEdit {
+    this.finishPointerDownCarets();
+    const mergedEdit = {
+      type: "multi" as const,
+      caretsBefore: this.serialize(),
+      // TODO: Deduplicate carets/remove overlapping carets
+      caretsAfter: [] as SerializedCaret[],
+      edits: [] as MathLayoutSimpleEdit[],
+    };
+
+    const carets = [...this.#carets.values()];
+
+    // Iterate over the ranges, and move them after every edit
+    let caretRanges = carets.map((caret) => caret.caret);
+    while (caretRanges.length > 0) {
+      const caret = caretRanges.shift();
+      assert(caret);
+
+      const edit = removeAtCaret(caret, direction, renderResult);
+      mergedEdit.caretsAfter.push(edit.caret);
+      mergedEdit.edits.push(...edit.edits);
+      edit.edits.forEach((simpleEdit) => {
+        caretRanges = tree.updateCaretsWithEdit(simpleEdit, caretRanges);
+      });
+    }
+
+    return mergedEdit;
+  }
+
   renderCarets(syntaxTree: SyntaxNode, renderResult: RenderResult<MathMLElement>) {
     this.map((caret) => caret.renderCaret(syntaxTree, renderResult));
   }
 
   addPointerDownCaret(pointerId: number, position: InputRowPosition) {
+    this.clearCarets();
     this.#pointerDownCarets.set(pointerId, this.createCaret(new CaretRange(position)));
   }
 
@@ -58,15 +99,15 @@ export class MathEditorCarets {
     caret.caret = CaretRange.getSharedCaret(caret.startPosition, position);
   }
 
-  removePointerDownCaret(pointerId: number) {
-    this.#pointerDownCarets.delete(pointerId);
-  }
-
   finishPointerDownCaret(pointerId: number) {
     const caret = this.#pointerDownCarets.get(pointerId) ?? null;
     if (caret === null) return;
     this.#pointerDownCarets.delete(pointerId);
     this.addAndMergeCarets(caret);
+  }
+
+  finishPointerDownCarets() {
+    [...this.#pointerDownCarets.keys()].forEach((key) => this.finishPointerDownCaret(key));
   }
 
   serialize() {
@@ -86,6 +127,7 @@ export class MathEditorCarets {
   }
 
   private addAndMergeCarets(newCaret: MathCaret) {
+    this.clearCarets();
     this.#carets.add(newCaret);
   }
 }
@@ -144,6 +186,7 @@ class MathCaret {
     this.element.setToken(renderResult.getViewportSelection(tokenAtCaret));
     // TODO: Use symbols for autocomplete
     const symbolsAtCaret = MathCaret.getSymbolsAt(syntaxTree, tokenAtCaret);
+    console.log("symbolsAtCaret", symbolsAtCaret);
   }
 
   /**

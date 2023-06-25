@@ -10,7 +10,6 @@ import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
 import { applyEdit, inverseEdit, MathLayoutEdit } from "../editing/input-tree-edit";
 import { UndoRedoManager } from "../editing/undo-redo-manager";
-import { CaretEdit, insertAtCaret, removeAtCaret } from "./editing/math-layout-caret-edit";
 import { InputRowPosition } from "../input-position/input-row-position";
 import { MathMLRenderer } from "../mathml/renderer";
 import { RenderResult, RenderedElement } from "../rendering/render-result";
@@ -18,7 +17,6 @@ import { SyntaxNode, getNodeIdentifiers, joinNodeIdentifier, parse } from "./../
 import { DebugSettings } from "./debug-settings";
 import { MathEditorCarets } from "./caret";
 import { InputRow } from "../input-tree/row";
-import { InputNodeSymbol } from "../input-tree/input-node";
 import { InputTree } from "../input-tree/input-tree";
 
 function createElementFromHtml(html: string) {
@@ -143,11 +141,6 @@ export class MathEditor extends HTMLElement {
     // - Shift+arrow keys to select
     // - Shortcuts system (import a lib)
 
-    // Multi-caret support
-    // TODO:
-    // - move carets to the same spot (merge)
-    // - select and delete region that contains a caret
-
     // Input handler container
     const inputContainer = document.createElement("span");
     inputContainer.style.position = "absolute";
@@ -156,16 +149,16 @@ export class MathEditor extends HTMLElement {
 
     this.inputHandler.element.addEventListener("keydown", (ev) => {
       if (ev.key === "ArrowUp") {
-        this.carets.map((caret) => caret.moveCaret(this.renderResult, "up"));
+        this.carets.moveCarets("up", this.renderResult);
         this.renderCarets();
       } else if (ev.key === "ArrowDown") {
-        this.carets.map((caret) => caret.moveCaret(this.renderResult, "down"));
+        this.carets.moveCarets("down", this.renderResult);
         this.renderCarets();
       } else if (ev.key === "ArrowLeft") {
-        this.carets.map((caret) => caret.moveCaret(this.renderResult, "left"));
+        this.carets.moveCarets("left", this.renderResult);
         this.renderCarets();
       } else if (ev.key === "ArrowRight") {
-        this.carets.map((caret) => caret.moveCaret(this.renderResult, "right"));
+        this.carets.moveCarets("right", this.renderResult);
         this.renderCarets();
       } else if (ev.code === "KeyZ" && ev.ctrlKey) {
         const undoAction = this.undoRedoStack.undo();
@@ -227,11 +220,11 @@ export class MathEditor extends HTMLElement {
 
     */
         if (ev.inputType === "deleteContentBackward" || ev.inputType === "deleteWordBackward") {
-          const edit = this.finalizeEdits(this.carets.map((v) => removeAtCaret(v.caret, "left", this.renderResult)));
+          const edit = this.carets.removeAtCarets("left", this.inputTree, this.renderResult);
           this.saveEdit(edit);
           this.applyEdit(edit);
         } else if (ev.inputType === "deleteContentForward" || ev.inputType === "deleteWordForward") {
-          const edit = this.finalizeEdits(this.carets.map((v) => removeAtCaret(v.caret, "right", this.renderResult)));
+          const edit = this.carets.removeAtCarets("right", this.inputTree, this.renderResult);
           this.saveEdit(edit);
           this.applyEdit(edit);
         } else if (ev.inputType === "insertText") {
@@ -248,11 +241,11 @@ export class MathEditor extends HTMLElement {
           const data = ev.data;
           if (data != null) {
             const characters = unicodeSplit(data);
-            const edit = this.finalizeEdits(
+            /*const edit = this.finalizeEdits(
               this.carets.map((v) => insertAtCaret(v.caret, new InputRow(characters.map((v) => new InputNodeSymbol(v)))))
             );
             this.saveEdit(edit);
-            this.applyEdit(edit);
+            this.applyEdit(edit);*/
           }
         } /*else
          if (ev.inputType === "historyUndo") {
@@ -372,20 +365,6 @@ export class MathEditor extends HTMLElement {
     }
   }
 
-  finalizeEdits(edits: readonly CaretEdit[]): MathLayoutEdit {
-    const caretsBefore = this.carets.serialize();
-
-    // TODO: Deduplicate carets/remove overlapping carets
-    const edit: MathLayoutEdit = {
-      type: "multi",
-      edits: edits.flatMap((v) => v.edits),
-      caretsBefore,
-      // TODO: Is this correct?
-      caretsAfter: edits.map((v) => v.caret),
-    };
-    return edit;
-  }
-
   saveEdit(edit: MathLayoutEdit) {
     if (edit.edits.length > 0) {
       this.undoRedoStack.push(edit);
@@ -393,7 +372,6 @@ export class MathEditor extends HTMLElement {
   }
 
   applyEdit(edit: MathLayoutEdit) {
-    // TODO: Deduplicate carets?
     const result = applyEdit(this.inputTree, edit);
     this.setInputAndCarets(this.inputTree, result.carets);
   }

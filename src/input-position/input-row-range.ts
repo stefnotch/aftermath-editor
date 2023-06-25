@@ -29,18 +29,15 @@ export class InputRowRange {
     return new InputRowPosition(this.zipper, this.start);
   }
 
-  equals(other: InputRowRange): boolean {
-    return this.zipper.equals(other.zipper) && this.start === other.start && this.end === other.end;
-  }
-
   toAbsoluteOffsets(): [AbsoluteOffset, AbsoluteOffset] {
-    return [this.zipper.startAbsoluteOffset + this.start, this.zipper.startAbsoluteOffset + this.end];
+    return [this.zipper.getAbsoluteOffset(this.start), this.zipper.getAbsoluteOffset(this.end)];
   }
 
   static fromAbsoluteOffsets(root: InputRowZipper, absoluteOffsets: [AbsoluteOffset, AbsoluteOffset]): InputRowRange {
     const zipper = root.getZipperAtOffset(absoluteOffsets[0]);
-    const start = absoluteOffsets[0] - zipper.startAbsoluteOffset;
-    const end = start + (absoluteOffsets[1] - absoluteOffsets[0]);
+    // This is very illegal, turnign absolute offsets into relative offsets without anything proper
+    // const start = absoluteOffsets[0] - zipper.startAbsoluteOffset;
+    // const end = start + (absoluteOffsets[1] - absoluteOffsets[0]);
     return new InputRowRange(zipper, start, end);
   }
 }

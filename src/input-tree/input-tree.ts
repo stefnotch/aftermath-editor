@@ -20,24 +20,40 @@ export class InputTree {
     return this.#rootZipper;
   }
 
-  updateCaretWithEdit(edit: MathLayoutSimpleEdit, caretsBefore: readonly CaretRange[]): CaretRange[] {
+  updateCaretsWithEdit(edit: MathLayoutSimpleEdit, caretsBefore: readonly CaretRange[]): CaretRange[] {
     const carets = caretsBefore.slice();
     const zipper = InputRowZipper.fromRowIndices(this.rootZipper, edit.zipper);
     if (edit.type === "insert") {
-      const absoluteOffsetOfEdit = zipper.startAbsoluteOffset + edit.offset;
+      const absoluteOffsetOfEdit = zipper.getAbsoluteOffset(edit.offset);
       for (let i = 0; i < carets.length; i++) {
-        carets[i] = this.updateAbsoluteOffsets(carets[i], (absoluteOffset) =>
-          absoluteOffsetOfEdit < absoluteOffset ? absoluteOffset + edit.values.length : absoluteOffset
-        );
+        carets[i] = this.updateAbsoluteOffsets(carets[i], (absoluteOffset) => {
+          if (absoluteOffsetOfEdit.value < absoluteOffset.value) {
+            edit.values.forEach((v) => {
+              absoluteOffset = absoluteOffset.plusNode(v);
+            });
+            return absoluteOffset;
+          } else {
+            return absoluteOffset;
+          }
+        });
       }
     } else if (edit.type === "remove") {
-      const absoluteOffsetOfEdit = zipper.startAbsoluteOffset + edit.index;
+      const absoluteOffsetOfEdit = zipper.getAbsoluteOffset(edit.index);
       for (let i = 0; i < carets.length; i++) {
-        carets[i] = this.updateAbsoluteOffsets(carets[i], (absoluteOffset) =>
-          absoluteOffsetOfEdit < absoluteOffset
-            ? Math.max(absoluteOffset - edit.values.length, absoluteOffsetOfEdit)
-            : absoluteOffset
-        );
+        carets[i] = this.updateAbsoluteOffsets(carets[i], (absoluteOffset) => {
+          if (absoluteOffsetOfEdit.value < absoluteOffset.value) {
+            edit.values.forEach((v) => {
+              absoluteOffset = absoluteOffset.minusNode(v);
+            });
+            // Make sure we can't accidentally go before the start of the edit
+            if (absoluteOffset.value < absoluteOffsetOfEdit.value) {
+              absoluteOffset = absoluteOffsetOfEdit;
+            }
+            return absoluteOffset;
+          } else {
+            return absoluteOffset;
+          }
+        });
       }
     } else {
       assertUnreachable(edit);

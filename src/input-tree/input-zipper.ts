@@ -14,7 +14,6 @@ interface InputZipper<ChildType extends InputZipper<any>> {
   readonly indexInParent: number;
   readonly children: ChildType[];
   readonly value: any;
-  readonly startAbsoluteOffset: AbsoluteOffset;
   readonly parent: InputZipper<any> | null;
   // That is an *absolute* offset
   containsAbsoluteOffset(absoluteOffset: AbsoluteOffset): boolean;
@@ -23,15 +22,18 @@ interface InputZipper<ChildType extends InputZipper<any>> {
 // Could also be a range, and to get a zipper, we have a constrained child type. Sorta like how a Rust Set<K> is just a HashMap<K, ()>.
 // But that'd be neater in Rust, were I could do impl InputRowZipper<number> just for zippers that point at a certain index, and impl InputRowZipper<Range> for zippers that point at a range.
 export class InputRowZipper implements InputZipper<InputNodeContainerZipper | InputSymbolZipper> {
+  private readonly startAbsoluteOffset: AbsoluteOffset;
   constructor(
     public readonly value: InputRow,
     public readonly parent: InputNodeContainerZipper | null,
     public readonly indexInParent: number,
-    public readonly startAbsoluteOffset: Offset
-  ) {}
+    startAbsoluteOffset: AbsoluteOffset
+  ) {
+    this.startAbsoluteOffset = startAbsoluteOffset;
+  }
 
   static fromRoot(root: InputRow) {
-    return new InputRowZipper(root, null, 0, 0);
+    return new InputRowZipper(root, null, 0, new AbsoluteOffset(0));
   }
 
   // TODO: Remove this method
@@ -55,16 +57,16 @@ export class InputRowZipper implements InputZipper<InputNodeContainerZipper | In
    */
   equals(other: InputRowZipper): boolean {
     assert(this.root === other.root, "zippers must share the same root");
-    const thisEndOffset = this.startAbsoluteOffset + this.value.offsetCount;
-    const otherEndOffset = other.startAbsoluteOffset + other.value.offsetCount;
+    const thisEndOffset = this.startAbsoluteOffset.value + this.value.offsetCount;
+    const otherEndOffset = other.startAbsoluteOffset.value + other.value.offsetCount;
     return this.startAbsoluteOffset === other.startAbsoluteOffset && thisEndOffset === otherEndOffset;
   }
 
   get children() {
     let startOffset = this.startAbsoluteOffset;
     return this.value.values.map((v, i) => {
-      const childStartOffset = startOffset + 1;
-      startOffset = startOffset + v.offsetCount + 1;
+      const childStartOffset = startOffset.plus(1);
+      startOffset = startOffset.plusNode(v);
       if (v instanceof InputNodeSymbol) {
         return new InputSymbolZipper(v, this, i, childStartOffset);
       } else {
@@ -77,7 +79,16 @@ export class InputRowZipper implements InputZipper<InputNodeContainerZipper | In
     return this.parent?.root ?? this;
   }
 
-  getZipperAtOffset(absoluteOffset: Offset): InputRowZipper {
+  getAbsoluteOffset(offset: Offset): AbsoluteOffset {
+    // See also: children getter
+    let absoluteOffset = this.startAbsoluteOffset;
+    for (let i = 0; i < offset; i++) {
+      absoluteOffset = absoluteOffset.plusNode(this.value.values[i]);
+    }
+    return absoluteOffset;
+  }
+
+  getZipperAtOffset(absoluteOffset: AbsoluteOffset): InputRowZipper {
     assert(this.containsAbsoluteOffset(absoluteOffset), "offset out of range");
 
     const childWithOffset = this.children.find((c) => c.containsAbsoluteOffset(absoluteOffset)) ?? null;
@@ -90,8 +101,11 @@ export class InputRowZipper implements InputZipper<InputNodeContainerZipper | In
     return subChildWithOffset.getZipperAtOffset(absoluteOffset);
   }
 
-  containsAbsoluteOffset(absoluteOffset: Offset): boolean {
-    return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.offsetCount;
+  containsAbsoluteOffset(absoluteOffset: AbsoluteOffset) {
+    return (
+      this.startAbsoluteOffset.value <= absoluteOffset.value &&
+      absoluteOffset.value < this.startAbsoluteOffset.value + this.value.offsetCount
+    );
   }
 
   insert(offset: Offset, newChildren: InputNode[]) {
@@ -141,12 +155,15 @@ export class InputRowZipper implements InputZipper<InputNodeContainerZipper | In
 }
 
 export class InputNodeContainerZipper implements InputZipper<InputRowZipper> {
+  private readonly startAbsoluteOffset: AbsoluteOffset;
   constructor(
     public readonly value: InputNodeContainer,
     public readonly parent: InputRowZipper,
     public readonly indexInParent: number,
-    public readonly startAbsoluteOffset: Offset
-  ) {}
+    startAbsoluteOffset: AbsoluteOffset
+  ) {
+    this.startAbsoluteOffset = startAbsoluteOffset;
+  }
 
   get type(): InputNodeContainer["containerType"] {
     return this.value.containerType;
@@ -157,7 +174,7 @@ export class InputNodeContainerZipper implements InputZipper<InputRowZipper> {
     return this.value.rows.values.map((v, i) => {
       // Different logic here because a container doesn't have extra places for the caret to go
       const childStartOffset = startOffset;
-      startOffset = startOffset + v.offsetCount;
+      startOffset = startOffset.plus(v.offsetCount);
       return new InputRowZipper(v, this, i, childStartOffset);
     });
   }
@@ -166,8 +183,11 @@ export class InputNodeContainerZipper implements InputZipper<InputRowZipper> {
     return this.parent.root;
   }
 
-  containsAbsoluteOffset(absoluteOffset: Offset): boolean {
-    return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.offsetCount;
+  containsAbsoluteOffset(absoluteOffset: AbsoluteOffset) {
+    return (
+      this.startAbsoluteOffset.value <= absoluteOffset.value &&
+      absoluteOffset.value < this.startAbsoluteOffset.value + this.value.offsetCount
+    );
   }
 
   replaceSelf(newValue: InputNodeContainer) {
@@ -190,12 +210,15 @@ export class InputNodeContainerZipper implements InputZipper<InputRowZipper> {
 }
 
 export class InputSymbolZipper implements InputZipper<never> {
+  private readonly startAbsoluteOffset: AbsoluteOffset;
   constructor(
     public readonly value: InputNodeSymbol,
     public readonly parent: InputRowZipper,
     public readonly indexInParent: number,
-    public readonly startAbsoluteOffset: Offset
-  ) {}
+    startAbsoluteOffset: AbsoluteOffset
+  ) {
+    this.startAbsoluteOffset = startAbsoluteOffset;
+  }
 
   get children() {
     return [];
@@ -205,8 +228,11 @@ export class InputSymbolZipper implements InputZipper<never> {
     return this.parent.root;
   }
 
-  containsAbsoluteOffset(absoluteOffset: Offset): boolean {
-    return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.offsetCount;
+  containsAbsoluteOffset(absoluteOffset: AbsoluteOffset) {
+    return (
+      this.startAbsoluteOffset.value <= absoluteOffset.value &&
+      absoluteOffset.value < this.startAbsoluteOffset.value + this.value.offsetCount
+    );
   }
 
   replaceSelf(newValue: InputNodeSymbol) {

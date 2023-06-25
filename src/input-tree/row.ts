@@ -9,7 +9,7 @@ export class InputRow {
   values: InputNode[];
   #offsetCount: number;
   constructor(values: InputNode[]) {
-    let row_offsets = values.length;
+    let row_offsets = values.length + 1;
     let child_offsets = values.map((x) => x.offsetCount).reduce((a, b) => a + b, 0);
     this.values = values;
     this.#offsetCount = row_offsets + child_offsets;
