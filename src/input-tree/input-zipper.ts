@@ -3,6 +3,7 @@ import { InputNode, InputNodeContainer, InputNodeSymbol } from "./input-node";
 import { InputRow } from "./row";
 import { AbsoluteOffset, Offset } from "./input-offset";
 import { RowIndices } from "./row-indices";
+import { InputRowPosition } from "../input-position/input-row-position";
 
 /**
  * A red-green tree: https://blog.yaakov.online/red-green-trees/
@@ -88,17 +89,25 @@ export class InputRowZipper implements InputZipper<InputNodeContainerZipper | In
     return absoluteOffset;
   }
 
-  getZipperAtOffset(absoluteOffset: AbsoluteOffset): InputRowZipper {
-    assert(this.containsAbsoluteOffset(absoluteOffset), "offset out of range");
-
-    const childWithOffset = this.children.find((c) => c.containsAbsoluteOffset(absoluteOffset)) ?? null;
+  getZipperAtOffset(targetOffset: AbsoluteOffset): InputRowPosition {
+    assert(this.containsAbsoluteOffset(targetOffset), "offset out of range");
+    const childWithOffset = this.children.find((c) => c.containsAbsoluteOffset(targetOffset)) ?? null;
     if (childWithOffset === null) {
-      return this;
+      let absoluteOffsetInRow = this.startAbsoluteOffset;
+      for (let offset = 0; offset < this.value.values.length; offset++) {
+        assert(absoluteOffsetInRow.value <= targetOffset.value, "offset out of range");
+        if (absoluteOffsetInRow.value === targetOffset.value) {
+          return new InputRowPosition(this, offset);
+        }
+        absoluteOffsetInRow = absoluteOffsetInRow.plusNode(this.value.values[offset]);
+      }
+      assert(absoluteOffsetInRow.value === targetOffset.value); // After last child
+      return new InputRowPosition(this, this.value.values.length);
     }
-    const subChildWithOffset = childWithOffset.children.find((c) => c.containsAbsoluteOffset(absoluteOffset)) ?? null;
-    assert(subChildWithOffset !== null, "child not found");
 
-    return subChildWithOffset.getZipperAtOffset(absoluteOffset);
+    const subChildWithOffset = childWithOffset.children.find((c) => c.containsAbsoluteOffset(targetOffset)) ?? null;
+    assert(subChildWithOffset !== null, "child not found");
+    return subChildWithOffset.getZipperAtOffset(targetOffset);
   }
 
   containsAbsoluteOffset(absoluteOffset: AbsoluteOffset) {

@@ -105,6 +105,9 @@ export class MathEditor extends HTMLElement {
       this.renderCarets();
     });
     container.addEventListener("pointermove", (e) => {
+      const PRIMARY_BUTTON = 1;
+      if ((e.buttons & PRIMARY_BUTTON) === 0) return;
+
       const newPositionIndices = this.renderResult.getLayoutPosition({ x: e.clientX, y: e.clientY });
       if (!newPositionIndices) return;
       const newPosition = new InputRowPosition(

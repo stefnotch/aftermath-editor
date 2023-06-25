@@ -34,10 +34,9 @@ export class InputRowRange {
   }
 
   static fromAbsoluteOffsets(root: InputRowZipper, absoluteOffsets: [AbsoluteOffset, AbsoluteOffset]): InputRowRange {
-    const zipper = root.getZipperAtOffset(absoluteOffsets[0]);
-    // This is very illegal, turnign absolute offsets into relative offsets without anything proper
-    // const start = absoluteOffsets[0] - zipper.startAbsoluteOffset;
-    // const end = start + (absoluteOffsets[1] - absoluteOffsets[0]);
-    return new InputRowRange(zipper, start, end);
+    const positionA = root.getZipperAtOffset(absoluteOffsets[0]);
+    const positionB = root.getZipperAtOffset(absoluteOffsets[1]);
+    assert(positionA.zipper.equals(positionB.zipper), "Offsets must be in the same row");
+    return new InputRowRange(positionA.zipper, positionA.offset, positionB.offset);
   }
 }
