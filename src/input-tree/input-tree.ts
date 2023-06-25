@@ -2,6 +2,7 @@ import { CaretRange } from "../component/editing/math-layout-caret";
 import { MathLayoutSimpleEdit } from "../editing/input-tree-edit";
 import { InputRowRange } from "../input-position/input-row-range";
 import { assertUnreachable } from "../utils/assert";
+import { AbsoluteOffset } from "./input-offset";
 import { InputRowZipper } from "./input-zipper";
 import { InputRow } from "./row";
 
@@ -25,30 +26,40 @@ export class InputTree {
     if (edit.type === "insert") {
       const absoluteOffsetOfEdit = zipper.startAbsoluteOffset + edit.offset;
       for (let i = 0; i < carets.length; i++) {
-        const absoluteOffsets = carets[i].range
-          .toAbsoluteOffsets()
-          .map((absoluteOffset) => (absoluteOffsetOfEdit < absoluteOffset ? absoluteOffset + 1 : absoluteOffset)) as [
-          number,
-          number
-        ];
-        carets[i] = new CaretRange(InputRowRange.fromAbsoluteOffsets(this.#rootZipper, absoluteOffsets));
+        carets[i] = this.updateAbsoluteOffsets(carets[i], (absoluteOffset) =>
+          absoluteOffsetOfEdit < absoluteOffset ? absoluteOffset + edit.values.length : absoluteOffset
+        );
       }
     } else if (edit.type === "remove") {
       const absoluteOffsetOfEdit = zipper.startAbsoluteOffset + edit.index;
       for (let i = 0; i < carets.length; i++) {
-        const absoluteOffsets = carets[i].range
-          .toAbsoluteOffsets()
-          .map((absoluteOffset) => (absoluteOffsetOfEdit < absoluteOffset ? absoluteOffset - 1 : absoluteOffset)) as [
-          number,
-          number
-        ];
-        carets[i] = new CaretRange(InputRowRange.fromAbsoluteOffsets(this.#rootZipper, absoluteOffsets));
+        carets[i] = this.updateAbsoluteOffsets(carets[i], (absoluteOffset) =>
+          absoluteOffsetOfEdit < absoluteOffset
+            ? Math.max(absoluteOffset - edit.values.length, absoluteOffsetOfEdit)
+            : absoluteOffset
+        );
       }
     } else {
       assertUnreachable(edit);
     }
 
     return carets;
+  }
+
+  private updateAbsoluteOffsets(
+    caret: CaretRange,
+    mapAbsoluteOffset: (absoluteOffset: AbsoluteOffset) => AbsoluteOffset
+  ): CaretRange {
+    const absoluteOffsets = caret.range.toAbsoluteOffsets();
+    let changed = false;
+    for (let i = 0; i < absoluteOffsets.length; i++) {
+      const newValue = mapAbsoluteOffset(absoluteOffsets[i]);
+      if (newValue !== absoluteOffsets[i]) {
+        absoluteOffsets[i] = newValue;
+        changed = true;
+      }
+    }
+    return changed ? new CaretRange(InputRowRange.fromAbsoluteOffsets(this.#rootZipper, absoluteOffsets)) : caret;
   }
 
   applyEdit(edit: MathLayoutSimpleEdit) {

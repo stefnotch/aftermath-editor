@@ -130,8 +130,8 @@ export class MathCaret {
 }
 
 export class MathEditorCarets {
-  carets: Set<MathCaret> = new Set<MathCaret>();
-  pointerDownCarets: Map<number, MathCaret> = new Map<number, MathCaret>();
+  #carets: Set<MathCaret> = new Set<MathCaret>();
+  #pointerDownCarets: Map<number, MathCaret> = new Map<number, MathCaret>();
   #containerElement: HTMLElement;
 
   constructor() {
@@ -145,24 +145,24 @@ export class MathEditorCarets {
 
   add(layoutCaret: CaretRange) {
     // TODO: Always guarantee that carets are non-overlapping
-    this.carets.add(this.createCaret(layoutCaret));
+    this.#carets.add(this.createCaret(layoutCaret));
   }
 
   remove(caret: MathCaret) {
     caret.remove();
     this.#containerElement.removeChild(caret.element.element);
-    this.carets.delete(caret);
+    this.#carets.delete(caret);
   }
 
   clearCarets() {
-    this.carets.forEach((caret) => {
+    this.#carets.forEach((caret) => {
       caret.remove();
     });
-    this.carets.clear();
-    this.pointerDownCarets.forEach((caret) => {
+    this.#carets.clear();
+    this.#pointerDownCarets.forEach((caret) => {
       caret.remove();
     });
-    this.pointerDownCarets.clear();
+    this.#pointerDownCarets.clear();
   }
 
   updateCaret(caret: MathCaret, newCaret: CaretRange | null) {
@@ -172,22 +172,22 @@ export class MathEditorCarets {
   }
 
   addPointerDownCaret(pointerId: number, position: InputRowPosition) {
-    this.pointerDownCarets.set(pointerId, this.createCaret(new CaretRange(position)));
+    this.#pointerDownCarets.set(pointerId, this.createCaret(new CaretRange(position)));
   }
 
   removePointerDownCaret(pointerId: number) {
-    this.pointerDownCarets.delete(pointerId);
+    this.#pointerDownCarets.delete(pointerId);
   }
 
   finishPointerDownCaret(pointerId: number) {
-    const caret = this.pointerDownCarets.get(pointerId) ?? null;
+    const caret = this.#pointerDownCarets.get(pointerId) ?? null;
     if (caret === null) return;
-    this.pointerDownCarets.delete(pointerId);
-    this.carets.add(caret);
+    this.#pointerDownCarets.delete(pointerId);
+    this.#carets.add(caret);
   }
 
   map<T>(fn: (caret: MathCaret) => T): T[] {
-    return Array.from(this.carets).concat(Array.from(this.pointerDownCarets.values())).map(fn);
+    return Array.from(this.#carets).concat(Array.from(this.#pointerDownCarets.values())).map(fn);
   }
 
   private createCaret(caret: CaretRange, startPostion?: InputRowPosition) {
