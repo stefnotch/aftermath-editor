@@ -32,4 +32,12 @@ export class InputRowPosition extends InputRowRange {
 
     return true;
   }
+
+  isContainedIn(range: InputRowRange) {
+    // Could be optimized
+    return (
+      new InputRowPosition(range.zipper, range.leftOffset).isBeforeOrEqual(this) &&
+      this.isBeforeOrEqual(new InputRowPosition(range.zipper, range.rightOffset))
+    );
+  }
 }

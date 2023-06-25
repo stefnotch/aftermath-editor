@@ -1,5 +1,5 @@
 import { match } from "ts-pattern";
-import { AbsoluteOffset, Offset } from "../../input-tree/input-offset";
+import { Offset } from "../../input-tree/input-offset";
 import { InputRowPosition } from "../../input-position/input-row-position";
 import { InputNodeContainerZipper, InputRowZipper, InputSymbolZipper } from "../../input-tree/input-zipper";
 import { RowIndices, getSharedRowIndices } from "../../input-tree/row-indices";
@@ -10,7 +10,7 @@ import { InputRowRange } from "../../input-position/input-row-range";
 import { InputTree } from "../../input-tree/input-tree";
 
 export type Direction = "left" | "right" | "up" | "down";
-export type SerializedCaret = { absoluteOffsets: [AbsoluteOffset, AbsoluteOffset] };
+export type SerializedCaret = { indices: RowIndices; start: Offset; end: Offset };
 
 /**
  * Whether the editor attempts to keep the caret in the same-ish x-coordinate when moving up.
@@ -38,11 +38,16 @@ export class CaretRange {
   }
 
   static serialize(caretRange: CaretRange): SerializedCaret {
-    return { absoluteOffsets: caretRange.range.toAbsoluteOffsets() };
+    return {
+      indices: RowIndices.fromZipper(caretRange.range.zipper),
+      start: caretRange.range.start,
+      end: caretRange.range.end,
+    };
   }
 
   static deserialize(tree: InputTree, serialized: SerializedCaret): CaretRange {
-    return new CaretRange(InputRowRange.fromAbsoluteOffsets(tree.rootZipper, serialized.absoluteOffsets));
+    const zipper = InputRowZipper.fromRowIndices(tree.rootZipper, serialized.indices);
+    return new CaretRange(new InputRowRange(zipper, serialized.start, serialized.end));
   }
 
   /**
