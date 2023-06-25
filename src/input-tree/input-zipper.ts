@@ -20,6 +20,8 @@ interface InputZipper<ChildType extends InputZipper<any>> {
   containsAbsoluteOffset(absoluteOffset: AbsoluteOffset): boolean;
 }
 
+// Could also be a range, and to get a zipper, we have a constrained child type. Sorta like how a Rust Set<K> is just a HashMap<K, ()>.
+// But that'd be neater in Rust, were I could do impl InputRowZipper<number> just for zippers that point at a certain index, and impl InputRowZipper<Range> for zippers that point at a range.
 export class InputRowZipper implements InputZipper<InputNodeContainerZipper | InputSymbolZipper> {
   constructor(
     public readonly value: InputRow,
@@ -28,6 +30,11 @@ export class InputRowZipper implements InputZipper<InputNodeContainerZipper | In
     public readonly startAbsoluteOffset: Offset
   ) {}
 
+  static fromRoot(root: InputRow) {
+    return new InputRowZipper(root, null, 0, 0);
+  }
+
+  // TODO: Remove this method
   static fromRowIndices(root: InputRowZipper, indices: RowIndices) {
     let current = root;
     for (let i = 0; i < indices.length; i++) {
@@ -87,10 +94,10 @@ export class InputRowZipper implements InputZipper<InputNodeContainerZipper | In
     return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.offsetCount;
   }
 
-  insert(offset: Offset, newChild: InputNode) {
+  insert(offset: Offset, newChildren: InputNode[]) {
     assert(offset >= 0 && offset <= this.value.values.length, "offset out of range");
     const values = this.value.values.slice();
-    values.splice(offset, 0, newChild);
+    values.splice(offset, 0, ...newChildren);
 
     const newZipper = this.replaceSelf(new InputRow(values));
     return {
@@ -99,9 +106,9 @@ export class InputRowZipper implements InputZipper<InputNodeContainerZipper | In
     };
   }
 
-  remove(index: number) {
+  remove(index: number, count: number) {
     assert(index >= 0 && index < this.value.values.length, "index out of range");
-    const values = [...this.value.values.slice(0, index), ...this.value.values.slice(index + 1)];
+    const values = [...this.value.values.slice(0, index), ...this.value.values.slice(index + count)];
     const newZipper = this.replaceSelf(new InputRow(values));
     return {
       newRoot: newZipper.root,

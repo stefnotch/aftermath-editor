@@ -1,9 +1,9 @@
 import { Offset } from "../input-tree/input-offset";
-import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
 import { assertUnreachable } from "../utils/assert";
-import { MathLayoutCaret, SerializedCaret } from "../component/editing/math-layout-caret";
+import { CaretRange, SerializedCaret } from "../component/editing/math-layout-caret";
 import { InputNode } from "../input-tree/input-node";
+import { InputTree } from "../input-tree/input-tree";
 
 export type MathLayoutEdit = {
   readonly type: "multi";
@@ -26,49 +26,31 @@ export type MathLayoutSimpleEdit =
       readonly zipper: RowIndices;
       readonly offset: Offset;
       /**
-       * The value that was inserted.
+       * The values that were inserted.
        */
-      readonly value: InputNode;
+      readonly values: InputNode[];
     }
   | {
       readonly type: "remove";
       readonly zipper: RowIndices;
       readonly index: number;
       /**
-       * The value that was removed, used for undo.
+       * The value that were removed, used for undo.
        */
-      readonly value: InputNode;
+      readonly values: InputNode[];
     };
 
-export function applyEdit(root: InputRowZipper, edit: MathLayoutEdit): { root: InputRowZipper; carets: MathLayoutCaret[] } {
+export function applyEdit(tree: InputTree, edit: MathLayoutEdit): { carets: CaretRange[] } {
   if (edit.type === "multi") {
-    let newRoot = root;
     for (const subEdit of edit.edits) {
-      newRoot = applySimpleEdit(newRoot, subEdit);
+      // All the simple edits have row indices that are relative to the current tree.
+      tree.applyEdit(subEdit);
     }
     return {
-      root: newRoot,
-      carets: edit.caretsAfter.map((v) => MathLayoutCaret.deserialize(newRoot, v)),
+      carets: edit.caretsAfter.map((v) => CaretRange.deserialize(tree, v)),
     };
   } else {
     assertUnreachable(edit.type);
-  }
-}
-
-function applySimpleEdit(root: InputRowZipper, edit: MathLayoutSimpleEdit): InputRowZipper {
-  if (edit.type === "insert") {
-    const zipper = InputRowZipper.fromRowIndices(root, edit.zipper);
-    const result = zipper.insert(edit.offset, edit.value);
-    return result.newRoot;
-  } else if (edit.type === "remove") {
-    console.log(edit);
-
-    const zipper = InputRowZipper.fromRowIndices(root, edit.zipper);
-    const result = zipper.remove(edit.index);
-
-    return result.newRoot;
-  } else {
-    assertUnreachable(edit);
   }
 }
 
@@ -97,14 +79,14 @@ function inverseSimpleEdit(edit: MathLayoutSimpleEdit): MathLayoutSimpleEdit {
       type: "remove",
       zipper: edit.zipper,
       index: edit.offset,
-      value: edit.value,
+      values: edit.values,
     };
   } else if (edit.type === "remove") {
     return {
       type: "insert",
       zipper: edit.zipper,
       offset: edit.index,
-      value: edit.value,
+      values: edit.values,
     };
   } else {
     assertUnreachable(edit);

@@ -1,12 +1,10 @@
 import { SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
-import { Offset } from "../input-tree/input-offset";
-import { InputRowPosition } from "../input-tree/input-row-position";
-import { InputRowZipper } from "../input-tree/input-zipper";
+import { InputRowPosition } from "../input-position/input-row-position";
 import { RowIndices } from "../input-tree/row-indices";
 import { RenderResult, RowIndicesAndRange } from "../rendering/render-result";
 import { assert } from "../utils/assert";
-import { CaretElement } from "./caret-element";
-import { MathLayoutCaret, moveCaret } from "./editing/math-layout-caret";
+import { CaretDomElement } from "./caret-element";
+import { CaretRange, moveCaret } from "./editing/math-layout-caret";
 
 export class MathCaret {
   /**
@@ -16,14 +14,14 @@ export class MathCaret {
   /**
    * The current caret, which may be different from the start position if the user has selected a range.
    */
-  caret: MathLayoutCaret;
-  element: CaretElement;
+  caret: CaretRange;
+  element: CaretDomElement;
 
   highlightedElements: ReadonlyArray<Element> = [];
 
   constructor(
     public container: HTMLElement,
-    opts: { startPosition: InputRowPosition; caret: MathLayoutCaret; element: CaretElement }
+    opts: { startPosition: InputRowPosition; caret: CaretRange; element: CaretDomElement }
   ) {
     this.startPosition = opts.startPosition;
     this.caret = opts.caret;
@@ -50,10 +48,10 @@ export class MathCaret {
    * The error would show the "did you mean x_1" autocomplete suggestion.
    */
   getTokenAtCaret(syntaxTree: SyntaxNode): RowIndicesAndRange {
-    const indices = RowIndices.fromZipper(this.caret.zipper);
+    const indices = RowIndices.fromZipper(this.caret.range.zipper);
+    const caretOffset = this.caret.range.end;
     // Now we walked down the indices, so we should be at the row we want.
     const row = getRowNode(syntaxTree, indices);
-    const caretOffset = this.caret.end;
 
     if (hasSyntaxNodeChildren(row, "Containers")) {
       // The row has further children, so we gotta inspect those.
@@ -73,20 +71,20 @@ export class MathCaret {
       return {
         indices,
         start: node.range.start,
-        end: this.caret.end,
+        end: caretOffset,
       };
     } else if (hasSyntaxNodeChildren(row, "Leaf")) {
       return {
         indices,
         start: 0,
-        end: this.caret.end,
+        end: caretOffset,
       };
     } else if (hasSyntaxNodeChildren(row, "NewRows")) {
-      assert(row.range.start === this.caret.end || row.range.end === this.caret.end);
+      assert(row.range.start === caretOffset || row.range.end === caretOffset);
       return {
         indices,
         start: 0,
-        end: this.caret.end,
+        end: caretOffset,
       };
     } else {
       throw new Error("Unexpected row type " + joinNodeIdentifier(row.name));
@@ -145,9 +143,9 @@ export class MathEditorCarets {
     return this.#containerElement;
   }
 
-  add(layoutCaret: MathLayoutCaret) {
+  add(layoutCaret: CaretRange) {
     // TODO: Always guarantee that carets are non-overlapping
-    this.carets.add(this.createCaret(layoutCaret.zipper, layoutCaret.start, layoutCaret.end));
+    this.carets.add(this.createCaret(layoutCaret));
   }
 
   remove(caret: MathCaret) {
@@ -167,14 +165,14 @@ export class MathEditorCarets {
     this.pointerDownCarets.clear();
   }
 
-  updateCaret(caret: MathCaret, newCaret: MathLayoutCaret | null) {
+  updateCaret(caret: MathCaret, newCaret: CaretRange | null) {
     if (newCaret) {
       caret.caret = newCaret;
     }
   }
 
-  addPointerDownCaret(pointerId: number, zipper: InputRowZipper, offset: number) {
-    this.pointerDownCarets.set(pointerId, this.createCaret(zipper, offset, offset));
+  addPointerDownCaret(pointerId: number, position: InputRowPosition) {
+    this.pointerDownCarets.set(pointerId, this.createCaret(new CaretRange(position)));
   }
 
   removePointerDownCaret(pointerId: number) {
@@ -192,11 +190,11 @@ export class MathEditorCarets {
     return Array.from(this.carets).concat(Array.from(this.pointerDownCarets.values())).map(fn);
   }
 
-  private createCaret(zipper: InputRowZipper, startOffset: Offset, endOffset: Offset) {
+  private createCaret(caret: CaretRange, startPostion?: InputRowPosition) {
     return new MathCaret(this.#containerElement, {
-      startPosition: new InputRowPosition(zipper, startOffset),
-      caret: new MathLayoutCaret(zipper, startOffset, endOffset),
-      element: new CaretElement(),
+      startPosition: startPostion ?? caret.range.startPosition(),
+      caret,
+      element: new CaretDomElement(),
     });
   }
 }

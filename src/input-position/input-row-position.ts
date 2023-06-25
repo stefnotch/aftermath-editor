@@ -1,24 +1,19 @@
-import { Offset } from "./input-offset";
-import { InputRowZipper } from "./input-zipper";
-import { RowIndices } from "./row-indices";
+import { Offset } from "../input-tree/input-offset";
+import { InputRowZipper } from "../input-tree/input-zipper";
+import { RowIndices } from "../input-tree/row-indices";
+import { InputRowRange } from "./input-row-range";
 
-export class InputRowPosition {
-  constructor(public readonly zipper: InputRowZipper, public readonly offset: Offset) {}
-
-  equals(other: InputRowPosition): boolean {
-    return this.zipper.equals(other.zipper) && this.offset === other.offset;
+export class InputRowPosition extends InputRowRange {
+  constructor(zipper: InputRowZipper, offset: Offset) {
+    super(zipper, offset, offset);
   }
 
-  static toAbsoluteOffset(zipper: InputRowZipper, offset: Offset): Offset {
-    return zipper.startAbsoluteOffset + offset;
+  get offset() {
+    return this.start;
   }
 
-  static fromAbsoluteOffset(root: InputRowZipper, absoluteOffset: Offset): InputRowPosition {
-    const zipper = root.getZipperAtOffset(absoluteOffset);
-    return new InputRowPosition(zipper, absoluteOffset - zipper.startAbsoluteOffset);
-  }
-
-  static isBeforeOrEqual(start: InputRowPosition, end: InputRowPosition) {
+  isBeforeOrEqual(end: InputRowPosition) {
+    const start = this;
     const startAncestorIndices = RowIndices.fromZipper(start.zipper).indices.flat();
     const endAncestorIndices = RowIndices.fromZipper(end.zipper).indices.flat();
 

@@ -1,7 +1,7 @@
 import { RenderedSelection } from "../rendering/rendered-selection";
 import { ViewportRect, ViewportValue } from "../rendering/viewport-coordinate";
 
-export class CaretElement {
+export class CaretDomElement {
   #element: HTMLElement;
 
   #caretElement: HTMLElement;

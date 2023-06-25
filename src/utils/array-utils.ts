@@ -76,4 +76,10 @@ export default {
   range: function (start: number, end: number) {
     return Array.from(new Array(end - start), (_, i) => i + start);
   },
+  shallowEquals: function <T>(a: T[], b: T[]) {
+    if (a === b) return true;
+    if (a == null || b == null) return false;
+    if (a.length !== b.length) return false;
+    return a.every((a, i) => a === b[i]);
+  },
 };

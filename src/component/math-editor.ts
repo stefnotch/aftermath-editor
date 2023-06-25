@@ -5,13 +5,13 @@ import caretStyles from "./caret-styles.css?inline";
 import mathEditorStyles from "./math-editor-styles.css?inline";
 import inputHandlerStyles from "./input-handler-style.css?inline";
 import { InputHandlerElement } from "./input-handler-element";
-import { MathLayoutCaret } from "./editing/math-layout-caret";
+import { CaretRange } from "./editing/math-layout-caret";
 import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
-import { applyEdit, inverseEdit, MathLayoutEdit } from "../editing/math-layout-edit";
+import { applyEdit, inverseEdit, MathLayoutEdit } from "../editing/input-tree-edit";
 import { UndoRedoManager } from "../editing/undo-redo-manager";
 import { CaretEdit, insertAtCaret, removeAtCaret } from "./editing/math-layout-caret-edit";
-import { InputRowPosition } from "../input-tree/input-row-position";
+import { InputRowPosition } from "../input-position/input-row-position";
 import { MathMLRenderer } from "../mathml/renderer";
 import { RenderResult, RenderedElement } from "../rendering/render-result";
 import { SyntaxNode, getNodeIdentifiers, joinNodeIdentifier, parse } from "./../core";
@@ -19,6 +19,7 @@ import { DebugSettings } from "./debug-settings";
 import { MathCaret, MathEditorCarets } from "./caret";
 import { InputRow } from "../input-tree/row";
 import { InputNodeSymbol } from "../input-tree/input-node";
+import { InputTree } from "../input-tree/input-tree";
 
 function createElementFromHtml(html: string) {
   const template = document.createElement("template");
@@ -49,7 +50,7 @@ export class MathEditor extends HTMLElement {
   carets: MathEditorCarets;
   inputHandler: InputHandlerElement;
 
-  inputTree: InputRowZipper = new InputRowZipper(new InputRow([]), null, 0, 0);
+  inputTree: InputTree = new InputTree(new InputRow([]));
 
   syntaxTree: SyntaxNode;
 
@@ -91,8 +92,7 @@ export class MathEditor extends HTMLElement {
       this.carets.clearCarets();
       this.carets.addPointerDownCaret(
         e.pointerId,
-        InputRowZipper.fromRowIndices(this.inputTree, newCaret.indices),
-        newCaret.offset
+        new InputRowPosition(InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newCaret.indices), newCaret.offset)
       );
       this.renderCarets();
     });
@@ -114,9 +114,9 @@ export class MathEditor extends HTMLElement {
       if (!newPosition) return;
 
       // TODO: Table selections
-      caret.caret = MathLayoutCaret.getSharedCaret(
+      caret.caret = CaretRange.getSharedCaret(
         caret.startPosition,
-        new InputRowPosition(InputRowZipper.fromRowIndices(this.inputTree, newPosition.indices), newPosition.offset)
+        new InputRowPosition(InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newPosition.indices), newPosition.offset)
       );
       this.renderCarets();
     });
@@ -186,12 +186,55 @@ export class MathEditor extends HTMLElement {
     this.inputHandler.element.addEventListener("beforeinput", (ev) => {
       // Woah, apparently running this code later fixes a Firefox textarea bug
       this.renderTaskQueue.add(() => {
+        /*
+        
+
+    function applySymbolShortcuts(zipper: InputRowZipper, syntaxNode: SyntaxNode): { rangeEnd: number } {
+      // First operate on the children
+      if (hasSyntaxNodeChildren(syntaxNode, "Leaf")) {
+        // Done
+      } else if (hasSyntaxNodeChildren(syntaxNode, "NewRows")) {
+        const newRows = syntaxNode.children.NewRows.values;
+        assert(syntaxNode.range.start + 1 === syntaxNode.range.end);
+        for (let i = 0; i < newRows.length; i++) {
+          applySymbolShortcuts(zipper.children[syntaxNode.range.start].children[i], newRows[i]);
+        }
+      } else if (hasSyntaxNodeChildren(syntaxNode, "Containers")) {
+        // TODO: Maybe refactor the syntax node range to only be a width. (We have a ton of constraints on the range anyways.)
+        for (const child of syntaxNode.children.Containers) {
+          applySymbolShortcuts(zipper, child);
+        }
+      } else {
+        throw new Error("Unknown syntax node children type");
+      }
+
+      if (syntaxNode.name[0] === "SymbolShortcut") {
+        const type = syntaxNode.name[1];
+        const operandValues = syntaxNode.children;
+        const deletionEdit = deleteRange(zipper, syntaxNode.range);
+        // Do something
+      } else {
+        return { rangeEnd: syntaxNode.range.end };
+      }
+    }
+
+    // Handle symbol shortcuts
+    const result = applyEdit(this.inputTree, edit);
+    const parsed = parse(result.root.value);
+    // 1. Get shortcut symbols in syntax tree (nested stuff - indices will change no matter what I do)
+    // 2. Get the ranges of the operator symbols and ranges of arguments
+    // 3. Delete the ranges
+    // 4. Insert the new symbol
+
+    // TODO: If I have those contiguous indices, does the "shift indices after insert/remove" become very easy? Or does it have cursed edge cases?
+
+    */
         if (ev.inputType === "deleteContentBackward" || ev.inputType === "deleteWordBackward") {
-          const edit = this.recordEdits(this.carets.map((v) => removeAtCaret(v.caret, "left", this.renderResult)));
+          const edit = this.finalizeEdits(this.carets.map((v) => removeAtCaret(v.caret, "left", this.renderResult)));
           this.saveEdit(edit);
           this.applyEdit(edit);
         } else if (ev.inputType === "deleteContentForward" || ev.inputType === "deleteWordForward") {
-          const edit = this.recordEdits(this.carets.map((v) => removeAtCaret(v.caret, "right", this.renderResult)));
+          const edit = this.finalizeEdits(this.carets.map((v) => removeAtCaret(v.caret, "right", this.renderResult)));
           this.saveEdit(edit);
           this.applyEdit(edit);
         } else if (ev.inputType === "insertText") {
@@ -208,7 +251,7 @@ export class MathEditor extends HTMLElement {
           const data = ev.data;
           if (data != null) {
             const characters = unicodeSplit(data);
-            const edit = this.recordEdits(
+            const edit = this.finalizeEdits(
               this.carets.map((v) => insertAtCaret(v.caret, new InputRow(characters.map((v) => new InputNodeSymbol(v)))))
             );
             this.saveEdit(edit);
@@ -253,7 +296,7 @@ export class MathEditor extends HTMLElement {
     shadowRoot.append(styles, inputContainer, container);
 
     // Math formula
-    this.setInputTree(this.inputTree, []);
+    this.setInputAndCarets(this.inputTree, []);
   }
 
   connectedCallback() {
@@ -275,8 +318,7 @@ export class MathEditor extends HTMLElement {
       if (parsedInput.errors.length > 0) {
         console.warn("Parsed input has errors", parsedInput.errors);
       }
-      const inputTree = new InputRowZipper(parsedInput.inputTree, null, 0, 0);
-      this.setInputTree(inputTree, []);
+      this.setInputAndCarets(parsedInput.inputTree, []);
     } else {
       console.log("Attribute changed", name, oldValue, newValue);
     }
@@ -290,15 +332,14 @@ export class MathEditor extends HTMLElement {
    * Updates the user input. Then reparses and rerenders the math formula.
    * Also updates the carets.
    */
-  setInputTree(inputTree: InputRowZipper, newCarets: MathLayoutCaret[]) {
+  setInputAndCarets(inputTree: InputTree, newCarets: CaretRange[]) {
     this.inputTree = inputTree;
     this.carets.clearCarets();
     newCarets.forEach((v) => {
-      assert(v.zipper.root.value === inputTree.value);
       this.carets.add(v);
     });
 
-    const parsed = parse(this.inputTree.value);
+    const parsed = parse(this.inputTree.root);
     this.syntaxTree = parsed.value;
     console.log("Parsed", parsed);
 
@@ -335,13 +376,14 @@ export class MathEditor extends HTMLElement {
   }
 
   renderCaret(caret: MathCaret) {
+    const caretIndices = RowIndices.fromZipper(caret.caret.range.zipper);
     const renderedCaret = this.renderResult.getViewportSelection({
-      indices: RowIndices.fromZipper(caret.caret.zipper),
+      indices: caretIndices,
       start: caret.caret.leftOffset,
       end: caret.caret.rightOffset,
     });
     // Render caret itself
-    const caretSize = this.renderResult.getViewportCaretSize(RowIndices.fromZipper(caret.caret.zipper));
+    const caretSize = this.renderResult.getViewportCaretSize(caretIndices);
     caret.element.setPosition(
       renderedCaret.rect.x + (caret.caret.isForwards ? renderedCaret.rect.width : 0),
       renderedCaret.baseline + caretSize * 0.1
@@ -355,7 +397,7 @@ export class MathEditor extends HTMLElement {
     }
 
     // Highlight container (for the caret)
-    const container = this.renderResult.getElement(RowIndices.fromZipper(caret.caret.zipper));
+    const container = this.renderResult.getElement(caretIndices);
     caret.setHighlightedElements(container.getElements());
 
     // Highlight token at the caret
@@ -365,8 +407,8 @@ export class MathEditor extends HTMLElement {
     const symbolsAtCaret = MathCaret.getSymbolsAt(this.syntaxTree, tokenAtCaret);
   }
 
-  recordEdits(edits: readonly CaretEdit[]): MathLayoutEdit {
-    const caretsBefore = this.carets.map((v) => MathLayoutCaret.serialize(v.caret.zipper, v.caret.start, v.caret.end));
+  finalizeEdits(edits: readonly CaretEdit[]): MathLayoutEdit {
+    const caretsBefore = this.carets.map((v) => CaretRange.serialize(v.caret));
 
     // TODO: Deduplicate carets/remove overlapping carets
     const edit: MathLayoutEdit = {
@@ -375,17 +417,6 @@ export class MathEditor extends HTMLElement {
       caretsBefore,
       caretsAfter: edits.map((v) => v.caret),
     };
-
-    // Handle symbol shortcuts
-    //const result = applyEdit(this.inputTree, edit);
-    //const parsed = parse(result.root.value);
-    // 1. Get shortcut symbols in syntax tree (nested stuff - indices will change no matter what I do)
-    // 2. Get the ranges of the operator symbols and ranges of arguments
-    // 3. Delete the ranges
-    // 4. Insert the new symbol
-
-    // TODO: If I have those contiguous indices, does the "shift indices after insert/remove" become very easy? Or does it have cursed edge cases?
-
     return edit;
   }
 
@@ -396,9 +427,9 @@ export class MathEditor extends HTMLElement {
   }
 
   applyEdit(edit: MathLayoutEdit) {
+    // TODO: Deduplicate carets?
     const result = applyEdit(this.inputTree, edit);
-    // TODO: Deduplicate carets
-    this.setInputTree(result.root, result.carets);
+    this.setInputAndCarets(this.inputTree, result.carets);
   }
 
   /**

@@ -44,6 +44,13 @@ export class RowIndices {
     return this.indices.length;
   }
 
+  equals(other: RowIndices) {
+    return (
+      this.indices.length === other.indices.length &&
+      this.indices.every((v, i) => v[0] === other.indices[i][0] && v[1] === other.indices[i][1])
+    );
+  }
+
   [Symbol.iterator](): Iterator<RowIndex> {
     let i = 0;
     return {
