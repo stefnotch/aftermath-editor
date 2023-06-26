@@ -1,9 +1,10 @@
 import "./../core";
 import { assert } from "../utils/assert";
 import { fromElement as fromMathMLElement, unicodeSplit } from "../mathml/parsing";
-import caretStyles from "./caret-styles.css?inline";
+import caretStyles from "./caret/caret-styles.css?inline";
 import mathEditorStyles from "./math-editor-styles.css?inline";
-import inputHandlerStyles from "./input-handler-style.css?inline";
+import inputHandlerStyles from "./input/input-handler-style.css?inline";
+import autocompleteStyles from "./autocomplete/autocomplete-styles.css?inline";
 import { InputHandlerElement } from "./input/input-handler-element";
 import { CaretRange } from "./editing/math-layout-caret";
 import { InputRowZipper } from "../input-tree/input-zipper";
@@ -18,6 +19,7 @@ import { DebugSettings } from "./debug-settings";
 import { MathEditorCarets } from "./caret/caret-elements";
 import { InputRow } from "../input-tree/row";
 import { InputTree } from "../input-tree/input-tree";
+import { AutocompleteElement } from "./autocomplete/autocomplete-element";
 
 function createElementFromHtml(html: string) {
   const template = document.createElement("template");
@@ -47,6 +49,7 @@ class RenderTaskQueue {
 export class MathEditor extends HTMLElement {
   carets: MathEditorCarets;
   inputHandler: InputHandlerElement;
+  autocomplete: AutocompleteElement;
 
   inputTree: InputTree = new InputTree(new InputRow([]));
 
@@ -275,6 +278,9 @@ export class MathEditor extends HTMLElement {
       });
     });
 
+    this.autocomplete = new AutocompleteElement();
+    inputContainer.appendChild(this.autocomplete.element);
+
     // Rendering
     this.renderer = new MathMLRenderer();
     getNodeIdentifiers().forEach((name) => {
@@ -293,7 +299,7 @@ export class MathEditor extends HTMLElement {
     });
 
     const styles = document.createElement("style");
-    styles.textContent = `${mathEditorStyles}\n ${inputHandlerStyles}\n ${caretStyles}`;
+    styles.textContent = `${mathEditorStyles}\n ${inputHandlerStyles}\n ${caretStyles}\n ${autocompleteStyles}`;
     shadowRoot.append(styles, inputContainer, container);
 
     // Math formula

@@ -39,7 +39,7 @@ impl NFAMatches {
         } else if self.states.len() == 0 {
             Err(MatchError::NoMatch)
         } else if self.states.len() > 1 {
-            Err(MatchError::MultipleMatches)
+            Err(MatchError::MultipleMatches) // Reached multiple final states. TODO: Should this even be an error?
         } else {
             let _ = self.states.iter().next().unwrap();
             Ok(MatchResult::new(input))
@@ -49,19 +49,16 @@ impl NFAMatches {
 
 #[derive(Debug)]
 pub struct MatchResult<'input, Input> {
-    input: &'input [Input],
+    matched: &'input [Input],
 }
 
 impl<'input, Input> MatchResult<'input, Input> {
-    pub fn new(input: &'input [Input]) -> Self {
-        Self { input }
+    pub fn new(matched: &'input [Input]) -> Self {
+        Self { matched }
     }
 
     pub fn get_length(&self) -> usize {
-        self.input.len()
-    }
-    pub fn get_input(&self) -> &'input [Input] {
-        self.input
+        self.matched.len()
     }
 }
 
