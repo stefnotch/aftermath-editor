@@ -1,13 +1,13 @@
-import { SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
-import { MathLayoutEdit, MathLayoutSimpleEdit } from "../editing/input-tree-edit";
-import { InputRowPosition } from "../input-position/input-row-position";
-import { InputTree } from "../input-tree/input-tree";
-import { RowIndices } from "../input-tree/row-indices";
-import { RenderResult, RowIndicesAndRange } from "../rendering/render-result";
-import { assert } from "../utils/assert";
+import { SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../../core";
+import { MathLayoutEdit, MathLayoutSimpleEdit } from "../../editing/input-tree-edit";
+import { InputRowPosition } from "../../input-position/input-row-position";
+import { InputTree } from "../../input-tree/input-tree";
+import { RowIndices } from "../../input-tree/row-indices";
+import { RenderResult, RowIndicesAndRange } from "../../rendering/render-result";
+import { assert } from "../../utils/assert";
 import { CaretDomElement } from "./caret-element";
-import { CaretRange, SerializedCaret, moveCaret } from "./editing/math-layout-caret";
-import { removeAtCaret } from "./editing/math-layout-caret-edit";
+import { CaretRange, SerializedCaret, moveCaret } from "../editing/math-layout-caret";
+import { removeAtCaret } from "../editing/math-layout-caret-edit";
 
 export class MathEditorCarets {
   // Currently limited to one caret

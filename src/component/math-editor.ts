@@ -4,7 +4,7 @@ import { fromElement as fromMathMLElement, unicodeSplit } from "../mathml/parsin
 import caretStyles from "./caret-styles.css?inline";
 import mathEditorStyles from "./math-editor-styles.css?inline";
 import inputHandlerStyles from "./input-handler-style.css?inline";
-import { InputHandlerElement } from "./input-handler-element";
+import { InputHandlerElement } from "./input/input-handler-element";
 import { CaretRange } from "./editing/math-layout-caret";
 import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
@@ -15,7 +15,7 @@ import { MathMLRenderer } from "../mathml/renderer";
 import { RenderResult, RenderedElement } from "../rendering/render-result";
 import { SyntaxNode, getNodeIdentifiers, joinNodeIdentifier, parse } from "./../core";
 import { DebugSettings } from "./debug-settings";
-import { MathEditorCarets } from "./caret";
+import { MathEditorCarets } from "./caret/caret-elements";
 import { InputRow } from "../input-tree/row";
 import { InputTree } from "../input-tree/input-tree";
 
@@ -219,8 +219,6 @@ export class MathEditor extends HTMLElement {
     // 3. Delete the ranges
     // 4. Insert the new symbol
 
-    // TODO: If I have those contiguous indices, does the "shift indices after insert/remove" become very easy? Or does it have cursed edge cases?
-
     */
         if (ev.inputType === "deleteContentBackward" || ev.inputType === "deleteWordBackward") {
           const edit = this.carets.removeAtCarets("left", this.inputTree, this.renderResult);
@@ -242,14 +240,24 @@ export class MathEditor extends HTMLElement {
           //
           // TODO: Table editing
           const data = ev.data;
-          if (data != null) {
-            const characters = unicodeSplit(data);
-            /*const edit = this.finalizeEdits(
+          if (data === null) return;
+          console.log(data);
+          const characters = unicodeSplit(data);
+
+          // And reposition the caret!
+          if (characters.length === 1) {
+            if (characters[0] === "/") {
+            } else if (characters[0] === "^") {
+            } else if (characters[0] === "_") {
+            }
+          }
+          /*const edit = this.finalizeEdits(
               this.carets.map((v) => insertAtCaret(v.caret, new InputRow(characters.map((v) => new InputNodeSymbol(v)))))
             );
             this.saveEdit(edit);
             this.applyEdit(edit);*/
-          }
+        } else if (ev.inputType === "insertCompositionText") {
+          // TODO: Handle it differently
         } /*else
          if (ev.inputType === "historyUndo") {
           // TODO: https://stackoverflow.com/questions/27027833/is-it-possible-to-edit-a-text-input-with-javascript-and-add-to-the-undo-stack
