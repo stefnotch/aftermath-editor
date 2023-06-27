@@ -1,21 +1,25 @@
 use std::ops::Range;
 
 use input_tree::input_node::InputNode;
+use serde::Serialize;
 
 use crate::token_matcher::MatchResult;
 
+#[derive(Serialize)]
 pub struct AutocompleteResult<'a> {
     pub range_in_input: Range<usize>,
     /// Can also be empty if there are no rules that match
     pub potential_rules: Vec<AutocompleteRuleMatch<'a>>,
 }
 
+#[derive(Serialize)]
 pub struct AutocompleteRuleMatch<'a> {
     pub rule: &'a AutocompleteRule,
     /// How much of the rule value was matched
     pub match_length: usize,
 }
 
+#[derive(Serialize)]
 pub struct AutocompleteRule {
     pub result: Vec<InputNode>,
     pub value: String,

@@ -141,13 +141,11 @@ export class MathEditor extends HTMLElement {
     // Register keyboard handlers
     // TODO:
     // - special symbols (sum, for, forall, ...) ( https://github.com/arnog/mathlive/search?q=forall )
-    // - autocomplete popup
     // - better placeholders, don't grab binary operators, but grab multiple symbols and unary operators if possible (like if you have 1+|34 and hit /, the result should be 1+\frac{}{|34})
     // - space to move to the right (but only in some cases)
     // - Shift+arrow keys to select
     // - Shortcuts system (import a lib)
 
-    // Input handler container
     const inputContainer = document.createElement("span");
     inputContainer.style.position = "absolute";
     this.inputHandler = new InputHandlerElement();
@@ -342,9 +340,6 @@ export class MathEditor extends HTMLElement {
   setInputAndCarets(inputTree: InputTree, newCarets: CaretRange[]) {
     this.inputTree = inputTree;
     this.carets.clearCarets();
-    newCarets.forEach((v) => {
-      this.carets.add(v);
-    });
 
     const parsed = parse(this.inputTree.root);
     this.syntaxTree = parsed.value;
@@ -360,13 +355,16 @@ export class MathEditor extends HTMLElement {
     }
     this.mathMlElement.replaceChildren(...mathMlElements);
 
+    newCarets.forEach((v) => {
+      this.carets.add(v);
+    });
     // Rerender the carets
     this.renderCarets();
   }
 
   renderCarets() {
     if (!this.isConnected) return;
-    this.carets.renderCarets(this.syntaxTree, this.renderResult);
+    this.carets.renderCarets(this.renderResult);
 
     if (import.meta.env.DEV) {
       if (DebugSettings.renderRows) {

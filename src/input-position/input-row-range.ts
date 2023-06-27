@@ -1,7 +1,8 @@
 import { AbsoluteOffset, Offset } from "../input-tree/input-offset";
 import { InputRowZipper } from "../input-tree/input-zipper";
+import { RowIndices } from "../input-tree/row-indices";
+import { RowIndicesAndRange } from "../rendering/render-result";
 import { assert } from "../utils/assert";
-import { InputRowPosition } from "./input-row-position";
 
 export class InputRowRange {
   constructor(public readonly zipper: InputRowZipper, public readonly start: Offset, public readonly end: Offset) {
@@ -25,8 +26,12 @@ export class InputRowRange {
     return this.start <= this.end;
   }
 
-  startPosition(): InputRowPosition {
-    return new InputRowPosition(this.zipper, this.start);
+  toRowIndicesAndRange(): RowIndicesAndRange {
+    return {
+      indices: RowIndices.fromZipper(this.zipper),
+      start: this.leftOffset,
+      end: this.rightOffset,
+    };
   }
 
   toAbsoluteOffsets(): [AbsoluteOffset, AbsoluteOffset] {

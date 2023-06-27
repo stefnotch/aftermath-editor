@@ -37,7 +37,6 @@ export class InputRowZipper implements InputZipper<InputNodeContainerZipper | In
     return new InputRowZipper(root, null, 0, new AbsoluteOffset(0));
   }
 
-  // TODO: Remove this method
   static fromRowIndices(root: InputRowZipper, indices: RowIndices) {
     let current = root;
     for (let i = 0; i < indices.length; i++) {

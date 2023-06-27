@@ -56,22 +56,19 @@ export class InputTree {
       // and a remove edit clamps contained carets to the start of the edit
       for (let i = 0; i < carets.length; i++) {
         const editRange = new InputRowRange(zipper, edit.index, edit.index + edit.values.length);
-        let caretStartPosition = carets[i].range.startPosition();
-        let caretEndPosition = new InputRowPosition(carets[i].range.zipper, carets[i].range.end);
         let changed = false;
-        if (caretStartPosition.isContainedIn(editRange)) {
-          caretStartPosition = editRange.startPosition();
+        let caretStartOffset = 0;
+        if (carets[i].startPosition().isContainedIn(editRange)) {
+          caretStartOffset = editRange.leftOffset;
           changed = true;
         }
-        if (caretEndPosition.isContainedIn(editRange)) {
-          caretEndPosition = editRange.startPosition();
+        let caretEndOffset = 0;
+        if (carets[i].endPosition().isContainedIn(editRange)) {
+          caretEndOffset = editRange.leftOffset;
           changed = true;
         }
         if (changed) {
-          assert(caretStartPosition.zipper.equals(caretEndPosition.zipper));
-          carets[i] = new CaretRange(
-            new InputRowRange(caretStartPosition.zipper, caretStartPosition.offset, caretEndPosition.offset)
-          );
+          carets[i] = new CaretRange(new InputRowRange(carets[i].range.zipper, caretStartOffset, caretEndOffset));
         }
       }
     } else {

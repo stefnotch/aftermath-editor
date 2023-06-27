@@ -13,16 +13,7 @@ export class CaretDomElement {
     containerElement.style.position = "absolute";
 
     const caretElement = document.createElement("span");
-    caretElement.style.userSelect = "none";
-    caretElement.style.position = "absolute";
-    caretElement.style.height = "10px";
-    caretElement.style.width = "0px";
-    caretElement.style.margin = "0px";
-    caretElement.style.borderRightWidth = "0px";
-    caretElement.style.boxShadow = "0px 0px 0px 0.6px rgba(50, 50, 230, 50%)";
-    caretElement.style.top = "0px";
-    // TODO: Maybe add some cute blinking
-    caretElement.className = "math-caret";
+    caretElement.className = "caret";
     this.#caretElement = caretElement;
     containerElement.append(caretElement);
 

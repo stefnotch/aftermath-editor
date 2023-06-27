@@ -1,5 +1,9 @@
 import { ViewportValue } from "../../rendering/viewport-coordinate";
 
+/**
+ * There's only one autocomplete element.
+ * However, the autocomplete logic is separate from the element. See caret instead.
+ */
 export class AutocompleteElement {
   #element: HTMLElement;
   #listElement: HTMLElement;

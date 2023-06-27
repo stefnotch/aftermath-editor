@@ -21,8 +21,8 @@ export type CaretEdit = {
 };
 
 export function removeAtCaret<T>(caret: CaretRange, direction: "left" | "right", renderResult: RenderResult<T>): CaretEdit {
-  if (caret.range.isCollapsed) {
-    return removeAtPosition(caret.range.startPosition(), direction, renderResult);
+  if (caret.isCollapsed) {
+    return removeAtPosition(caret.startPosition(), direction, renderResult);
   } else {
     return removeRange(caret.range);
   }
@@ -139,11 +139,11 @@ function serializeCollapsedCaret(zipper: InputRowZipper, offset: number): Serial
 }
 
 export function insertAtCaret(caret: CaretRange, value: InputRow): CaretEdit {
-  if (caret.range.isCollapsed) {
-    return insertAtPosition(caret.range.startPosition(), value);
+  if (caret.isCollapsed) {
+    return insertAtPosition(caret.startPosition(), value);
   } else {
     const removeExisting = removeRange(caret.range);
-    const insertAfterRemoval = insertAtPosition(caret.range.startPosition(), value);
+    const insertAfterRemoval = insertAtPosition(caret.leftPosition(), value);
     return {
       edits: removeExisting.edits.concat(insertAfterRemoval.edits),
       caret: insertAfterRemoval.caret,

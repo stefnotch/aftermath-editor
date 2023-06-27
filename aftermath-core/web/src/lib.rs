@@ -1,6 +1,6 @@
 mod utils;
 
-use input_tree::row::InputRow;
+use input_tree::{input_node::InputNode, row::InputRow};
 use parser::{parse_rules::ParserRules, ParseError, ParseResult, SyntaxNode};
 use serde::Serialize;
 use utils::set_panic_hook;
@@ -51,6 +51,13 @@ impl MathParser {
         let parsed: MathParseResult = parser::parse_row(&layout, &self.parser_rules).into();
 
         let serialized_result = parsed.serialize(&self.serializer)?;
+        Ok(serialized_result)
+    }
+
+    pub fn autocomplete(&self, input_nodes: JsValue) -> Result<JsValue, JsValue> {
+        let nodes: Vec<InputNode> = serde_wasm_bindgen::from_value(input_nodes)?;
+        let result = self.parser_rules.get_autocomplete(&nodes);
+        let serialized_result = result.serialize(&self.serializer)?;
         Ok(serialized_result)
     }
 

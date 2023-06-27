@@ -1,4 +1,3 @@
-import { match } from "ts-pattern";
 import { Offset } from "../../input-tree/input-offset";
 import { InputRowPosition } from "../../input-position/input-row-position";
 import { InputNodeContainerZipper, InputRowZipper, InputSymbolZipper } from "../../input-tree/input-zipper";
@@ -35,6 +34,22 @@ export class CaretRange {
 
   get isForwards() {
     return this.range.isForwards;
+  }
+
+  startPosition(): InputRowPosition {
+    return new InputRowPosition(this.range.zipper, this.range.start);
+  }
+
+  endPosition(): InputRowPosition {
+    return new InputRowPosition(this.range.zipper, this.range.end);
+  }
+
+  leftPosition(): InputRowPosition {
+    return new InputRowPosition(this.range.zipper, this.range.leftOffset);
+  }
+
+  rightPosition(): InputRowPosition {
+    return new InputRowPosition(this.range.zipper, this.range.rightOffset);
   }
 
   static serialize(caretRange: CaretRange): SerializedCaret {
@@ -304,8 +319,11 @@ function movePositionRecursive(
  * Checks if the caret is moving at the very edge of its container
  */
 function isTouchingEdge(position: InputRowPosition, direction: "left" | "right"): boolean {
-  return match(direction)
-    .with("left", () => position.offset <= 0)
-    .with("right", () => position.offset >= position.zipper.value.values.length)
-    .exhaustive();
+  if (direction === "left") {
+    return position.offset <= 0;
+  } else if (direction === "right") {
+    return position.offset >= position.zipper.value.values.length;
+  } else {
+    assertUnreachable(direction);
+  }
 }
