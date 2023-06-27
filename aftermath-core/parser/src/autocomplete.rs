@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use input_tree::input_node::InputNode;
 
-use crate::{syntax_tree::NodeIdentifier, token_matcher::MatchResult};
+use crate::token_matcher::MatchResult;
 
 pub struct AutocompleteResult<'a> {
     pub range_in_input: Range<usize>,
@@ -17,13 +17,16 @@ pub struct AutocompleteRuleMatch<'a> {
 }
 
 pub struct AutocompleteRule {
-    pub name: NodeIdentifier,
+    pub result: Vec<InputNode>,
     pub value: String,
 }
 
 impl AutocompleteRule {
-    pub fn new(name: NodeIdentifier, value: String) -> Self {
-        Self { name, value }
+    pub fn new(result: Vec<InputNode>, value: impl Into<String>) -> Self {
+        Self {
+            result,
+            value: value.into(),
+        }
     }
 
     /// Match as much of the input as possible, and use up all of the self.value
@@ -33,7 +36,7 @@ impl AutocompleteRule {
             match node {
                 InputNode::Container { .. } => return None,
                 InputNode::Symbol(symbol) => {
-                    if Some(symbol.as_str()) != self.value.get(i..symbol.len()) {
+                    if Some(symbol.as_str()) != self.value.get(i..(i + symbol.len())) {
                         return None;
                     }
                     i += symbol.len();
@@ -49,7 +52,7 @@ impl AutocompleteRule {
     }
 
     /// Match all of the input, and use up as much of self.value as possible
-    pub fn input_starts_with_this<'a>(
+    pub fn this_starts_with_input<'a>(
         &'a self,
         input: &[InputNode],
     ) -> Option<MatchResult<'a, u8>> {
@@ -58,7 +61,7 @@ impl AutocompleteRule {
             match node {
                 InputNode::Container { .. } => return None,
                 InputNode::Symbol(symbol) => {
-                    if Some(symbol.as_str()) != self.value.get(i..symbol.len()) {
+                    if Some(symbol.as_str()) != self.value.get(i..(i + symbol.len())) {
                         return None;
                     }
                     i += symbol.len();

@@ -104,6 +104,13 @@ impl InputNode {
         )
     }
 
+    pub fn symbols<T: Into<String>>(values: Vec<T>) -> Vec<Self> {
+        values
+            .into_iter()
+            .map(|value| Self::Symbol(value.into()))
+            .collect()
+    }
+
     fn container_with_type(container_type: InputNodeContainer, rows: Grid<InputRow>) -> Self {
         let offset_count = rows.values().iter().map(|row| row.offset_count()).sum();
         InputNode::Container {

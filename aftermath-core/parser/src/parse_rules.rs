@@ -129,7 +129,7 @@ impl<'a> ParserRules<'a> {
             let autocomplete_partial_matches: Vec<_> = self
                 .autocomplete_rules
                 .iter()
-                .filter_map(|rule| rule.input_starts_with_this(content).map(|v| (v, rule)))
+                .filter_map(|rule| rule.this_starts_with_input(content).map(|v| (v, rule)))
                 .collect();
 
             if autocomplete_partial_matches.len() > 0 {
@@ -269,7 +269,26 @@ impl<'a> ParserRules<'a> {
             StartingTokenMatcher::operator_from_character('!'),
         ));
 
-        let mut autocomplete_rules = vec![];
+        let autocomplete_rules = vec![
+            AutocompleteRule::new(
+                vec![InputNode::fraction([
+                    Default::default(),
+                    Default::default(),
+                ])],
+                "/",
+            ),
+            AutocompleteRule::new(vec![InputNode::sup(Default::default())], "^"),
+            AutocompleteRule::new(vec![InputNode::sub(Default::default())], "_"),
+            AutocompleteRule::new(InputNode::symbols(vec!["l", "i", "m"]), "lim"),
+            AutocompleteRule::new(
+                InputNode::symbols(vec!["l", "i", "m", "s", "u", "p"]),
+                "limsup",
+            ),
+            AutocompleteRule::new(
+                InputNode::symbols(vec!["l", "i", "m", "i", "n", "f"]),
+                "liminf",
+            ),
+        ];
 
         ParserRules::new(None, rules, autocomplete_rules)
     }

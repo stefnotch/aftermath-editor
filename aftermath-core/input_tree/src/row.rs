@@ -33,6 +33,12 @@ impl InputRow {
     }
 }
 
+impl Default for InputRow {
+    fn default() -> Self {
+        InputRow::new(vec![])
+    }
+}
+
 /// A proper grid of values.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Grid<T> {
