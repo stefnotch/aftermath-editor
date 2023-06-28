@@ -1,9 +1,12 @@
 import { AbsoluteOffset, Offset } from "../input-tree/input-offset";
+import { InputTree } from "../input-tree/input-tree";
 import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
 import { RowIndicesAndRange } from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { InputRowPosition } from "./input-row-position";
+
+export type SerializedInputRowRange = { indices: RowIndices; start: Offset; end: Offset };
 
 export class InputRowRange {
   constructor(public readonly zipper: InputRowZipper, public readonly start: Offset, public readonly end: Offset) {
@@ -49,6 +52,19 @@ export class InputRowRange {
       start: this.leftOffset,
       end: this.rightOffset,
     };
+  }
+
+  serialize(): SerializedInputRowRange {
+    return {
+      indices: RowIndices.fromZipper(this.zipper),
+      start: this.start,
+      end: this.end,
+    };
+  }
+
+  static deserialize(tree: InputTree, serialized: SerializedInputRowRange): InputRowRange {
+    const zipper = InputRowZipper.fromRowIndices(tree.rootZipper, serialized.indices);
+    return new InputRowRange(zipper, serialized.start, serialized.end);
   }
 
   toAbsoluteOffsets(): [AbsoluteOffset, AbsoluteOffset] {

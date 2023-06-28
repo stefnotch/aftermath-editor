@@ -15,11 +15,10 @@ import { MathMLRenderer } from "../mathml/renderer";
 import { RenderResult, RenderedElement } from "../rendering/render-result";
 import { SyntaxNode, getNodeIdentifiers, joinNodeIdentifier, parse } from "./../core";
 import { DebugSettings } from "./debug-settings";
-import { MathEditorCarets } from "./caret/caret-elements";
+import { MathEditorCarets } from "./caret/carets-element";
 import { InputRow } from "../input-tree/row";
 import { InputTree } from "../input-tree/input-tree";
 import { AutocompleteElement } from "./autocomplete/autocomplete-element";
-import { CaretRange } from "./caret/math-layout-caret";
 
 function createElementFromHtml(html: string) {
   const template = document.createElement("template");

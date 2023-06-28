@@ -1,7 +1,9 @@
 import { Offset } from "../input-tree/input-offset";
+import { InputTree } from "../input-tree/input-tree";
 import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
-import { InputRowRange } from "./input-row-range";
+import { assert } from "../utils/assert";
+import { InputRowRange, SerializedInputRowRange } from "./input-row-range";
 
 export class InputRowPosition extends InputRowRange {
   constructor(zipper: InputRowZipper, offset: Offset) {
@@ -10,6 +12,12 @@ export class InputRowPosition extends InputRowRange {
 
   get offset() {
     return this.start;
+  }
+
+  static deserialize(tree: InputTree, serialized: SerializedInputRowRange): InputRowPosition {
+    const deserialized = InputRowRange.deserialize(tree, serialized);
+    assert(deserialized.isCollapsed);
+    return deserialized.startPosition();
   }
 
   isBeforeOrEqual(end: InputRowPosition) {

@@ -1,7 +1,6 @@
 import { Offset } from "../input-tree/input-offset";
 import { RowIndices } from "../input-tree/row-indices";
 import { assertUnreachable } from "../utils/assert";
-import { CaretRange, SerializedCaret } from "../component/caret/math-layout-caret";
 import { InputNode } from "../input-tree/input-node";
 import { InputTree } from "../input-tree/input-tree";
 

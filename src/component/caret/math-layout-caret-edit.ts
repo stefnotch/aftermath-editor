@@ -5,7 +5,7 @@ import { InputNodeContainerZipper, InputSymbolZipper, InputRowZipper } from "../
 import { RowIndices } from "../../input-tree/row-indices";
 import { RenderResult } from "../../rendering/render-result";
 import arrayUtils from "../../utils/array-utils";
-import { CaretRange, moveCaret, SerializedCaret } from "./math-layout-caret";
+import { moveCaret } from "./math-layout-caret";
 import { MathLayoutSimpleEdit } from "../../editing/input-tree-edit";
 import { InputRowRange } from "../../input-position/input-row-range";
 

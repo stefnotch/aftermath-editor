@@ -6,10 +6,8 @@ import { assert, assertUnreachable } from "../../utils/assert";
 import { ViewportValue } from "../../rendering/viewport-coordinate";
 import { RenderResult } from "../../rendering/render-result";
 import { InputRowRange } from "../../input-position/input-row-range";
-import { InputTree } from "../../input-tree/input-tree";
 
 export type Direction = "left" | "right" | "up" | "down";
-export type SerializedCaret = { indices: RowIndices; start: Offset; end: Offset };
 
 /**
  * Whether the editor attempts to keep the caret in the same-ish x-coordinate when moving up.
@@ -17,92 +15,41 @@ export type SerializedCaret = { indices: RowIndices; start: Offset; end: Offset 
  */
 const KeepXPosition = false;
 
-export class CaretRange {
-  constructor(public readonly range: InputRowRange) {}
+/**
+ * Gets a caret from two positions that might be in different rows.
+ */
+export function getSharedCaret(startPosition: InputRowPosition, endPosition: InputRowPosition): InputRowRange {
+  const startAncestorIndices = RowIndices.fromZipper(startPosition.zipper);
+  const endAncestorIndices = RowIndices.fromZipper(endPosition.zipper);
+  const sharedParentPart = getSharedRowIndices(startAncestorIndices, endAncestorIndices);
 
-  get leftOffset(): Offset {
-    return this.range.leftOffset;
-  }
+  // We need to know the direction of the selection to know whether the caret should be at the start or end of the row
+  // We also have to handle edge cases like first caret is at top of fraction and second caret is at bottom of fraction
+  const isForwards = startPosition.isBeforeOrEqual(endPosition);
 
-  get rightOffset(): Offset {
-    return this.range.rightOffset;
-  }
+  // And now that we know the direction, we can compute the actual start and end offsets
+  const startOffset =
+    sharedParentPart.length < startAncestorIndices.length
+      ? startAncestorIndices.indices[sharedParentPart.length][0] + (isForwards ? 0 : 1)
+      : startPosition.offset;
 
-  get isCollapsed() {
-    return this.range.isCollapsed;
-  }
+  const endOffset =
+    sharedParentPart.length < endAncestorIndices.length
+      ? endAncestorIndices.indices[sharedParentPart.length][0] + (isForwards ? 1 : 0)
+      : endPosition.offset;
 
-  get isForwards() {
-    return this.range.isForwards;
-  }
+  const sharedParent = InputRowZipper.fromRowIndices(startPosition.zipper.root, sharedParentPart);
 
-  startPosition(): InputRowPosition {
-    return this.range.startPosition();
-  }
-
-  endPosition(): InputRowPosition {
-    return this.range.endPosition();
-  }
-
-  leftPosition(): InputRowPosition {
-    return this.range.leftPosition();
-  }
-
-  rightPosition(): InputRowPosition {
-    return this.range.rightPosition();
-  }
-
-  static serialize(caretRange: CaretRange): SerializedCaret {
-    return {
-      indices: RowIndices.fromZipper(caretRange.range.zipper),
-      start: caretRange.range.start,
-      end: caretRange.range.end,
-    };
-  }
-
-  static deserialize(tree: InputTree, serialized: SerializedCaret): CaretRange {
-    const zipper = InputRowZipper.fromRowIndices(tree.rootZipper, serialized.indices);
-    return new CaretRange(new InputRowRange(zipper, serialized.start, serialized.end));
-  }
-
-  /**
-   * Gets a caret from two positions that might be in different rows.
-   */
-  static getSharedCaret(startPosition: InputRowPosition, endPosition: InputRowPosition): CaretRange {
-    const startAncestorIndices = RowIndices.fromZipper(startPosition.zipper);
-    const endAncestorIndices = RowIndices.fromZipper(endPosition.zipper);
-    const sharedParentPart = getSharedRowIndices(startAncestorIndices, endAncestorIndices);
-
-    // We need to know the direction of the selection to know whether the caret should be at the start or end of the row
-    // We also have to handle edge cases like first caret is at top of fraction and second caret is at bottom of fraction
-    const isForwards = startPosition.isBeforeOrEqual(endPosition);
-
-    // And now that we know the direction, we can compute the actual start and end offsets
-    const startOffset =
-      sharedParentPart.length < startAncestorIndices.length
-        ? startAncestorIndices.indices[sharedParentPart.length][0] + (isForwards ? 0 : 1)
-        : startPosition.offset;
-
-    const endOffset =
-      sharedParentPart.length < endAncestorIndices.length
-        ? endAncestorIndices.indices[sharedParentPart.length][0] + (isForwards ? 1 : 0)
-        : endPosition.offset;
-
-    startPosition.zipper;
-
-    const sharedParent = InputRowZipper.fromRowIndices(startPosition.zipper.root, sharedParentPart);
-
-    return new CaretRange(new InputRowRange(sharedParent, startOffset, endOffset));
-  }
+  return new InputRowRange(sharedParent, startOffset, endOffset);
 }
 
 export function moveCaret<T>(
-  caret: CaretRange,
+  caret: InputRowRange,
   direction: "up" | "down" | "left" | "right",
   renderResult: RenderResult<T>
-): CaretRange | null {
+): InputRowPosition | null {
   const layoutPosition = new InputRowPosition(
-    caret.range.zipper,
+    caret.zipper,
     direction === "left" || direction === "up" ? caret.leftOffset : caret.rightOffset
   );
   const viewportPosition = renderResult.getViewportSelection({
@@ -127,7 +74,7 @@ export function moveCaret<T>(
 
   if (newPosition === null) return null;
 
-  return new CaretRange(newPosition);
+  return newPosition;
 }
 
 /**

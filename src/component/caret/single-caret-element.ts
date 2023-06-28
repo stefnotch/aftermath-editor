@@ -60,8 +60,10 @@ export class CaretDomElement {
     this.#selectionsContainer.append(selection);
   }
 
-  setToken(selection: RenderedSelection) {
-    if (selection.isCollapsed) {
+  setToken(selection: RenderedSelection | null) {
+    if (selection === null) {
+      this.#tokenHighlighter.style.display = "none";
+    } else if (selection.isCollapsed) {
       this.#tokenHighlighter.style.display = "none";
     } else {
       this.#tokenHighlighter.style.display = "block";
