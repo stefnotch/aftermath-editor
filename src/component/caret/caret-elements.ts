@@ -17,6 +17,12 @@ redo -> save carets -> (finish carets) -> create old carets, including the old #
 
 finish carets -> if edited, forcibly apply "selected && perfect match" autocompletions (by default the top autocompletion is selected)
 
+drag ->
+  assert state is selecting
+  if replace: replace logic already ran
+  else if add
+  else if extend
+
 click -> if carets
     if replace // default
 		check target location
@@ -27,17 +33,27 @@ click -> if carets
 	else if add // when the user is pressing something funny like ctrlcheck target location
 		check target location
 			if it's a known location, we remove the caret there without finishing it
-			else add caret
+			else if isPotentialGrid
+        save start position the carets
+        finish carets
+        create grid with saved carets, and add new caret at target location
+      else add caret
 	
 	else if extend // when the user is pressing shift
-		
-	
-	
-    check new position (is it inside one of the currentTokens) 
-    inside -> finish carets -> create new caret
-    not inside -> finish carets -> create new caret
+    copy start position and #currentTokens from the main caret
+    finish carets
+    add caret with start position and #currentTokens
 
   else if grid
+    if replace
+      finish carets
+      switch to carets
+      add caret
+    if add
+      
+    
+
+
 check new position -> finish carets -> update caret's #currentTokens
 
 
