@@ -6,7 +6,6 @@ import mathEditorStyles from "./math-editor-styles.css?inline";
 import inputHandlerStyles from "./input/input-handler-style.css?inline";
 import autocompleteStyles from "./autocomplete/autocomplete-styles.css?inline";
 import { InputHandlerElement } from "./input/input-handler-element";
-import { CaretRange } from "./editing/math-layout-caret";
 import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
 import { applyEdit, inverseEdit, MathLayoutEdit } from "../editing/input-tree-edit";
@@ -20,6 +19,7 @@ import { MathEditorCarets } from "./caret/caret-elements";
 import { InputRow } from "../input-tree/row";
 import { InputTree } from "../input-tree/input-tree";
 import { AutocompleteElement } from "./autocomplete/autocomplete-element";
+import { CaretRange } from "./caret/math-layout-caret";
 
 function createElementFromHtml(html: string) {
   const template = document.createElement("template");
@@ -83,6 +83,7 @@ export class MathEditor extends HTMLElement {
     container.append(this.carets.element);
 
     container.addEventListener("pointerdown", (e) => {
+      if (!e.isPrimary) return;
       const newCaret = this.renderResult.getLayoutPosition({ x: e.clientX, y: e.clientY });
       if (!newCaret) return;
 
@@ -90,26 +91,26 @@ export class MathEditor extends HTMLElement {
       // If I'm going to prevent default, then I also have to manually trigger the focus!
       // e.preventDefault();
 
-      this.carets.clearCarets();
-      this.carets.addPointerDownCaret(
-        e.pointerId,
+      this.carets.startPointerDown(
         new InputRowPosition(InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newCaret.indices), newCaret.offset)
       );
       this.renderCarets();
     });
     container.addEventListener("pointerup", (e) => {
+      if (!e.isPrimary) return;
       container.releasePointerCapture(e.pointerId);
-      this.carets.finishPointerDownCaret(e.pointerId);
+      this.carets.finishPointerDown();
       this.renderCarets();
     });
     container.addEventListener("pointercancel", (e) => {
+      if (!e.isPrimary) return;
       container.releasePointerCapture(e.pointerId);
-      this.carets.finishPointerDownCaret(e.pointerId);
+      this.carets.finishPointerDown();
       this.renderCarets();
     });
     container.addEventListener("pointermove", (e) => {
-      const PRIMARY_BUTTON = 1;
-      if ((e.buttons & PRIMARY_BUTTON) === 0) return;
+      if (!e.isPrimary) return;
+      if (!this.carets.isPointerDown()) return;
 
       const newPositionIndices = this.renderResult.getLayoutPosition({ x: e.clientX, y: e.clientY });
       if (!newPositionIndices) return;
@@ -118,7 +119,7 @@ export class MathEditor extends HTMLElement {
         newPositionIndices.offset
       );
 
-      this.carets.updatePointerDownCaret(e.pointerId, newPosition);
+      this.carets.updatePointerDown(newPosition);
       this.renderCarets();
     });
 
@@ -339,7 +340,7 @@ export class MathEditor extends HTMLElement {
    */
   setInputAndCarets(inputTree: InputTree, newCarets: CaretRange[]) {
     this.inputTree = inputTree;
-    this.carets.clearCarets();
+    this.carets.finishAndClearCarets();
 
     const parsed = parse(this.inputTree.root);
     this.syntaxTree = parsed.value;

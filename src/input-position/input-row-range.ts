@@ -3,6 +3,7 @@ import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
 import { RowIndicesAndRange } from "../rendering/render-result";
 import { assert } from "../utils/assert";
+import { InputRowPosition } from "./input-row-position";
 
 export class InputRowRange {
   constructor(public readonly zipper: InputRowZipper, public readonly start: Offset, public readonly end: Offset) {
@@ -24,6 +25,22 @@ export class InputRowRange {
 
   get isForwards() {
     return this.start <= this.end;
+  }
+
+  startPosition(): InputRowPosition {
+    return new InputRowPosition(this.zipper, this.start);
+  }
+
+  endPosition(): InputRowPosition {
+    return new InputRowPosition(this.zipper, this.end);
+  }
+
+  leftPosition(): InputRowPosition {
+    return new InputRowPosition(this.zipper, this.leftOffset);
+  }
+
+  rightPosition(): InputRowPosition {
+    return new InputRowPosition(this.zipper, this.rightOffset);
   }
 
   toRowIndicesAndRange(): RowIndicesAndRange {

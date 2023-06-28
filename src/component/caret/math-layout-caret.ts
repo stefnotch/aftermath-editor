@@ -37,19 +37,19 @@ export class CaretRange {
   }
 
   startPosition(): InputRowPosition {
-    return new InputRowPosition(this.range.zipper, this.range.start);
+    return this.range.startPosition();
   }
 
   endPosition(): InputRowPosition {
-    return new InputRowPosition(this.range.zipper, this.range.end);
+    return this.range.endPosition();
   }
 
   leftPosition(): InputRowPosition {
-    return new InputRowPosition(this.range.zipper, this.range.leftOffset);
+    return this.range.leftPosition();
   }
 
   rightPosition(): InputRowPosition {
-    return new InputRowPosition(this.range.zipper, this.range.rightOffset);
+    return this.range.rightPosition();
   }
 
   static serialize(caretRange: CaretRange): SerializedCaret {

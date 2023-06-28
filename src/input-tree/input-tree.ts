@@ -1,8 +1,6 @@
-import { CaretRange } from "../component/editing/math-layout-caret";
 import { MathLayoutSimpleEdit } from "../editing/input-tree-edit";
-import { InputRowPosition } from "../input-position/input-row-position";
 import { InputRowRange } from "../input-position/input-row-range";
-import { assert, assertUnreachable } from "../utils/assert";
+import { assertUnreachable } from "../utils/assert";
 import { Offset } from "./input-offset";
 import { InputRowZipper } from "./input-zipper";
 import { InputRow } from "./row";
@@ -21,15 +19,15 @@ export class InputTree {
     return this.#rootZipper;
   }
 
-  updateCaretsWithEdit(edit: MathLayoutSimpleEdit, caretsBefore: readonly CaretRange[]): CaretRange[] {
-    const carets = caretsBefore.slice();
+  updateRangesWithEdit(edit: MathLayoutSimpleEdit, rangesBefore: readonly InputRowRange[]): InputRowRange[] {
+    const ranges = rangesBefore.slice();
     const zipper = InputRowZipper.fromRowIndices(this.rootZipper, edit.zipper);
     if (edit.type === "insert") {
       // An insert edit only moves carets on the same row
-      for (let i = 0; i < carets.length; i++) {
-        const caretZipper = carets[i].range.zipper;
+      for (let i = 0; i < ranges.length; i++) {
+        const caretZipper = ranges[i].zipper;
         if (caretZipper.equals(zipper)) {
-          carets[i] = this.updateOffsets(carets[i], (offset) => {
+          ranges[i] = this.updateOffsets(ranges[i], (offset) => {
             if (edit.offset <= offset) {
               return offset + edit.values.length;
             } else {
@@ -40,11 +38,11 @@ export class InputTree {
       }
     } else if (edit.type === "remove") {
       // A remove edit moves carets on the same row
-      for (let i = 0; i < carets.length; i++) {
-        const caretZipper = carets[i].range.zipper;
+      for (let i = 0; i < ranges.length; i++) {
+        const caretZipper = ranges[i].zipper;
         if (caretZipper.equals(zipper)) {
           const editEndOffset = edit.index + edit.values.length;
-          carets[i] = this.updateOffsets(carets[i], (offset) => {
+          ranges[i] = this.updateOffsets(ranges[i], (offset) => {
             if (editEndOffset <= offset) {
               return offset - edit.values.length;
             } else {
@@ -54,32 +52,32 @@ export class InputTree {
         }
       }
       // and a remove edit clamps contained carets to the start of the edit
-      for (let i = 0; i < carets.length; i++) {
+      for (let i = 0; i < ranges.length; i++) {
         const editRange = new InputRowRange(zipper, edit.index, edit.index + edit.values.length);
         let changed = false;
         let caretStartOffset = 0;
-        if (carets[i].startPosition().isContainedIn(editRange)) {
+        if (ranges[i].startPosition().isContainedIn(editRange)) {
           caretStartOffset = editRange.leftOffset;
           changed = true;
         }
         let caretEndOffset = 0;
-        if (carets[i].endPosition().isContainedIn(editRange)) {
+        if (ranges[i].endPosition().isContainedIn(editRange)) {
           caretEndOffset = editRange.leftOffset;
           changed = true;
         }
         if (changed) {
-          carets[i] = new CaretRange(new InputRowRange(carets[i].range.zipper, caretStartOffset, caretEndOffset));
+          ranges[i] = new InputRowRange(ranges[i].zipper, caretStartOffset, caretEndOffset);
         }
       }
     } else {
       assertUnreachable(edit);
     }
 
-    return carets;
+    return ranges;
   }
 
-  private updateOffsets(caret: CaretRange, mapOffset: (offset: Offset) => Offset): CaretRange {
-    return new CaretRange(new InputRowRange(caret.range.zipper, mapOffset(caret.range.start), mapOffset(caret.range.end)));
+  private updateOffsets(range: InputRowRange, mapOffset: (offset: Offset) => Offset): InputRowRange {
+    return new InputRowRange(range.zipper, mapOffset(range.start), mapOffset(range.end));
   }
 
   applyEdit(edit: MathLayoutSimpleEdit) {
