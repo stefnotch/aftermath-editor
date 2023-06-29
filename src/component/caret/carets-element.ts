@@ -104,41 +104,47 @@ export class MathEditorCarets {
   }
 
   /**
-   * Finishes the current carets, and returns the edit that needs to be applied.
+   * Finishes the current carets, and returns the edit that has been applied.
    */
   removeAtCarets(direction: "left" | "right", tree: InputTree, renderResult: RenderResult<MathMLElement>): MathLayoutEdit {
+    // Note: Be very careful about using the syntaxTree here, because it is outdated after the first edit.
     this.finishPointerDown();
-    const mergedEdit = {
-      type: "multi" as const,
-      caretsBefore: this.serialize(),
-      // TODO: Deduplicate carets/remove overlapping carets
-      caretsAfter: [] as SerializedCaret[],
-      edits: [] as MathLayoutSimpleEdit[],
-    };
+    const caretsBefore = this.serialize();
+    const edits: MathLayoutSimpleEdit[] = [];
 
-    // Iterate over the ranges, and move them after every edit
-    // TODO: This is wrong. We have to update *every* caret after *every* edit
-    let caretRanges = this.map((caret) => caret.caret);
-    while (caretRanges.length > 0) {
-      const caret = caretRanges.shift();
-      assert(caret);
+    // Take ownership of the carets
+    const carets = this.#carets;
+    this.#carets = [];
+    for (let i = 0; i < carets.length; i++) {
+      const selection = carets[i].selection;
+      if (selection.type === "caret") {
+        const edit = removeAtCaret(selection.range, direction, renderResult);
+        edits.push(...edit.edits);
+        edit.edits.forEach((edit) => tree.applyEdit(edit));
+        carets[i].setHasEdited();
+        carets[i].moveCaretTo(InputRowPosition.deserialize(tree, edit.caret)); // TODO: This function still doesn't work properly
 
-      const edit = removeAtCaret(caret, direction, renderResult);
-      mergedEdit.caretsAfter.push(edit.caret);
-      mergedEdit.edits.push(...edit.edits);
-      edit.edits.forEach((simpleEdit) => {
-        caretRanges = tree
-          .updateRangeWithEdit(
-            simpleEdit,
-            caretRanges.map((v) => v.range)
-          )
-          .map((v) => new CaretRange(v));
-      });
+        // Move all other carets according to the edit
+        for (let j = 0; j < carets.length; j++) {
+          if (i === j) continue;
+          edit.edits.forEach((edit) => carets[j].editRanges(tree, edit));
+        }
+      } else if (selection.type === "grid") {
+        // TODO: Implement grid edits
+      } else {
+        assertUnreachable(selection);
+      }
     }
 
-    this.finishAndClearCarets();
+    // TODO: Deduplicate carets/remove overlapping carets
 
-    return mergedEdit;
+    const caretsAfter: SerializedCaret[] = [];
+    for (let i = 0; i < carets.length; i++) {
+      caretsAfter.push(carets[i].serialize());
+    }
+    // TODO: After the syntax tree gets updated, we have to update all the null this.#editingCaret.currentTokens
+
+    return new MathLayoutEdit(edits, caretsBefore, caretsAfter);
   }
 
   renderCarets(renderResult: RenderResult<MathMLElement>) {
@@ -146,11 +152,12 @@ export class MathEditorCarets {
     this.map((caret) => caret.renderCaret(renderResult));
   }
 
-  finishAndClearCarets() {
-    this.map((caret) => {
-      caret.finish();
-      caret.remove();
-    });
+  finishCarets() {
+    this.map((caret) => caret.finish());
+  }
+
+  clearCarets() {
+    this.map((caret) => caret.remove());
     this.#carets = [];
   }
 
@@ -173,6 +180,14 @@ export class MathEditorCarets {
       // TODO: deduplicate carets after adding it to the list
       this.#carets.push(this.#selection);
       this.#selection = null;
+    }
+  }
+
+  deserialize(carets: readonly SerializedCaret[], tree: InputTree) {
+    this.clearCarets();
+    for (let i = 0; i < carets.length; i++) {
+      const caret = CaretAndSelection.deserialize(this.#containerElement, carets[i], tree);
+      this.#carets.push(caret);
     }
   }
 
@@ -222,6 +237,10 @@ class CaretAndSelection {
     return new CaretAndSelection(container, EditingCaret.fromRange(position, position, syntaxTree));
   }
 
+  editRanges(inputTree: InputTree, edit: MathLayoutSimpleEdit) {
+    this.#editingCaret = this.#editingCaret.withEditedRanges(inputTree, edit);
+  }
+
   get selection() {
     return this.#editingCaret.selection;
   }
@@ -248,6 +267,23 @@ class CaretAndSelection {
         this.#currentTokens = getTokenFromSelection(syntaxTree, this.selection);
         this.#hasEdited = false;
       }
+    }
+  }
+
+  setHasEdited() {
+    this.#editingCaret = new EditingCaret(
+      this.#editingCaret.startPosition,
+      this.#editingCaret.endPosition,
+      this.#editingCaret.currentTokens,
+      true
+    );
+  }
+
+  moveCaretTo(position: InputRowPosition) {
+    if (this.#editingCaret.currentTokens && position.isContainedIn(this.#editingCaret.currentTokens)) {
+      this.#editingCaret = new EditingCaret(position, position, this.#editingCaret.currentTokens, this.#editingCaret.hasEdited);
+    } else {
+      this.#editingCaret = new EditingCaret(position, position, null, false);
     }
   }
 

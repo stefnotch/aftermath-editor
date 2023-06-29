@@ -92,7 +92,8 @@ export class MathEditor extends HTMLElement {
       // If I'm going to prevent default, then I also have to manually trigger the focus!
       // e.preventDefault();
 
-      this.carets.finishAndClearCarets();
+      this.carets.finishCarets();
+      this.carets.clearCarets();
       this.carets.startPointerDown(
         new InputRowPosition(InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newCaret.indices), newCaret.offset)
       );
@@ -173,12 +174,16 @@ export class MathEditor extends HTMLElement {
       } else if (ev.code === "KeyZ" && ev.ctrlKey) {
         const undoAction = this.undoRedoStack.undo();
         if (undoAction !== null) {
-          this.applyEdit(undoAction);
+          const result = undoAction.applyEdit(this.inputTree);
+          this.carets.deserialize(result.carets, this.inputTree);
+          this.updateInput(this.inputTree);
         }
       } else if (ev.code === "KeyY" && ev.ctrlKey) {
         const redoAction = this.undoRedoStack.redo();
         if (redoAction !== null) {
-          this.applyEdit(redoAction);
+          const result = redoAction.applyEdit(this.inputTree);
+          this.carets.deserialize(result.carets, this.inputTree);
+          this.updateInput(this.inputTree);
         }
       }
     });
@@ -230,11 +235,9 @@ export class MathEditor extends HTMLElement {
         if (ev.inputType === "deleteContentBackward" || ev.inputType === "deleteWordBackward") {
           const edit = this.carets.removeAtCarets("left", this.inputTree, this.renderResult);
           this.saveEdit(edit);
-          this.applyEdit(edit);
         } else if (ev.inputType === "deleteContentForward" || ev.inputType === "deleteWordForward") {
           const edit = this.carets.removeAtCarets("right", this.inputTree, this.renderResult);
           this.saveEdit(edit);
-          this.applyEdit(edit);
         } else if (ev.inputType === "insertText") {
           // TODO: This definitely needs access to the *parsed* stuff, not just the layout
           // (I don't think the removeAtCaret function needs it, but the insertAtCaret function does)
@@ -301,7 +304,8 @@ export class MathEditor extends HTMLElement {
     shadowRoot.append(styles, inputContainer, container);
 
     // Math formula
-    this.setInputAndCarets(this.inputTree, []);
+    this.setCarets([], this.inputTree);
+    this.updateInput(this.inputTree);
   }
 
   connectedCallback() {
@@ -323,7 +327,8 @@ export class MathEditor extends HTMLElement {
       if (parsedInput.errors.length > 0) {
         console.warn("Parsed input has errors", parsedInput.errors);
       }
-      this.setInputAndCarets(parsedInput.inputTree, []);
+      this.setCarets([], parsedInput.inputTree);
+      this.updateInput(parsedInput.inputTree);
     } else {
       console.log("Attribute changed", name, oldValue, newValue);
     }
@@ -333,14 +338,15 @@ export class MathEditor extends HTMLElement {
     return ["mathml"];
   }
 
+  setCarets(carets: readonly SerializedCaret[], tree: InputTree) {
+    this.carets.deserialize(carets, tree);
+  }
+
   /**
    * Updates the user input. Then reparses and rerenders the math formula.
-   * Also updates the carets.
    */
-  setInputAndCarets(inputTree: InputTree, newCarets: readonly SerializedCaret[]) {
+  updateInput(inputTree: InputTree) {
     this.inputTree = inputTree;
-    this.carets.finishAndClearCarets();
-
     const parsed = parse(this.inputTree.root);
     this.syntaxTree = parsed.value;
     console.log("Parsed", parsed);
@@ -355,10 +361,6 @@ export class MathEditor extends HTMLElement {
     }
     this.mathMlElement.replaceChildren(...mathMlElements);
 
-    newCarets.forEach((v) => {
-      this.carets.add(v);
-    });
-    // Rerender the carets
     this.renderCarets();
   }
 
@@ -381,14 +383,7 @@ export class MathEditor extends HTMLElement {
   }
 
   saveEdit(edit: MathLayoutEdit) {
-    if (edit.edits.length > 0) {
-      this.undoRedoStack.push(edit);
-    }
-  }
-
-  applyEdit(edit: MathLayoutEdit) {
-    const result = edit.applyEdit(this.inputTree);
-    this.setInputAndCarets(this.inputTree, result.carets);
+    if (!edit.isEmpty) this.undoRedoStack.push(edit);
   }
 
   /**

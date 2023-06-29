@@ -13,6 +13,10 @@ export class MathLayoutEdit {
     public readonly caretsAfter: readonly SerializedCaret[]
   ) {}
 
+  get isEmpty(): boolean {
+    return this.edits.length === 0;
+  }
+
   /**
    * Mutates the tree.
    */
