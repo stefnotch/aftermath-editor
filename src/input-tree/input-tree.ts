@@ -19,61 +19,54 @@ export class InputTree {
     return this.#rootZipper;
   }
 
-  updateRangesWithEdit(edit: MathLayoutSimpleEdit, rangesBefore: readonly InputRowRange[]): InputRowRange[] {
-    const ranges = rangesBefore.slice();
+  updateRangeWithEdit(edit: MathLayoutSimpleEdit, rangeBefore: InputRowRange): InputRowRange {
+    let range = rangeBefore;
     const zipper = InputRowZipper.fromRowIndices(this.rootZipper, edit.zipper);
     if (edit.type === "insert") {
       // An insert edit only moves carets on the same row
-      for (let i = 0; i < ranges.length; i++) {
-        const caretZipper = ranges[i].zipper;
-        if (caretZipper.equals(zipper)) {
-          ranges[i] = this.updateOffsets(ranges[i], (offset) => {
-            if (edit.offset <= offset) {
-              return offset + edit.values.length;
-            } else {
-              return offset;
-            }
-          });
-        }
+      if (range.zipper.equals(zipper)) {
+        range = this.updateOffsets(range, (offset) => {
+          if (edit.offset <= offset) {
+            return offset + edit.values.length;
+          } else {
+            return offset;
+          }
+        });
       }
     } else if (edit.type === "remove") {
       // A remove edit moves carets on the same row
-      for (let i = 0; i < ranges.length; i++) {
-        const caretZipper = ranges[i].zipper;
-        if (caretZipper.equals(zipper)) {
-          const editEndOffset = edit.index + edit.values.length;
-          ranges[i] = this.updateOffsets(ranges[i], (offset) => {
-            if (editEndOffset <= offset) {
-              return offset - edit.values.length;
-            } else {
-              return offset;
-            }
-          });
-        }
+      if (range.zipper.equals(zipper)) {
+        const editEndOffset = edit.index + edit.values.length;
+        range = this.updateOffsets(range, (offset) => {
+          if (editEndOffset <= offset) {
+            return offset - edit.values.length;
+          } else {
+            return offset;
+          }
+        });
       }
+
       // and a remove edit clamps contained carets to the start of the edit
-      for (let i = 0; i < ranges.length; i++) {
-        const editRange = new InputRowRange(zipper, edit.index, edit.index + edit.values.length);
-        let changed = false;
-        let caretStartOffset = 0;
-        if (ranges[i].startPosition().isContainedIn(editRange)) {
-          caretStartOffset = editRange.leftOffset;
-          changed = true;
-        }
-        let caretEndOffset = 0;
-        if (ranges[i].endPosition().isContainedIn(editRange)) {
-          caretEndOffset = editRange.leftOffset;
-          changed = true;
-        }
-        if (changed) {
-          ranges[i] = new InputRowRange(ranges[i].zipper, caretStartOffset, caretEndOffset);
-        }
+      const editRange = new InputRowRange(zipper, edit.index, edit.index + edit.values.length);
+      let changed = false;
+      let caretStartOffset = 0;
+      if (range.startPosition().isContainedIn(editRange)) {
+        caretStartOffset = editRange.leftOffset;
+        changed = true;
+      }
+      let caretEndOffset = 0;
+      if (range.endPosition().isContainedIn(editRange)) {
+        caretEndOffset = editRange.leftOffset;
+        changed = true;
+      }
+      if (changed) {
+        range = new InputRowRange(range.zipper, caretStartOffset, caretEndOffset);
       }
     } else {
       assertUnreachable(edit);
     }
 
-    return ranges;
+    return range;
   }
 
   private updateOffsets(range: InputRowRange, mapOffset: (offset: Offset) => Offset): InputRowRange {

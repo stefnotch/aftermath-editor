@@ -1,13 +1,13 @@
-import { InputNode } from "../../input-tree/input-node";
-import { InputRow } from "../../input-tree/row";
-import { InputRowPosition } from "../../input-position/input-row-position";
-import { InputNodeContainerZipper, InputSymbolZipper, InputRowZipper } from "../../input-tree/input-zipper";
-import { RowIndices } from "../../input-tree/row-indices";
-import { RenderResult } from "../../rendering/render-result";
-import arrayUtils from "../../utils/array-utils";
-import { moveCaret } from "./math-layout-caret";
-import { MathLayoutSimpleEdit } from "../../editing/input-tree-edit";
-import { InputRowRange } from "../../input-position/input-row-range";
+import { InputNode } from "../input-tree/input-node";
+import { InputRow } from "../input-tree/row";
+import { InputRowPosition } from "../input-position/input-row-position";
+import { InputNodeContainerZipper, InputSymbolZipper, InputRowZipper } from "../input-tree/input-zipper";
+import { RowIndices } from "../input-tree/row-indices";
+import { RenderResult } from "../rendering/render-result";
+import arrayUtils from "../utils/array-utils";
+import { moveCaret } from "./caret-move";
+import { MathLayoutSimpleEdit } from "./input-tree-edit";
+import { InputRowRange, SerializedInputRowRange } from "../input-position/input-row-range";
 
 export type CaretEdit = {
   /**
@@ -17,14 +17,14 @@ export type CaretEdit = {
   /**
    * Where the caret should end up after the edits
    */
-  caret: SerializedCaret;
+  caret: SerializedInputRowRange;
 };
 
-export function removeAtCaret<T>(caret: CaretRange, direction: "left" | "right", renderResult: RenderResult<T>): CaretEdit {
+export function removeAtCaret<T>(caret: InputRowRange, direction: "left" | "right", renderResult: RenderResult<T>): CaretEdit {
   if (caret.isCollapsed) {
     return removeAtPosition(caret.startPosition(), direction, renderResult);
   } else {
-    return removeRange(caret.range);
+    return removeRange(caret);
   }
 }
 
@@ -35,10 +35,9 @@ function removeAtPosition<T>(
 ): CaretEdit {
   // Nothing to delete, just move the caret
   const move = () => {
-    const caret = new CaretRange(position);
-    const newCaret = moveCaret(caret, direction, renderResult) ?? caret;
+    const newCaret = moveCaret(position, direction, renderResult) ?? position;
     return {
-      caret: CaretRange.serialize(newCaret),
+      caret: newCaret.serialize(),
       edits: [],
     };
   };
@@ -134,15 +133,15 @@ function removeRange(caret: InputRowRange): CaretEdit {
   };
 }
 
-function serializeCollapsedCaret(zipper: InputRowZipper, offset: number): SerializedCaret {
-  return CaretRange.serialize(new CaretRange(new InputRowRange(zipper, offset, offset)));
+function serializeCollapsedCaret(zipper: InputRowZipper, offset: number): SerializedInputRowRange {
+  return new InputRowRange(zipper, offset, offset).serialize();
 }
 
-export function insertAtCaret(caret: CaretRange, value: InputRow): CaretEdit {
+export function insertAtCaret(caret: InputRowRange, value: InputRow): CaretEdit {
   if (caret.isCollapsed) {
     return insertAtPosition(caret.startPosition(), value);
   } else {
-    const removeExisting = removeRange(caret.range);
+    const removeExisting = removeRange(caret);
     const insertAfterRemoval = insertAtPosition(caret.leftPosition(), value);
     return {
       edits: removeExisting.edits.concat(insertAfterRemoval.edits),

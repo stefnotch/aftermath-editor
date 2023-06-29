@@ -68,6 +68,10 @@ impl<T> Grid<T> {
         self.values.get(self.xy_to_index(x, y))
     }
 
+    pub fn get_index(&self, index: usize) -> Option<&T> {
+        self.values.get(index)
+    }
+
     pub fn index_to_xy(&self, index: usize) -> (usize, usize) {
         (index % self.width, index / self.width)
     }

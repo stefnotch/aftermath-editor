@@ -1,11 +1,11 @@
-import { Offset } from "../../input-tree/input-offset";
-import { InputRowPosition } from "../../input-position/input-row-position";
-import { InputNodeContainerZipper, InputRowZipper, InputSymbolZipper } from "../../input-tree/input-zipper";
-import { RowIndices, getSharedRowIndices } from "../../input-tree/row-indices";
-import { assert, assertUnreachable } from "../../utils/assert";
-import { ViewportValue } from "../../rendering/viewport-coordinate";
-import { RenderResult } from "../../rendering/render-result";
-import { InputRowRange } from "../../input-position/input-row-range";
+import { Offset } from "../input-tree/input-offset";
+import { InputRowPosition } from "../input-position/input-row-position";
+import { InputNodeContainerZipper, InputRowZipper, InputSymbolZipper } from "../input-tree/input-zipper";
+import { RowIndices } from "../input-tree/row-indices";
+import { assert, assertUnreachable } from "../utils/assert";
+import { ViewportValue } from "../rendering/viewport-coordinate";
+import { RenderResult } from "../rendering/render-result";
+import { InputRowRange } from "../input-position/input-row-range";
 
 export type Direction = "left" | "right" | "up" | "down";
 
@@ -14,34 +14,6 @@ export type Direction = "left" | "right" | "up" | "down";
  * See https://github.com/stefnotch/aftermath-editor/issues/13
  */
 const KeepXPosition = false;
-
-/**
- * Gets a caret from two positions that might be in different rows.
- */
-export function getSharedCaret(startPosition: InputRowPosition, endPosition: InputRowPosition): InputRowRange {
-  const startAncestorIndices = RowIndices.fromZipper(startPosition.zipper);
-  const endAncestorIndices = RowIndices.fromZipper(endPosition.zipper);
-  const sharedParentPart = getSharedRowIndices(startAncestorIndices, endAncestorIndices);
-
-  // We need to know the direction of the selection to know whether the caret should be at the start or end of the row
-  // We also have to handle edge cases like first caret is at top of fraction and second caret is at bottom of fraction
-  const isForwards = startPosition.isBeforeOrEqual(endPosition);
-
-  // And now that we know the direction, we can compute the actual start and end offsets
-  const startOffset =
-    sharedParentPart.length < startAncestorIndices.length
-      ? startAncestorIndices.indices[sharedParentPart.length][0] + (isForwards ? 0 : 1)
-      : startPosition.offset;
-
-  const endOffset =
-    sharedParentPart.length < endAncestorIndices.length
-      ? endAncestorIndices.indices[sharedParentPart.length][0] + (isForwards ? 1 : 0)
-      : endPosition.offset;
-
-  const sharedParent = InputRowZipper.fromRowIndices(startPosition.zipper.root, sharedParentPart);
-
-  return new InputRowRange(sharedParent, startOffset, endOffset);
-}
 
 export function moveCaret<T>(
   caret: InputRowRange,
@@ -72,7 +44,10 @@ export function moveCaret<T>(
     }
   );
 
-  if (newPosition === null) return null;
+  if (newPosition === null) {
+    if (caret.isCollapsed) return null;
+    else return layoutPosition;
+  }
 
   return newPosition;
 }

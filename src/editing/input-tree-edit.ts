@@ -3,14 +3,39 @@ import { RowIndices } from "../input-tree/row-indices";
 import { assertUnreachable } from "../utils/assert";
 import { InputNode } from "../input-tree/input-node";
 import { InputTree } from "../input-tree/input-tree";
+import { SerializedCaret } from "./serialized-caret";
 
-export type MathLayoutEdit = {
-  readonly type: "multi";
-  readonly edits: readonly MathLayoutSimpleEdit[];
-  readonly caretsBefore: readonly SerializedCaret[];
-  // Not neccessarily deduplicated
-  readonly caretsAfter: readonly SerializedCaret[];
-};
+export class MathLayoutEdit {
+  constructor(
+    public readonly edits: readonly MathLayoutSimpleEdit[],
+    public readonly caretsBefore: readonly SerializedCaret[],
+    // TODO: Must be deduplicated
+    public readonly caretsAfter: readonly SerializedCaret[]
+  ) {}
+
+  /**
+   * Mutates the tree.
+   */
+  applyEdit(tree: InputTree): { carets: readonly SerializedCaret[] } {
+    for (const subEdit of this.edits) {
+      // All the simple edits have row indices that are relative to the current tree.
+      tree.applyEdit(subEdit);
+    }
+    return {
+      carets: this.caretsAfter,
+    };
+  }
+
+  /**
+   * Turns an edit into an undo edit on the fly.
+   * Invariant is that undo(und(edit)) = edit.
+   */
+  static inverseEdit(edit: MathLayoutEdit): MathLayoutEdit {
+    const edits = edit.edits.map(inverseSimpleEdit);
+    edits.reverse();
+    return new MathLayoutEdit(edits, edit.caretsAfter, edit.caretsBefore);
+  }
+}
 
 /**
  * Useless note: A MathLayoutSimpleEdit[] together with the .concat() method forms an algebraic group.
@@ -38,39 +63,6 @@ export type MathLayoutSimpleEdit =
        */
       readonly values: InputNode[];
     };
-
-export function applyEdit(tree: InputTree, edit: MathLayoutEdit): { carets: CaretRange[] } {
-  if (edit.type === "multi") {
-    for (const subEdit of edit.edits) {
-      // All the simple edits have row indices that are relative to the current tree.
-      tree.applyEdit(subEdit);
-    }
-    return {
-      carets: edit.caretsAfter.map((v) => CaretRange.deserialize(tree, v)),
-    };
-  } else {
-    assertUnreachable(edit.type);
-  }
-}
-
-/**
- * Turns an edit into an undo edit on the fly.
- * Invariant is that undo(und(edit)) = edit.
- */
-export function inverseEdit(edit: MathLayoutEdit): MathLayoutEdit {
-  if (edit.type === "multi") {
-    const edits = edit.edits.map(inverseSimpleEdit);
-    edits.reverse();
-    return {
-      type: "multi",
-      edits,
-      caretsBefore: edit.caretsAfter,
-      caretsAfter: edit.caretsBefore,
-    };
-  } else {
-    assertUnreachable(edit.type);
-  }
-}
 
 function inverseSimpleEdit(edit: MathLayoutSimpleEdit): MathLayoutSimpleEdit {
   if (edit.type === "insert") {

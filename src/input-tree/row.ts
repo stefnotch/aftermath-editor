@@ -50,6 +50,13 @@ export class Grid<T> {
     return this.#values.at(this.xyToIndex(x, y)) ?? null;
   }
 
+  getIndex(index: number): T | null {
+    if (index >= this.#values.length) {
+      return null;
+    }
+    return this.#values.at(index) ?? null;
+  }
+
   indexToXY(index: number) {
     return { x: index % this.width, y: Math.floor(index / this.width) };
   }

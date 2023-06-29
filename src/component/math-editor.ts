@@ -8,7 +8,7 @@ import autocompleteStyles from "./autocomplete/autocomplete-styles.css?inline";
 import { InputHandlerElement } from "./input/input-handler-element";
 import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
-import { applyEdit, inverseEdit, MathLayoutEdit } from "../editing/input-tree-edit";
+import { MathLayoutEdit } from "../editing/input-tree-edit";
 import { UndoRedoManager } from "../editing/undo-redo-manager";
 import { InputRowPosition } from "../input-position/input-row-position";
 import { MathMLRenderer } from "../mathml/renderer";
@@ -19,6 +19,7 @@ import { MathEditorCarets } from "./caret/carets-element";
 import { InputRow } from "../input-tree/row";
 import { InputTree } from "../input-tree/input-tree";
 import { AutocompleteElement } from "./autocomplete/autocomplete-element";
+import { SerializedCaret } from "../editing/serialized-caret";
 
 function createElementFromHtml(html: string) {
   const template = document.createElement("template");
@@ -51,7 +52,6 @@ export class MathEditor extends HTMLElement {
   autocomplete: AutocompleteElement;
 
   inputTree: InputTree = new InputTree(new InputRow([]));
-
   syntaxTree: SyntaxNode;
 
   renderer: MathMLRenderer;
@@ -60,7 +60,7 @@ export class MathEditor extends HTMLElement {
 
   mathMlElement: Element;
 
-  undoRedoStack = new UndoRedoManager<MathLayoutEdit>(inverseEdit);
+  undoRedoStack = new UndoRedoManager<MathLayoutEdit>(MathLayoutEdit.inverseEdit);
 
   constructor() {
     super();
@@ -73,12 +73,14 @@ export class MathEditor extends HTMLElement {
     container.style.touchAction = "none"; // Dirty hack to disable pinch zoom on mobile, not ideal
     container.tabIndex = 0;
 
-    // Click to focus
-    container.addEventListener("focus", () => {
-      this.inputHandler.focus();
-    });
+    this.syntaxTree = {
+      name: ["BuiltIn", "Nothing"],
+      children: { Containers: [] },
+      value: [],
+      range: { start: 0, end: 0 },
+    };
 
-    this.carets = new MathEditorCarets();
+    this.carets = new MathEditorCarets(this.syntaxTree);
     container.append(this.carets.element);
 
     container.addEventListener("pointerdown", (e) => {
@@ -90,6 +92,7 @@ export class MathEditor extends HTMLElement {
       // If I'm going to prevent default, then I also have to manually trigger the focus!
       // e.preventDefault();
 
+      this.carets.finishAndClearCarets();
       this.carets.startPointerDown(
         new InputRowPosition(InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newCaret.indices), newCaret.offset)
       );
@@ -150,7 +153,10 @@ export class MathEditor extends HTMLElement {
     inputContainer.style.position = "absolute";
     this.inputHandler = new InputHandlerElement();
     inputContainer.appendChild(this.inputHandler.element);
-
+    // Click to focus
+    container.addEventListener("focus", () => {
+      this.inputHandler.focus();
+    });
     this.inputHandler.element.addEventListener("keydown", (ev) => {
       if (ev.key === "ArrowUp") {
         this.carets.moveCarets("up", this.renderResult);
@@ -285,12 +291,6 @@ export class MathEditor extends HTMLElement {
       assert(this.renderer.canRender(name), "Cannot render " + joinNodeIdentifier(name) + ".");
     });
 
-    this.syntaxTree = {
-      name: ["BuiltIn", "Nothing"],
-      children: { Containers: [] },
-      value: [],
-      range: { start: 0, end: 0 },
-    };
     this.renderResult = this.renderer.renderAll({
       errors: [],
       value: this.syntaxTree,
@@ -337,7 +337,7 @@ export class MathEditor extends HTMLElement {
    * Updates the user input. Then reparses and rerenders the math formula.
    * Also updates the carets.
    */
-  setInputAndCarets(inputTree: InputTree, newCarets: CaretRange[]) {
+  setInputAndCarets(inputTree: InputTree, newCarets: readonly SerializedCaret[]) {
     this.inputTree = inputTree;
     this.carets.finishAndClearCarets();
 
@@ -387,7 +387,7 @@ export class MathEditor extends HTMLElement {
   }
 
   applyEdit(edit: MathLayoutEdit) {
-    const result = applyEdit(this.inputTree, edit);
+    const result = edit.applyEdit(this.inputTree);
     this.setInputAndCarets(this.inputTree, result.carets);
   }
 

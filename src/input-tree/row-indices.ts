@@ -44,6 +44,21 @@ export class RowIndices {
     return this.indices.length;
   }
 
+  sharedRowIndices(indicesB: RowIndices): RowIndices {
+    const sharedAncestorIndices: [number, number][] = [];
+    for (let i = 0; i < this.indices.length && i < indicesB.indices.length; i++) {
+      const a = this.indices[i];
+      const b = indicesB.indices[i];
+      if (a[0] === b[0] && a[1] === b[1]) {
+        sharedAncestorIndices.push([a[0], a[1]]);
+      } else {
+        break;
+      }
+    }
+
+    return new RowIndices(sharedAncestorIndices);
+  }
+
   equals(other: RowIndices) {
     return (
       this.indices.length === other.indices.length &&
@@ -62,19 +77,4 @@ export class RowIndices {
       },
     };
   }
-}
-
-export function getSharedRowIndices(indicesA: RowIndices, indicesB: RowIndices): RowIndices {
-  const sharedAncestorIndices: [number, number][] = [];
-  for (let i = 0; i < indicesA.indices.length && i < indicesB.indices.length; i++) {
-    const a = indicesA.indices[i];
-    const b = indicesB.indices[i];
-    if (a[0] === b[0] && a[1] === b[1]) {
-      sharedAncestorIndices.push([a[0], a[1]]);
-    } else {
-      break;
-    }
-  }
-
-  return new RowIndices(sharedAncestorIndices);
 }

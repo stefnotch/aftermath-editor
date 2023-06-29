@@ -6,11 +6,15 @@ import { RowIndices } from "../../input-tree/row-indices";
 import { RenderResult } from "../../rendering/render-result";
 import { assert, assertUnreachable } from "../../utils/assert";
 import { CaretDomElement } from "./single-caret-element";
-import { getSharedCaret, moveCaret } from "./math-layout-caret";
-import { removeAtCaret } from "./math-layout-caret-edit";
+import { removeAtCaret } from "../../editing/caret-edit";
 import { InputNode, InputNodeContainer } from "../../input-tree/input-node";
 import { InputRowRange } from "../../input-position/input-row-range";
-import { SerializedCaret } from "./serialized-caret";
+import { SerializedCaret } from "../../editing/serialized-caret";
+import { InputRowZipper } from "../../input-tree/input-zipper";
+import { ViewportMath } from "../../rendering/viewport-coordinate";
+import { InputGridRange } from "../../input-position/input-grid-range";
+import { memoize } from "../../utils/memoize";
+import { EditingCaret, EditingCaretSelection } from "../../editing/editing-caret";
 /*
 undo -> save carets -> (finish carets) -> create old carets, including the old #currentTokens
 redo -> save carets -> (finish carets) -> create old carets, including the old #currentTokens
@@ -60,24 +64,19 @@ check new position -> finish carets -> update caret's #currentTokens
 
 move -> behaves similar to click
 add, remove -> behaves similar to click
-*/
-
-/**
- * Manages the rendering and editing of carets. There are multiple possible states.
- *
- * 1. Row selections
- * - Selecting with pointer
- * - N carets
- *
- * 2. Grid selections
- * - TODO: Implement the table selections
- */
-export class MathEditorCarets {
-  //
   // - move carets to the same spot (merge)
   // - select and delete region that contains a caret
+*/
 
+export class MathEditorCarets {
   #carets: CaretAndSelection[] = [];
+
+  /**
+   * Does not become a real caret until it's finished.
+   * Carets inside a selection can be rendered differently.
+   * TODO: Move this to a separate class
+   */
+  #selection: CaretAndSelection | null = null;
 
   #containerElement: HTMLElement;
   #syntaxTree: SyntaxNode;
@@ -94,20 +93,6 @@ export class MathEditorCarets {
 
   private get mainCaret() {
     return this.#carets.at(-1) ?? null;
-  }
-
-  updateSyntaxTree(inputTree: InputTree, syntaxTree: SyntaxNode) {
-    this.#syntaxTree = syntaxTree;
-    const serializedCarets = this.serialize();
-    this.map((caret) => caret.remove());
-    this.#carets = serializedCarets.map((serializedCaret) =>
-      CaretAndSelection.deserialize(this.#containerElement, inputTree, syntaxTree, serializedCaret)
-    );
-  }
-
-  finishAndClearCarets() {
-    this.map((caret) => caret.finishAndRemove());
-    this.#carets = [];
   }
 
   moveCarets(direction: "up" | "down" | "left" | "right", renderResult: RenderResult<MathMLElement>) {
@@ -132,6 +117,7 @@ export class MathEditorCarets {
     };
 
     // Iterate over the ranges, and move them after every edit
+    // TODO: This is wrong. We have to update *every* caret after *every* edit
     let caretRanges = this.map((caret) => caret.caret);
     while (caretRanges.length > 0) {
       const caret = caretRanges.shift();
@@ -142,7 +128,7 @@ export class MathEditorCarets {
       mergedEdit.edits.push(...edit.edits);
       edit.edits.forEach((simpleEdit) => {
         caretRanges = tree
-          .updateRangesWithEdit(
+          .updateRangeWithEdit(
             simpleEdit,
             caretRanges.map((v) => v.range)
           )
@@ -156,91 +142,51 @@ export class MathEditorCarets {
   }
 
   renderCarets(renderResult: RenderResult<MathMLElement>) {
+    // TODO: Carets inside the selection can be rendered differently.
     this.map((caret) => caret.renderCaret(renderResult));
   }
 
+  finishAndClearCarets() {
+    this.map((caret) => {
+      caret.finish();
+      caret.remove();
+    });
+    this.#carets = [];
+  }
+
   startPointerDown(position: InputRowPosition) {
-    this.finishAndClearCarets();
-    this.#carets = {
-      type: "selecting",
-      caret: this.createCaret(new CaretRange(position)),
-    };
+    this.#selection = CaretAndSelection.fromPosition(this.#containerElement, position, this.#syntaxTree);
   }
 
   isPointerDown() {
-    return this.#carets.type === "selecting";
+    return this.#selection !== null;
   }
 
   updatePointerDown(position: InputRowPosition) {
-    assert(this.#carets.type === "selecting");
-    this.#carets.caret.setEndPosition(this.#syntaxTree, position);
+    assert(this.#selection);
+    this.#selection.dragEndPosition(position, this.#syntaxTree);
   }
 
   finishPointerDown() {
-    if (this.#carets.type === "selecting") {
-      this.#carets = {
-        type: "carets",
-        carets: [this.#carets.caret],
-      };
+    if (this.#selection) {
+      // TODO: check where caret ends up. we might need to move an existing caret instead of adding a new one
+      // TODO: deduplicate carets after adding it to the list
+      this.#carets.push(this.#selection);
+      this.#selection = null;
     }
   }
 
-  private deserialize(layoutCaret: CaretRange) {
-    // Limited to one caret
-    const newCaret = this.createCaret(layoutCaret);
-    this.addAndMergeCarets(newCaret);
-  }
-
   private serialize() {
-    this.finishPointerDown();
     return this.map((v) => v.serialize());
   }
 
   private map<T>(fn: (caret: CaretAndSelection) => T): T[] {
-    let carets: CaretAndSelection[];
-    if (this.#carets.type === "selecting") {
-      carets = [this.#carets.caret];
-    } else if (this.#carets.type === "carets" || this.#carets.type === "grid") {
-      carets = this.#carets.carets;
-    } else {
-      assertUnreachable(this.#carets);
-    }
-    return carets.map(fn);
-  }
-
-  private createCaret(caret: CaretRange, startPostion?: InputRowPosition) {
-    return new CaretAndSelection(this.#containerElement, this.#syntaxTree, {
-      startPosition: startPostion ?? caret.startPosition(),
-      caret,
-    });
+    return this.#carets.map(fn);
   }
 }
 
-type CaretSelection =
-  | {
-      type: "caret";
-      range: InputRowRange;
-    }
-  | {
-      type: "grid";
-      // when one de-selects a grid cell, one ends up splitting the selection into two
-    };
-
 class CaretAndSelection {
   /**
-   * Where the user started the caret.
-   */
-  #startPosition: InputRowPosition;
-  /**
-   * Where the user ended the caret.
-   */
-  #endPosition: InputRowPosition;
-
-  #selected: CaretSelection;
-
-  /**
-   * Range of input nodes that are currently being edited. Used for autocompletions.
-   *
    * Since we're asking the SyntaxTree, we'll get info like "is currently inside a wide text token".
    * And then, no autocompletions will match.
    *
@@ -260,56 +206,56 @@ class CaretAndSelection {
    *   3. Query the parser for autocompletions
    *   4. If there are any tokens that must be applied, we'll do that. Then we can update the currentTokens.
    */
-  #currentTokens: InputRowRange | null;
 
-  #hasEdited: boolean = false;
+  #editingCaret: EditingCaret;
 
   // For rendering
   highlightedElements: ReadonlyArray<Element> = [];
   #element = new CaretDomElement();
 
-  constructor(
-    public container: HTMLElement,
-    opts: {
-      syntaxTree: SyntaxNode;
-      startPosition: InputRowPosition;
-      endPosition: InputRowPosition;
-    }
-  ) {
-    this.#startPosition = opts.startPosition;
-    this.#endPosition = opts.endPosition;
-    this.#selected = getSelection(opts.startPosition, opts.endPosition);
-    this.#currentTokens = getTokenFromSelection(opts.syntaxTree, this.#selected);
-    this.#hasEdited = false;
+  constructor(public container: HTMLElement, editingCaret: EditingCaret) {
+    this.#editingCaret = editingCaret;
     container.append(this.#element.element);
   }
 
-  getAutocompleteNodes(): InputNode[] {
-    if (!this.#currentTokens) {
-      return [];
-    }
-    return this.#currentTokens.zipper.value.values.slice(this.#currentTokens.start, this.#endPosition.end);
+  static fromPosition(container: HTMLElement, position: InputRowPosition, syntaxTree: SyntaxNode) {
+    return new CaretAndSelection(container, EditingCaret.fromRange(position, position, syntaxTree));
+  }
+
+  get selection() {
+    return this.#editingCaret.selection;
   }
 
   /**
    * Note: Make sure to re-render the caret after moving it
+   * TODO: Support more moving modes, like "move end position only"
    */
   moveCaret(syntaxTree: SyntaxNode, renderResult: RenderResult<MathMLElement>, direction: "up" | "down" | "left" | "right") {
-    const newCaret = moveCaret(this.#caret, direction, renderResult);
+    const newCaret = moveCaret(
+      this.selection.type === "caret" ? this.selection.range : this.#endPosition,
+      direction,
+      renderResult
+    );
     if (newCaret) {
-      this.#caret = newCaret;
-      // TODO: if newCaret outside of #currentTokens, then "finish current tokens" and "start new tokens"
-      this.#currentTokens = getTokenAtPosition(syntaxTree, this.#caret.endPosition());
+      if (this.#currentTokens && newCaret.isContainedIn(this.#currentTokens)) {
+        this.#startPosition = newCaret.startPosition();
+        this.#endPosition = newCaret.endPosition();
+      } else {
+        // We basically have to create a new caret
+        this.finish();
+        this.#startPosition = newCaret.startPosition();
+        this.#endPosition = newCaret.endPosition();
+        this.#currentTokens = getTokenFromSelection(syntaxTree, this.selection);
+        this.#hasEdited = false;
+      }
     }
   }
 
   /**
    * For mouse dragging.
    */
-  setEndPosition(syntaxTree: SyntaxNode, position: InputRowPosition) {
-    this.#endPosition = position;
-    this.#selected = getSelection(this.#startPosition, position);
-    this.#currentTokens = getTokenFromSelection(syntaxTree, this.#selected);
+  dragEndPosition(position: InputRowPosition, syntaxTree: SyntaxNode) {
+    this.#editingCaret = EditingCaret.fromRange(this.#editingCaret.startPosition, position, syntaxTree);
   }
 
   setHighlightedElements(elements: ReadonlyArray<Element>) {
@@ -319,8 +265,9 @@ class CaretAndSelection {
   }
 
   renderCaret(renderResult: RenderResult<MathMLElement>) {
-    if (this.#selected.type === "caret") {
-      const range = this.#selected.range;
+    const selected = this.selection;
+    if (selected.type === "caret") {
+      const range = selected.range;
       const caretIndices = RowIndices.fromZipper(range.zipper);
       const renderedCaret = renderResult.getViewportSelection({
         indices: caretIndices,
@@ -346,43 +293,56 @@ class CaretAndSelection {
       this.setHighlightedElements(container.getElements());
 
       // Highlight token at the caret
-      if (this.#currentTokens) {
-        this.#element.setToken(renderResult.getViewportSelection(this.#currentTokens.toRowIndicesAndRange()));
+      if (this.#editingCaret.currentTokens) {
+        this.#element.setToken(renderResult.getViewportSelection(this.#editingCaret.currentTokens.toRowIndicesAndRange()));
       } else {
         this.#element.setToken(null);
       }
-    } else if (this.#selected.type === "grid") {
-      console.warn("TODO: render grid selection");
+    } else if (selected.type === "grid") {
+      const startIndices = RowIndices.fromZipper(selected.range.zipper).addRowIndex([
+        selected.range.index,
+        selected.range.start,
+      ]);
+      const renderedStart = renderResult.getViewportSelection({
+        indices: startIndices,
+        start: 0,
+        end: 0,
+      });
+      const endIndices = RowIndices.fromZipper(selected.range.zipper).addRowIndex([selected.range.index, selected.range.end]);
+      const endRowLength = selected.range.getRow(selected.range.end)?.values.length ?? 0;
+      const renderedEnd = renderResult.getViewportSelection({
+        indices: endIndices,
+        start: endRowLength,
+        end: endRowLength,
+      });
+      this.#element.clearSelections();
+      this.#element.addSelection(
+        ViewportMath.joinRectangles(
+          {
+            x: Math.min(renderedStart.rect.x, renderedEnd.rect.x),
+            y: Math.min(renderedStart.rect.y, renderedEnd.rect.y),
+            width: 0,
+            height: 0,
+          },
+          {
+            x: Math.max(renderedStart.rect.x + renderedStart.rect.width, renderedEnd.rect.x + renderedEnd.rect.width),
+            y: Math.max(renderedStart.rect.y + renderedStart.rect.height, renderedEnd.rect.y + renderedEnd.rect.height),
+            width: 0,
+            height: 0,
+          }
+        )
+      );
+
+      this.setHighlightedElements([]);
+      this.#element.setToken(null);
     } else {
-      assertUnreachable(this.#selected);
+      assertUnreachable(selected);
     }
-  }
-
-  serialize(): SerializedCaret {
-    return new SerializedCaret(
-      this.#startPosition.serialize(),
-      this.#endPosition.serialize(),
-      this.#selected.type === "caret" ? "caret" : "grid",
-      this.#currentTokens?.serialize() ?? null,
-      this.#hasEdited
-    );
-  }
-
-  static deserialize(
-    container: HTMLElement,
-    tree: InputTree,
-    syntaxTree: SyntaxNode,
-    serialized: SerializedCaret
-  ): CaretAndSelection {
-    return new CaretAndSelection(container, {
-      syntaxTree,
-      startPosition: InputRowPosition.deserialize(tree, serialized.startPosition),
-      endPosition: InputRowPosition.deserialize(tree, serialized.endPosition),
-    });
   }
 
   finish() {
     if (this.#hasEdited) {
+      // TODO:
     }
   }
 
@@ -390,68 +350,12 @@ class CaretAndSelection {
     this.container.removeChild(this.#element.element);
     this.setHighlightedElements([]);
   }
-}
 
-function getSelection(start: InputRowPosition, end: InputRowPosition): CaretSelection {
-  const sharedRange = getSharedCaret(start, end);
-  const isSingleElementSelected = sharedRange.start + 1 === sharedRange.end;
-  if (isSingleElementSelected) {
-    const selectedElement = sharedRange.zipper.value.values[sharedRange.start];
-    if (selectedElement instanceof InputNodeContainer && selectedElement.containerType === "Table") {
-      return {
-        type: "grid",
-      };
-    }
+  serialize(): SerializedCaret {
+    return this.#editingCaret.serialize();
   }
 
-  return {
-    type: "caret",
-    range: sharedRange,
-  };
-}
-
-function getTokenFromSelection(syntaxTree: SyntaxNode, caretSelection: CaretSelection): InputRowRange | null {
-  if (caretSelection.type === "caret" && caretSelection.range.isCollapsed) {
-    return getTokenAtPosition(syntaxTree, caretSelection.range.startPosition());
-  } else {
-    return null;
-  }
-}
-
-/**
- * Gets the token that the caret is in the middle of,
- * or a token that is to the left of the caret.
- */
-function getTokenAtPosition(syntaxTree: SyntaxNode, caret: InputRowPosition): InputRowRange {
-  // We walk down the indices, so we should be at the row we want.
-  const indices = RowIndices.fromZipper(caret.zipper);
-  const row = getRowNode(syntaxTree, indices);
-
-  if (caret.offset === 0) {
-    return new InputRowRange(caret.zipper, 0, 0);
-  }
-
-  if (hasSyntaxNodeChildren(row, "Containers")) {
-    // The row has further children, so we gotta inspect those.
-    let node: SyntaxNode = row;
-    while (hasSyntaxNodeChildren(node, "Containers")) {
-      // Caret inside or to the left of the child
-      let newNode = node.children.Containers.find(
-        (child) => child.range.start < caret.offset && caret.offset <= child.range.end
-      );
-      if (newNode) {
-        node = newNode;
-      } else {
-        break;
-      }
-    }
-    return new InputRowRange(caret.zipper, node.range.start, node.range.end);
-  } else if (hasSyntaxNodeChildren(row, "Leaf")) {
-    return new InputRowRange(caret.zipper, row.range.start, row.range.end);
-  } else if (hasSyntaxNodeChildren(row, "NewRows")) {
-    assert(row.range.start === caret.offset || row.range.end === caret.offset);
-    return new InputRowRange(caret.zipper, row.range.start, row.range.end);
-  } else {
-    throw new Error("Unexpected row type " + joinNodeIdentifier(row.name));
+  static deserialize(container: HTMLElement, serialized: SerializedCaret, tree: InputTree): CaretAndSelection {
+    return new CaretAndSelection(container, EditingCaret.deserialize(serialized, tree));
   }
 }
