@@ -136,15 +136,15 @@ export class MathEditorCarets {
       if (selection.type === "caret") {
         const edit = removeAtCaret(selection.range, direction, renderResult);
         edits.push(...edit.edits);
-        edit.edits.forEach((edit) => tree.applyEdit(edit));
+        edit.edits.forEach((edit) => {
+          tree.applyEdit(edit);
+          // Update all carets according to the edit
+          for (let j = 0; j < carets.length; j++) {
+            carets[j].editRanges(tree, edit);
+          }
+        });
         carets[i].moveCaretTo(InputRowPosition.deserialize(tree, edit.caret));
         carets[i].setHasEdited();
-
-        // Move all other carets according to the edit
-        for (let j = 0; j < carets.length; j++) {
-          if (i === j) continue;
-          edit.edits.forEach((edit) => carets[j].editRanges(tree, edit));
-        }
       } else if (selection.type === "grid") {
         // TODO: Implement grid edits
       } else {
