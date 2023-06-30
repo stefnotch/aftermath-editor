@@ -1,8 +1,8 @@
-import { NodeIdentifier, ParseResult, SyntaxNode } from "../core";
-import { Offset } from "../input-tree/input-offset";
-import { RowIndex, RowIndices } from "../input-tree/row-indices";
+import type { NodeIdentifier, ParseResult, SyntaxNode } from "../core";
+import type { Offset } from "../input-tree/input-offset";
+import { type RowIndex, RowIndices } from "../input-tree/row-indices";
 import { RenderedSelection } from "./rendered-selection";
-import { ViewportCoordinate, ViewportRect, ViewportValue } from "./viewport-coordinate";
+import type { ViewportCoordinate, ViewportRect, ViewportValue } from "./viewport-coordinate";
 
 export interface Renderer<T> {
   canRender(syntaxTreeNames: NodeIdentifier): boolean;

@@ -1,13 +1,13 @@
-import { InputNode } from "../input-tree/input-node";
+import type { InputNode } from "../input-tree/input-node";
 import { InputRow } from "../input-tree/row";
-import { InputRowPosition } from "../input-position/input-row-position";
+import { InputRowPosition, type SerializedInputRowPosition } from "../input-position/input-row-position";
 import { InputNodeContainerZipper, InputSymbolZipper, InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
-import { RenderResult } from "../rendering/render-result";
+import type { RenderResult } from "../rendering/render-result";
 import arrayUtils from "../utils/array-utils";
 import { moveCaret } from "./caret-move";
-import { MathLayoutSimpleEdit } from "./input-tree-edit";
-import { InputRowRange, SerializedInputRowRange } from "../input-position/input-row-range";
+import type { MathLayoutSimpleEdit } from "./input-tree-edit";
+import { InputRowRange } from "../input-position/input-row-range";
 
 export type CaretEdit = {
   /**
@@ -17,7 +17,7 @@ export type CaretEdit = {
   /**
    * Where the caret should end up after the edits
    */
-  caret: SerializedInputRowRange;
+  caret: SerializedInputRowPosition;
 };
 
 export function removeAtCaret<T>(caret: InputRowRange, direction: "left" | "right", renderResult: RenderResult<T>): CaretEdit {
@@ -35,7 +35,7 @@ function removeAtPosition<T>(
 ): CaretEdit {
   // Nothing to delete, just move the caret
   const move = () => {
-    const newCaret = moveCaret(position, direction, renderResult) ?? position;
+    const newCaret = moveCaret(position.range(), direction, renderResult) ?? position;
     return {
       caret: newCaret.serialize(),
       edits: [],
@@ -133,8 +133,8 @@ function removeRange(caret: InputRowRange): CaretEdit {
   };
 }
 
-function serializeCollapsedCaret(zipper: InputRowZipper, offset: number): SerializedInputRowRange {
-  return new InputRowRange(zipper, offset, offset).serialize();
+function serializeCollapsedCaret(zipper: InputRowZipper, offset: number): SerializedInputRowPosition {
+  return new InputRowPosition(zipper, offset).serialize();
 }
 
 export function insertAtCaret(caret: InputRowRange, value: InputRow): CaretEdit {

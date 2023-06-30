@@ -1,8 +1,8 @@
-import { AbsoluteOffset, Offset } from "../input-tree/input-offset";
-import { InputTree } from "../input-tree/input-tree";
+import type { AbsoluteOffset, Offset } from "../input-tree/input-offset";
+import type { InputTree } from "../input-tree/input-tree";
 import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
-import { RowIndicesAndRange } from "../rendering/render-result";
+import type { RowIndicesAndRange } from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { InputRowPosition } from "./input-row-position";
 
@@ -66,15 +66,37 @@ export class InputRowRange {
     const zipper = InputRowZipper.fromRowIndices(tree.rootZipper, serialized.indices);
     return new InputRowRange(zipper, serialized.start, serialized.end);
   }
+}
+// @ts-ignore
+function toAbsoluteOffsets(x: InputRowRange): [AbsoluteOffset, AbsoluteOffset] {
+  return [x.zipper.getAbsoluteOffset(x.start), x.zipper.getAbsoluteOffset(x.end)];
+}
 
-  toAbsoluteOffsets(): [AbsoluteOffset, AbsoluteOffset] {
-    return [this.zipper.getAbsoluteOffset(this.start), this.zipper.getAbsoluteOffset(this.end)];
+// @ts-ignore
+function fromAbsoluteOffsets(root: InputRowZipper, absoluteOffsets: [AbsoluteOffset, AbsoluteOffset]): InputRowRange {
+  const positionA = getZipperAtOffset(root, absoluteOffsets[0]);
+  const positionB = getZipperAtOffset(root, absoluteOffsets[1]);
+  assert(positionA.zipper.equals(positionB.zipper), "Offsets must be in the same row");
+  return new InputRowRange(positionA.zipper, positionA.offset, positionB.offset);
+}
+
+function getZipperAtOffset(zipper: InputRowZipper, targetOffset: AbsoluteOffset): InputRowPosition {
+  assert(zipper.containsAbsoluteOffset(targetOffset), "offset out of range");
+  const childWithOffset = zipper.children.find((c) => c.containsAbsoluteOffset(targetOffset)) ?? null;
+  if (childWithOffset === null) {
+    let absoluteOffsetInRow = zipper.startAbsoluteOffset;
+    for (let offset = 0; offset < zipper.value.values.length; offset++) {
+      assert(absoluteOffsetInRow.value <= targetOffset.value, "offset out of range");
+      if (absoluteOffsetInRow.value === targetOffset.value) {
+        return new InputRowPosition(zipper, offset);
+      }
+      absoluteOffsetInRow = absoluteOffsetInRow.plusNode(zipper.value.values[offset]);
+    }
+    assert(absoluteOffsetInRow.value === targetOffset.value); // After last child
+    return new InputRowPosition(zipper, zipper.value.values.length);
   }
 
-  static fromAbsoluteOffsets(root: InputRowZipper, absoluteOffsets: [AbsoluteOffset, AbsoluteOffset]): InputRowRange {
-    const positionA = root.getZipperAtOffset(absoluteOffsets[0]);
-    const positionB = root.getZipperAtOffset(absoluteOffsets[1]);
-    assert(positionA.zipper.equals(positionB.zipper), "Offsets must be in the same row");
-    return new InputRowRange(positionA.zipper, positionA.offset, positionB.offset);
-  }
+  const subChildWithOffset = childWithOffset.children.find((c) => c.containsAbsoluteOffset(targetOffset)) ?? null;
+  assert(subChildWithOffset !== null, "child not found");
+  return getZipperAtOffset(subChildWithOffset, targetOffset);
 }

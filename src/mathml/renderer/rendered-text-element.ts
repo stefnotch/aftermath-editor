@@ -1,10 +1,10 @@
-import { SyntaxNode, offsetInRange } from "../../core";
-import { Offset } from "../../input-tree/input-offset";
-import { RowIndex } from "../../input-tree/row-indices";
-import { RenderedElement } from "../../rendering/render-result";
-import { ViewportCoordinate } from "../../rendering/viewport-coordinate";
+import { type SyntaxNode, offsetInRange } from "../../core";
+import { type Offset } from "../../input-tree/input-offset";
+import { type RowIndex } from "../../input-tree/row-indices";
+import { type RenderedElement } from "../../rendering/render-result";
+import { type ViewportCoordinate } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
-import { MathMLTags } from "../mathml-spec";
+import type { MathMLTags } from "../mathml-spec";
 import { RenderedMathML, createMathElement } from "./rendered-element";
 import { LeafMathMLElement } from "./rendered-leaf";
 

@@ -1,9 +1,9 @@
 import { hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
-import { Offset } from "../input-tree/input-offset";
+import type { Offset } from "../input-tree/input-offset";
 import { RowIndices } from "../input-tree/row-indices";
-import { RenderResult, RenderedElement, RowIndicesAndOffset, RowIndicesAndRange } from "../rendering/render-result";
+import type { RenderResult, RenderedElement, RowIndicesAndOffset, RowIndicesAndRange } from "../rendering/render-result";
 import { RenderedSelection } from "../rendering/rendered-selection";
-import { ViewportCoordinate, ViewportMath, ViewportValue } from "../rendering/viewport-coordinate";
+import { type ViewportCoordinate, ViewportMath, type ViewportValue } from "../rendering/viewport-coordinate";
 import { assert } from "../utils/assert";
 
 type ElementWithIndices = {

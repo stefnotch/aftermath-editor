@@ -1,7 +1,7 @@
-import { RenderedElement } from "../../rendering/render-result";
-import { ViewportRect, ViewportValue } from "../../rendering/viewport-coordinate";
+import type { RenderedElement } from "../../rendering/render-result";
+import type { ViewportRect, ViewportValue } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
-import { MathMLTags, MathMLTagsExpectedChildrenCount } from "../mathml-spec";
+import { type MathMLTags, MathMLTagsExpectedChildrenCount } from "../mathml-spec";
 
 export class RenderedMathML {
   element: MathMLElement;

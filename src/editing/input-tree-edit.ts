@@ -1,9 +1,9 @@
-import { Offset } from "../input-tree/input-offset";
-import { RowIndices } from "../input-tree/row-indices";
+import type { Offset } from "../input-tree/input-offset";
+import type { RowIndices } from "../input-tree/row-indices";
 import { assertUnreachable } from "../utils/assert";
-import { InputNode } from "../input-tree/input-node";
-import { InputTree } from "../input-tree/input-tree";
-import { SerializedCaret } from "./serialized-caret";
+import type { InputNode } from "../input-tree/input-node";
+import type { InputTree } from "../input-tree/input-tree";
+import type { SerializedCaret } from "./serialized-caret";
 
 export class MathLayoutEdit {
   constructor(

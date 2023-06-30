@@ -1,9 +1,8 @@
 import { assert } from "../utils/assert";
-import { InputNode, InputNodeContainer, InputNodeSymbol } from "./input-node";
+import { type InputNode, type InputNodeContainer, InputNodeSymbol } from "./input-node";
 import { InputRow } from "./row";
-import { AbsoluteOffset, Offset } from "./input-offset";
-import { RowIndices } from "./row-indices";
-import { InputRowPosition } from "../input-position/input-row-position";
+import { AbsoluteOffset, type Offset } from "./input-offset";
+import type { RowIndices } from "./row-indices";
 
 /**
  * A red-green tree: https://blog.yaakov.online/red-green-trees/
@@ -23,12 +22,11 @@ interface InputZipper<ChildType extends InputZipper<any>> {
 // Could also be a range, and to get a zipper, we have a constrained child type. Sorta like how a Rust Set<K> is just a HashMap<K, ()>.
 // But that'd be neater in Rust, were I could do impl InputRowZipper<number> just for zippers that point at a certain index, and impl InputRowZipper<Range> for zippers that point at a range.
 export class InputRowZipper implements InputZipper<InputNodeContainerZipper | InputSymbolZipper> {
-  private readonly startAbsoluteOffset: AbsoluteOffset;
   constructor(
     public readonly value: InputRow,
     public readonly parent: InputNodeContainerZipper | null,
     public readonly indexInParent: number,
-    startAbsoluteOffset: AbsoluteOffset
+    public readonly startAbsoluteOffset: AbsoluteOffset
   ) {
     this.startAbsoluteOffset = startAbsoluteOffset;
   }
@@ -86,27 +84,6 @@ export class InputRowZipper implements InputZipper<InputNodeContainerZipper | In
       absoluteOffset = absoluteOffset.plusNode(this.value.values[i]);
     }
     return absoluteOffset;
-  }
-
-  getZipperAtOffset(targetOffset: AbsoluteOffset): InputRowPosition {
-    assert(this.containsAbsoluteOffset(targetOffset), "offset out of range");
-    const childWithOffset = this.children.find((c) => c.containsAbsoluteOffset(targetOffset)) ?? null;
-    if (childWithOffset === null) {
-      let absoluteOffsetInRow = this.startAbsoluteOffset;
-      for (let offset = 0; offset < this.value.values.length; offset++) {
-        assert(absoluteOffsetInRow.value <= targetOffset.value, "offset out of range");
-        if (absoluteOffsetInRow.value === targetOffset.value) {
-          return new InputRowPosition(this, offset);
-        }
-        absoluteOffsetInRow = absoluteOffsetInRow.plusNode(this.value.values[offset]);
-      }
-      assert(absoluteOffsetInRow.value === targetOffset.value); // After last child
-      return new InputRowPosition(this, this.value.values.length);
-    }
-
-    const subChildWithOffset = childWithOffset.children.find((c) => c.containsAbsoluteOffset(targetOffset)) ?? null;
-    assert(subChildWithOffset !== null, "child not found");
-    return subChildWithOffset.getZipperAtOffset(targetOffset);
   }
 
   containsAbsoluteOffset(absoluteOffset: AbsoluteOffset) {

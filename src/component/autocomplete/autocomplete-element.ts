@@ -1,4 +1,4 @@
-import { ViewportValue } from "../../rendering/viewport-coordinate";
+import type { ViewportValue } from "../../rendering/viewport-coordinate";
 
 /**
  * There's only one autocomplete element.

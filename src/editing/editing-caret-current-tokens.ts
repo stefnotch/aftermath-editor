@@ -1,5 +1,5 @@
-import { SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
-import { InputRowPosition } from "../input-position/input-row-position";
+import { type SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
+import type { InputRowPosition } from "../input-position/input-row-position";
 import { InputRowRange } from "../input-position/input-row-range";
 import { RowIndices } from "../input-tree/row-indices";
 import { assert } from "../utils/assert";

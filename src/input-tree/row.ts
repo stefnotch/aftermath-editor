@@ -3,7 +3,7 @@
 // (Might want to wait for WebAssembly Interface Types though)
 
 import { assert } from "../utils/assert";
-import { InputNode } from "./input-node";
+import type { InputNode } from "./input-node";
 
 export class InputRow {
   values: InputNode[];

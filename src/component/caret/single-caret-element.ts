@@ -1,5 +1,5 @@
 import { RenderedSelection } from "../../rendering/rendered-selection";
-import { ViewportRect, ViewportValue } from "../../rendering/viewport-coordinate";
+import type { ViewportRect, ViewportValue } from "../../rendering/viewport-coordinate";
 
 export class CaretDomElement {
   #element: HTMLElement;

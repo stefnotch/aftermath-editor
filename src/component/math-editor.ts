@@ -12,8 +12,8 @@ import { MathLayoutEdit } from "../editing/input-tree-edit";
 import { UndoRedoManager } from "../editing/undo-redo-manager";
 import { InputRowPosition } from "../input-position/input-row-position";
 import { MathMLRenderer } from "../mathml/renderer";
-import { RenderResult, RenderedElement } from "../rendering/render-result";
-import { SyntaxNode, getNodeIdentifiers, joinNodeIdentifier, parse } from "./../core";
+import type { RenderResult, RenderedElement } from "../rendering/render-result";
+import { type SyntaxNode, getNodeIdentifiers, joinNodeIdentifier, parse } from "./../core";
 import { DebugSettings } from "./debug-settings";
 import { MathEditorCarets } from "./caret/carets-element";
 import { InputRow } from "../input-tree/row";
@@ -160,16 +160,16 @@ export class MathEditor extends HTMLElement {
     });
     this.inputHandler.element.addEventListener("keydown", (ev) => {
       if (ev.key === "ArrowUp") {
-        this.carets.moveCarets("up", this.renderResult);
+        this.carets.moveCarets("up", this.syntaxTree, this.renderResult);
         this.renderCarets();
       } else if (ev.key === "ArrowDown") {
-        this.carets.moveCarets("down", this.renderResult);
+        this.carets.moveCarets("down", this.syntaxTree, this.renderResult);
         this.renderCarets();
       } else if (ev.key === "ArrowLeft") {
-        this.carets.moveCarets("left", this.renderResult);
+        this.carets.moveCarets("left", this.syntaxTree, this.renderResult);
         this.renderCarets();
       } else if (ev.key === "ArrowRight") {
-        this.carets.moveCarets("right", this.renderResult);
+        this.carets.moveCarets("right", this.syntaxTree, this.renderResult);
         this.renderCarets();
       } else if (ev.code === "KeyZ" && ev.ctrlKey) {
         const undoAction = this.undoRedoStack.undo();
@@ -235,9 +235,11 @@ export class MathEditor extends HTMLElement {
         if (ev.inputType === "deleteContentBackward" || ev.inputType === "deleteWordBackward") {
           const edit = this.carets.removeAtCarets("left", this.inputTree, this.renderResult);
           this.saveEdit(edit);
+          this.updateInput(this.inputTree);
         } else if (ev.inputType === "deleteContentForward" || ev.inputType === "deleteWordForward") {
           const edit = this.carets.removeAtCarets("right", this.inputTree, this.renderResult);
           this.saveEdit(edit);
+          this.updateInput(this.inputTree);
         } else if (ev.inputType === "insertText") {
           // TODO: This definitely needs access to the *parsed* stuff, not just the layout
           // (I don't think the removeAtCaret function needs it, but the insertAtCaret function does)
@@ -361,6 +363,7 @@ export class MathEditor extends HTMLElement {
     }
     this.mathMlElement.replaceChildren(...mathMlElements);
 
+    this.carets.updateMissingCurrentTokens(this.syntaxTree);
     this.renderCarets();
   }
 

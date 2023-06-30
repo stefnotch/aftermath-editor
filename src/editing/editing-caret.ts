@@ -1,14 +1,14 @@
-import { SyntaxNode } from "../core";
+import type { SyntaxNode } from "../core";
 import { InputGridRange } from "../input-position/input-grid-range";
 import { InputRowPosition } from "../input-position/input-row-position";
 import { InputRowRange } from "../input-position/input-row-range";
-import { InputNode, InputNodeContainer } from "../input-tree/input-node";
+import { type InputNode, InputNodeContainer } from "../input-tree/input-node";
 import { InputTree } from "../input-tree/input-tree";
 import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
 import { memoize } from "../utils/memoize";
 import { getTokenAtPosition } from "./editing-caret-current-tokens";
-import { MathLayoutSimpleEdit } from "./input-tree-edit";
+import type { MathLayoutSimpleEdit } from "./input-tree-edit";
 import { SerializedCaret } from "./serialized-caret";
 
 export type EditingCaretSelection =
@@ -47,13 +47,25 @@ export class EditingCaret {
     return EditingCaret.deserialize(serializedCaret, inputTree);
   }
 
+  updateMissingCurrentToken(syntaxTree: SyntaxNode) {
+    if (this.currentTokens === null) {
+      return new EditingCaret(
+        this.startPosition,
+        this.endPosition,
+        EditingCaret.getTokenFromSelection(syntaxTree, getSelection(this.startPosition, this.endPosition)),
+        this.hasEdited
+      );
+    }
+    return this;
+  }
+
   /**
    * When an edit happens somewhere in the tree, other carets can be moved around.
    * This function returns a new caret that is updated to reflect the edit.
    */
   withEditedRanges(inputTree: InputTree, edit: MathLayoutSimpleEdit): EditingCaret {
-    const newStartPosition = inputTree.updateRangeWithEdit(edit, this.startPosition).startPosition();
-    const newEndPosition = inputTree.updateRangeWithEdit(edit, this.endPosition).startPosition();
+    const newStartPosition = inputTree.updateRangeWithEdit(edit, this.startPosition.range()).startPosition();
+    const newEndPosition = inputTree.updateRangeWithEdit(edit, this.endPosition.range()).startPosition();
     const newCurrentTokens = this.currentTokens !== null ? inputTree.updateRangeWithEdit(edit, this.currentTokens) : null;
     return new EditingCaret(newStartPosition, newEndPosition, newCurrentTokens, this.hasEdited);
   }
@@ -67,7 +79,7 @@ export class EditingCaret {
     if (!this.currentTokens) {
       return [];
     }
-    return this.currentTokens.zipper.value.values.slice(this.currentTokens.start, this.endPosition.end);
+    return this.currentTokens.zipper.value.values.slice(this.currentTokens.start, this.endPosition.offset);
   }
 
   serialize(): SerializedCaret {

@@ -1,13 +1,13 @@
 import {
-  NodeIdentifier,
-  NodeIdentifierJoined,
-  ParseResult,
-  SyntaxNode,
+  type NodeIdentifier,
+  type NodeIdentifierJoined,
+  type ParseResult,
+  type SyntaxNode,
   hasSyntaxNodeChildren,
   joinNodeIdentifier,
 } from "../core";
-import { RowIndex } from "../input-tree/row-indices";
-import { RenderedElement, RenderResult, Renderer } from "../rendering/render-result";
+import type { RowIndex } from "../input-tree/row-indices";
+import type { RenderedElement, RenderResult, Renderer } from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { MathMLRenderResult } from "./render-result";
 import { SimpleContainerMathMLElement } from "./renderer/rendered-container-element";

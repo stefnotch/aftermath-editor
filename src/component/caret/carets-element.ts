@@ -1,32 +1,18 @@
-import { SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../../core";
-import { MathLayoutEdit, MathLayoutSimpleEdit } from "../../editing/input-tree-edit";
+import type { SyntaxNode } from "../../core";
+import { MathLayoutEdit, type MathLayoutSimpleEdit } from "../../editing/input-tree-edit";
 import { InputRowPosition } from "../../input-position/input-row-position";
-import { InputTree } from "../../input-tree/input-tree";
+import type { InputTree } from "../../input-tree/input-tree";
 import { RowIndices } from "../../input-tree/row-indices";
-import { RenderResult } from "../../rendering/render-result";
+import type { RenderResult } from "../../rendering/render-result";
 import { assert, assertUnreachable } from "../../utils/assert";
 import { CaretDomElement } from "./single-caret-element";
 import { removeAtCaret } from "../../editing/caret-edit";
-import { InputNode, InputNodeContainer } from "../../input-tree/input-node";
-import { InputRowRange } from "../../input-position/input-row-range";
-import { SerializedCaret } from "../../editing/serialized-caret";
-import { InputRowZipper } from "../../input-tree/input-zipper";
+import type { SerializedCaret } from "../../editing/serialized-caret";
 import { ViewportMath } from "../../rendering/viewport-coordinate";
-import { InputGridRange } from "../../input-position/input-grid-range";
-import { memoize } from "../../utils/memoize";
-import { EditingCaret, EditingCaretSelection } from "../../editing/editing-caret";
+import { EditingCaret } from "../../editing/editing-caret";
+import { moveCaret } from "../../editing/caret-move";
 /*
-undo -> save carets -> (finish carets) -> create old carets, including the old #currentTokens
-redo -> save carets -> (finish carets) -> create old carets, including the old #currentTokens
-=> SerializedCaret includes more info
-
 finish carets -> if edited, forcibly apply "selected && perfect match" autocompletions (by default the top autocompletion is selected)
-
-drag ->
-  assert state is selecting
-  if replace: replace logic already ran
-  else if add
-  else if extend
 
 click -> if carets
     if replace // default
@@ -68,6 +54,11 @@ add, remove -> behaves similar to click
   // - select and delete region that contains a caret
 */
 
+/**
+ * For now only the default "replace" mode is used.
+ *
+ * However, adding carets (user holds Alt), or extending the selection (Shift + Arrow Key) should be implemented in the future.
+ */
 export class MathEditorCarets {
   #carets: CaretAndSelection[] = [];
 
@@ -91,26 +82,51 @@ export class MathEditorCarets {
     return this.#containerElement;
   }
 
+  /*
   private get mainCaret() {
     return this.#carets.at(-1) ?? null;
-  }
+  }*/
 
-  moveCarets(direction: "up" | "down" | "left" | "right", renderResult: RenderResult<MathMLElement>) {
+  moveCarets(direction: "up" | "down" | "left" | "right", syntaxTree: SyntaxNode, renderResult: RenderResult<MathMLElement>) {
     this.finishPointerDown();
-    this.map((caret) => {
-      caret.moveCaret(this.#syntaxTree, renderResult, direction);
-    });
+
+    const carets = this.#carets;
+    this.#carets = [];
+    for (let i = 0; i < carets.length; i++) {
+      const selection = carets[i].selection;
+      if (selection.type === "caret") {
+        const moveTo = moveCaret(selection.range, direction, renderResult);
+        if (moveTo) {
+          if (carets[i].isOutside(moveTo)) {
+            carets[i].finishAutocomplete();
+          }
+          carets[i].moveCaretTo(moveTo);
+        }
+      } else if (selection.type === "grid") {
+        // TODO: Implement grid movement
+      } else {
+        assertUnreachable(selection);
+      }
+    }
     // TODO: Deduplicate carets/remove overlapping carets
+    this.#carets = carets;
+
+    // Since the syntax tree hasn't updated, we can safely reobtain all missing currentTokens
+    this.updateMissingCurrentTokens(syntaxTree);
   }
 
   /**
    * Finishes the current carets, and returns the edit that has been applied.
+   *
+   * Remember to call updateMissingCurrentTokens after reparsing.
    */
   removeAtCarets(direction: "left" | "right", tree: InputTree, renderResult: RenderResult<MathMLElement>): MathLayoutEdit {
     // Note: Be very careful about using the syntaxTree here, because it is outdated after the first edit.
     this.finishPointerDown();
     const caretsBefore = this.serialize();
     const edits: MathLayoutSimpleEdit[] = [];
+
+    // Do not finish any carets
 
     // Take ownership of the carets
     const carets = this.#carets;
@@ -121,8 +137,8 @@ export class MathEditorCarets {
         const edit = removeAtCaret(selection.range, direction, renderResult);
         edits.push(...edit.edits);
         edit.edits.forEach((edit) => tree.applyEdit(edit));
+        carets[i].moveCaretTo(InputRowPosition.deserialize(tree, edit.caret));
         carets[i].setHasEdited();
-        carets[i].moveCaretTo(InputRowPosition.deserialize(tree, edit.caret)); // TODO: This function still doesn't work properly
 
         // Move all other carets according to the edit
         for (let j = 0; j < carets.length; j++) {
@@ -138,6 +154,7 @@ export class MathEditorCarets {
 
     // TODO: Deduplicate carets/remove overlapping carets
 
+    this.#carets = carets;
     const caretsAfter: SerializedCaret[] = [];
     for (let i = 0; i < carets.length; i++) {
       caretsAfter.push(carets[i].serialize());
@@ -147,13 +164,21 @@ export class MathEditorCarets {
     return new MathLayoutEdit(edits, caretsBefore, caretsAfter);
   }
 
+  /**
+   * Needs to be called whenever the syntax tree changes.
+   * Kinda an error-prone design.
+   */
+  updateMissingCurrentTokens(syntaxTree: SyntaxNode) {
+    this.#carets.forEach((c) => c.updateMissingCurrentToken(syntaxTree));
+  }
+
   renderCarets(renderResult: RenderResult<MathMLElement>) {
     // TODO: Carets inside the selection can be rendered differently.
     this.map((caret) => caret.renderCaret(renderResult));
   }
 
   finishCarets() {
-    this.map((caret) => caret.finish());
+    this.map((caret) => caret.finishAutocomplete());
   }
 
   clearCarets() {
@@ -245,31 +270,6 @@ class CaretAndSelection {
     return this.#editingCaret.selection;
   }
 
-  /**
-   * Note: Make sure to re-render the caret after moving it
-   * TODO: Support more moving modes, like "move end position only"
-   */
-  moveCaret(syntaxTree: SyntaxNode, renderResult: RenderResult<MathMLElement>, direction: "up" | "down" | "left" | "right") {
-    const newCaret = moveCaret(
-      this.selection.type === "caret" ? this.selection.range : this.#endPosition,
-      direction,
-      renderResult
-    );
-    if (newCaret) {
-      if (this.#currentTokens && newCaret.isContainedIn(this.#currentTokens)) {
-        this.#startPosition = newCaret.startPosition();
-        this.#endPosition = newCaret.endPosition();
-      } else {
-        // We basically have to create a new caret
-        this.finish();
-        this.#startPosition = newCaret.startPosition();
-        this.#endPosition = newCaret.endPosition();
-        this.#currentTokens = getTokenFromSelection(syntaxTree, this.selection);
-        this.#hasEdited = false;
-      }
-    }
-  }
-
   setHasEdited() {
     this.#editingCaret = new EditingCaret(
       this.#editingCaret.startPosition,
@@ -279,12 +279,24 @@ class CaretAndSelection {
     );
   }
 
+  /**
+   * Moves the caret to a new position.
+   * If it has moved outside of the currently edited token, it's set to null and must be re-obtained.
+   */
   moveCaretTo(position: InputRowPosition) {
     if (this.#editingCaret.currentTokens && position.isContainedIn(this.#editingCaret.currentTokens)) {
       this.#editingCaret = new EditingCaret(position, position, this.#editingCaret.currentTokens, this.#editingCaret.hasEdited);
     } else {
-      this.#editingCaret = new EditingCaret(position, position, null, false);
+      this.#editingCaret = new EditingCaret(position, position, null, this.#editingCaret.hasEdited);
     }
+  }
+
+  isOutside(position: InputRowPosition) {
+    return !(this.#editingCaret.currentTokens && position.isContainedIn(this.#editingCaret.currentTokens));
+  }
+
+  updateMissingCurrentToken(syntaxTree: SyntaxNode) {
+    this.#editingCaret = this.#editingCaret.updateMissingCurrentToken(syntaxTree);
   }
 
   /**
@@ -376,8 +388,8 @@ class CaretAndSelection {
     }
   }
 
-  finish() {
-    if (this.#hasEdited) {
+  finishAutocomplete() {
+    if (this.#editingCaret.hasEdited) {
       // TODO:
     }
   }

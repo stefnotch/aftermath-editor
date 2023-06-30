@@ -1,11 +1,11 @@
-import { Offset } from "../input-tree/input-offset";
+import type { Offset } from "../input-tree/input-offset";
 import { InputRowPosition } from "../input-position/input-row-position";
 import { InputNodeContainerZipper, InputRowZipper, InputSymbolZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
 import { assert, assertUnreachable } from "../utils/assert";
-import { ViewportValue } from "../rendering/viewport-coordinate";
-import { RenderResult } from "../rendering/render-result";
-import { InputRowRange } from "../input-position/input-row-range";
+import type { ViewportValue } from "../rendering/viewport-coordinate";
+import type { RenderResult } from "../rendering/render-result";
+import type { InputRowRange } from "../input-position/input-row-range";
 
 export type Direction = "left" | "right" | "up" | "down";
 

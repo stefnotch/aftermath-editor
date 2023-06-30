@@ -1,5 +1,5 @@
 import { assert } from "../utils/assert";
-import { InputNode, InputNodeContainer, InputNodeSymbol } from "../input-tree/input-node";
+import { type InputNode, InputNodeContainer, InputNodeSymbol } from "../input-tree/input-node";
 import { InputRow } from "../input-tree/row";
 import { InputTree } from "../input-tree/input-tree";
 /**

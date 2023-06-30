@@ -1,7 +1,7 @@
-import { MathLayoutSimpleEdit } from "../editing/input-tree-edit";
+import { type MathLayoutSimpleEdit } from "../editing/input-tree-edit";
 import { InputRowRange } from "../input-position/input-row-range";
 import { assertUnreachable } from "../utils/assert";
-import { Offset } from "./input-offset";
+import { type Offset } from "./input-offset";
 import { InputRowZipper } from "./input-zipper";
 import { InputRow } from "./row";
 
