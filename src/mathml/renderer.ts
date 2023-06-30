@@ -1,13 +1,13 @@
 import {
-  NodeIdentifier,
-  NodeIdentifierJoined,
-  ParseResult,
-  SyntaxNode,
+  type NodeIdentifier,
+  type NodeIdentifierJoined,
+  type ParseResult,
+  type SyntaxNode,
   hasSyntaxNodeChildren,
   joinNodeIdentifier,
 } from "../core";
-import { RowIndex } from "../input-tree/math-layout-zipper";
-import { RenderedElement, RenderResult, Renderer } from "../rendering/render-result";
+import type { RowIndex } from "../input-tree/row-indices";
+import type { RenderedElement, RenderResult, Renderer } from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { MathMLRenderResult } from "./render-result";
 import { SimpleContainerMathMLElement } from "./renderer/rendered-container-element";
@@ -129,6 +129,10 @@ if (mathIR.type === "table") {
         assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
         return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });
+      core.add("Subscript", (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
+        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
+      });
     }
     {
       const arithmetic = this.rendererCollection("Arithmetic");
@@ -136,7 +140,7 @@ if (mathIR.type === "table") {
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
         return new TextMathMLElement(syntaxTree, rowIndex, "mn");
       });
-      ["Add", "Subtract", "Multiply", "Divide"].forEach((name) => {
+      ["Add", "Subtract", "Multiply", "Divide", "Exponent"].forEach((name) => {
         arithmetic.add(name, (syntaxTree, rowIndex) => {
           assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
           return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);

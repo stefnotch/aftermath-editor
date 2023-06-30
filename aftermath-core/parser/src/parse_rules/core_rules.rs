@@ -36,6 +36,11 @@ impl CoreRules {
                     symbol_type: LeafNodeType::Symbol,
                 }),
             ),
+            TokenDefinition::new(
+                CoreRules::rule_name("Subscript"),
+                (Some(850), None), // Dunno really
+                StartingTokenMatcher::operator_from_character('_'),
+            ),
             // Amusingly, if someone defines the closing bracket as a postfix operator, it'll break the brackets
             // Brackets
 

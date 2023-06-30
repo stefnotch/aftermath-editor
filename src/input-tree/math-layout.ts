@@ -1,7 +1,5 @@
 /*
 TODO:
-// Things like mpadded or mphantom or styling won't be modeled for now
-// sub and sup are a bit special, they "apply" to the element before them
 // mmultiscripts won't be modeled for now
  */
 

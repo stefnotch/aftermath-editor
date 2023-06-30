@@ -1,3 +1,4 @@
+mod autocomplete;
 mod grapheme_matcher;
 mod lexer;
 mod nfa;

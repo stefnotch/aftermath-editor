@@ -1,18 +1,18 @@
 import { assert } from "../utils/assert";
-import { InputNode, InputNodeContainer, InputNodeSymbol } from "../input-tree/input-node";
+import { type InputNode, InputNodeContainer, InputNodeSymbol } from "../input-tree/input-node";
 import { InputRow } from "../input-tree/row";
-import { wrapInRow } from "../input-tree/math-layout-utils";
+import { InputTree } from "../input-tree/input-tree";
 /**
  * Takes a MathML DOM tree and returns a MathLayout
  * TODO: A parser should specify which syntax it emits. (e.g. Emits quoted strings)
  */
-export function fromElement(element: HTMLElement | MathMLElement): { inputTree: InputRow; errors: Error[] } {
+export function fromElement(element: HTMLElement | MathMLElement): { inputTree: InputTree; errors: Error[] } {
   assert(tagIs(element, "math"));
   const errors: Error[] = [];
-  const inputTree = toMathLayout(element, errors);
-  assert(!Array.isArray(inputTree));
-  assert(inputTree instanceof InputRow);
-
+  const root = toMathLayout(element, errors);
+  assert(!Array.isArray(root));
+  assert(root instanceof InputRow);
+  const inputTree = new InputTree(root);
   return { inputTree, errors };
 }
 
@@ -150,4 +150,26 @@ export function unicodeSplit(text: string) {
  */
 function tagIs(element: Element, ...tagNames: string[]): boolean {
   return tagNames.includes(element.tagName.toLowerCase());
+}
+
+function wrapInRow(mathLayout: (InputRow | InputNode) | (InputRow | InputNode)[] | null): InputRow {
+  if (mathLayout == null) {
+    return new InputRow([]);
+  }
+
+  if (!Array.isArray(mathLayout)) {
+    if (mathLayout instanceof InputRow) {
+      return mathLayout;
+    }
+    mathLayout = [mathLayout];
+  }
+  return new InputRow(
+    mathLayout.flatMap((v) => {
+      if (v instanceof InputRow) {
+        return v.values;
+      } else {
+        return v;
+      }
+    })
+  );
 }

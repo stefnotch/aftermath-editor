@@ -56,11 +56,16 @@ impl ArithmeticRules {
                 (Some(200), Some(201)),
                 StartingTokenMatcher::operator_from_character('*'),
             ),
-            /*TokenDefinition::new(
+            TokenDefinition::new(
                 ArithmeticRules::rule_name("Divide"),
                 (Some(200), Some(201)),
                 StartingTokenMatcher::operator_from_character('/'),
-            ),*/
+            ),
+            TokenDefinition::new(
+                ArithmeticRules::rule_name("Exponent"),
+                (Some(850), None),
+                StartingTokenMatcher::operator_from_character('^'),
+            ),
         ]
     }
 }

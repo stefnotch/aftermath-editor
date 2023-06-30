@@ -5,7 +5,7 @@ pub mod core_rules;
 pub mod function_rules;
 pub mod string_rules;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, iter};
 
 use input_tree::{
     input_node::{InputNode, InputNodeContainer},
@@ -13,6 +13,7 @@ use input_tree::{
 };
 
 use crate::{
+    autocomplete::{AutocompleteResult, AutocompleteRule, AutocompleteRuleMatch},
     lexer::{LexerRange, LexerToken},
     parse_row,
     syntax_tree::{LeafNodeType, NodeIdentifier, SyntaxLeafNode},
@@ -43,6 +44,7 @@ pub struct ParserRules<'a> {
     // takes the parent context and gives it back afterwards
     parent_context: Option<&'a ParserRules<'a>>,
     known_tokens: HashMap<TokenType, Vec<TokenDefinition>>,
+    autocomplete_rules: Vec<AutocompleteRule>,
     // rule_collections: Vec<&'a dyn ParseRuleCollection>,
 }
 
@@ -50,7 +52,11 @@ pub struct ParserRules<'a> {
 /// - No prefix and atom token may have the same symbol.
 /// - No postfix and infix token may have the same symbol.
 impl<'a> ParserRules<'a> {
-    pub fn new(parent_context: Option<&'a ParserRules<'a>>, tokens: Vec<TokenDefinition>) -> Self {
+    pub fn new(
+        parent_context: Option<&'a ParserRules<'a>>,
+        tokens: Vec<TokenDefinition>,
+        autocomplete_rules: Vec<AutocompleteRule>,
+    ) -> Self {
         let known_tokens = tokens
             .into_iter()
             .fold(HashMap::new(), |mut acc, definition| {
@@ -62,40 +68,160 @@ impl<'a> ParserRules<'a> {
         Self {
             parent_context,
             known_tokens,
+            autocomplete_rules,
         }
     }
 
+    /// Greedily gets the next token. Whichever match is the longest is returned.
+    /// (If the match isn't what the user intended, the user can use spaces to separate the tokens.)
     pub fn get_token<'input, 'lexer>(
         &self,
         mut lexer_range: LexerRange<'input, 'lexer>,
         token_type: TokenType,
     ) -> Option<(LexerRange<'input, 'lexer>, &TokenDefinition)> {
-        let matches: Vec<_> = self
+        let mut matches: Vec<_> = self
             .known_tokens
             .get(&token_type)?
             .iter()
-            .map(|definition| {
-                (
-                    definition
-                        .starting_parser
-                        .matches(lexer_range.get_next_slice()),
-                    definition,
-                )
+            .filter_map(|definition| {
+                definition
+                    .starting_parser
+                    .matches(lexer_range.get_next_slice())
+                    .map(|v| (v, definition))
+                    .ok()
             })
-            .filter_map(|(match_result, definition)| match_result.ok().map(|v| (v, definition)))
             .collect();
 
-        if matches.len() > 1 {
-            // TODO: Better error
-            panic!("multiple matches for token");
-        } else if matches.len() == 1 {
-            let (match_result, definition) = matches.into_iter().next().unwrap();
-            lexer_range.consume_n(match_result.get_length());
-            Some((lexer_range, definition))
+        matches = retain_max_by_key(matches, |(match_result, _)| match_result.get_length());
+
+        if matches.len() > 0 {
+            if matches.len() > 1 {
+                // TODO: Better error
+                panic!("multiple longest matches for token");
+            } else if matches.len() == 1 {
+                let (match_result, definition) = matches.into_iter().next().unwrap();
+                lexer_range.consume_n(match_result.get_length());
+                Some((lexer_range, definition))
+            } else {
+                panic!("no matches for token");
+            }
         } else {
             self.parent_context
                 .and_then(|v| v.get_token(lexer_range, token_type))
         }
+    }
+
+    /// Gets all autocomplete tokens that start with the given content.
+    ///
+    /// If there is no matching autocomplete token, we try finding a completed autocomplete token at the start of the content.
+    /// If there's nothing of that either, we assume that a normal token is at the start of the content.
+    ///
+    /// If not all the content has been matched, we recursively call this function on the remaining content.
+    ///
+    /// Note: If an array with multiple elements is returned, then the last element has the autocompletes that should be displayed.
+    /// The previous elements are the autocompletes that should be applied.
+    pub fn get_autocomplete(&'a self, content: &[InputNode]) -> Vec<AutocompleteResult<'a>> {
+        if content.len() == 0 {
+            return vec![];
+        }
+
+        {
+            let autocomplete_partial_matches: Vec<_> = self
+                .autocomplete_rules
+                .iter()
+                .filter_map(|rule| rule.this_starts_with_input(content).map(|v| (v, rule)))
+                .collect();
+
+            if autocomplete_partial_matches.len() > 0 {
+                return vec![AutocompleteResult {
+                    range_in_input: 0..content.len(),
+                    potential_rules: autocomplete_partial_matches
+                        .into_iter()
+                        .map(|(match_result, rule)| AutocompleteRuleMatch {
+                            rule,
+                            match_length: match_result.get_length(),
+                        })
+                        .collect(),
+                }];
+            }
+        }
+        {
+            let mut finished_autocomplete_matches: Vec<_> = self
+                .autocomplete_rules
+                .iter()
+                .filter_map(|rule| rule.matches(content).map(|v| (v, rule)))
+                .collect();
+            finished_autocomplete_matches =
+                retain_max_by_key(finished_autocomplete_matches, |(match_result, _)| {
+                    match_result.get_length()
+                });
+
+            if finished_autocomplete_matches.len() > 0 {
+                let (match_result, _) = finished_autocomplete_matches.first().unwrap();
+                let match_length = match_result.get_length();
+                return iter::once(AutocompleteResult {
+                    range_in_input: 0..match_length,
+                    potential_rules: finished_autocomplete_matches
+                        .into_iter()
+                        .map(|(_, rule)| AutocompleteRuleMatch { rule, match_length })
+                        .collect(),
+                })
+                .chain(
+                    self.get_autocomplete(&content[match_length..])
+                        .into_iter()
+                        .map(|mut v| {
+                            v.range_in_input.start += match_length;
+                            v.range_in_input.end += match_length;
+                            v
+                        }),
+                )
+                .collect();
+            }
+        }
+        {
+            let mut finished_token_matches: Vec<_> = [TokenType::Starting, TokenType::Continue]
+                .iter()
+                .flat_map(|token_type| {
+                    self.known_tokens
+                        .get(&token_type)
+                        .map(|v| v.iter())
+                        .unwrap_or_default()
+                        .filter_map(|definition| {
+                            definition
+                                .starting_parser
+                                .matches(content)
+                                .map(|v| (v, definition))
+                                .ok()
+                        })
+                })
+                .collect();
+            finished_token_matches =
+                retain_max_by_key(finished_token_matches, |(match_result, _)| {
+                    match_result.get_length()
+                });
+
+            if finished_token_matches.len() > 0 {
+                let (match_result, _) = finished_token_matches.first().unwrap();
+                let match_length = match_result.get_length();
+                return iter::once(AutocompleteResult {
+                    range_in_input: 0..match_length,
+                    potential_rules: vec![],
+                })
+                .chain(
+                    self.get_autocomplete(&content[match_length..])
+                        .into_iter()
+                        .map(|mut v| {
+                            v.range_in_input.start += match_length;
+                            v.range_in_input.end += match_length;
+                            v
+                        }),
+                )
+                .collect();
+            }
+        }
+
+        // Nothing matched. Give up.
+        vec![]
     }
 
     pub fn get_symbol<'input, 'lexer>(
@@ -143,7 +269,28 @@ impl<'a> ParserRules<'a> {
             StartingTokenMatcher::operator_from_character('!'),
         ));
 
-        ParserRules::new(None, rules)
+        let autocomplete_rules = vec![
+            AutocompleteRule::new(
+                vec![InputNode::fraction([
+                    Default::default(),
+                    Default::default(),
+                ])],
+                "/",
+            ),
+            AutocompleteRule::new(vec![InputNode::sup(Default::default())], "^"),
+            AutocompleteRule::new(vec![InputNode::sub(Default::default())], "_"),
+            AutocompleteRule::new(InputNode::symbols(vec!["l", "i", "m"]), "lim"),
+            AutocompleteRule::new(
+                InputNode::symbols(vec!["l", "i", "m", "s", "u", "p"]),
+                "limsup",
+            ),
+            AutocompleteRule::new(
+                InputNode::symbols(vec!["l", "i", "m", "i", "n", "f"]),
+                "liminf",
+            ),
+        ];
+
+        ParserRules::new(None, rules, autocomplete_rules)
     }
 }
 
@@ -442,5 +589,17 @@ pub trait ParseRuleCollection {
             .collect::<Vec<_>>();
         rules_names.extend(Self::get_extra_rule_names());
         rules_names
+    }
+}
+
+fn retain_max_by_key<T, F, B: Ord>(mut values: Vec<T>, mut get_max: F) -> Vec<T>
+where
+    F: FnMut(&T) -> B,
+{
+    if let Some(max) = values.iter().map(&mut get_max).max() {
+        values.retain(|v| (get_max)(v) == max);
+        values
+    } else {
+        vec![]
     }
 }

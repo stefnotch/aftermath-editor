@@ -1,5 +1,5 @@
 import { assert } from "../utils/assert";
-import { ViewportMath, ViewportRect, ViewportValue } from "./viewport-coordinate";
+import { ViewportMath, type ViewportRect, type ViewportValue } from "./viewport-coordinate";
 
 export class RenderedSelection {
   #rect: ViewportRect;

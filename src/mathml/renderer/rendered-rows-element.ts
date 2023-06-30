@@ -1,9 +1,9 @@
-import { SyntaxNode } from "../../core";
-import { RowIndex } from "../../input-tree/math-layout-zipper";
-import { RenderedElement, Renderer } from "../../rendering/render-result";
-import { ViewportCoordinate } from "../../rendering/viewport-coordinate";
+import type { SyntaxNode } from "../../core";
+import type { RowIndex } from "../../input-tree/row-indices";
+import type { RenderedElement, Renderer } from "../../rendering/render-result";
+import type { ViewportCoordinate } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
-import { MathMLTags } from "../mathml-spec";
+import type { MathMLTags } from "../mathml-spec";
 import { RenderedMathML, createMathElement } from "./rendered-element";
 
 /**

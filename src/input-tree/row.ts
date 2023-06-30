@@ -3,13 +3,13 @@
 // (Might want to wait for WebAssembly Interface Types though)
 
 import { assert } from "../utils/assert";
-import { InputNode } from "./input-node";
+import type { InputNode } from "./input-node";
 
 export class InputRow {
   values: InputNode[];
   #offsetCount: number;
   constructor(values: InputNode[]) {
-    let row_offsets = values.length;
+    let row_offsets = values.length + 1;
     let child_offsets = values.map((x) => x.offsetCount).reduce((a, b) => a + b, 0);
     this.values = values;
     this.#offsetCount = row_offsets + child_offsets;
@@ -48,6 +48,13 @@ export class Grid<T> {
     }
 
     return this.#values.at(this.xyToIndex(x, y)) ?? null;
+  }
+
+  getIndex(index: number): T | null {
+    if (index >= this.#values.length) {
+      return null;
+    }
+    return this.#values.at(index) ?? null;
   }
 
   indexToXY(index: number) {

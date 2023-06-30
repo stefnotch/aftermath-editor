@@ -33,6 +33,12 @@ impl InputRow {
     }
 }
 
+impl Default for InputRow {
+    fn default() -> Self {
+        InputRow::new(vec![])
+    }
+}
+
 /// A proper grid of values.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Grid<T> {
@@ -60,6 +66,10 @@ impl<T> Grid<T> {
             return None;
         }
         self.values.get(self.xy_to_index(x, y))
+    }
+
+    pub fn get_index(&self, index: usize) -> Option<&T> {
+        self.values.get(index)
     }
 
     pub fn index_to_xy(&self, index: usize) -> (usize, usize) {

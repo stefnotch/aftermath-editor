@@ -1,16 +1,19 @@
 mod utils;
 
-use input_tree::row::InputRow;
+use input_tree::{input_node::InputNode, row::InputRow};
 use parser::{parse_rules::ParserRules, ParseError, ParseResult, SyntaxNode};
 use serde::Serialize;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
-// When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
-// allocator.
-#[cfg(feature = "wee_alloc")]
+// TODO: Or maybe just use the default allocator
+#[cfg(target_arch = "wasm32")]
+use lol_alloc::{FreeListAllocator, LockedAllocator};
+
+#[cfg(target_arch = "wasm32")]
 #[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+static ALLOCATOR: LockedAllocator<FreeListAllocator> =
+    LockedAllocator::new(FreeListAllocator::new());
 
 #[wasm_bindgen]
 extern "C" {}
@@ -48,6 +51,13 @@ impl MathParser {
         let parsed: MathParseResult = parser::parse_row(&layout, &self.parser_rules).into();
 
         let serialized_result = parsed.serialize(&self.serializer)?;
+        Ok(serialized_result)
+    }
+
+    pub fn autocomplete(&self, input_nodes: JsValue) -> Result<JsValue, JsValue> {
+        let nodes: Vec<InputNode> = serde_wasm_bindgen::from_value(input_nodes)?;
+        let result = self.parser_rules.get_autocomplete(&nodes);
+        let serialized_result = result.serialize(&self.serializer)?;
         Ok(serialized_result)
     }
 

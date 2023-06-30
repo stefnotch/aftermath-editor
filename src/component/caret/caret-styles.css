@@ -1,0 +1,30 @@
+.caret-container-highlight {
+  background-color: #f2f2f2;
+  border-radius: 3px;
+}
+
+.caret-selection {
+  background-color: #1895f558;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.caret-token-highlighter {
+  pointer-events: none;
+  position: absolute;
+  display: none;
+  border-bottom: 1px solid #21212189;
+}
+
+.caret {
+  /** TODO: https://stackoverflow.com/a/73012567/3492994 */
+  /*TODO: Maybe add some cute blinking. And make sure to make it better than GeoGebra*/
+  user-select: none;
+  position: absolute;
+  height: 10px;
+  width: 0px;
+  margin: 0px;
+  border-right-width: 0px;
+  box-shadow: 0px 0px 0px 0.5px rgba(50, 50, 230, 50%);
+  top: 0px;
+}

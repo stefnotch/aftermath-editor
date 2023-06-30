@@ -1,7 +1,8 @@
 import { assert } from "../utils/assert";
-import { InputNode, InputNodeContainer, InputNodeSymbol } from "./input-node";
+import { type InputNode, type InputNodeContainer, InputNodeSymbol } from "./input-node";
 import { InputRow } from "./row";
-import { AbsoluteOffset, Offset } from "./math-layout-offset";
+import { AbsoluteOffset, type Offset } from "./input-offset";
+import type { RowIndices } from "./row-indices";
 
 /**
  * A red-green tree: https://blog.yaakov.online/red-green-trees/
@@ -13,19 +14,40 @@ interface InputZipper<ChildType extends InputZipper<any>> {
   readonly indexInParent: number;
   readonly children: ChildType[];
   readonly value: any;
-  readonly startAbsoluteOffset: AbsoluteOffset;
   readonly parent: InputZipper<any> | null;
   // That is an *absolute* offset
   containsAbsoluteOffset(absoluteOffset: AbsoluteOffset): boolean;
 }
 
+// Could also be a range, and to get a zipper, we have a constrained child type. Sorta like how a Rust Set<K> is just a HashMap<K, ()>.
+// But that'd be neater in Rust, were I could do impl InputRowZipper<number> just for zippers that point at a certain index, and impl InputRowZipper<Range> for zippers that point at a range.
 export class InputRowZipper implements InputZipper<InputNodeContainerZipper | InputSymbolZipper> {
   constructor(
     public readonly value: InputRow,
     public readonly parent: InputNodeContainerZipper | null,
     public readonly indexInParent: number,
-    public readonly startAbsoluteOffset: Offset
-  ) {}
+    public readonly startAbsoluteOffset: AbsoluteOffset
+  ) {
+    this.startAbsoluteOffset = startAbsoluteOffset;
+  }
+
+  static fromRoot(root: InputRow) {
+    return new InputRowZipper(root, null, 0, new AbsoluteOffset(0));
+  }
+
+  static fromRowIndices(root: InputRowZipper, indices: RowIndices) {
+    let current = root;
+    for (let i = 0; i < indices.length; i++) {
+      const [firstIndex, secondIndex] = indices.indices[i];
+
+      const child = current.children.at(firstIndex);
+      const nextChild = child?.children.at(secondIndex);
+      assert(nextChild !== undefined, "Invalid ancestor indices");
+      current = nextChild;
+    }
+
+    return current;
+  }
 
   /**
    * Only makes sense if they share the same root.
@@ -33,16 +55,16 @@ export class InputRowZipper implements InputZipper<InputNodeContainerZipper | In
    */
   equals(other: InputRowZipper): boolean {
     assert(this.root === other.root, "zippers must share the same root");
-    const thisEndOffset = this.startAbsoluteOffset + this.value.offsetCount;
-    const otherEndOffset = other.startAbsoluteOffset + other.value.offsetCount;
+    const thisEndOffset = this.startAbsoluteOffset.value + this.value.offsetCount;
+    const otherEndOffset = other.startAbsoluteOffset.value + other.value.offsetCount;
     return this.startAbsoluteOffset === other.startAbsoluteOffset && thisEndOffset === otherEndOffset;
   }
 
   get children() {
     let startOffset = this.startAbsoluteOffset;
     return this.value.values.map((v, i) => {
-      const childStartOffset = startOffset + 1;
-      startOffset = startOffset + v.offsetCount + 1;
+      const childStartOffset = startOffset.plus(1);
+      startOffset = startOffset.plusNode(v);
       if (v instanceof InputNodeSymbol) {
         return new InputSymbolZipper(v, this, i, childStartOffset);
       } else {
@@ -55,27 +77,26 @@ export class InputRowZipper implements InputZipper<InputNodeContainerZipper | In
     return this.parent?.root ?? this;
   }
 
-  getZipperAtOffset(absoluteOffset: Offset): InputRowZipper {
-    assert(this.containsAbsoluteOffset(absoluteOffset), "offset out of range");
-
-    const childWithOffset = this.children.find((c) => c.containsAbsoluteOffset(absoluteOffset)) ?? null;
-    if (childWithOffset === null) {
-      return this;
+  getAbsoluteOffset(offset: Offset): AbsoluteOffset {
+    // See also: children getter
+    let absoluteOffset = this.startAbsoluteOffset;
+    for (let i = 0; i < offset; i++) {
+      absoluteOffset = absoluteOffset.plusNode(this.value.values[i]);
     }
-    const subChildWithOffset = childWithOffset.children.find((c) => c.containsAbsoluteOffset(absoluteOffset)) ?? null;
-    assert(subChildWithOffset !== null, "child not found");
-
-    return subChildWithOffset.getZipperAtOffset(absoluteOffset);
+    return absoluteOffset;
   }
 
-  containsAbsoluteOffset(absoluteOffset: Offset): boolean {
-    return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.offsetCount;
+  containsAbsoluteOffset(absoluteOffset: AbsoluteOffset) {
+    return (
+      this.startAbsoluteOffset.value <= absoluteOffset.value &&
+      absoluteOffset.value < this.startAbsoluteOffset.value + this.value.offsetCount
+    );
   }
 
-  insert(offset: Offset, newChild: InputNode) {
+  insert(offset: Offset, newChildren: InputNode[]) {
     assert(offset >= 0 && offset <= this.value.values.length, "offset out of range");
     const values = this.value.values.slice();
-    values.splice(offset, 0, newChild);
+    values.splice(offset, 0, ...newChildren);
 
     const newZipper = this.replaceSelf(new InputRow(values));
     return {
@@ -84,9 +105,9 @@ export class InputRowZipper implements InputZipper<InputNodeContainerZipper | In
     };
   }
 
-  remove(index: number) {
+  remove(index: number, count: number) {
     assert(index >= 0 && index < this.value.values.length, "index out of range");
-    const values = [...this.value.values.slice(0, index), ...this.value.values.slice(index + 1)];
+    const values = [...this.value.values.slice(0, index), ...this.value.values.slice(index + count)];
     const newZipper = this.replaceSelf(new InputRow(values));
     return {
       newRoot: newZipper.root,
@@ -119,12 +140,15 @@ export class InputRowZipper implements InputZipper<InputNodeContainerZipper | In
 }
 
 export class InputNodeContainerZipper implements InputZipper<InputRowZipper> {
+  private readonly startAbsoluteOffset: AbsoluteOffset;
   constructor(
     public readonly value: InputNodeContainer,
     public readonly parent: InputRowZipper,
     public readonly indexInParent: number,
-    public readonly startAbsoluteOffset: Offset
-  ) {}
+    startAbsoluteOffset: AbsoluteOffset
+  ) {
+    this.startAbsoluteOffset = startAbsoluteOffset;
+  }
 
   get type(): InputNodeContainer["containerType"] {
     return this.value.containerType;
@@ -135,7 +159,7 @@ export class InputNodeContainerZipper implements InputZipper<InputRowZipper> {
     return this.value.rows.values.map((v, i) => {
       // Different logic here because a container doesn't have extra places for the caret to go
       const childStartOffset = startOffset;
-      startOffset = startOffset + v.offsetCount;
+      startOffset = startOffset.plus(v.offsetCount);
       return new InputRowZipper(v, this, i, childStartOffset);
     });
   }
@@ -144,8 +168,11 @@ export class InputNodeContainerZipper implements InputZipper<InputRowZipper> {
     return this.parent.root;
   }
 
-  containsAbsoluteOffset(absoluteOffset: Offset): boolean {
-    return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.offsetCount;
+  containsAbsoluteOffset(absoluteOffset: AbsoluteOffset) {
+    return (
+      this.startAbsoluteOffset.value <= absoluteOffset.value &&
+      absoluteOffset.value < this.startAbsoluteOffset.value + this.value.offsetCount
+    );
   }
 
   replaceSelf(newValue: InputNodeContainer) {
@@ -168,12 +195,15 @@ export class InputNodeContainerZipper implements InputZipper<InputRowZipper> {
 }
 
 export class InputSymbolZipper implements InputZipper<never> {
+  private readonly startAbsoluteOffset: AbsoluteOffset;
   constructor(
     public readonly value: InputNodeSymbol,
     public readonly parent: InputRowZipper,
     public readonly indexInParent: number,
-    public readonly startAbsoluteOffset: Offset
-  ) {}
+    startAbsoluteOffset: AbsoluteOffset
+  ) {
+    this.startAbsoluteOffset = startAbsoluteOffset;
+  }
 
   get children() {
     return [];
@@ -183,8 +213,11 @@ export class InputSymbolZipper implements InputZipper<never> {
     return this.parent.root;
   }
 
-  containsAbsoluteOffset(absoluteOffset: Offset): boolean {
-    return this.startAbsoluteOffset <= absoluteOffset && absoluteOffset < this.startAbsoluteOffset + this.value.offsetCount;
+  containsAbsoluteOffset(absoluteOffset: AbsoluteOffset) {
+    return (
+      this.startAbsoluteOffset.value <= absoluteOffset.value &&
+      absoluteOffset.value < this.startAbsoluteOffset.value + this.value.offsetCount
+    );
   }
 
   replaceSelf(newValue: InputNodeSymbol) {
@@ -200,64 +233,4 @@ export class InputSymbolZipper implements InputZipper<never> {
     assert(index >= 0 && index < 1, "index out of range");
     return this.replaceSelf(new InputNodeSymbol(newChild));
   }
-}
-
-export type RowIndex = [indexOfContainer: number, indexOfRow: number];
-
-/**
- * Indices of a row in the tree.
- * Order is "-> container -> row"
- */
-export type RowIndices = readonly RowIndex[];
-
-/**
- * Gets the indices of the given zipper in the tree.
- * As in, every "indexInParent" of every element that has a parent, including the starting one.
- */
-export function getRowIndices(zipper: InputRowZipper): RowIndices {
-  const ancestorIndices: [number, number][] = [];
-  let current = zipper;
-  while (true) {
-    const parent = current.parent;
-    if (parent === null) break;
-
-    ancestorIndices.push([parent.indexInParent, current.indexInParent]);
-    current = parent.parent;
-  }
-  ancestorIndices.reverse();
-  return ancestorIndices;
-}
-
-export function addRowIndex(indices: RowIndices, index: RowIndex | null): RowIndices {
-  if (index === null) return indices;
-  return indices.concat([index]);
-}
-
-export function fromRowIndices(root: InputRowZipper, indices: RowIndices) {
-  let current = root;
-  for (let i = 0; i < indices.length; i++) {
-    const [firstIndex, secondIndex] = indices[i];
-
-    const child = current.children.at(firstIndex);
-    const nextChild = child?.children.at(secondIndex);
-    assert(nextChild !== undefined, "Invalid ancestor indices");
-    current = nextChild;
-  }
-
-  return current;
-}
-
-export function getSharedRowIndices(indicesA: RowIndices, indicesB: RowIndices): RowIndices {
-  const sharedAncestorIndices: [number, number][] = [];
-  for (let i = 0; i < indicesA.length && i < indicesB.length; i++) {
-    const a = indicesA[i];
-    const b = indicesB[i];
-    if (a[0] === b[0] && a[1] === b[1]) {
-      sharedAncestorIndices.push([a[0], a[1]]);
-    } else {
-      break;
-    }
-  }
-
-  return sharedAncestorIndices;
 }

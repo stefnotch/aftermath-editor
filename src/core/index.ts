@@ -1,7 +1,7 @@
 import init, { MathParser } from "../../aftermath-core/pkg";
-import { InputNodeContainer } from "../input-tree/input-node";
-import { Offset } from "../input-tree/math-layout-offset";
-import { RowIndices } from "../input-tree/math-layout-zipper";
+import { type InputNode, InputNodeContainer } from "../input-tree/input-node";
+import type { Offset } from "../input-tree/input-offset";
+import { RowIndices } from "../input-tree/row-indices";
 import { InputRow } from "../input-tree/row";
 import { assert } from "../utils/assert";
 
@@ -13,6 +13,11 @@ const parser = MathParser.new();
 export function parse(row: InputRow): ParseResult {
   let result: ParseResult = parser.parse(toCore(row));
 
+  return result;
+}
+
+export function autocomplete(inputNodes: InputNode[]): AutocompleteResult[] {
+  let result: AutocompleteResult[] = parser.autocomplete(inputNodes.map((n) => toCoreNode(n)));
   return result;
 }
 
@@ -28,23 +33,24 @@ export function joinNodeIdentifier(nodeIdentifier: NodeIdentifier): NodeIdentifi
 }
 
 function toCore(row: InputRow): CoreRow {
-  const values: CoreElement[] = row.values.map((v) => {
-    if (v instanceof InputNodeContainer) {
-      return {
-        Container: {
-          container_type: v.containerType,
-          rows: { values: v.rows.values.map((row) => toCore(row)), width: v.rows.width },
-          offset_count: v.offsetCount,
-        },
-      };
-    } else {
-      const value = v.symbol.normalize("NFD");
-      return { Symbol: value };
-    }
-    // Uh oh, now I'm also maintaining invariants in two places.
-  });
-
+  const values = row.values.map((v) => toCoreNode(v));
   return { values, offset_count: row.offsetCount };
+}
+
+function toCoreNode(node: InputNode): CoreElement {
+  if (node instanceof InputNodeContainer) {
+    return {
+      Container: {
+        container_type: node.containerType,
+        rows: { values: node.rows.values.map((row) => toCore(row)), width: node.rows.width },
+        offset_count: node.offsetCount,
+      },
+    };
+  } else {
+    const value = node.symbol.normalize("NFD");
+    return { Symbol: value };
+  }
+  // Uh oh, now I'm also maintaining invariants in two places.
 }
 
 // TODO:
@@ -114,6 +120,21 @@ export type SyntaxLeafNode = {
 export type ParseError = {
   error: any;
   range: any;
+};
+
+export type AutocompleteResult = {
+  range_in_input: Range<number>;
+  potential_rules: AutocompleteRuleMatch[];
+};
+
+export type AutocompleteRuleMatch = {
+  rule: AutocompleteRule;
+  match_length: number;
+};
+
+export type AutocompleteRule = {
+  result: CoreElement[]; // TODO:
+  value: string;
 };
 
 export function hasSyntaxNodeChildren<T extends SyntaxNodesKeys>(node: SyntaxNode, childType: T): node is SyntaxNode<T> {
