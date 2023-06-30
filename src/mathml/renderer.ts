@@ -129,6 +129,10 @@ if (mathIR.type === "table") {
         assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
         return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });
+      core.add("Subscript", (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
+        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
+      });
     }
     {
       const arithmetic = this.rendererCollection("Arithmetic");
@@ -136,7 +140,7 @@ if (mathIR.type === "table") {
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
         return new TextMathMLElement(syntaxTree, rowIndex, "mn");
       });
-      ["Add", "Subtract", "Multiply", "Divide"].forEach((name) => {
+      ["Add", "Subtract", "Multiply", "Divide", "Exponent"].forEach((name) => {
         arithmetic.add(name, (syntaxTree, rowIndex) => {
           assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
           return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
