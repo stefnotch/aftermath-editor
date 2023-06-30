@@ -10,7 +10,9 @@ export class AutocompleteElement {
 
   constructor() {
     const containerElement = document.createElement("div");
+    containerElement.classList.add("autocomplete-container");
     containerElement.style.position = "absolute";
+    containerElement.style.display = "none";
     this.#element = containerElement;
 
     const listElement = document.createElement("ul");

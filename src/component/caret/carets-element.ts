@@ -112,7 +112,7 @@ export class MathEditorCarets {
     this.#carets = carets;
 
     // Since the syntax tree hasn't updated, we can safely reobtain all missing currentTokens
-    this.updateMissingCurrentTokens(syntaxTree);
+    this.updateSyntaxTree(syntaxTree);
   }
 
   /**
@@ -168,13 +168,15 @@ export class MathEditorCarets {
    * Needs to be called whenever the syntax tree changes.
    * Kinda an error-prone design.
    */
-  updateMissingCurrentTokens(syntaxTree: SyntaxNode) {
+  updateSyntaxTree(syntaxTree: SyntaxNode) {
+    this.#syntaxTree = syntaxTree;
     this.#carets.forEach((c) => c.updateMissingCurrentToken(syntaxTree));
   }
 
   renderCarets(renderResult: RenderResult<MathMLElement>) {
     // TODO: Carets inside the selection can be rendered differently.
     this.map((caret) => caret.renderCaret(renderResult));
+    this.#selection?.renderCaret(renderResult);
   }
 
   finishCarets() {

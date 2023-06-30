@@ -92,6 +92,7 @@ export class MathEditor extends HTMLElement {
       // If I'm going to prevent default, then I also have to manually trigger the focus!
       // e.preventDefault();
 
+      // TODO: This is wrong, we shouldn't forcibly finish all carets. Instead, carets that land in a good position should be preserved.
       this.carets.finishCarets();
       this.carets.clearCarets();
       this.carets.startPointerDown(
@@ -363,7 +364,7 @@ export class MathEditor extends HTMLElement {
     }
     this.mathMlElement.replaceChildren(...mathMlElements);
 
-    this.carets.updateMissingCurrentTokens(this.syntaxTree);
+    this.carets.updateSyntaxTree(this.syntaxTree);
     this.renderCarets();
   }
 
