@@ -52,7 +52,12 @@ export class MathEditor extends HTMLElement {
   autocomplete: AutocompleteElement;
 
   inputTree: InputTree = new InputTree(new InputRow([]));
-  syntaxTree: SyntaxNode;
+  syntaxTree: SyntaxNode = {
+    name: ["BuiltIn", "Nothing"],
+    children: { Containers: [] },
+    value: [],
+    range: { start: 0, end: 0 },
+  };
 
   renderer: MathMLRenderer;
   renderResult: RenderResult<MathMLElement>;
@@ -73,59 +78,10 @@ export class MathEditor extends HTMLElement {
     container.style.touchAction = "none"; // Dirty hack to disable pinch zoom on mobile, not ideal
     container.tabIndex = 0;
 
-    this.syntaxTree = {
-      name: ["BuiltIn", "Nothing"],
-      children: { Containers: [] },
-      value: [],
-      range: { start: 0, end: 0 },
-    };
-
-    this.carets = new MathEditorCarets(this.syntaxTree);
+    this.carets = new MathEditorCarets();
     container.append(this.carets.element);
 
-    container.addEventListener("pointerdown", (e) => {
-      if (!e.isPrimary) return;
-      const newCaret = this.renderResult.getLayoutPosition({ x: e.clientX, y: e.clientY });
-      if (!newCaret) return;
-
-      container.setPointerCapture(e.pointerId);
-      // If I'm going to prevent default, then I also have to manually trigger the focus!
-      // e.preventDefault();
-
-      // TODO: This is wrong, we shouldn't forcibly finish all carets. Instead, carets that land in a good position should be preserved.
-      this.carets.finishCarets();
-      this.carets.clearCarets();
-      this.carets.startPointerDown(
-        new InputRowPosition(InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newCaret.indices), newCaret.offset)
-      );
-      this.renderCarets();
-    });
-    container.addEventListener("pointerup", (e) => {
-      if (!e.isPrimary) return;
-      container.releasePointerCapture(e.pointerId);
-      this.carets.finishPointerDown();
-      this.renderCarets();
-    });
-    container.addEventListener("pointercancel", (e) => {
-      if (!e.isPrimary) return;
-      container.releasePointerCapture(e.pointerId);
-      this.carets.finishPointerDown();
-      this.renderCarets();
-    });
-    container.addEventListener("pointermove", (e) => {
-      if (!e.isPrimary) return;
-      if (!this.carets.isPointerDown()) return;
-
-      const newPositionIndices = this.renderResult.getLayoutPosition({ x: e.clientX, y: e.clientY });
-      if (!newPositionIndices) return;
-      const newPosition = new InputRowPosition(
-        InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newPositionIndices.indices),
-        newPositionIndices.offset
-      );
-
-      this.carets.updatePointerDown(newPosition);
-      this.renderCarets();
-    });
+    this.addPointerEventListeners(container);
 
     // Resize - rerender carets in correct locations
     const editorResizeObserver = new ResizeObserver(() => {
@@ -156,9 +112,33 @@ export class MathEditor extends HTMLElement {
     this.inputHandler = new InputHandlerElement();
     inputContainer.appendChild(this.inputHandler.element);
     // Click to focus
-    container.addEventListener("focus", () => {
-      this.inputHandler.focus();
+    container.addEventListener("focus", () => this.inputHandler.focus());
+    this.addInputEventListeners();
+
+    this.autocomplete = new AutocompleteElement();
+    inputContainer.appendChild(this.autocomplete.element);
+
+    // Rendering
+    this.renderer = new MathMLRenderer();
+    getNodeIdentifiers().forEach((name) => {
+      assert(this.renderer.canRender(name), "Cannot render " + joinNodeIdentifier(name) + ".");
     });
+
+    this.renderResult = this.renderer.renderAll({
+      errors: [],
+      value: this.syntaxTree,
+    });
+
+    const styles = document.createElement("style");
+    styles.textContent = `${mathEditorStyles}\n ${inputHandlerStyles}\n ${caretStyles}\n ${autocompleteStyles}`;
+    shadowRoot.append(styles, inputContainer, container);
+
+    // Math formula
+    this.setCarets([], this.inputTree);
+    this.updateInput(this.inputTree);
+  }
+
+  private addInputEventListeners() {
     this.inputHandler.element.addEventListener("keydown", (ev) => {
       if (ev.key === "ArrowUp") {
         this.carets.moveCarets("up", this.syntaxTree, this.renderResult);
@@ -194,7 +174,7 @@ export class MathEditor extends HTMLElement {
       this.renderTaskQueue.add(() => {
         /*
         
-
+ 
     function applySymbolShortcuts(zipper: InputRowZipper, syntaxNode: SyntaxNode): { rangeEnd: number } {
       // First operate on the children
       if (hasSyntaxNodeChildren(syntaxNode, "Leaf")) {
@@ -213,7 +193,7 @@ export class MathEditor extends HTMLElement {
       } else {
         throw new Error("Unknown syntax node children type");
       }
-
+ 
       if (syntaxNode.name[0] === "SymbolShortcut") {
         const type = syntaxNode.name[1];
         const operandValues = syntaxNode.children;
@@ -223,7 +203,7 @@ export class MathEditor extends HTMLElement {
         return { rangeEnd: syntaxNode.range.end };
       }
     }
-
+ 
     // Handle symbol shortcuts
     const result = applyEdit(this.inputTree, edit);
     const parsed = parse(result.root.value);
@@ -231,7 +211,7 @@ export class MathEditor extends HTMLElement {
     // 2. Get the ranges of the operator symbols and ranges of arguments
     // 3. Delete the ranges
     // 4. Insert the new symbol
-
+ 
     */
         if (ev.inputType === "deleteContentBackward" || ev.inputType === "deleteWordBackward") {
           const edit = this.carets.removeAtCarets("left", this.inputTree, this.renderResult);
@@ -242,73 +222,74 @@ export class MathEditor extends HTMLElement {
           this.saveEdit(edit);
           this.updateInput(this.inputTree);
         } else if (ev.inputType === "insertText") {
-          // TODO: This definitely needs access to the *parsed* stuff, not just the layout
-          // (I don't think the removeAtCaret function needs it, but the insertAtCaret function does)
-
-          // TODO: Would some sort of fancy "tree pattern matching" work here?
-
-          // TODO: The hardest short term thing is the multi-character shortcuts, like forall -> ∀
-          // Because when we hit backspace, it should change back and stuff like that.
-          // So we should at least somehow keep track of what the currently inserted stuff is (and clear that when we click away with the caret or something)
-          //
           // TODO: Table editing
           const data = ev.data;
           if (data === null) return;
           console.log(data);
           const characters = unicodeSplit(data);
+          const edit = this.carets.insertAtCarets(characters, this.inputTree);
+          this.saveEdit(edit);
+          this.updateInput(this.inputTree);
 
-          // And reposition the caret!
+          // TODO: Select and shortcut
           if (characters.length === 1) {
             if (characters[0] === "/") {
             } else if (characters[0] === "^") {
             } else if (characters[0] === "_") {
+            } else if (characters[0] === "(") {
             }
           }
-          /*const edit = this.finalizeEdits(
-              this.carets.map((v) => insertAtCaret(v.caret, new InputRow(characters.map((v) => new InputNodeSymbol(v)))))
-            );
-            this.saveEdit(edit);
-            this.applyEdit(edit);*/
         } else if (ev.inputType === "insertCompositionText") {
           // TODO: Handle it differently
-        } /*else
-         if (ev.inputType === "historyUndo") {
-          // TODO: https://stackoverflow.com/questions/27027833/is-it-possible-to-edit-a-text-input-with-javascript-and-add-to-the-undo-stack
-          // ^ Fix it using this slightly dirty hack
-          // Doesn't reliably fire, ugh
-          // I might be able to hack around this by firing keyboard events such that the browser has something to undo
-          // Or I could just wait for the Keyboard API to get implemented
-          ev.preventDefault();
-        } else if (ev.inputType === "historyRedo") {
-          // Doesn't reliably fire, ugh
-          // I might be able to hack around this by firing keyboard events such that the browser has something to redo
-          // Or I could just wait for the Keyboard API to get implemented
-          ev.preventDefault();
-        }*/
+        }
       });
     });
+  }
 
-    this.autocomplete = new AutocompleteElement();
-    inputContainer.appendChild(this.autocomplete.element);
+  private addPointerEventListeners(container: HTMLSpanElement) {
+    container.addEventListener("pointerdown", (e) => {
+      if (!e.isPrimary) return;
+      const newCaret = this.renderResult.getLayoutPosition({ x: e.clientX, y: e.clientY });
+      if (!newCaret) return;
 
-    // Rendering
-    this.renderer = new MathMLRenderer();
-    getNodeIdentifiers().forEach((name) => {
-      assert(this.renderer.canRender(name), "Cannot render " + joinNodeIdentifier(name) + ".");
+      container.setPointerCapture(e.pointerId);
+      // If I'm going to prevent default, then I also have to manually trigger the focus!
+      // e.preventDefault();
+      // TODO: This is wrong, we shouldn't forcibly finish all carets. Instead, carets that land in a good position should be preserved.
+      this.carets.finishCarets();
+      this.carets.clearCarets();
+      this.carets.startPointerDown(
+        new InputRowPosition(InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newCaret.indices), newCaret.offset),
+        this.syntaxTree
+      );
+      this.renderCarets();
     });
-
-    this.renderResult = this.renderer.renderAll({
-      errors: [],
-      value: this.syntaxTree,
+    container.addEventListener("pointerup", (e) => {
+      if (!e.isPrimary) return;
+      container.releasePointerCapture(e.pointerId);
+      this.carets.finishPointerDown();
+      this.renderCarets();
     });
+    container.addEventListener("pointercancel", (e) => {
+      if (!e.isPrimary) return;
+      container.releasePointerCapture(e.pointerId);
+      this.carets.finishPointerDown();
+      this.renderCarets();
+    });
+    container.addEventListener("pointermove", (e) => {
+      if (!e.isPrimary) return;
+      if (!this.carets.isPointerDown()) return;
 
-    const styles = document.createElement("style");
-    styles.textContent = `${mathEditorStyles}\n ${inputHandlerStyles}\n ${caretStyles}\n ${autocompleteStyles}`;
-    shadowRoot.append(styles, inputContainer, container);
+      const newPositionIndices = this.renderResult.getLayoutPosition({ x: e.clientX, y: e.clientY });
+      if (!newPositionIndices) return;
+      const newPosition = new InputRowPosition(
+        InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newPositionIndices.indices),
+        newPositionIndices.offset
+      );
 
-    // Math formula
-    this.setCarets([], this.inputTree);
-    this.updateInput(this.inputTree);
+      this.carets.updatePointerDown(newPosition, this.syntaxTree);
+      this.renderCarets();
+    });
   }
 
   connectedCallback() {

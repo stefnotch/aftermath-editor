@@ -137,12 +137,12 @@ function serializeCollapsedCaret(zipper: InputRowZipper, offset: number): Serial
   return new InputRowPosition(zipper, offset).serialize();
 }
 
-export function insertAtCaret(caret: InputRowRange, value: InputRow): CaretEdit {
+export function insertAtCaret(caret: InputRowRange, values: InputNode[]): CaretEdit {
   if (caret.isCollapsed) {
-    return insertAtPosition(caret.startPosition(), value);
+    return insertAtPosition(caret.startPosition(), values);
   } else {
     const removeExisting = removeRange(caret);
-    const insertAfterRemoval = insertAtPosition(caret.leftPosition(), value);
+    const insertAfterRemoval = insertAtPosition(caret.leftPosition(), values);
     return {
       edits: removeExisting.edits.concat(insertAfterRemoval.edits),
       caret: insertAfterRemoval.caret,
@@ -150,17 +150,17 @@ export function insertAtCaret(caret: InputRowRange, value: InputRow): CaretEdit 
   }
 }
 
-function insertAtPosition(position: InputRowPosition, value: InputRow): CaretEdit {
+function insertAtPosition(position: InputRowPosition, values: InputNode[]): CaretEdit {
   return {
     edits: [
       {
         type: "insert" as const,
         zipper: RowIndices.fromZipper(position.zipper),
         offset: position.offset,
-        values: value.values,
+        values: values,
       },
     ],
-    caret: serializeCollapsedCaret(position.zipper, position.offset + value.values.length),
+    caret: serializeCollapsedCaret(position.zipper, position.offset + values.length),
   };
 }
 
