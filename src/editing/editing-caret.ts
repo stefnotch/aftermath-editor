@@ -7,7 +7,7 @@ import { InputTree } from "../input-tree/input-tree";
 import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
 import { memoize } from "../utils/memoize";
-import { getTokenAtPosition } from "./editing-caret-current-tokens";
+import { getTokenAtPosition } from "./editing-autocomplete";
 import type { MathLayoutSimpleEdit } from "./input-tree-edit";
 import { SerializedCaret } from "./serialized-caret";
 

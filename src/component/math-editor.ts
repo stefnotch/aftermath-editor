@@ -13,7 +13,7 @@ import { UndoRedoManager } from "../editing/undo-redo-manager";
 import { InputRowPosition } from "../input-position/input-row-position";
 import { MathMLRenderer } from "../mathml/renderer";
 import type { RenderResult, RenderedElement } from "../rendering/render-result";
-import { type SyntaxNode, getNodeIdentifiers, joinNodeIdentifier, parse } from "./../core";
+import { type SyntaxNode, getNodeIdentifiers, joinNodeIdentifier, parse, autocomplete } from "./../core";
 import { DebugSettings } from "./debug-settings";
 import { MathEditorCarets } from "./caret/carets-element";
 import { InputRow } from "../input-tree/row";
@@ -78,7 +78,7 @@ export class MathEditor extends HTMLElement {
     container.style.touchAction = "none"; // Dirty hack to disable pinch zoom on mobile, not ideal
     container.tabIndex = 0;
 
-    this.carets = new MathEditorCarets();
+    this.carets = new MathEditorCarets(autocomplete);
     container.append(this.carets.element);
 
     this.addPointerEventListeners(container);
@@ -225,20 +225,11 @@ export class MathEditor extends HTMLElement {
           // TODO: Table editing
           const data = ev.data;
           if (data === null) return;
-          console.log(data);
+          console.log(data, this.carets.getMainAutocomplete());
           const characters = unicodeSplit(data);
           const edit = this.carets.insertAtCarets(characters, this.inputTree);
           this.saveEdit(edit);
           this.updateInput(this.inputTree);
-
-          // TODO: Select and shortcut
-          if (characters.length === 1) {
-            if (characters[0] === "/") {
-            } else if (characters[0] === "^") {
-            } else if (characters[0] === "_") {
-            } else if (characters[0] === "(") {
-            }
-          }
         } else if (ev.inputType === "insertCompositionText") {
           // TODO: Handle it differently
         }

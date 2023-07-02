@@ -1,4 +1,4 @@
-import type { SyntaxNode } from "../../core";
+import { type autocomplete as coreAutocomplete, type SyntaxNode } from "../../core";
 import { MathLayoutEdit, type MathLayoutSimpleEdit } from "../../editing/input-tree-edit";
 import { InputRowPosition } from "../../input-position/input-row-position";
 import type { InputTree } from "../../input-tree/input-tree";
@@ -28,21 +28,35 @@ export class MathEditorCarets {
    */
   #selection: CaretAndSelection | null = null;
 
+  #autocomplete: typeof coreAutocomplete;
+
   #containerElement: HTMLElement;
 
-  constructor() {
+  constructor(autocomplete: typeof coreAutocomplete) {
     this.#containerElement = document.createElement("div");
     this.#containerElement.style.position = "absolute";
+    this.#autocomplete = autocomplete;
   }
 
   get element() {
     return this.#containerElement;
   }
 
-  /*
   private get mainCaret() {
     return this.#carets.at(-1) ?? null;
-  }*/
+  }
+
+  getMainAutocomplete() {
+    return this.mainCaret !== null ? this.getAutocomplete(this.mainCaret) : null;
+  }
+
+  private getAutocomplete(caret: CaretAndSelection) {
+    const input = caret.getAutocompleteNodes();
+    return {
+      input,
+      autocomplete: this.#autocomplete(input),
+    };
+  }
 
   moveCarets(direction: "up" | "down" | "left" | "right", syntaxTree: SyntaxNode, renderResult: RenderResult<MathMLElement>) {
     this.finishPointerDown();
@@ -132,7 +146,9 @@ export class MathEditorCarets {
     this.#carets = [];
     for (let i = 0; i < carets.length; i++) {
       const selection = carets[i].selection;
-      if (selection.type === "caret") {
+      if (selection.type === "caret" && !selection.range.isCollapsed && this.isKnownShortcut(characters)) {
+        // TODO: Select and shortcut
+      } else if (selection.type === "caret") {
         const edit = insertAtCaret(
           selection.range,
           characters.map((v) => new InputNodeSymbol(v))
@@ -162,6 +178,18 @@ export class MathEditorCarets {
     this.#carets = carets;
     const caretsAfter = carets.map((v) => v.serialize());
     return new MathLayoutEdit(edits, caretsBefore, caretsAfter);
+  }
+
+  isKnownShortcut(_characters: string[]) {
+    return false;
+    /*        TODO: Don't hardcode here
+        if (characters.length === 1) {
+          if (characters[0] === "/") {
+          } else if (characters[0] === "^") {
+          } else if (characters[0] === "_") {
+          } else if (characters[0] === "(") {
+          }
+        }*/
   }
 
   /**
@@ -390,6 +418,10 @@ class CaretAndSelection {
     } else {
       assertUnreachable(selected);
     }
+  }
+
+  getAutocompleteNodes() {
+    return this.#editingCaret.getAutocompleteNodes();
   }
 
   finishAutocomplete() {
