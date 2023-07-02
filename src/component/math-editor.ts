@@ -214,11 +214,11 @@ export class MathEditor extends HTMLElement {
  
     */
         if (ev.inputType === "deleteContentBackward" || ev.inputType === "deleteWordBackward") {
-          const edit = this.carets.removeAtCarets("left", this.inputTree, this.renderResult);
+          const edit = this.carets.removeAtCarets("left", this.inputTree, this.syntaxTree, this.renderResult);
           this.saveEdit(edit);
           this.updateInput(this.inputTree);
         } else if (ev.inputType === "deleteContentForward" || ev.inputType === "deleteWordForward") {
-          const edit = this.carets.removeAtCarets("right", this.inputTree, this.renderResult);
+          const edit = this.carets.removeAtCarets("right", this.inputTree, this.syntaxTree, this.renderResult);
           this.saveEdit(edit);
           this.updateInput(this.inputTree);
         } else if (ev.inputType === "insertText") {
@@ -227,7 +227,7 @@ export class MathEditor extends HTMLElement {
           if (data === null) return;
           console.log(data, this.carets.getMainAutocomplete());
           const characters = unicodeSplit(data);
-          const edit = this.carets.insertAtCarets(characters, this.inputTree);
+          const edit = this.carets.insertAtCarets(characters, this.inputTree, this.syntaxTree);
           this.saveEdit(edit);
           this.updateInput(this.inputTree);
         } else if (ev.inputType === "insertCompositionText") {
@@ -250,21 +250,20 @@ export class MathEditor extends HTMLElement {
       this.carets.finishCarets();
       this.carets.clearCarets();
       this.carets.startPointerDown(
-        new InputRowPosition(InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newCaret.indices), newCaret.offset),
-        this.syntaxTree
+        new InputRowPosition(InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newCaret.indices), newCaret.offset)
       );
       this.renderCarets();
     });
     container.addEventListener("pointerup", (e) => {
       if (!e.isPrimary) return;
       container.releasePointerCapture(e.pointerId);
-      this.carets.finishPointerDown();
+      this.carets.finishPointerDown(this.syntaxTree);
       this.renderCarets();
     });
     container.addEventListener("pointercancel", (e) => {
       if (!e.isPrimary) return;
       container.releasePointerCapture(e.pointerId);
-      this.carets.finishPointerDown();
+      this.carets.finishPointerDown(this.syntaxTree);
       this.renderCarets();
     });
     container.addEventListener("pointermove", (e) => {
@@ -278,7 +277,7 @@ export class MathEditor extends HTMLElement {
         newPositionIndices.offset
       );
 
-      this.carets.updatePointerDown(newPosition, this.syntaxTree);
+      this.carets.updatePointerDown(newPosition);
       this.renderCarets();
     });
   }

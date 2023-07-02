@@ -1,5 +1,4 @@
 import type { InputNode } from "../input-tree/input-node";
-import { InputRow } from "../input-tree/row";
 import { InputRowPosition, type SerializedInputRowPosition } from "../input-position/input-row-position";
 import { InputNodeContainerZipper, InputSymbolZipper, InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";

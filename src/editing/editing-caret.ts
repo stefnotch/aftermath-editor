@@ -1,13 +1,11 @@
-import type { SyntaxNode } from "../core";
 import { InputGridRange } from "../input-position/input-grid-range";
 import { InputRowPosition } from "../input-position/input-row-position";
 import { InputRowRange } from "../input-position/input-row-range";
-import { type InputNode, InputNodeContainer } from "../input-tree/input-node";
+import { InputNodeContainer } from "../input-tree/input-node";
 import { InputTree } from "../input-tree/input-tree";
 import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
 import { memoize } from "../utils/memoize";
-import { getTokenAtPosition } from "./editing-autocomplete";
 import type { MathLayoutSimpleEdit } from "./input-tree-edit";
 import { SerializedCaret } from "./serialized-caret";
 
@@ -26,37 +24,16 @@ export class EditingCaret {
   constructor(
     public readonly startPosition: InputRowPosition,
     public readonly endPosition: InputRowPosition,
-    /**
-     * Range of input nodes that are currently being edited. Used for autocompletions.
-     */
-    public readonly currentTokens: InputRowRange | null,
     public readonly hasEdited: boolean
   ) {}
 
-  static fromRange(startPosition: InputRowPosition, endPosition: InputRowPosition, syntaxTree: SyntaxNode): EditingCaret {
-    return new EditingCaret(
-      startPosition,
-      endPosition,
-      EditingCaret.getTokenFromSelection(syntaxTree, getSelection(startPosition, endPosition)),
-      false
-    );
+  static fromRange(startPosition: InputRowPosition, endPosition: InputRowPosition): EditingCaret {
+    return new EditingCaret(startPosition, endPosition, false);
   }
 
   updateTrees(inputTree: InputTree): EditingCaret {
     const serializedCaret = this.serialize();
     return EditingCaret.deserialize(serializedCaret, inputTree);
-  }
-
-  updateMissingCurrentToken(syntaxTree: SyntaxNode) {
-    if (this.currentTokens === null) {
-      return new EditingCaret(
-        this.startPosition,
-        this.endPosition,
-        EditingCaret.getTokenFromSelection(syntaxTree, getSelection(this.startPosition, this.endPosition)),
-        this.hasEdited
-      );
-    }
-    return this;
   }
 
   /**
@@ -66,8 +43,7 @@ export class EditingCaret {
   withEditedRanges(inputTree: InputTree, edit: MathLayoutSimpleEdit): EditingCaret {
     const newStartPosition = inputTree.updateRangeWithEdit(edit, this.startPosition.range()).startPosition();
     const newEndPosition = inputTree.updateRangeWithEdit(edit, this.endPosition.range()).startPosition();
-    const newCurrentTokens = this.currentTokens !== null ? inputTree.updateRangeWithEdit(edit, this.currentTokens) : null;
-    return new EditingCaret(newStartPosition, newEndPosition, newCurrentTokens, this.hasEdited);
+    return new EditingCaret(newStartPosition, newEndPosition, this.hasEdited);
   }
 
   #getSelection: typeof getSelection = memoize(getSelection);
@@ -75,37 +51,16 @@ export class EditingCaret {
     return this.#getSelection(this.startPosition, this.endPosition);
   }
 
-  getAutocompleteNodes(): InputNode[] {
-    if (!this.currentTokens) {
-      return [];
-    }
-    return this.currentTokens.zipper.value.values.slice(this.currentTokens.start, this.endPosition.offset);
-  }
-
   serialize(): SerializedCaret {
-    return new SerializedCaret(
-      this.startPosition.serialize(),
-      this.endPosition.serialize(),
-      this.currentTokens?.serialize() ?? null,
-      this.hasEdited
-    );
+    return new SerializedCaret(this.startPosition.serialize(), this.endPosition.serialize(), this.hasEdited);
   }
 
   static deserialize(serialized: SerializedCaret, tree: InputTree): EditingCaret {
     return new EditingCaret(
       InputRowPosition.deserialize(tree, serialized.startPosition),
       InputRowPosition.deserialize(tree, serialized.endPosition),
-      serialized.currentTokens !== null ? InputRowRange.deserialize(tree, serialized.currentTokens) : null,
       serialized.hasEdited
     );
-  }
-
-  static getTokenFromSelection(syntaxTree: SyntaxNode, caretSelection: EditingCaretSelection): InputRowRange | null {
-    if (caretSelection.type === "caret" && caretSelection.range.isCollapsed) {
-      return getTokenAtPosition(syntaxTree, caretSelection.range.startPosition());
-    } else {
-      return null;
-    }
   }
 }
 

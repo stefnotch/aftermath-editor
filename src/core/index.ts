@@ -16,8 +16,8 @@ export function parse(row: InputRow): ParseResult {
   return result;
 }
 
-export function autocomplete(inputNodes: InputNode[]): AutocompleteResult[] {
-  let result: AutocompleteResult[] = parser.autocomplete(inputNodes.map((n) => toCoreNode(n)));
+export function autocomplete(inputNodes: InputNode[]): AutocompleteResult {
+  let result: AutocompleteResult = parser.autocomplete(inputNodes.map((n) => toCoreNode(n)));
   return result;
 }
 

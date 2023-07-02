@@ -5,7 +5,7 @@ pub mod core_rules;
 pub mod function_rules;
 pub mod string_rules;
 
-use std::{collections::HashMap, iter};
+use std::collections::HashMap;
 
 use input_tree::{
     input_node::{InputNode, InputNodeContainer},
@@ -112,17 +112,10 @@ impl<'a> ParserRules<'a> {
     }
 
     /// Gets all autocomplete tokens that start with the given content.
-    ///
     /// If there is no matching autocomplete token, we try finding a completed autocomplete token at the start of the content.
-    /// If there's nothing of that either, we assume that a normal token is at the start of the content.
-    ///
-    /// If not all the content has been matched, we recursively call this function on the remaining content.
-    ///
-    /// Note: If an array with multiple elements is returned, then the last element has the autocompletes that should be displayed.
-    /// The previous elements are the autocompletes that should be applied.
-    pub fn get_autocomplete(&'a self, content: &[InputNode]) -> Vec<AutocompleteResult<'a>> {
+    pub fn get_autocomplete(&'a self, content: &[InputNode]) -> Option<AutocompleteResult<'a>> {
         if content.len() == 0 {
-            return vec![];
+            return None;
         }
 
         {
@@ -133,7 +126,7 @@ impl<'a> ParserRules<'a> {
                 .collect();
 
             if autocomplete_partial_matches.len() > 0 {
-                return vec![AutocompleteResult {
+                return Some(AutocompleteResult {
                     range_in_input: 0..content.len(),
                     potential_rules: autocomplete_partial_matches
                         .into_iter()
@@ -142,7 +135,7 @@ impl<'a> ParserRules<'a> {
                             match_length: match_result.get_length(),
                         })
                         .collect(),
-                }];
+                });
             }
         }
         {
@@ -159,69 +152,17 @@ impl<'a> ParserRules<'a> {
             if finished_autocomplete_matches.len() > 0 {
                 let (match_result, _) = finished_autocomplete_matches.first().unwrap();
                 let match_length = match_result.get_length();
-                return iter::once(AutocompleteResult {
+                return Some(AutocompleteResult {
                     range_in_input: 0..match_length,
                     potential_rules: finished_autocomplete_matches
                         .into_iter()
                         .map(|(_, rule)| AutocompleteRuleMatch { rule, match_length })
                         .collect(),
-                })
-                .chain(
-                    self.get_autocomplete(&content[match_length..])
-                        .into_iter()
-                        .map(|mut v| {
-                            v.range_in_input.start += match_length;
-                            v.range_in_input.end += match_length;
-                            v
-                        }),
-                )
-                .collect();
-            }
-        }
-        {
-            let mut finished_token_matches: Vec<_> = [TokenType::Starting, TokenType::Continue]
-                .iter()
-                .flat_map(|token_type| {
-                    self.known_tokens
-                        .get(&token_type)
-                        .map(|v| v.iter())
-                        .unwrap_or_default()
-                        .filter_map(|definition| {
-                            definition
-                                .starting_parser
-                                .matches(content)
-                                .map(|v| (v, definition))
-                                .ok()
-                        })
-                })
-                .collect();
-            finished_token_matches =
-                retain_max_by_key(finished_token_matches, |(match_result, _)| {
-                    match_result.get_length()
                 });
-
-            if finished_token_matches.len() > 0 {
-                let (match_result, _) = finished_token_matches.first().unwrap();
-                let match_length = match_result.get_length();
-                return iter::once(AutocompleteResult {
-                    range_in_input: 0..match_length,
-                    potential_rules: vec![],
-                })
-                .chain(
-                    self.get_autocomplete(&content[match_length..])
-                        .into_iter()
-                        .map(|mut v| {
-                            v.range_in_input.start += match_length;
-                            v.range_in_input.end += match_length;
-                            v
-                        }),
-                )
-                .collect();
             }
         }
 
-        // Nothing matched. Give up.
-        vec![]
+        None
     }
 
     pub fn get_symbol<'input, 'lexer>(

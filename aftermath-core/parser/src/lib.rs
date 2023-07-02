@@ -18,6 +18,7 @@ use crate::{
 
 use self::parse_rules::ParserRules;
 
+pub use self::autocomplete::{AutocompleteResult, AutocompleteRule, AutocompleteRuleMatch};
 pub use self::parse_result::{ParseError, ParseErrorType, ParseResult};
 pub use self::syntax_tree::{SyntaxLeafNode, SyntaxNode, SyntaxNodes};
 
