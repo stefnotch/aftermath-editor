@@ -1,4 +1,4 @@
-import { type autocomplete as coreAutocomplete, type SyntaxNode } from "../../core";
+import { type Autocomplete, type SyntaxNode } from "../../core";
 import { MathLayoutEdit, type MathLayoutSimpleEdit } from "../../editing/input-tree-edit";
 import { InputRowPosition } from "../../input-position/input-row-position";
 import type { InputTree } from "../../input-tree/input-tree";
@@ -12,8 +12,15 @@ import { ViewportMath } from "../../rendering/viewport-coordinate";
 import { EditingCaret } from "../../editing/editing-caret";
 import { moveCaret } from "../../editing/caret-move";
 import { InputNodeSymbol } from "../../input-tree/input-node";
-import type { InputRowRange } from "../../input-position/input-row-range";
+import { InputRowRange } from "../../input-position/input-row-range";
 import { getAutocompleteTokens } from "../../editing/editing-autocomplete";
+import type { Offset } from "../../input-tree/input-offset";
+import type { RenderedSelection } from "../../rendering/rendered-selection";
+
+export interface Autocompleter {
+  autocomplete(tokenStarts: InputRowPosition[], endPosition: Offset): Autocomplete[];
+  beginningAutocomplete(token: InputRowPosition, endPosition: Offset): Autocomplete | null;
+}
 
 /**
  * For now only the default "replace" mode is used.
@@ -23,6 +30,16 @@ import { getAutocompleteTokens } from "../../editing/editing-autocomplete";
 export class MathEditorCarets {
   #carets: CaretAndSelection[] = [];
 
+  // TODO: Move those to a separate class
+  #autocompleter: Autocompleter;
+  /**
+   * Autocomplete results for the main caret.
+   * TODO: Should be sorted.
+   */
+  #autocompleteResults: Autocomplete[] = [];
+
+  #autocompleteTokenElement: HTMLElement;
+
   /**
    * Does not become a real caret until it's finished.
    * Carets inside a selection can be rendered differently.
@@ -30,14 +47,17 @@ export class MathEditorCarets {
    */
   #selection: CaretAndSelection | null = null;
 
-  #autocomplete: typeof coreAutocomplete;
-
   #containerElement: HTMLElement;
 
-  constructor(autocomplete: typeof coreAutocomplete) {
+  constructor(autocompleter: Autocompleter) {
     this.#containerElement = document.createElement("div");
     this.#containerElement.style.position = "absolute";
-    this.#autocomplete = autocomplete;
+    this.#autocompleter = autocompleter;
+
+    const tokenHighlighter = document.createElement("div");
+    tokenHighlighter.className = "caret-token-highlighter";
+    this.#autocompleteTokenElement = tokenHighlighter;
+    this.#containerElement.append(tokenHighlighter);
   }
 
   get element() {
@@ -45,44 +65,29 @@ export class MathEditorCarets {
   }
 
   private get mainCaret() {
-    return this.#carets.at(-1) ?? null;
-  }
-
-  getMainAutocomplete() {
-    return this.mainCaret !== null ? this.getAutocomplete(this.mainCaret) : null;
-  }
-
-  private getAutocomplete(caret: CaretAndSelection) {
-    const input = caret.getAutocompleteInput();
-    return {
-      input,
-      autocomplete: this.#autocomplete(input),
-    };
+    return this.#carets.at(0) ?? null;
   }
 
   moveCarets(direction: "up" | "down" | "left" | "right", syntaxTree: SyntaxNode, renderResult: RenderResult<MathMLElement>) {
     this.finishPointerDown(syntaxTree);
 
-    const carets = this.#carets;
-    this.#carets = [];
-    for (let i = 0; i < carets.length; i++) {
-      const selection = carets[i].selection;
-      if (selection.type === "caret") {
-        const moveTo = moveCaret(selection.range, direction, renderResult);
-        if (moveTo) {
-          if (carets[i].isOutside(moveTo)) {
-            carets[i].finishAutocomplete();
+    this.withAutocomplete((carets) => {
+      for (let i = 0; i < carets.length; i++) {
+        const selection = carets[i].selection;
+        if (selection.type === "caret") {
+          const moveTo = moveCaret(selection.range, direction, renderResult);
+          if (moveTo) {
+            carets[i].moveCaretTo(moveTo);
           }
-          carets[i].moveCaretTo(moveTo);
+        } else if (selection.type === "grid") {
+          // TODO: Implement grid movement
+        } else {
+          assertUnreachable(selection);
         }
-      } else if (selection.type === "grid") {
-        // TODO: Implement grid movement
-      } else {
-        assertUnreachable(selection);
       }
-    }
-    // TODO: Deduplicate carets/remove overlapping carets
-    this.#carets = carets;
+      // TODO: Deduplicate carets/remove overlapping carets
+      return carets;
+    });
 
     // Call this to update all missing currentTokens
     this.updateSyntaxTree(syntaxTree);
@@ -149,41 +154,37 @@ export class MathEditorCarets {
     const edits: MathLayoutSimpleEdit[] = [];
 
     // Take ownership of the carets
-    const carets = this.#carets;
-    this.#carets = [];
-    for (let i = 0; i < carets.length; i++) {
-      const selection = carets[i].selection;
-      if (selection.type === "caret" && !selection.range.isCollapsed && this.isKnownShortcut(characters)) {
-        // TODO: Select and shortcut
-      } else if (selection.type === "caret") {
-        const edit = insertAtCaret(
-          selection.range,
-          characters.map((v) => new InputNodeSymbol(v))
-        );
-        edits.push(...edit.edits);
-        edit.edits.forEach((edit) => {
-          tree.applyEdit(edit);
-          // Update all carets according to the edit
-          for (let j = 0; j < carets.length; j++) {
-            carets[j].editRanges(tree, edit);
-          }
-        });
-        carets[i].moveCaretTo(InputRowPosition.deserialize(tree, edit.caret));
-        carets[i].setHasEdited();
-
-        // TODO: This then checks if any edit can be forcibly completed. If yes, we also do that.
-        carets[i].finishAutocomplete();
-      } else if (selection.type === "grid") {
-        // TODO: Implement grid edits
-      } else {
-        assertUnreachable(selection);
+    this.withAutocomplete((carets) => {
+      for (let i = 0; i < carets.length; i++) {
+        const selection = carets[i].selection;
+        if (selection.type === "caret" && !selection.range.isCollapsed && this.isKnownShortcut(characters)) {
+          // TODO: Select and shortcut
+        } else if (selection.type === "caret") {
+          const edit = insertAtCaret(
+            selection.range,
+            characters.map((v) => new InputNodeSymbol(v))
+          );
+          edits.push(...edit.edits);
+          edit.edits.forEach((edit) => {
+            tree.applyEdit(edit);
+            // Update all carets according to the edit
+            for (let j = 0; j < carets.length; j++) {
+              carets[j].editRanges(tree, edit);
+            }
+          });
+          carets[i].moveCaretTo(InputRowPosition.deserialize(tree, edit.caret));
+          carets[i].setHasEdited();
+        } else if (selection.type === "grid") {
+          // TODO: Implement grid edits
+        } else {
+          assertUnreachable(selection);
+        }
       }
-    }
+      // TODO: Deduplicate carets/remove overlapping carets
+      return carets;
+    });
 
-    // TODO: Deduplicate carets/remove overlapping carets
-
-    this.#carets = carets;
-    const caretsAfter = carets.map((v) => v.serialize());
+    const caretsAfter = this.#carets.map((v) => v.serialize());
     return new MathLayoutEdit(edits, caretsBefore, caretsAfter);
   }
 
@@ -204,20 +205,85 @@ export class MathEditorCarets {
    * Kinda an error-prone design.
    */
   updateSyntaxTree(syntaxTree: SyntaxNode) {
-    this.#carets.forEach((c) => c.updateAutocomplete(syntaxTree));
+    this.updateAutocomplete(syntaxTree);
   }
 
   renderCarets(renderResult: RenderResult<MathMLElement>) {
     // TODO: Carets inside the selection can be rendered differently.
     this.map((caret) => caret.renderCaret(renderResult));
     this.#selection?.renderCaret(renderResult);
+
+    // Highlight token at the caret
+    const autocompleteRange = this.autocompleteRange;
+    if (autocompleteRange !== null) {
+      this.renderAutocompleteToken(renderResult.getViewportSelection(autocompleteRange.toRowIndicesAndRange()));
+    } else {
+      this.renderAutocompleteToken(null);
+    }
   }
 
-  finishCarets() {
-    /*
+  private withAutocomplete(callback: (carets: CaretAndSelection[]) => CaretAndSelection[]) {
+    const autocompleteRange = this.autocompleteRange;
+    const carets = this.#carets;
+    this.#carets = [];
+
+    const result = callback(carets);
+    this.#carets = result;
+
+    const movedOutside = autocompleteRange !== null && this.mainCaret?.isContainedIn(autocompleteRange) === false;
+    if (movedOutside && this.mainCaret?.hasEdited) {
+      let perfectMatches = this.#autocompleter.beginningAutocomplete(autocompleteRange.startPosition(), autocompleteRange.end);
+      console.log("going to apply", perfectMatches);
+      /*
 finish carets -> if edited, forcibly apply "selected && perfect match" autocompletions (by default the top autocompletion is selected)
 */
-    this.map((caret) => caret.finishAutocomplete());
+      // TODO: apply this
+      // and deal with fractions
+
+      // We don't have to shrink the autocomplete range, since it gets recomputed every time anyways.
+    }
+  }
+
+  private updateAutocomplete(syntaxTree: SyntaxNode) {
+    const caretPosition = this.mainCaret?.selection?.range?.endPosition() ?? null;
+    if (caretPosition !== null) {
+      const tokensBeforeCaret = getAutocompleteTokens(syntaxTree, caretPosition).map((v) => v.startPosition());
+      this.#autocompleteResults = this.#autocompleter.autocomplete(tokensBeforeCaret, caretPosition.offset);
+    } else {
+      this.#autocompleteResults = [];
+    }
+  }
+
+  get autocompleteResults() {
+    return this.#autocompleteResults;
+  }
+
+  get selectedAutocompleteResult() {
+    return this.#autocompleteResults.at(0)?.result?.potentialRules?.at(0) ?? null;
+  }
+
+  get autocompleteRange() {
+    const selected = this.selectedAutocompleteResult;
+    if (selected === null) return null;
+    const mainCaretRange = this.mainCaret?.selection.range ?? null;
+    if (mainCaretRange === null) return null;
+
+    return new InputRowRange(mainCaretRange.zipper, mainCaretRange.end - selected.matchLength, mainCaretRange.end);
+  }
+
+  renderAutocompleteToken(selection: RenderedSelection | null) {
+    if (selection === null) {
+      this.#autocompleteTokenElement.style.display = "none";
+    } else if (selection.isCollapsed) {
+      this.#autocompleteTokenElement.style.display = "none";
+    } else {
+      this.#autocompleteTokenElement.style.display = "block";
+      const parentPos = this.#containerElement.getBoundingClientRect();
+      this.#autocompleteTokenElement.style.left = `${selection.rect.x - parentPos.left}px`;
+      this.#autocompleteTokenElement.style.top = `${selection.rect.y - parentPos.top}px`;
+      this.#autocompleteTokenElement.style.width = `${selection.rect.width}px`;
+      this.#autocompleteTokenElement.style.height = `${selection.rect.height}px`;
+    }
   }
 
   clearCarets() {
@@ -242,7 +308,7 @@ finish carets -> if edited, forcibly apply "selected && perfect match" autocompl
     if (this.#selection) {
       // TODO: check where caret ends up. we might need to move an existing caret instead of adding a new one
       // TODO: deduplicate carets after adding it to the list
-      this.#selection.updateAutocomplete(syntaxTree);
+      this.updateAutocomplete(syntaxTree);
       this.#carets.push(this.#selection);
       this.#selection = null;
     }
@@ -289,11 +355,6 @@ class CaretAndSelection {
 
   #editingCaret: EditingCaret;
 
-  /**
-   * Cached range of the token that the caret wants to use for autocomplete.
-   */
-  #currentTokens: InputRowRange | null = null;
-
   // For rendering
   highlightedElements: ReadonlyArray<Element> = [];
   #element = new CaretDomElement();
@@ -308,12 +369,17 @@ class CaretAndSelection {
   }
 
   editRanges(inputTree: InputTree, edit: MathLayoutSimpleEdit) {
-    this.#currentTokens = null;
     this.#editingCaret = this.#editingCaret.withEditedRanges(inputTree, edit);
   }
 
   get selection() {
     return this.#editingCaret.selection;
+  }
+
+  isContainedIn(range: InputRowRange) {
+    return (
+      this.#editingCaret.selection.type === "caret" && this.#editingCaret.selection.range.endPosition().isContainedIn(range)
+    );
   }
 
   setHasEdited() {
@@ -324,18 +390,7 @@ class CaretAndSelection {
    * Moves the caret to a new position.
    */
   moveCaretTo(position: InputRowPosition) {
-    this.#currentTokens = null;
     this.#editingCaret = new EditingCaret(position, position, this.#editingCaret.hasEdited);
-  }
-
-  isOutside(position: InputRowPosition) {
-    return !(this.#currentTokens && position.isContainedIn(this.#currentTokens));
-  }
-
-  updateAutocomplete(syntaxTree: SyntaxNode) {
-    if (this.#currentTokens === null) {
-      getAutocompleteTokens(x);
-    }
   }
 
   /**
@@ -378,13 +433,6 @@ class CaretAndSelection {
       // Highlight container (for the caret)
       const container = renderResult.getElement(caretIndices);
       this.setHighlightedElements(container.getElements());
-
-      // Highlight token at the caret
-      if (this.#currentTokens) {
-        this.#element.setToken(renderResult.getViewportSelection(this.#currentTokens.toRowIndicesAndRange()));
-      } else {
-        this.#element.setToken(null);
-      }
     } else if (selected.type === "grid") {
       const startIndices = RowIndices.fromZipper(selected.range.zipper).addRowIndex([
         selected.range.index,
@@ -421,26 +469,13 @@ class CaretAndSelection {
       );
 
       this.setHighlightedElements([]);
-      this.#element.setToken(null);
     } else {
       assertUnreachable(selected);
     }
   }
 
-  /**
-   * @returns The input nodes that are used for the currently selected autocomplete result.
-   */
-  getAutocompleteInput() {
-    if (!this.#currentTokens) {
-      return [];
-    }
-    return this.#currentTokens.zipper.value.values.slice(this.#currentTokens.start, this.#editingCaret.endPosition.offset);
-  }
-
-  finishAutocomplete() {
-    if (this.#editingCaret.hasEdited) {
-      // TODO:
-    }
+  get hasEdited() {
+    return this.#editingCaret.hasEdited;
   }
 
   remove() {

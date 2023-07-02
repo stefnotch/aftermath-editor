@@ -13,7 +13,7 @@ import { UndoRedoManager } from "../editing/undo-redo-manager";
 import { InputRowPosition } from "../input-position/input-row-position";
 import { MathMLRenderer } from "../mathml/renderer";
 import type { RenderResult, RenderedElement } from "../rendering/render-result";
-import { type SyntaxNode, getNodeIdentifiers, joinNodeIdentifier, parse, autocomplete } from "./../core";
+import { type SyntaxNode, getNodeIdentifiers, joinNodeIdentifier, parse, autocomplete, beginningAutocomplete } from "./../core";
 import { DebugSettings } from "./debug-settings";
 import { MathEditorCarets } from "./caret/carets-element";
 import { InputRow } from "../input-tree/row";
@@ -78,7 +78,7 @@ export class MathEditor extends HTMLElement {
     container.style.touchAction = "none"; // Dirty hack to disable pinch zoom on mobile, not ideal
     container.tabIndex = 0;
 
-    this.carets = new MathEditorCarets(autocomplete);
+    this.carets = new MathEditorCarets({ autocomplete, beginningAutocomplete });
     container.append(this.carets.element);
 
     this.addPointerEventListeners(container);
@@ -225,7 +225,7 @@ export class MathEditor extends HTMLElement {
           // TODO: Table editing
           const data = ev.data;
           if (data === null) return;
-          console.log(data, this.carets.getMainAutocomplete());
+          console.log("inputting", data, "with autocomplete", this.carets.autocompleteResults);
           const characters = unicodeSplit(data);
           const edit = this.carets.insertAtCarets(characters, this.inputTree, this.syntaxTree);
           this.saveEdit(edit);
@@ -247,7 +247,7 @@ export class MathEditor extends HTMLElement {
       // If I'm going to prevent default, then I also have to manually trigger the focus!
       // e.preventDefault();
       // TODO: This is wrong, we shouldn't forcibly finish all carets. Instead, carets that land in a good position should be preserved.
-      this.carets.finishCarets();
+      //this.carets.finishCarets();
       this.carets.clearCarets();
       this.carets.startPointerDown(
         new InputRowPosition(InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newCaret.indices), newCaret.offset)

@@ -22,7 +22,7 @@ pub struct AutocompleteRuleMatch<'a> {
 #[derive(Serialize)]
 pub struct AutocompleteRule {
     pub result: Vec<InputNode>,
-    pub value: String,
+    pub value: String, // Could just as well be a vector of input nodes, or a regex, or something
 }
 
 impl AutocompleteRule {

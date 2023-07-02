@@ -11,7 +11,7 @@ export class InputNodeContainer {
   rows: Grid<InputRow>;
   #offsetCount: number;
 
-  private constructor(containerType: InputNodeContainerType, rows: Grid<InputRow>) {
+  constructor(containerType: InputNodeContainerType, rows: Grid<InputRow>) {
     let offset_count = rows.values.map((row) => row.offsetCount).reduce((a, b) => a + b, 0);
 
     this.containerType = containerType;

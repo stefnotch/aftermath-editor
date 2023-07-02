@@ -1,9 +1,11 @@
 import init, { MathParser } from "../../aftermath-core/pkg";
-import { type InputNode, InputNodeContainer } from "../input-tree/input-node";
+import { type InputNode, InputNodeContainer, InputNodeSymbol } from "../input-tree/input-node";
 import type { Offset } from "../input-tree/input-offset";
 import { RowIndices } from "../input-tree/row-indices";
-import { InputRow } from "../input-tree/row";
+import { Grid, InputRow } from "../input-tree/row";
 import { assert } from "../utils/assert";
+import { InputRowRange } from "../input-position/input-row-range";
+import type { InputRowPosition } from "../input-position/input-row-position";
 
 // Yay, top level await is neat https://v8.dev/features/top-level-await
 await init();
@@ -16,9 +18,59 @@ export function parse(row: InputRow): ParseResult {
   return result;
 }
 
-export function autocomplete(inputNodes: InputNode[]): AutocompleteResult {
-  let result: AutocompleteResult = parser.autocomplete(inputNodes.map((n) => toCoreNode(n)));
-  return result;
+export type Autocomplete = {
+  input: InputRowRange;
+  result: AutocompleteResult;
+};
+
+export type AutocompleteResult = {
+  potentialRules: AutocompleteRuleMatch[];
+};
+
+export type AutocompleteRuleMatch = {
+  rule: InputNode[];
+  matchLength: number;
+};
+
+export function autocomplete(tokenStarts: InputRowPosition[], endPosition: Offset): Autocomplete[] {
+  return tokenStarts.flatMap((token) => {
+    let inputNodes = token.zipper.value.values.slice(token.offset, endPosition);
+    let result: CoreAutocompleteResult | null = parser.autocomplete(inputNodes.map((n) => toCoreNode(n))) ?? null;
+    if (result !== null) {
+      let autocomplete: Autocomplete = {
+        input: new InputRowRange(token.zipper, token.offset, endPosition),
+        result: fromCoreAutocompleteResult(result),
+      };
+      return [autocomplete];
+    } else {
+      return [];
+    }
+  });
+}
+
+export function beginningAutocomplete(token: InputRowPosition, endPosition: Offset): Autocomplete | null {
+  let inputNodes = token.zipper.value.values.slice(token.offset, endPosition);
+  let result: CoreAutocompleteResult | null = parser.beginning_autocomplete(inputNodes.map((n) => toCoreNode(n))) ?? null;
+  if (result !== null) {
+    let autocomplete: Autocomplete = {
+      input: new InputRowRange(token.zipper, token.offset, endPosition),
+      result: fromCoreAutocompleteResult(result),
+    };
+    return autocomplete;
+  } else {
+    return null;
+  }
+}
+
+function fromCoreAutocompleteResult(result: CoreAutocompleteResult): AutocompleteResult {
+  return {
+    potentialRules: result.potential_rules.map((r) => {
+      return {
+        rule: r.rule.result.map((e) => fromCoreNode(e)),
+        matchLength: r.match_length,
+      };
+    }),
+  };
 }
 
 export function getNodeIdentifiers(): Array<NodeIdentifier> {
@@ -53,6 +105,21 @@ function toCoreNode(node: InputNode): CoreElement {
   // Uh oh, now I'm also maintaining invariants in two places.
 }
 
+function fromCore(row: CoreRow): InputRow {
+  const values = row.values.map((v) => fromCoreNode(v));
+  return new InputRow(values);
+}
+
+function fromCoreNode(node: CoreElement): InputNode {
+  if ("Container" in node) {
+    const container = node.Container;
+    const rows = container.rows.values.map((row) => fromCore(row));
+    return new InputNodeContainer(container.container_type, Grid.fromOneDimensional(rows, container.rows.width));
+  } else {
+    return new InputNodeSymbol(node.Symbol);
+  }
+}
+
 // TODO:
 // We're maintaining the types by hand for now, since we tried out mostly everything else.
 // Directly using WASM-bindgen's Typescript stuff doesn't work, because they don't support enums. https://github.com/rustwasm/wasm-bindgen/issues/2407
@@ -67,7 +134,7 @@ type CoreElement =
   | {
       Container: {
         container_type: CoreContainer;
-        rows: Grid<CoreRow>;
+        rows: CoreGrid<CoreRow>;
         offset_count: number;
       };
     }
@@ -75,7 +142,7 @@ type CoreElement =
 
 type CoreContainer = "Fraction" | "Root" | "Under" | "Over" | "Sup" | "Sub" | "Table";
 
-type Grid<T> = { values: T[]; width: number };
+type CoreGrid<T> = { values: T[]; width: number };
 
 export type ParseResult = {
   value: SyntaxNode;
@@ -87,7 +154,7 @@ export type SyntaxNodes =
       Containers: SyntaxNode[];
     }
   | {
-      NewRows: Grid<SyntaxNode>;
+      NewRows: CoreGrid<SyntaxNode>;
     }
   | {
       Leaf: SyntaxLeafNode;
@@ -122,18 +189,18 @@ export type ParseError = {
   range: any;
 };
 
-export type AutocompleteResult = {
+type CoreAutocompleteResult = {
   range_in_input: Range<number>;
-  potential_rules: AutocompleteRuleMatch[];
+  potential_rules: CoreAutocompleteRuleMatch[];
 };
 
-export type AutocompleteRuleMatch = {
-  rule: AutocompleteRule;
+type CoreAutocompleteRuleMatch = {
+  rule: CoreAutocompleteRule;
   match_length: number;
 };
 
-export type AutocompleteRule = {
-  result: CoreElement[]; // TODO:
+type CoreAutocompleteRule = {
+  result: CoreElement[];
   value: string;
 };
 

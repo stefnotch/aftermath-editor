@@ -16,7 +16,10 @@ static ALLOCATOR: LockedAllocator<FreeListAllocator> =
     LockedAllocator::new(FreeListAllocator::new());
 
 #[wasm_bindgen]
-extern "C" {}
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
 
 #[wasm_bindgen(start)]
 fn main() {
@@ -57,6 +60,15 @@ impl MathParser {
     pub fn autocomplete(&self, input_nodes: JsValue) -> Result<JsValue, JsValue> {
         let nodes: Vec<InputNode> = serde_wasm_bindgen::from_value(input_nodes)?;
         let result = self.parser_rules.get_autocomplete(&nodes);
+        let serialized_result = result.serialize(&self.serializer)?;
+        Ok(serialized_result)
+    }
+
+    pub fn beginning_autocomplete(&self, input_nodes: JsValue) -> Result<JsValue, JsValue> {
+        let nodes: Vec<InputNode> = serde_wasm_bindgen::from_value(input_nodes)?;
+        let result = self
+            .parser_rules
+            .get_finished_autocomplete_at_beginning(&nodes);
         let serialized_result = result.serialize(&self.serializer)?;
         Ok(serialized_result)
     }

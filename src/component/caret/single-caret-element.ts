@@ -1,4 +1,3 @@
-import { RenderedSelection } from "../../rendering/rendered-selection";
 import type { ViewportRect, ViewportValue } from "../../rendering/viewport-coordinate";
 
 export class CaretDomElement {
@@ -6,7 +5,6 @@ export class CaretDomElement {
 
   #caretElement: HTMLElement;
   #selectionsContainer: HTMLElement;
-  #tokenHighlighter: HTMLElement;
 
   constructor() {
     const containerElement = document.createElement("div");
@@ -23,11 +21,6 @@ export class CaretDomElement {
     selectionsContainer.style.left = "0px";
     this.#selectionsContainer = selectionsContainer;
     containerElement.append(selectionsContainer);
-
-    const tokenHighlighter = document.createElement("div");
-    tokenHighlighter.className = "caret-token-highlighter";
-    this.#tokenHighlighter = tokenHighlighter;
-    containerElement.append(tokenHighlighter);
 
     this.#element = containerElement;
   }
@@ -58,21 +51,6 @@ export class CaretDomElement {
     selection.style.width = `${rect.width}px`;
     selection.style.height = `${rect.height}px`;
     this.#selectionsContainer.append(selection);
-  }
-
-  setToken(selection: RenderedSelection | null) {
-    if (selection === null) {
-      this.#tokenHighlighter.style.display = "none";
-    } else if (selection.isCollapsed) {
-      this.#tokenHighlighter.style.display = "none";
-    } else {
-      this.#tokenHighlighter.style.display = "block";
-      const parentPos = this.#element.getBoundingClientRect();
-      this.#tokenHighlighter.style.left = `${selection.rect.x - parentPos.left}px`;
-      this.#tokenHighlighter.style.top = `${selection.rect.y - parentPos.top}px`;
-      this.#tokenHighlighter.style.width = `${selection.rect.width}px`;
-      this.#tokenHighlighter.style.height = `${selection.rect.height}px`;
-    }
   }
 
   clearSelections() {

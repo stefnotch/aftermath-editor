@@ -96,7 +96,7 @@ fn test_autocomplete_standard_symbol_match() {
 fn test_autocomplete_match_followed_by_no_match() {
     let input = InputNode::symbols(vec!["l", "i", "m", "x"]);
     let context = test_rules();
-    let result = context.get_autocomplete(&input);
+    let result = context.get_finished_autocomplete_at_beginning(&input);
     assert!(result.is_some());
     let result = result.unwrap();
     assert_eq!(result.range_in_input, 0..3);
@@ -110,6 +110,8 @@ fn test_autocomplete_no_match_followed_by_match() {
     let context = test_rules();
     let result = context.get_autocomplete(&input);
     assert!(result.is_none());
+    let result_b = context.get_finished_autocomplete_at_beginning(&input);
+    assert!(result_b.is_none());
 }
 
 #[test]
@@ -117,8 +119,10 @@ fn test_autocomplete_match_followed_by_autocomplete_match() {
     let input = InputNode::symbols(vec!["l", "i", "m", "l", "i", "m"]);
     let context = test_rules();
     let result = context.get_autocomplete(&input);
-    assert!(result.is_some());
-    let result = result.unwrap();
-    assert_eq!(result.range_in_input, 0..3);
-    assert_eq!(result.potential_rules.len(), 1);
+    assert!(result.is_none());
+    let result_b = context.get_finished_autocomplete_at_beginning(&input);
+    assert!(result_b.is_some());
+    let result_b = result_b.unwrap();
+    assert_eq!(result_b.range_in_input, 0..3);
+    assert_eq!(result_b.potential_rules.len(), 1);
 }
