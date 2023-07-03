@@ -229,7 +229,6 @@ export class MathEditor extends HTMLElement {
           // TODO: Table editing
           const data = ev.data;
           if (data === null) return;
-          console.log("inputting", data, "with autocomplete", this.carets.autocompleteResults);
           const characters = unicodeSplit(data);
           const edit = this.carets.insertAtCarets(characters, this.inputTree);
           this.saveEdit(edit);

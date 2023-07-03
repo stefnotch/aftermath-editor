@@ -1,7 +1,6 @@
 mod autocomplete;
 mod grapheme_matcher;
 mod lexer;
-mod nfa;
 mod nfa_builder;
 mod parse_result;
 pub mod parse_rules;

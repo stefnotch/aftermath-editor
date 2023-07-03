@@ -55,9 +55,10 @@ export class InputTree {
     let end = rangeBefore.end;
     if (edit.type === "insert") {
       // An insert edit only moves carets on the same row
-      if (indices.equals(edit.zipper)) {
+      if (indices.equals(edit.indices)) {
         const mapOffset = (offset: Offset) => {
-          if (edit.offset <= offset) {
+          // Avoid moving elements that are exactly where the inserted symbols are
+          if (edit.offset < offset) {
             return offset + edit.values.length;
           } else {
             return offset;
@@ -68,33 +69,26 @@ export class InputTree {
       }
     } else if (edit.type === "remove") {
       // A remove edit moves carets on the same row
-      if (indices.equals(edit.zipper)) {
-        const mapOffset = (offset: Offset) => {
-          const editEndOffset = edit.index + edit.values.length;
-          if (editEndOffset <= offset) {
-            return offset - edit.values.length;
+      const editEndOffset = edit.index + edit.values.length;
+      if (indices.equals(edit.indices)) {
+        const mapOffset = (offsetToUpdate: Offset) => {
+          if (edit.index <= offsetToUpdate && offsetToUpdate < editEndOffset) {
+            return edit.index;
+          } else if (editEndOffset <= offsetToUpdate) {
+            return offsetToUpdate - edit.values.length;
           } else {
-            return offset;
+            return offsetToUpdate;
           }
         };
         start = mapOffset(start);
         end = mapOffset(end);
-      }
+      } else if (RowIndices.isContainedIn(indices, start, edit.indices, edit.index, editEndOffset)) {
+        // and a remove edit clamps contained carets in children to the start of the edit
+        // if the start index is in a child, and is contained in the edit, then the end index must be contained too
 
-      // and a remove edit clamps contained carets to the start of the edit
-      let changed = false;
-      const mapOffset = (offset: Offset) => {
-        if (RowIndices.isContainedIn(indices, offset, edit.zipper, edit.index, edit.index + edit.values.length)) {
-          changed = true;
-          return edit.index;
-        } else {
-          return offset;
-        }
-      };
-      start = mapOffset(start);
-      end = mapOffset(end);
-      if (changed) {
-        indices = edit.zipper;
+        start = edit.index;
+        end = edit.index;
+        indices = edit.indices;
       }
     } else {
       assertUnreachable(edit);
@@ -108,7 +102,7 @@ export class InputTree {
    */
   applyEdit(edit: MathLayoutSimpleEdit) {
     // Alternate design would create a new InputTree
-    const zipper = InputRowZipper.fromRowIndices(this.rootZipper, edit.zipper);
+    const zipper = InputRowZipper.fromRowIndices(this.rootZipper, edit.indices);
     if (edit.type === "insert") {
       // It's safe to keep those as zipper methods, since they construct a *new* tree instead of modifying it.
       const result = zipper.insert(edit.offset, edit.values);

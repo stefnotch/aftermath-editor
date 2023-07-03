@@ -1,11 +1,14 @@
+use input_tree::input_node::InputNode;
+
 use crate::{
     grapheme_matcher::GraphemeMatcher,
     nfa_builder::NFABuilder,
     parse_rules::{Argument, ArgumentParserType, StartingTokenMatcher, TokenMatcher},
     syntax_tree::{LeafNodeType, NodeIdentifier},
+    AutocompleteRule,
 };
 
-use super::TokenDefinition;
+use super::{RuleCollection, TokenDefinition};
 
 /// Core rules that one basically always wants.
 pub struct CoreRules {}
@@ -14,8 +17,9 @@ impl CoreRules {
     fn rule_name(name: &str) -> NodeIdentifier {
         NodeIdentifier::new(vec!["Core".into(), name.into()])
     }
-
-    pub fn get_rules() -> Vec<TokenDefinition> {
+}
+impl RuleCollection for CoreRules {
+    fn get_rules() -> Vec<TokenDefinition> {
         vec![
             // TODO: Good whitespace handling
             /*(
@@ -24,7 +28,7 @@ impl CoreRules {
                 TokenDefinition::new(minimal_definitions.empty.clone(), (None, None)),
             ),*/
             TokenDefinition::new(
-                CoreRules::rule_name("Variable"),
+                Self::rule_name("Variable"),
                 (None, None),
                 StartingTokenMatcher::Token(TokenMatcher {
                     symbol: NFABuilder::match_character(GraphemeMatcher::IdentifierStart)
@@ -37,7 +41,7 @@ impl CoreRules {
                 }),
             ),
             TokenDefinition::new(
-                CoreRules::rule_name("Subscript"),
+                Self::rule_name("Subscript"),
                 (Some(850), None), // Dunno really
                 StartingTokenMatcher::operator_from_character('_'),
             ),
@@ -46,7 +50,7 @@ impl CoreRules {
 
             // Unit tuple
             TokenDefinition::new(
-                CoreRules::rule_name("RoundBrackets"),
+                Self::rule_name("RoundBrackets"),
                 (None, None),
                 StartingTokenMatcher::from_characters(
                     vec!['(', ')'].into(),
@@ -54,7 +58,7 @@ impl CoreRules {
                 ),
             ),
             TokenDefinition::new_with_parsers(
-                CoreRules::rule_name("RoundBrackets"),
+                Self::rule_name("RoundBrackets"),
                 (None, None),
                 StartingTokenMatcher::from_character('(', LeafNodeType::Operator),
                 vec![
@@ -72,5 +76,12 @@ impl CoreRules {
                 ],
             ),
         ]
+    }
+
+    fn get_autocomplete_rules() -> Vec<crate::AutocompleteRule> {
+        vec![AutocompleteRule::new(
+            vec![InputNode::sub(Default::default())],
+            "_",
+        )]
     }
 }

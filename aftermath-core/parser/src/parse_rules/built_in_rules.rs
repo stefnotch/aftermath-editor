@@ -6,10 +6,10 @@ use crate::{
     nfa_builder::NFABuilder,
     parse_rules::{StartingTokenMatcher, TokenMatcher},
     syntax_tree::{LeafNodeType, NodeIdentifier},
-    SyntaxLeafNode, SyntaxNode, SyntaxNodes,
+    AutocompleteRule, SyntaxLeafNode, SyntaxNode, SyntaxNodes,
 };
 
-use super::{ParseRuleCollection, TokenDefinition};
+use super::{RuleCollection, TokenDefinition};
 
 pub struct BuiltInRules {}
 
@@ -128,7 +128,7 @@ impl BuiltInRules {
     }
 }
 
-impl ParseRuleCollection for BuiltInRules {
+impl RuleCollection for BuiltInRules {
     fn get_rules() -> Vec<TokenDefinition> {
         vec![
             // Matching those as *single* tokens is fine,
@@ -206,5 +206,9 @@ impl ParseRuleCollection for BuiltInRules {
             Self::nothing_name(),
             Self::operator_name(),
         ]
+    }
+
+    fn get_autocomplete_rules() -> Vec<AutocompleteRule> {
+        vec![]
     }
 }

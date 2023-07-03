@@ -2,9 +2,10 @@ use crate::{
     nfa_builder::NFABuilder,
     parse_rules::{Argument, ArgumentParserType, StartingTokenMatcher, TokenMatcher},
     syntax_tree::{LeafNodeType, NodeIdentifier},
+    AutocompleteRule,
 };
 
-use super::TokenDefinition;
+use super::{RuleCollection, TokenDefinition};
 
 pub struct FunctionRules {}
 
@@ -12,10 +13,11 @@ impl FunctionRules {
     fn rule_name(name: &str) -> NodeIdentifier {
         NodeIdentifier::new(vec!["Function".into(), name.into()])
     }
-
-    pub fn get_rules() -> Vec<TokenDefinition> {
+}
+impl RuleCollection for FunctionRules {
+    fn get_rules() -> Vec<TokenDefinition> {
         vec![TokenDefinition::new_with_parsers(
-            FunctionRules::rule_name("FunctionApplication"),
+            Self::rule_name("FunctionApplication"),
             (Some(800), None),
             StartingTokenMatcher::operator_from_character('('),
             vec![
@@ -32,5 +34,9 @@ impl FunctionRules {
                 },
             ],
         )]
+    }
+
+    fn get_autocomplete_rules() -> Vec<AutocompleteRule> {
+        vec![]
     }
 }

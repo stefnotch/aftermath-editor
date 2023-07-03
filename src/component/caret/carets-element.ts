@@ -274,7 +274,9 @@ export class MathEditorCarets {
       const ruleMatch = perfectMatches.result.potentialRules[0];
 
       // The start position can change during edits
-      const ranges = [new InputRowRange(startPosition.zipper, startPosition.offset, ruleMatch.matchLength)];
+      const ranges = [
+        new InputRowRange(startPosition.zipper, startPosition.offset, startPosition.offset + ruleMatch.matchLength),
+      ];
 
       // Delete existing text
       const deleteResult = MathEditorCarets.applyEdit(removeRange(ranges[0]), tree, this.#carets, ranges);
@@ -295,6 +297,8 @@ export class MathEditorCarets {
           this.#carets
         );
       }
+      // Force the main caret to be at the end of the inserted text
+      // this.#carets[0].moveCaretTo(insertResult.caret);
 
       return {
         edits: deleteResult.edits.concat(...insertResult.edits),

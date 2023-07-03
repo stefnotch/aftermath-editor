@@ -44,7 +44,7 @@ function removeAtPosition<T>(
   // Remove a zipper and its children
   const removeAction = (zipper: InputNodeContainerZipper | InputSymbolZipper): MathLayoutSimpleEdit => ({
     type: "remove" as const,
-    zipper: RowIndices.fromZipper(zipper.parent),
+    indices: RowIndices.fromZipper(zipper.parent),
     index: zipper.indexInParent,
     values: [zipper.value],
   });
@@ -54,7 +54,7 @@ function removeAtPosition<T>(
     removeAction(zipper),
     {
       type: "insert" as const,
-      zipper: RowIndices.fromZipper(zipper.parent),
+      indices: RowIndices.fromZipper(zipper.parent),
       offset: zipper.indexInParent,
       values: values.slice(),
     },
@@ -122,7 +122,7 @@ export function removeRange(caret: InputRowRange): CaretEdit {
     edits: [
       {
         type: "remove" as const,
-        zipper: ancestorIndices,
+        indices: ancestorIndices,
         // after a removal, the next element will be at the same index
         index: caret.leftOffset,
         values: caret.zipper.value.values.slice(caret.leftOffset, caret.rightOffset),
@@ -154,7 +154,7 @@ function insertAtPosition(position: InputRowPosition, values: InputNode[]): Care
     edits: [
       {
         type: "insert" as const,
-        zipper: RowIndices.fromZipper(position.zipper),
+        indices: RowIndices.fromZipper(position.zipper),
         offset: position.offset,
         values: values,
       },

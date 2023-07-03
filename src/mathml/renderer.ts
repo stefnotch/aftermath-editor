@@ -30,42 +30,9 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
 
   constructor() {
     // TODO:
-    // Maybe detect under-over?
     // If it's a square root, make the 2 a bit lighter?
-    // Bracket pairing (we already get enough info from the syntax tree!)
-    // element.setAttribute("stretchy", "false"); when rendering brackets
     // sub, sup without a base element - create a placeholder
     // look at https://w3c.github.io/mathml-core/#operator-tables
-
-    // TODO:
-    // under, over, underover, sub, sup, subsup
-    // table
-    /*
-if (mathIR.type === "table") {
-    const width = mathIR.rowWidth;
-    const rows: MathLayoutRow[][] = [];
-    const childTranslators: RowDomTranslator[] = [];
-    // copy rows from mathIR.values into rows
-    for (let i = 0; i < mathIR.values.length; i += width) {
-      rows.push(mathIR.values.slice(i, i + width));
-    }
-    const element = createMathElement(
-      "mtable",
-      rows.map((row) =>
-        createMathElement(
-          "mtr",
-          row.map((cell) => {
-            const cellWithElement = fromMathLayoutRow(cell);
-            childTranslators.push(cellWithElement.translator);
-            return createMathElement("mtd", [cellWithElement.element]);
-          })
-        )
-      )
-    );
-    const translator = new MathTableDomTranslator(mathIR, element, childTranslators);
-    return { element, translator };
-  }
-  */
 
     {
       const builtIn = this.rendererCollection("BuiltIn");
@@ -154,8 +121,17 @@ if (mathIR.type === "table") {
       });
     }
     {
-      const collections = this.rendererCollection("Collections");
-      collections.add("Tuple", (syntaxTree, rowIndex) => {
+      const comparison = this.rendererCollection("Comparison");
+      ["Equals", "GreaterThan", "LessThan", "GreaterThanOrEquals", "LessThanOrEquals"].forEach((name) => {
+        comparison.add(name, (syntaxTree, rowIndex) => {
+          assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
+          return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
+        });
+      });
+    }
+    {
+      const collection = this.rendererCollection("Collection");
+      collection.add("Tuple", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
         return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });

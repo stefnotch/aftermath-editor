@@ -1,8 +1,8 @@
 use input_tree::input_node::InputNode;
 use parser::{
     parse_rules::{
-        arithmetic_rules::ArithmeticRules, built_in_rules::BuiltInRules, ParseRuleCollection,
-        ParserRules,
+        arithmetic_rules::ArithmeticRules, built_in_rules::BuiltInRules, ParserRules,
+        RuleCollection,
     },
     AutocompleteRule,
 };

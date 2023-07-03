@@ -51,7 +51,7 @@ export class MathLayoutEdit {
 export type MathLayoutSimpleEdit =
   | {
       readonly type: "insert";
-      readonly zipper: RowIndices;
+      readonly indices: RowIndices;
       readonly offset: Offset;
       /**
        * The values that were inserted.
@@ -60,7 +60,7 @@ export type MathLayoutSimpleEdit =
     }
   | {
       readonly type: "remove";
-      readonly zipper: RowIndices;
+      readonly indices: RowIndices;
       readonly index: number;
       /**
        * The value that were removed, used for undo.
@@ -72,14 +72,14 @@ function inverseSimpleEdit(edit: MathLayoutSimpleEdit): MathLayoutSimpleEdit {
   if (edit.type === "insert") {
     return {
       type: "remove",
-      zipper: edit.zipper,
+      indices: edit.indices,
       index: edit.offset,
       values: edit.values,
     };
   } else if (edit.type === "remove") {
     return {
       type: "insert",
-      zipper: edit.zipper,
+      indices: edit.indices,
       offset: edit.index,
       values: edit.values,
     };

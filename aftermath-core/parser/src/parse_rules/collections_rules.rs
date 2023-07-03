@@ -1,19 +1,24 @@
 use crate::{parse_rules::StartingTokenMatcher, syntax_tree::NodeIdentifier};
 
-use super::TokenDefinition;
+use super::{RuleCollection, TokenDefinition};
 
-pub struct CollectionsRules {}
+pub struct CollectionRules {}
 
-impl CollectionsRules {
+impl CollectionRules {
     fn rule_name(name: &str) -> NodeIdentifier {
-        NodeIdentifier::new(vec!["Collections".into(), name.into()])
+        NodeIdentifier::new(vec!["Collection".into(), name.into()])
     }
-
-    pub fn get_rules() -> Vec<TokenDefinition> {
+}
+impl RuleCollection for CollectionRules {
+    fn get_rules() -> Vec<TokenDefinition> {
         vec![TokenDefinition::new(
-            CollectionsRules::rule_name("Tuple"),
+            Self::rule_name("Tuple"),
             (Some(50), Some(51)),
             StartingTokenMatcher::operator_from_character(','),
         )]
+    }
+
+    fn get_autocomplete_rules() -> Vec<crate::AutocompleteRule> {
+        vec![]
     }
 }

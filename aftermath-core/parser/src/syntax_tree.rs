@@ -28,7 +28,7 @@ pub struct SyntaxNode {
     /// value, especially for constants
     /// stored as bytes, and interpreted according to the name
     pub value: Vec<u8>,
-    /// The range, expressed in absolute offsets. TODO:
+    /// The range, expressed in offsets relative to the row.
     range: Range<usize>,
 }
 

@@ -2,9 +2,10 @@ use crate::{
     nfa_builder::NFABuilder,
     parse_rules::{StartingTokenMatcher, TokenMatcher},
     syntax_tree::{LeafNodeType, NodeIdentifier},
+    AutocompleteRule,
 };
 
-use super::TokenDefinition;
+use super::{RuleCollection, TokenDefinition};
 
 pub struct StringRules {}
 
@@ -12,10 +13,11 @@ impl StringRules {
     fn rule_name(name: &str) -> NodeIdentifier {
         NodeIdentifier::new(vec!["String".into(), name.into()])
     }
-
-    pub fn get_rules() -> Vec<TokenDefinition> {
+}
+impl RuleCollection for StringRules {
+    fn get_rules() -> Vec<TokenDefinition> {
         vec![TokenDefinition::new(
-            StringRules::rule_name("String"),
+            Self::rule_name("String"),
             (None, None),
             // https://stackoverflow.com/questions/249791/regex-for-quoted-string-with-escaping-quotes
             /*
@@ -50,5 +52,9 @@ impl StringRules {
                 symbol_type: LeafNodeType::Symbol,
             }),
         )]
+    }
+
+    fn get_autocomplete_rules() -> Vec<AutocompleteRule> {
+        vec![]
     }
 }

@@ -111,7 +111,7 @@ fn test_parser_tuple() {
     let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        r#"(Collections::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b"))"#
+        r#"(Collection::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b"))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -136,7 +136,7 @@ fn test_parser_tuple_advanced() {
         format!(
             "{}{}{}",
             r#"(Core::RoundBrackets (BuiltIn::Operator "(") "#,
-            r#"(Collections::Tuple (Collections::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b")) (BuiltIn::Operator ",") (Core::Variable "c")) "#,
+            r#"(Collection::Tuple (Collection::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b")) (BuiltIn::Operator ",") (Core::Variable "c")) "#,
             r#"(BuiltIn::Operator ")"))"#
         )
     );
@@ -162,7 +162,7 @@ fn test_parser_function_call() {
         format!(
             "{}{}{}",
             r#"(Function::FunctionApplication (Core::Variable "f") (BuiltIn::Operator "(") ("#,
-            r#"Collections::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b")"#,
+            r#"Collection::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b")"#,
             r#") (BuiltIn::Operator ")"))"#
         )
     );

@@ -1,6 +1,7 @@
 pub mod arithmetic_rules;
 pub mod built_in_rules;
 pub mod collections_rules;
+pub mod comparison_rules;
 pub mod core_rules;
 pub mod function_rules;
 pub mod string_rules;
@@ -23,8 +24,8 @@ use crate::{
 
 use self::{
     arithmetic_rules::ArithmeticRules, built_in_rules::BuiltInRules,
-    collections_rules::CollectionsRules, core_rules::CoreRules, function_rules::FunctionRules,
-    string_rules::StringRules,
+    collections_rules::CollectionRules, comparison_rules::ComparisonRules, core_rules::CoreRules,
+    function_rules::FunctionRules, string_rules::StringRules,
 };
 
 use super::{
@@ -199,33 +200,32 @@ impl<'a> ParserRules<'a> {
         // 4. Parser for whitespace
         // 5. Parser for chains of < <=, which could be treated as a "domain restriction"
 
-        let mut rules = vec![];
-        rules.extend(BuiltInRules::get_rules());
+        let mut parse_rules = vec![];
+        let mut autocomplete_rules = vec![];
+        parse_rules.extend(BuiltInRules::get_rules());
+        autocomplete_rules.extend(BuiltInRules::get_autocomplete_rules());
         // Bonus rules
-        rules.extend(ArithmeticRules::get_rules());
-        rules.extend(CollectionsRules::get_rules());
-        rules.extend(CoreRules::get_rules());
-        rules.extend(FunctionRules::get_rules());
-        rules.extend(StringRules::get_rules());
+        parse_rules.extend(CoreRules::get_rules());
+        autocomplete_rules.extend(CoreRules::get_autocomplete_rules());
+        parse_rules.extend(ArithmeticRules::get_rules());
+        autocomplete_rules.extend(ArithmeticRules::get_autocomplete_rules());
+        parse_rules.extend(ComparisonRules::get_rules());
+        autocomplete_rules.extend(ComparisonRules::get_autocomplete_rules());
+        parse_rules.extend(CollectionRules::get_rules());
+        autocomplete_rules.extend(CollectionRules::get_autocomplete_rules());
+        parse_rules.extend(FunctionRules::get_rules());
+        autocomplete_rules.extend(FunctionRules::get_autocomplete_rules());
+        parse_rules.extend(StringRules::get_rules());
+        autocomplete_rules.extend(StringRules::get_autocomplete_rules());
 
         // TODO: The dx at the end of an integral might not even be a closing bracket.
         // After all, it can also sometimes appear inside an integral.
-        rules.push(TokenDefinition::new(
+        parse_rules.push(TokenDefinition::new(
             NodeIdentifier::new(vec!["Unsorted".into(), "Factorial".into()]),
             (Some(600), None),
             StartingTokenMatcher::operator_from_character('!'),
         ));
-
-        let autocomplete_rules = vec![
-            AutocompleteRule::new(
-                vec![InputNode::fraction([
-                    Default::default(),
-                    Default::default(),
-                ])],
-                "/",
-            ),
-            AutocompleteRule::new(vec![InputNode::sup(Default::default())], "^"),
-            AutocompleteRule::new(vec![InputNode::sub(Default::default())], "_"),
+        autocomplete_rules.extend(vec![
             AutocompleteRule::new(InputNode::symbols(vec!["l", "i", "m"]), "lim"),
             AutocompleteRule::new(
                 InputNode::symbols(vec!["l", "i", "m", "s", "u", "p"]),
@@ -235,9 +235,9 @@ impl<'a> ParserRules<'a> {
                 InputNode::symbols(vec!["l", "i", "m", "i", "n", "f"]),
                 "liminf",
             ),
-        ];
+        ]);
 
-        ParserRules::new(None, rules, autocomplete_rules)
+        ParserRules::new(None, parse_rules, autocomplete_rules)
     }
 }
 
@@ -524,8 +524,9 @@ impl TokenDefinition {
     }
 }
 
-pub trait ParseRuleCollection {
+pub trait RuleCollection {
     fn get_rules() -> Vec<TokenDefinition>;
+    fn get_autocomplete_rules() -> Vec<AutocompleteRule>;
     fn get_extra_rule_names() -> Vec<NodeIdentifier> {
         vec![]
     }
