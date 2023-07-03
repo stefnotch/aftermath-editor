@@ -8,7 +8,7 @@ import { assert, assertUnreachable } from "../../utils/assert";
 import { CaretDomElement } from "./single-caret-element";
 import { insertAtCaret, removeAtCaret, type CaretEdit, removeRange } from "../../editing/caret-edit";
 import type { SerializedCaret } from "../../editing/serialized-caret";
-import { ViewportMath } from "../../rendering/viewport-coordinate";
+import { ViewportMath, type ViewportCoordinate, type ViewportRect } from "../../rendering/viewport-coordinate";
 import { EditingCaret } from "../../editing/editing-caret";
 import { moveCaret } from "../../editing/caret-move";
 import { InputNodeContainer, InputNodeSymbol } from "../../input-tree/input-node";
@@ -57,6 +57,7 @@ export class MathEditorCarets {
     const tokenHighlighter = document.createElement("div");
     tokenHighlighter.className = "caret-token-highlighter";
     this.#autocompleteTokenElement = tokenHighlighter;
+    this.#autocompleteTokenElement.style.display = "none";
     this.#containerElement.append(tokenHighlighter);
   }
 
@@ -66,6 +67,15 @@ export class MathEditorCarets {
 
   private get mainCaret() {
     return this.#carets.at(0) ?? null;
+  }
+
+  get mainCaretBounds(): ViewportRect | null {
+    const caret = this.mainCaret;
+    if (caret) {
+      return caret.getBounds();
+    } else {
+      return null;
+    }
   }
 
   moveCarets(
@@ -164,6 +174,10 @@ export class MathEditorCarets {
           edits.push(...edit.edits);
           carets[i].moveCaretTo(edit.caret);
           carets[i].setHasEdited();
+
+          /* if(this.isKnownShortcut(characters)) {
+
+          }*/
         } else if (selection.type === "grid") {
           // TODO: Implement grid edits
         } else {
@@ -283,16 +297,16 @@ export class MathEditorCarets {
 
       // Input new text
       let insertResult;
-      if (ruleMatch.rule.at(0) instanceof InputNodeContainer) {
+      if (ruleMatch.result.at(0) instanceof InputNodeContainer) {
         // TODO: deal with fractions
         insertResult = MathEditorCarets.applyEdit(
-          insertAtCaret(ranges[0].startPosition().range(), ruleMatch.rule),
+          insertAtCaret(ranges[0].startPosition().range(), ruleMatch.result),
           tree,
           this.#carets
         );
       } else {
         insertResult = MathEditorCarets.applyEdit(
-          insertAtCaret(ranges[0].startPosition().range(), ruleMatch.rule),
+          insertAtCaret(ranges[0].startPosition().range(), ruleMatch.result),
           tree,
           this.#carets
         );
@@ -329,7 +343,7 @@ export class MathEditorCarets {
   /**
    * Range of the currently selected autocomplete
    */
-  get autocompleteRange() {
+  private get autocompleteRange() {
     const selected = this.selectedAutocompleteResult;
     if (selected === null) return null;
     const mainCaretRange = this.mainCaret?.selection.range ?? null;
@@ -375,9 +389,9 @@ export class MathEditorCarets {
     if (this.#selection) {
       // TODO: check where caret ends up. we might need to move an existing caret instead of adding a new one
       // TODO: deduplicate carets after adding it to the list
-      this.updateAutocomplete(syntaxTree);
       this.#carets.push(this.#selection);
       this.#selection = null;
+      this.updateAutocomplete(syntaxTree);
     }
   }
 
@@ -467,6 +481,10 @@ class CaretAndSelection {
     this.#editingCaret = EditingCaret.fromRange(this.#editingCaret.startPosition, position);
   }
 
+  getBounds() {
+    return this.#element.getBounds();
+  }
+
   setHighlightedElements(elements: ReadonlyArray<Element>) {
     this.highlightedElements.forEach((v) => v.classList.remove("caret-container-highlight"));
     this.highlightedElements = elements;
@@ -485,10 +503,10 @@ class CaretAndSelection {
       });
       // Render caret itself
       const caretSize = renderResult.getViewportCaretSize(caretIndices);
-      this.#element.setPosition(
-        renderedCaret.rect.x + (range.isForwards ? renderedCaret.rect.width : 0),
-        renderedCaret.baseline + caretSize * 0.1
-      );
+      this.#element.setPosition({
+        x: renderedCaret.rect.x + (range.isForwards ? renderedCaret.rect.width : 0),
+        y: renderedCaret.baseline + caretSize * 0.1,
+      });
       this.#element.setHeight(caretSize);
 
       // Render selection

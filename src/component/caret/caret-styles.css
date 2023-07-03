@@ -12,7 +12,6 @@
 .caret-token-highlighter {
   pointer-events: none;
   position: absolute;
-  display: none;
   border-bottom: 1px solid #21212189;
 }
 

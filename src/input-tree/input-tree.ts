@@ -22,6 +22,7 @@ export class InputTree {
   getParsed(): ParseResult {
     if (this.#parsed === null) {
       this.#parsed = this.#parser(this.root);
+      console.log("Parsed", this.#parsed);
     }
     return this.#parsed;
   }

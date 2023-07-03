@@ -78,10 +78,13 @@ export class MathEditor extends HTMLElement {
     this.addPointerEventListeners(container);
 
     // Resize - rerender carets in correct locations
+    /* Depends on https://github.com/stefnotch/aftermath-editor/issues/58
+    Will also need logic to avoid uselessly triggering the resize observer when rerendering the formula.
     const editorResizeObserver = new ResizeObserver(() => {
-      this.renderCarets();
+       this.renderCarets();
     });
-    editorResizeObserver.observe(container, { box: "border-box" });
+    editorResizeObserver.observe(container);
+    */
 
     this.mathMlElement = document.createElement("math");
     container.append(this.mathMlElement);
@@ -325,7 +328,6 @@ export class MathEditor extends HTMLElement {
    */
   updateInput() {
     const parsed = this.inputTree.getParsed();
-    console.log("Parsed", parsed);
     this.renderResult = this.renderer.renderAll(this.inputTree.getParsed());
     console.log("Rendered", this.renderResult);
 
@@ -335,8 +337,14 @@ export class MathEditor extends HTMLElement {
       assert(element instanceof MathMLElement);
     }
     this.mathMlElement.replaceChildren(...mathMlElements);
-
     this.carets.updateSyntaxTree(parsed.value);
+    this.renderCarets();
+    // Workaround for Firefox rendering bug
+    for (const element of mathMlElements) {
+      assert(element instanceof MathMLElement);
+      element.style.transform = "translate(0, 0)";
+      element.style.transform = "";
+    }
     this.renderCarets();
   }
 
@@ -344,6 +352,16 @@ export class MathEditor extends HTMLElement {
     if (!this.isConnected) return;
     this.carets.renderCarets(this.renderResult);
 
+    // TODO: Also draw the result of each autocomplete rule
+    // TODO: add a "match length" to the autocomplete results (for proper positioning and such)
+    this.autocomplete.setElements(this.carets.autocompleteResults.flatMap((v) => v.result.potentialRules.map((v) => v.value)));
+    const mainCaretBounds = this.carets.mainCaretBounds;
+    if (mainCaretBounds) {
+      this.autocomplete.setPosition({
+        x: mainCaretBounds.x,
+        y: mainCaretBounds.y + mainCaretBounds.height,
+      });
+    }
     if (import.meta.env.DEV) {
       if (DebugSettings.renderRows) {
         function debugRenderRows(renderedElement: RenderedElement<MathMLElement>) {

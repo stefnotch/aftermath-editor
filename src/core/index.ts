@@ -28,7 +28,8 @@ export type AutocompleteResult = {
 };
 
 export type AutocompleteRuleMatch = {
-  rule: InputNode[];
+  value: string;
+  result: InputNode[];
   matchLength: number;
 };
 
@@ -66,7 +67,8 @@ function fromCoreAutocompleteResult(result: CoreAutocompleteResult): Autocomplet
   return {
     potentialRules: result.potential_rules.map((r) => {
       return {
-        rule: r.rule.result.map((e) => fromCoreNode(e)),
+        value: r.rule.value,
+        result: r.rule.result.map((e) => fromCoreNode(e)),
         matchLength: r.match_length,
       };
     }),

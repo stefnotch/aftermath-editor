@@ -1,10 +1,11 @@
-import type { ViewportValue } from "../../rendering/viewport-coordinate";
+import type { ViewportCoordinate } from "../../rendering/viewport-coordinate";
 
 /**
  * There's only one autocomplete element.
  * However, the autocomplete logic is separate from the element. See caret instead.
  */
 export class AutocompleteElement {
+  #container: HTMLElement;
   #element: HTMLElement;
   #listElement: HTMLElement;
 
@@ -12,22 +13,33 @@ export class AutocompleteElement {
     const containerElement = document.createElement("div");
     containerElement.classList.add("autocomplete-container");
     containerElement.style.position = "absolute";
-    containerElement.style.display = "none";
-    this.#element = containerElement;
+    this.#container = containerElement;
+
+    const element = document.createElement("div");
+    element.style.position = "absolute";
+    containerElement.append(element);
+    this.#element = element;
 
     const listElement = document.createElement("ul");
-    containerElement.append(listElement);
+    element.append(listElement);
     this.#listElement = listElement;
+
+    this.setVisibility(false);
   }
 
   get element(): HTMLElement {
-    return this.#element;
+    return this.#container;
   }
 
-  setPosition(x: ViewportValue, y: ViewportValue) {
-    const parentPos = this.#element.getBoundingClientRect();
-    this.#element.style.left = `${x - parentPos.left}px`;
-    this.#element.style.top = `${y - parentPos.top}px`;
+  private setVisibility(visible: boolean) {
+    this.#container.style.display = visible ? "block" : "none";
+    this.#element.style.display = visible ? "block" : "none";
+  }
+
+  setPosition(position: ViewportCoordinate) {
+    const parentPos = this.#container.getBoundingClientRect();
+    this.#element.style.left = `${position.x - parentPos.left}px`;
+    this.#element.style.top = `${position.y - parentPos.top}px`;
   }
 
   setElements(elements: string[]) {
@@ -37,5 +49,6 @@ export class AutocompleteElement {
       li.innerText = element;
       this.#listElement.append(li);
     }
+    this.setVisibility(elements.length > 0);
   }
 }

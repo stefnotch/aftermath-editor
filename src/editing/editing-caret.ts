@@ -71,8 +71,8 @@ function getSelection(start: InputRowPosition, end: InputRowPosition): EditingCa
     const selectedElement = sharedRange.zipper.value.values[sharedRange.start];
     if (selectedElement instanceof InputNodeContainer && selectedElement.containerType === "Table") {
       const sharedParentPart = RowIndices.fromZipper(sharedRange.zipper);
-      const startIndex = RowIndices.fromZipper(start.zipper).indices[sharedParentPart.length + 1][0];
-      const endIndex = RowIndices.fromZipper(end.zipper).indices[sharedParentPart.length + 1][0];
+      const startIndex = RowIndices.fromZipper(start.zipper).indices[sharedParentPart.length][0];
+      const endIndex = RowIndices.fromZipper(end.zipper).indices[sharedParentPart.length][0];
 
       const range = new InputGridRange(sharedRange.zipper, sharedRange.start, startIndex, endIndex);
       return {

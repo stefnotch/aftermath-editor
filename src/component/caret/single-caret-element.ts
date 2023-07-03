@@ -1,4 +1,4 @@
-import type { ViewportRect, ViewportValue } from "../../rendering/viewport-coordinate";
+import type { ViewportCoordinate, ViewportRect } from "../../rendering/viewport-coordinate";
 
 export class CaretDomElement {
   #element: HTMLElement;
@@ -29,10 +29,20 @@ export class CaretDomElement {
     return this.#element;
   }
 
-  setPosition(x: ViewportValue, y: ViewportValue) {
+  setPosition(position: ViewportCoordinate) {
     const parentPos = this.#element.getBoundingClientRect();
-    this.#caretElement.style.left = `${x - parentPos.left}px`;
-    this.#caretElement.style.top = `${y - parentPos.top}px`;
+    this.#caretElement.style.left = `${position.x - parentPos.left}px`;
+    this.#caretElement.style.top = `${position.y - parentPos.top}px`;
+  }
+
+  getBounds(): ViewportRect | null {
+    const position = this.#caretElement.getBoundingClientRect();
+    return {
+      x: position.x,
+      y: position.y,
+      width: position.width,
+      height: position.height,
+    };
   }
 
   setHeight(v: number) {
