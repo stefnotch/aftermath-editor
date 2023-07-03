@@ -116,7 +116,7 @@ function removeAtPosition<T>(
   }
 }
 
-function removeRange(caret: InputRowRange): CaretEdit {
+export function removeRange(caret: InputRowRange): CaretEdit {
   const ancestorIndices = RowIndices.fromZipper(caret.zipper);
   return {
     edits: [

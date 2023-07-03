@@ -1,15 +1,36 @@
-import { type MathLayoutSimpleEdit } from "../editing/input-tree-edit";
+import type { ParseResult, SyntaxNode } from "../core";
+import type { MathLayoutSimpleEdit } from "../editing/input-tree-edit";
 import { InputRowRange } from "../input-position/input-row-range";
 import { assertUnreachable } from "../utils/assert";
-import { type Offset } from "./input-offset";
+import type { Offset } from "./input-offset";
 import { InputRowZipper } from "./input-zipper";
 import { InputRow } from "./row";
 import { RowIndices } from "./row-indices";
 
 export class InputTree {
   #rootZipper: InputRowZipper;
-  constructor(root: InputRow) {
+  #parsed: ParseResult | null = null;
+  #parser: (row: InputRow) => ParseResult;
+  constructor(root: InputRow, parser: (row: InputRow) => ParseResult) {
     this.#rootZipper = InputRowZipper.fromRoot(root);
+    this.#parser = parser;
+  }
+
+  /**
+   * Gets the parsed result. Can reparse the input tree if it's out of date.
+   */
+  getParsed(): ParseResult {
+    if (this.#parsed === null) {
+      this.#parsed = this.#parser(this.root);
+    }
+    return this.#parsed;
+  }
+
+  /**
+   * Gets the parsed syntax tree. Can reparse the input tree if it's out of date.
+   */
+  getSyntaxTree(): SyntaxNode {
+    return this.getParsed().value;
   }
 
   get root() {
@@ -18,6 +39,11 @@ export class InputTree {
 
   get rootZipper() {
     return this.#rootZipper;
+  }
+
+  replaceRoot(root: InputRow) {
+    this.#rootZipper = InputRowZipper.fromRoot(root);
+    this.#parsed = null;
   }
 
   /**
@@ -87,9 +113,11 @@ export class InputTree {
       // It's safe to keep those as zipper methods, since they construct a *new* tree instead of modifying it.
       const result = zipper.insert(edit.offset, edit.values);
       this.#rootZipper = result.newRoot;
+      this.#parsed = null;
     } else if (edit.type === "remove") {
       const result = zipper.remove(edit.index, edit.values.length);
       this.#rootZipper = result.newRoot;
+      this.#parsed = null;
     } else {
       assertUnreachable(edit);
     }

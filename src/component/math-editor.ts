@@ -13,7 +13,7 @@ import { UndoRedoManager } from "../editing/undo-redo-manager";
 import { InputRowPosition } from "../input-position/input-row-position";
 import { MathMLRenderer } from "../mathml/renderer";
 import type { RenderResult, RenderedElement } from "../rendering/render-result";
-import { type SyntaxNode, getNodeIdentifiers, joinNodeIdentifier, parse, autocomplete, beginningAutocomplete } from "./../core";
+import { getNodeIdentifiers, joinNodeIdentifier, parse, autocomplete, beginningAutocomplete } from "./../core";
 import { DebugSettings } from "./debug-settings";
 import { MathEditorCarets } from "./caret/carets-element";
 import { InputRow } from "../input-tree/row";
@@ -51,13 +51,7 @@ export class MathEditor extends HTMLElement {
   inputHandler: InputHandlerElement;
   autocomplete: AutocompleteElement;
 
-  inputTree: InputTree = new InputTree(new InputRow([]));
-  syntaxTree: SyntaxNode = {
-    name: ["BuiltIn", "Nothing"],
-    children: { Containers: [] },
-    value: [],
-    range: { start: 0, end: 0 },
-  };
+  readonly inputTree: InputTree = new InputTree(new InputRow([]), parse);
 
   renderer: MathMLRenderer;
   renderResult: RenderResult<MathMLElement>;
@@ -126,45 +120,55 @@ export class MathEditor extends HTMLElement {
 
     this.renderResult = this.renderer.renderAll({
       errors: [],
-      value: this.syntaxTree,
+      value: this.inputTree.getSyntaxTree(),
     });
 
     const styles = document.createElement("style");
     styles.textContent = `${mathEditorStyles}\n ${inputHandlerStyles}\n ${caretStyles}\n ${autocompleteStyles}`;
     shadowRoot.append(styles, inputContainer, container);
 
-    // Math formula
-    this.setCarets([], this.inputTree);
-    this.updateInput(this.inputTree);
+    this.updateInput();
   }
 
   private addInputEventListeners() {
     this.inputHandler.element.addEventListener("keydown", (ev) => {
       if (ev.key === "ArrowUp") {
-        this.carets.moveCarets("up", this.syntaxTree, this.renderResult);
-        this.renderCarets();
+        const edit = this.carets.moveCarets("up", this.inputTree, this.renderResult);
+        if (edit) {
+          this.saveEdit(edit);
+        }
+        this.updateInput();
       } else if (ev.key === "ArrowDown") {
-        this.carets.moveCarets("down", this.syntaxTree, this.renderResult);
-        this.renderCarets();
+        const edit = this.carets.moveCarets("down", this.inputTree, this.renderResult);
+        if (edit) {
+          this.saveEdit(edit);
+        }
+        this.updateInput();
       } else if (ev.key === "ArrowLeft") {
-        this.carets.moveCarets("left", this.syntaxTree, this.renderResult);
-        this.renderCarets();
+        const edit = this.carets.moveCarets("left", this.inputTree, this.renderResult);
+        if (edit) {
+          this.saveEdit(edit);
+        }
+        this.updateInput();
       } else if (ev.key === "ArrowRight") {
-        this.carets.moveCarets("right", this.syntaxTree, this.renderResult);
-        this.renderCarets();
+        const edit = this.carets.moveCarets("right", this.inputTree, this.renderResult);
+        if (edit) {
+          this.saveEdit(edit);
+        }
+        this.updateInput();
       } else if (ev.code === "KeyZ" && ev.ctrlKey) {
         const undoAction = this.undoRedoStack.undo();
         if (undoAction !== null) {
           const result = undoAction.applyEdit(this.inputTree);
           this.carets.deserialize(result.carets, this.inputTree);
-          this.updateInput(this.inputTree);
+          this.updateInput();
         }
       } else if (ev.code === "KeyY" && ev.ctrlKey) {
         const redoAction = this.undoRedoStack.redo();
         if (redoAction !== null) {
           const result = redoAction.applyEdit(this.inputTree);
           this.carets.deserialize(result.carets, this.inputTree);
-          this.updateInput(this.inputTree);
+          this.updateInput();
         }
       }
     });
@@ -214,22 +218,22 @@ export class MathEditor extends HTMLElement {
  
     */
         if (ev.inputType === "deleteContentBackward" || ev.inputType === "deleteWordBackward") {
-          const edit = this.carets.removeAtCarets("left", this.inputTree, this.syntaxTree, this.renderResult);
+          const edit = this.carets.removeAtCarets("left", this.inputTree, this.renderResult);
           this.saveEdit(edit);
-          this.updateInput(this.inputTree);
+          this.updateInput();
         } else if (ev.inputType === "deleteContentForward" || ev.inputType === "deleteWordForward") {
-          const edit = this.carets.removeAtCarets("right", this.inputTree, this.syntaxTree, this.renderResult);
+          const edit = this.carets.removeAtCarets("right", this.inputTree, this.renderResult);
           this.saveEdit(edit);
-          this.updateInput(this.inputTree);
+          this.updateInput();
         } else if (ev.inputType === "insertText") {
           // TODO: Table editing
           const data = ev.data;
           if (data === null) return;
           console.log("inputting", data, "with autocomplete", this.carets.autocompleteResults);
           const characters = unicodeSplit(data);
-          const edit = this.carets.insertAtCarets(characters, this.inputTree, this.syntaxTree);
+          const edit = this.carets.insertAtCarets(characters, this.inputTree);
           this.saveEdit(edit);
-          this.updateInput(this.inputTree);
+          this.updateInput();
         } else if (ev.inputType === "insertCompositionText") {
           // TODO: Handle it differently
         }
@@ -257,13 +261,13 @@ export class MathEditor extends HTMLElement {
     container.addEventListener("pointerup", (e) => {
       if (!e.isPrimary) return;
       container.releasePointerCapture(e.pointerId);
-      this.carets.finishPointerDown(this.syntaxTree);
+      this.carets.finishPointerDown(this.inputTree.getSyntaxTree());
       this.renderCarets();
     });
     container.addEventListener("pointercancel", (e) => {
       if (!e.isPrimary) return;
       container.releasePointerCapture(e.pointerId);
-      this.carets.finishPointerDown(this.syntaxTree);
+      this.carets.finishPointerDown(this.inputTree.getSyntaxTree());
       this.renderCarets();
     });
     container.addEventListener("pointermove", (e) => {
@@ -301,8 +305,9 @@ export class MathEditor extends HTMLElement {
       if (parsedInput.errors.length > 0) {
         console.warn("Parsed input has errors", parsedInput.errors);
       }
-      this.setCarets([], parsedInput.inputTree);
-      this.updateInput(parsedInput.inputTree);
+      this.inputTree.replaceRoot(parsedInput.root);
+      this.setCarets([], this.inputTree);
+      this.updateInput();
     } else {
       console.log("Attribute changed", name, oldValue, newValue);
     }
@@ -319,13 +324,10 @@ export class MathEditor extends HTMLElement {
   /**
    * Updates the user input. Then reparses and rerenders the math formula.
    */
-  updateInput(inputTree: InputTree) {
-    this.inputTree = inputTree;
-    const parsed = parse(this.inputTree.root);
-    this.syntaxTree = parsed.value;
+  updateInput() {
+    const parsed = this.inputTree.getParsed();
     console.log("Parsed", parsed);
-
-    this.renderResult = this.renderer.renderAll(parsed);
+    this.renderResult = this.renderer.renderAll(this.inputTree.getParsed());
     console.log("Rendered", this.renderResult);
 
     // The MathML elements directly under the <math> tag
@@ -335,7 +337,7 @@ export class MathEditor extends HTMLElement {
     }
     this.mathMlElement.replaceChildren(...mathMlElements);
 
-    this.carets.updateSyntaxTree(this.syntaxTree);
+    this.carets.updateSyntaxTree(parsed.value);
     this.renderCarets();
   }
 

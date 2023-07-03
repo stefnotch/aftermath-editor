@@ -1,19 +1,17 @@
 import { assert } from "../utils/assert";
 import { type InputNode, InputNodeContainer, InputNodeSymbol } from "../input-tree/input-node";
 import { InputRow } from "../input-tree/row";
-import { InputTree } from "../input-tree/input-tree";
 /**
  * Takes a MathML DOM tree and returns a MathLayout
  * TODO: A parser should specify which syntax it emits. (e.g. Emits quoted strings)
  */
-export function fromElement(element: HTMLElement | MathMLElement): { inputTree: InputTree; errors: Error[] } {
+export function fromElement(element: HTMLElement | MathMLElement): { root: InputRow; errors: Error[] } {
   assert(tagIs(element, "math"));
   const errors: Error[] = [];
   const root = toMathLayout(element, errors);
   assert(!Array.isArray(root));
   assert(root instanceof InputRow);
-  const inputTree = new InputTree(root);
-  return { inputTree, errors };
+  return { root, errors };
 }
 
 // Time to iterate over the MathML and create a cute little tree

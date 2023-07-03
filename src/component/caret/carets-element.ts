@@ -6,12 +6,12 @@ import { RowIndices } from "../../input-tree/row-indices";
 import type { RenderResult } from "../../rendering/render-result";
 import { assert, assertUnreachable } from "../../utils/assert";
 import { CaretDomElement } from "./single-caret-element";
-import { insertAtCaret, removeAtCaret } from "../../editing/caret-edit";
+import { insertAtCaret, removeAtCaret, type CaretEdit, removeRange } from "../../editing/caret-edit";
 import type { SerializedCaret } from "../../editing/serialized-caret";
 import { ViewportMath } from "../../rendering/viewport-coordinate";
 import { EditingCaret } from "../../editing/editing-caret";
 import { moveCaret } from "../../editing/caret-move";
-import { InputNodeSymbol } from "../../input-tree/input-node";
+import { InputNodeContainer, InputNodeSymbol } from "../../input-tree/input-node";
 import { InputRowRange } from "../../input-position/input-row-range";
 import { getAutocompleteTokens } from "../../editing/editing-autocomplete";
 import type { Offset } from "../../input-tree/input-offset";
@@ -68,10 +68,16 @@ export class MathEditorCarets {
     return this.#carets.at(0) ?? null;
   }
 
-  moveCarets(direction: "up" | "down" | "left" | "right", syntaxTree: SyntaxNode, renderResult: RenderResult<MathMLElement>) {
-    this.finishPointerDown(syntaxTree);
+  moveCarets(
+    direction: "up" | "down" | "left" | "right",
+    inputTree: InputTree,
+    renderResult: RenderResult<MathMLElement>
+  ): MathLayoutEdit | null {
+    this.finishPointerDown(inputTree.getSyntaxTree());
+    const caretsBefore = this.serialize();
+    const edits: MathLayoutSimpleEdit[] = [];
 
-    this.withAutocomplete((carets) => {
+    const autocompleteEdits = this.usingMatchedAutocomplete(inputTree, (carets) => {
       for (let i = 0; i < carets.length; i++) {
         const selection = carets[i].selection;
         if (selection.type === "caret") {
@@ -88,24 +94,20 @@ export class MathEditorCarets {
       // TODO: Deduplicate carets/remove overlapping carets
       return carets;
     });
+    edits.push(...autocompleteEdits.edits);
 
-    // Call this to update all missing currentTokens
-    this.updateSyntaxTree(syntaxTree);
+    if (edits.length === 0) return null;
+
+    const caretsAfter = this.#carets.map((v) => v.serialize());
+    return new MathLayoutEdit(edits, caretsBefore, caretsAfter);
   }
 
   /**
    * Finishes the current carets, and returns the edit that has been applied.
-   *
-   * Remember to call updateMissingCurrentTokens after reparsing.
    */
-  removeAtCarets(
-    direction: "left" | "right",
-    tree: InputTree,
-    syntaxTree: SyntaxNode,
-    renderResult: RenderResult<MathMLElement>
-  ): MathLayoutEdit {
+  removeAtCarets(direction: "left" | "right", tree: InputTree, renderResult: RenderResult<MathMLElement>): MathLayoutEdit {
     // Note: Be very careful about using the syntaxTree here, because it is outdated after the first edit.
-    this.finishPointerDown(syntaxTree);
+    this.finishPointerDown(tree.getSyntaxTree());
     const caretsBefore = this.serialize();
     const edits: MathLayoutSimpleEdit[] = [];
 
@@ -117,16 +119,9 @@ export class MathEditorCarets {
     for (let i = 0; i < carets.length; i++) {
       const selection = carets[i].selection;
       if (selection.type === "caret") {
-        const edit = removeAtCaret(selection.range, direction, renderResult);
+        const edit = MathEditorCarets.applyEdit(removeAtCaret(selection.range, direction, renderResult), tree, carets);
         edits.push(...edit.edits);
-        edit.edits.forEach((edit) => {
-          tree.applyEdit(edit);
-          // Update all carets according to the edit
-          for (let j = 0; j < carets.length; j++) {
-            carets[j].editRanges(tree, edit);
-          }
-        });
-        carets[i].moveCaretTo(InputRowPosition.deserialize(tree, edit.caret));
+        carets[i].moveCaretTo(edit.caret);
         carets[i].setHasEdited();
       } else if (selection.type === "grid") {
         // TODO: Implement grid edits
@@ -144,35 +139,29 @@ export class MathEditorCarets {
 
   /**
    * Finishes the current carets, and returns the edit that has been applied.
-   *
-   * Remember to call updateMissingCurrentTokens after reparsing.
    */
-  insertAtCarets(characters: string[], tree: InputTree, syntaxTree: SyntaxNode): MathLayoutEdit {
+  insertAtCarets(characters: string[], tree: InputTree): MathLayoutEdit {
     // Note: Be very careful about using the syntaxTree here, because it is outdated after the first edit.
-    this.finishPointerDown(syntaxTree);
+    this.finishPointerDown(tree.getSyntaxTree());
     const caretsBefore = this.serialize();
     const edits: MathLayoutSimpleEdit[] = [];
 
-    // Take ownership of the carets
-    this.withAutocomplete((carets) => {
+    let autocompleteEdits = this.usingMatchedAutocomplete(tree, (carets) => {
       for (let i = 0; i < carets.length; i++) {
         const selection = carets[i].selection;
         if (selection.type === "caret" && !selection.range.isCollapsed && this.isKnownShortcut(characters)) {
           // TODO: Select and shortcut
         } else if (selection.type === "caret") {
-          const edit = insertAtCaret(
-            selection.range,
-            characters.map((v) => new InputNodeSymbol(v))
+          const edit = MathEditorCarets.applyEdit(
+            insertAtCaret(
+              selection.range,
+              characters.map((v) => new InputNodeSymbol(v))
+            ),
+            tree,
+            carets
           );
           edits.push(...edit.edits);
-          edit.edits.forEach((edit) => {
-            tree.applyEdit(edit);
-            // Update all carets according to the edit
-            for (let j = 0; j < carets.length; j++) {
-              carets[j].editRanges(tree, edit);
-            }
-          });
-          carets[i].moveCaretTo(InputRowPosition.deserialize(tree, edit.caret));
+          carets[i].moveCaretTo(edit.caret);
           carets[i].setHasEdited();
         } else if (selection.type === "grid") {
           // TODO: Implement grid edits
@@ -183,9 +172,33 @@ export class MathEditorCarets {
       // TODO: Deduplicate carets/remove overlapping carets
       return carets;
     });
+    edits.push(...autocompleteEdits.edits);
 
     const caretsAfter = this.#carets.map((v) => v.serialize());
     return new MathLayoutEdit(edits, caretsBefore, caretsAfter);
+  }
+
+  private static applyEdit(
+    edit: CaretEdit,
+    tree: InputTree,
+    carets: CaretAndSelection[],
+    ranges: InputRowRange[] = []
+  ): { edits: MathLayoutSimpleEdit[]; caret: InputRowPosition } {
+    edit.edits.forEach((edit) => {
+      tree.applyEdit(edit);
+      // Update all carets according to the edit
+      for (let j = 0; j < carets.length; j++) {
+        carets[j].editRanges(tree, edit);
+      }
+      for (let j = 0; j < ranges.length; j++) {
+        ranges[j] = tree.updateRangeWithEdit(edit, ranges[j]);
+      }
+    });
+
+    return {
+      edits: edit.edits,
+      caret: InputRowPosition.deserialize(tree, edit.caret),
+    };
   }
 
   isKnownShortcut(_characters: string[]) {
@@ -222,26 +235,67 @@ export class MathEditorCarets {
     }
   }
 
-  private withAutocomplete(callback: (carets: CaretAndSelection[]) => CaretAndSelection[]) {
+  /**
+   * Whenever an autocomplete result perfectly matches, we apply it.
+   * (Our autocomplete results can turn text into symbols.)
+   */
+  private usingMatchedAutocomplete(
+    tree: InputTree,
+    callback: (carets: CaretAndSelection[]) => CaretAndSelection[]
+  ): { edits: MathLayoutSimpleEdit[] } {
     const autocompleteRange = this.autocompleteRange;
+
+    // Take ownership of the carets
     const carets = this.#carets;
     this.#carets = [];
-
     const result = callback(carets);
     this.#carets = result;
 
     const movedOutside = autocompleteRange !== null && this.mainCaret?.isContainedIn(autocompleteRange) === false;
     if (movedOutside && this.mainCaret?.hasEdited) {
-      let perfectMatches = this.#autocompleter.beginningAutocomplete(autocompleteRange.startPosition(), autocompleteRange.end);
-      console.log("going to apply", perfectMatches);
-      /*
-finish carets -> if edited, forcibly apply "selected && perfect match" autocompletions (by default the top autocompletion is selected)
-*/
-      // TODO: apply this
-      // and deal with fractions
+      const startPosition = autocompleteRange.startPosition();
+      let perfectMatches = this.#autocompleter.beginningAutocomplete(startPosition, autocompleteRange.end);
+      if (perfectMatches === null || perfectMatches.result.potentialRules.length === 0) {
+        return { edits: [] };
+      }
+      if (perfectMatches.result.potentialRules.length > 1) {
+        console.warn("Multiple rules matched", perfectMatches);
+      }
+      // TODO: Deal with multiple carets (https://github.com/stefnotch/aftermath-editor/issues/29#issuecomment-1616656705)
+      // Currently we're just dealing with the main caret. Very cheapskate
 
-      // We don't have to shrink the autocomplete range, since it gets recomputed every time anyways.
+      console.log("going to apply", perfectMatches);
+      const ruleMatch = perfectMatches.result.potentialRules[0];
+
+      // The start position can change during edits
+      const ranges = [new InputRowRange(startPosition.zipper, startPosition.offset, ruleMatch.matchLength)];
+
+      // Delete existing text
+      const deleteResult = MathEditorCarets.applyEdit(removeRange(ranges[0]), tree, this.#carets, ranges);
+
+      // Input new text
+      let insertResult;
+      if (ruleMatch.rule.at(0) instanceof InputNodeContainer) {
+        // TODO: deal with fractions
+        insertResult = MathEditorCarets.applyEdit(
+          insertAtCaret(ranges[0].startPosition().range(), ruleMatch.rule),
+          tree,
+          this.#carets
+        );
+      } else {
+        insertResult = MathEditorCarets.applyEdit(
+          insertAtCaret(ranges[0].startPosition().range(), ruleMatch.rule),
+          tree,
+          this.#carets
+        );
+      }
+
+      return {
+        edits: deleteResult.edits.concat(...insertResult.edits),
+      };
+      // And the autocomplete range automatically gets recomputed.
     }
+    return { edits: [] };
   }
 
   private updateAutocomplete(syntaxTree: SyntaxNode) {
@@ -262,6 +316,9 @@ finish carets -> if edited, forcibly apply "selected && perfect match" autocompl
     return this.#autocompleteResults.at(0)?.result?.potentialRules?.at(0) ?? null;
   }
 
+  /**
+   * Range of the currently selected autocomplete
+   */
   get autocompleteRange() {
     const selected = this.selectedAutocompleteResult;
     if (selected === null) return null;
