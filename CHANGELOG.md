@@ -1,3 +1,11 @@
+# v0.2.1
+
+- Implement inserting
+  - With autocorrect, like replacing >= with ≥
+  - Theoretically takes multiple carets into account
+- Render stretchy operators
+-
+
 # v0.2.0
 
 - Refactor InputNodes to have Grids instead of simple arrays of rows.
