@@ -146,7 +146,7 @@ export class MathEditorCarets {
     const caretsBefore = this.serialize();
     const edits: MathLayoutSimpleEdit[] = [];
 
-    let autocompleteEdits = this.usingMatchedAutocomplete(tree, (carets) => {
+    let autocompleteEdits = this.usingMatchedAutocomplete(tree, (carets, ranges) => {
       for (let i = 0; i < carets.length; i++) {
         const selection = carets[i].selection;
         if (selection.type === "caret" && !selection.range.isCollapsed && this.isKnownShortcut(characters)) {
@@ -158,7 +158,8 @@ export class MathEditorCarets {
               characters.map((v) => new InputNodeSymbol(v))
             ),
             tree,
-            carets
+            carets,
+            ranges
           );
           edits.push(...edit.edits);
           carets[i].moveCaretTo(edit.caret);
@@ -241,18 +242,23 @@ export class MathEditorCarets {
    */
   private usingMatchedAutocomplete(
     tree: InputTree,
-    callback: (carets: CaretAndSelection[]) => CaretAndSelection[]
+    callback: (carets: CaretAndSelection[], ranges: InputRowRange[]) => CaretAndSelection[]
   ): { edits: MathLayoutSimpleEdit[] } {
-    const autocompleteRange = this.autocompleteRange;
+    let autocompleteRange = this.autocompleteRange;
+    // ugh, Rust's &mut would be so pretty here
+    const ranges = autocompleteRange ? [autocompleteRange] : [];
 
     // Take ownership of the carets
     const carets = this.#carets;
     this.#carets = [];
-    const result = callback(carets);
+    const result = callback(carets, ranges);
     this.#carets = result;
+
+    autocompleteRange = autocompleteRange !== null ? ranges[0] : null;
 
     const movedOutside = autocompleteRange !== null && this.mainCaret?.isContainedIn(autocompleteRange) === false;
     if (movedOutside && this.mainCaret?.hasEdited) {
+      assert(autocompleteRange !== null);
       const startPosition = autocompleteRange.startPosition();
       let perfectMatches = this.#autocompleter.beginningAutocomplete(startPosition, autocompleteRange.end);
       if (perfectMatches === null || perfectMatches.result.potentialRules.length === 0) {
