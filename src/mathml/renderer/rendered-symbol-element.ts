@@ -15,11 +15,21 @@ export class SymbolMathMLElement implements RenderedElement<MathMLElement> {
   element: RenderedMathML;
   private textElement: LeafMathMLElement;
 
-  constructor(public syntaxTree: SyntaxNode<"Leaf">, public rowIndex: RowIndex | null, elementName: MathMLTags) {
+  constructor(
+    public syntaxTree: SyntaxNode<"Leaf">,
+    public rowIndex: RowIndex | null,
+    elementName: MathMLTags,
+    options: Partial<{
+      isStretchy: boolean;
+    }> = {}
+  ) {
     this.textElement = new LeafMathMLElement(syntaxTree.children.Leaf);
     let children: Text[] = this.textElement.getElements();
     const mathElement = createMathElement(elementName, children);
     mathElement.style.whiteSpace = "nowrap";
+    if (options.isStretchy) {
+      mathElement.setAttribute("stretchy", "true");
+    }
     this.element = new RenderedMathML(mathElement);
   }
   getCaretSize() {

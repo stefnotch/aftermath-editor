@@ -16,12 +16,21 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
     public syntaxTree: SyntaxNode<"Containers">,
     public rowIndex: RowIndex | null,
     elementName: MathMLTags,
-    renderer: Renderer<MathMLElement>
+    renderer: Renderer<MathMLElement>,
+    options: Partial<{
+      stretchyOperators: boolean;
+    }> = {}
   ) {
     assert(syntaxTree.children.Containers.length > 0, "Needs at least one child");
     this.element = new RenderedMathML(createMathElement(elementName, []));
 
-    this.element.setChildren(syntaxTree.children.Containers.map((c) => renderer.render(c, null)));
+    this.element.setChildren(
+      syntaxTree.children.Containers.map((c) =>
+        renderer.render(c, null, {
+          stretchyOperators: options.stretchyOperators,
+        })
+      )
+    );
     assert(this.element.getChildren().length === this.syntaxTree.children.Containers.length, "Invalid number of children");
     assert(this.element.getChildren().length > 0, "Needs at least one rendered child");
   }

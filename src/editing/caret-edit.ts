@@ -133,7 +133,7 @@ export function removeRange(caret: InputRowRange): CaretEdit {
 }
 
 function serializeCollapsedCaret(zipper: InputRowZipper, offset: number): SerializedInputRowPosition {
-  return new InputRowPosition(zipper, offset).serialize();
+  return InputRowPosition.serialize(RowIndices.fromZipper(zipper), offset);
 }
 
 export function insertAtCaret(caret: InputRowRange, values: InputNode[]): CaretEdit {

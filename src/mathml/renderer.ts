@@ -7,7 +7,7 @@ import {
   joinNodeIdentifier,
 } from "../core";
 import type { RowIndex } from "../input-tree/row-indices";
-import type { RenderedElement, RenderResult, Renderer } from "../rendering/render-result";
+import type { RenderedElement, RenderResult, Renderer, ImmediateRenderingOptions } from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { MathMLRenderResult } from "./render-result";
 import { SimpleContainerMathMLElement } from "./renderer/rendered-container-element";
@@ -21,7 +21,11 @@ import { TextMathMLElement } from "./renderer/rendered-text-element";
 export class MathMLRenderer implements Renderer<MathMLElement> {
   private readonly renderers: Map<
     NodeIdentifierJoined,
-    (syntaxTree: SyntaxNode, rowIndex: RowIndex | null) => RenderedElement<MathMLElement>
+    (
+      syntaxTree: SyntaxNode,
+      rowIndex: RowIndex | null,
+      options: Partial<ImmediateRenderingOptions>
+    ) => RenderedElement<MathMLElement>
   > = new Map();
 
   constructor() {
@@ -82,9 +86,11 @@ if (mathIR.type === "table") {
         // Dirty little patch to render missing tokens
         return new NothingMathMLElement(syntaxTree, rowIndex);
       });
-      builtIn.add("Operator", (syntaxTree, rowIndex) => {
+      builtIn.add("Operator", (syntaxTree, rowIndex, options) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
-        return new SymbolMathMLElement(syntaxTree, rowIndex, "mo");
+        return new SymbolMathMLElement(syntaxTree, rowIndex, "mo", {
+          isStretchy: options.stretchyOperators ?? false,
+        });
       });
       builtIn.add("Fraction", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "NewRows"));
@@ -127,7 +133,7 @@ if (mathIR.type === "table") {
       });
       core.add("RoundBrackets", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
-        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
+        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this, { stretchyOperators: true });
       });
       core.add("Subscript", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
@@ -189,14 +195,18 @@ if (mathIR.type === "table") {
 
     function addRenderer(
       nameFull: NodeIdentifier,
-      renderer: (syntaxTree: SyntaxNode, rowIndex: RowIndex | null) => RenderedElement<MathMLElement>
+      renderer: (
+        syntaxTree: SyntaxNode,
+        rowIndex: RowIndex | null,
+        options: Partial<ImmediateRenderingOptions>
+      ) => RenderedElement<MathMLElement>
     ): void {
       let name = joinNodeIdentifier(nameFull);
       assert(!self.renderers.has(name), `Renderer for ${name} already exists`);
 
       if (import.meta.env.DEV) {
-        self.renderers.set(name, (syntaxTree, rowIndex) => {
-          const rendered = renderer(syntaxTree, rowIndex);
+        self.renderers.set(name, (syntaxTree, rowIndex, options) => {
+          const rendered = renderer(syntaxTree, rowIndex, options);
           rendered.getElements().forEach((v) => {
             v.setAttribute("data-renderer-name", name);
           });
@@ -211,7 +221,11 @@ if (mathIR.type === "table") {
       return {
         add: (
           name: string,
-          renderer: (syntaxTree: SyntaxNode, rowIndex: RowIndex | null) => RenderedElement<MathMLElement>
+          renderer: (
+            syntaxTree: SyntaxNode,
+            rowIndex: RowIndex | null,
+            options: Partial<ImmediateRenderingOptions>
+          ) => RenderedElement<MathMLElement>
         ) => {
           addRenderer(nameParts.concat([name]), renderer);
         },
@@ -234,11 +248,15 @@ if (mathIR.type === "table") {
     return new MathMLRenderResult(element);
   }
 
-  render(syntaxTree: SyntaxNode, rowIndex: RowIndex | null): RenderedElement<MathMLElement> {
+  render(
+    syntaxTree: SyntaxNode,
+    rowIndex: RowIndex | null,
+    options: Partial<ImmediateRenderingOptions> = {}
+  ): RenderedElement<MathMLElement> {
     const renderer = this.renderers.get(joinNodeIdentifier(syntaxTree.name));
     assert(renderer, `No renderer for "${joinNodeIdentifier(syntaxTree.name)}"`);
 
-    const element = renderer(syntaxTree, rowIndex);
+    const element = renderer(syntaxTree, rowIndex, options);
     return element;
   }
 }

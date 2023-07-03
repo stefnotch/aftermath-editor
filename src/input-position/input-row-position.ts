@@ -18,9 +18,13 @@ export class InputRowPosition {
   }
 
   serialize(): SerializedInputRowPosition {
+    return InputRowPosition.serialize(RowIndices.fromZipper(this.zipper), this.offset);
+  }
+
+  static serialize(indices: RowIndices, offset: Offset): SerializedInputRowPosition {
     return {
-      indices: RowIndices.fromZipper(this.zipper),
-      offset: this.offset,
+      indices,
+      offset,
     };
   }
 

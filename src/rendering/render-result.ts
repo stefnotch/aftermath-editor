@@ -4,12 +4,19 @@ import { type RowIndex, RowIndices } from "../input-tree/row-indices";
 import { RenderedSelection } from "./rendered-selection";
 import type { ViewportCoordinate, ViewportRect, ViewportValue } from "./viewport-coordinate";
 
+/**
+ * Rendering options that only apply to the direct children.
+ */
+export interface ImmediateRenderingOptions {
+  stretchyOperators: boolean;
+}
+
 export interface Renderer<T> {
   canRender(syntaxTreeNames: NodeIdentifier): boolean;
 
   renderAll(parsed: ParseResult): RenderResult<T>;
 
-  render(syntaxTree: SyntaxNode, rowIndex: RowIndex | null): RenderedElement<T>;
+  render(syntaxTree: SyntaxNode, rowIndex: RowIndex | null, options?: Partial<ImmediateRenderingOptions>): RenderedElement<T>;
 }
 
 export type RowIndicesAndOffset = { indices: RowIndices; offset: Offset };
