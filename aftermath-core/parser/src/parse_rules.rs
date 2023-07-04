@@ -1,9 +1,11 @@
 pub mod arithmetic_rules;
 pub mod built_in_rules;
+pub mod calculus_rules;
 pub mod collections_rules;
 pub mod comparison_rules;
 pub mod core_rules;
 pub mod function_rules;
+pub mod logic_rules;
 pub mod string_rules;
 
 use std::collections::HashMap;
@@ -23,9 +25,9 @@ use crate::{
 };
 
 use self::{
-    arithmetic_rules::ArithmeticRules, built_in_rules::BuiltInRules,
+    arithmetic_rules::ArithmeticRules, built_in_rules::BuiltInRules, calculus_rules::CalculusRules,
     collections_rules::CollectionRules, comparison_rules::ComparisonRules, core_rules::CoreRules,
-    function_rules::FunctionRules, string_rules::StringRules,
+    function_rules::FunctionRules, logic_rules::LogicRules, string_rules::StringRules,
 };
 
 use super::{
@@ -209,6 +211,8 @@ impl<'a> ParserRules<'a> {
         autocomplete_rules.extend(CoreRules::get_autocomplete_rules());
         parse_rules.extend(ArithmeticRules::get_rules());
         autocomplete_rules.extend(ArithmeticRules::get_autocomplete_rules());
+        parse_rules.extend(CalculusRules::get_rules());
+        autocomplete_rules.extend(CalculusRules::get_autocomplete_rules());
         parse_rules.extend(ComparisonRules::get_rules());
         autocomplete_rules.extend(ComparisonRules::get_autocomplete_rules());
         parse_rules.extend(CollectionRules::get_rules());
@@ -217,6 +221,8 @@ impl<'a> ParserRules<'a> {
         autocomplete_rules.extend(FunctionRules::get_autocomplete_rules());
         parse_rules.extend(StringRules::get_rules());
         autocomplete_rules.extend(StringRules::get_autocomplete_rules());
+        parse_rules.extend(LogicRules::get_rules());
+        autocomplete_rules.extend(LogicRules::get_autocomplete_rules());
 
         // TODO: The dx at the end of an integral might not even be a closing bracket.
         // After all, it can also sometimes appear inside an integral.
@@ -225,17 +231,6 @@ impl<'a> ParserRules<'a> {
             (Some(600), None),
             StartingTokenMatcher::operator_from_character('!'),
         ));
-        autocomplete_rules.extend(vec![
-            AutocompleteRule::new(InputNode::symbols(vec!["l", "i", "m"]), "lim"),
-            AutocompleteRule::new(
-                InputNode::symbols(vec!["l", "i", "m", "s", "u", "p"]),
-                "limsup",
-            ),
-            AutocompleteRule::new(
-                InputNode::symbols(vec!["l", "i", "m", "i", "n", "f"]),
-                "liminf",
-            ),
-        ]);
 
         ParserRules::new(None, parse_rules, autocomplete_rules)
     }

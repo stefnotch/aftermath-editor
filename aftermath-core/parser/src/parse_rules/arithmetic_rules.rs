@@ -82,6 +82,10 @@ impl RuleCollection for ArithmeticRules {
                 ])],
                 "/",
             ),
+            AutocompleteRule::new(
+                vec![InputNode::root([Default::default(), Default::default()])],
+                "sqrt",
+            ),
             AutocompleteRule::new(vec![InputNode::sup(Default::default())], "^"),
         ]
     }

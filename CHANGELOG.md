@@ -4,7 +4,7 @@
   - With autocorrect, like replacing >= with ≥
   - Theoretically takes multiple carets into account
 - Render stretchy operators
--
+- Basic autocomplete popup
 
 # v0.2.0
 

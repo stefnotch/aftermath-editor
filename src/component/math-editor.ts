@@ -354,6 +354,21 @@ export class MathEditor extends HTMLElement {
 
     // TODO: Also draw the result of each autocomplete rule
     // TODO: add a "match length" to the autocomplete results (for proper positioning and such)
+    /* I want the autocomplete to look like this
+
+    1 + lim|  
+      +---------+
+      |=lim=====|
+      | limSUP  |
+      | limINF  |
+      +---------+
+
+
+    explanation: the caret is at the end of "lim", and the autocomplete is showing the results for "lim"
+    the first line is selected
+    the text is aligned with the caret
+    the not yet typed part of the autocomplete is bolded or something
+      */
     this.autocomplete.setElements(this.carets.autocompleteResults.flatMap((v) => v.result.potentialRules.map((v) => v.value)));
     const mainCaretBounds = this.carets.mainCaretBounds;
     if (mainCaretBounds) {
