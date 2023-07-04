@@ -11,6 +11,7 @@ import type { RenderedElement, RenderResult, Renderer, ImmediateRenderingOptions
 import { assert } from "../utils/assert";
 import { MathMLRenderResult } from "./render-result";
 import { SimpleContainerMathMLElement } from "./renderer/rendered-container-element";
+import { MissingMathMLElement } from "./renderer/rendered-missing";
 import { NothingMathMLElement } from "./renderer/rendered-nothing";
 import { RootMathMLElement } from "./renderer/rendered-root-element";
 import { RowsContainerMathMLElement } from "./renderer/rendered-rows-element";
@@ -50,8 +51,7 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
       });
       builtIn.add("ErrorMissingToken", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
-        // Dirty little patch to render missing tokens
-        return new NothingMathMLElement(syntaxTree, rowIndex);
+        return new MissingMathMLElement(syntaxTree, rowIndex);
       });
       builtIn.add("Operator", (syntaxTree, rowIndex, options) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
@@ -113,21 +113,27 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
         return new TextMathMLElement(syntaxTree, rowIndex, "mn");
       });
-      ["Add", "Subtract", "Multiply", "Divide", "Exponent"].forEach((name) => {
-        arithmetic.add(name, (syntaxTree, rowIndex) => {
-          assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
-          return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
-        });
+      arithmetic.add(["Add", "Subtract", "Multiply", "Divide", "Exponent"], (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
+        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
+      });
+    }
+    {
+      const calculus = this.rendererCollection("Calculus");
+      calculus.add(["Infinity", "Lim", "LimSup", "LimInf"], (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
+        return new TextMathMLElement(syntaxTree, rowIndex, "mi");
       });
     }
     {
       const comparison = this.rendererCollection("Comparison");
-      ["Equals", "GreaterThan", "LessThan", "GreaterThanOrEquals", "LessThanOrEquals"].forEach((name) => {
-        comparison.add(name, (syntaxTree, rowIndex) => {
+      comparison.add(
+        ["Equals", "GreaterThan", "LessThan", "GreaterThanOrEquals", "LessThanOrEquals"],
+        (syntaxTree, rowIndex) => {
           assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
           return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
-        });
-      });
+        }
+      );
     }
     {
       const collection = this.rendererCollection("Collection");
@@ -144,6 +150,13 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
       });
     }
     {
+      const functions = this.rendererCollection("Function");
+      functions.add("FunctionApplication", (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
+        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
+      });
+    }
+    {
       const string = this.rendererCollection("String");
       string.add("String", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
@@ -151,16 +164,16 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
       });
     }
     {
-      const functions = this.rendererCollection("Function");
-      ["FunctionApplication"].forEach((name) => {
-        functions.add(name, (syntaxTree, rowIndex) => {
-          assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
-          return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
-        });
+      const logic = this.rendererCollection("Logic");
+      logic.add(["True", "False"], (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
+        return new TextMathMLElement(syntaxTree, rowIndex, "mi");
+      });
+      logic.add(["And", "Or", "Not", "Equivalent", "Implies"], (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Containers"));
+        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });
     }
-
-    // TODO: all the others
   }
 
   /**
@@ -196,14 +209,19 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
     function renderCollectionInternal(nameParts: string[]) {
       return {
         add: (
-          name: string,
+          names: string | string[],
           renderer: (
             syntaxTree: SyntaxNode,
             rowIndex: RowIndex | null,
             options: Partial<ImmediateRenderingOptions>
           ) => RenderedElement<MathMLElement>
         ) => {
-          addRenderer(nameParts.concat([name]), renderer);
+          if (typeof names === "string") {
+            names = [names];
+          }
+          names.forEach((name) => {
+            addRenderer(nameParts.concat([name]), renderer);
+          });
         },
         rendererCollection(namePart: string) {
           return renderCollectionInternal(nameParts.concat([namePart]));

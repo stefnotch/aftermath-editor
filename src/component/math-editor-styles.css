@@ -35,3 +35,16 @@ merror {
   margin: 0;
   padding: 0;
 }
+
+.red-squiggly {
+  /* Maybe https://stackoverflow.com/a/56199850/3492994 could be used */
+
+  border-bottom: 1px solid red;
+  border-bottom-style: dotted;
+
+  /* Doesn't render in Firefox, has slightly broken rendering in Chrome
+  text-decoration: underline;
+  text-decoration-color: red;
+  text-decoration-style: wavy;
+  */
+}

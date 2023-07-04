@@ -4,7 +4,7 @@ import { assert } from "../../utils/assert";
 import { type MathMLTags, MathMLTagsExpectedChildrenCount } from "../mathml-spec";
 
 export class RenderedMathML {
-  element: MathMLElement;
+  readonly element: MathMLElement;
   private children: RenderedElement<MathMLElement>[] = [];
 
   constructor(element: MathMLElement) {
