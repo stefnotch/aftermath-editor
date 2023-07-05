@@ -1,7 +1,8 @@
 import { InputNodeContainer } from "../input-tree/input-node";
 import type { Offset } from "../input-tree/input-offset";
 import type { InputTree } from "../input-tree/input-tree";
-import { InputRowZipper } from "../input-tree/input-zipper";
+import { InputNodeContainerZipper, InputRowZipper } from "../input-tree/input-zipper";
+import type { InputRow } from "../input-tree/row";
 import { RowIndices } from "../input-tree/row-indices";
 import { assert } from "../utils/assert";
 
@@ -27,6 +28,35 @@ export class InputGridRange {
 
   getRow(index: number) {
     return this.grid.rows.getIndex(index);
+  }
+
+  getRowZippers(): InputRowZipper[] {
+    const grid = this.zipper.children[this.index];
+    assert(grid instanceof InputNodeContainerZipper);
+
+    const pointA = grid.value.rows.indexToXY(this.start);
+    const pointB = grid.value.rows.indexToXY(this.end);
+
+    const minPoint = {
+      x: Math.min(pointA.x, pointB.x),
+      y: Math.min(pointA.y, pointB.y),
+    };
+    const maxPoint = {
+      x: Math.max(pointA.x, pointB.x),
+      y: Math.max(pointA.y, pointB.y),
+    };
+
+    const allChildren = grid.children;
+    const rows: InputRowZipper[] = [];
+    // nested for loops
+    for (let y = minPoint.y; y <= maxPoint.y; y++) {
+      for (let x = minPoint.x; x <= maxPoint.x; x++) {
+        const index = grid.value.rows.xyToIndex(x, y);
+        const row = allChildren[index];
+        rows.push(row);
+      }
+    }
+    return rows;
   }
 
   get leftOffset(): Offset {

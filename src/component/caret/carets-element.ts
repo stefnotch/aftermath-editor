@@ -134,7 +134,15 @@ export class MathEditorCarets {
         carets[i].moveCaretTo(edit.caret);
         carets[i].setHasEdited();
       } else if (selection.type === "grid") {
-        // TODO: Implement grid edits
+        selection.range.getRowZippers().forEach((row) => {
+          const edit = MathEditorCarets.applyEdit(
+            removeAtCaret(new InputRowRange(row, 0, row.value.values.length), direction, renderResult),
+            tree,
+            carets
+          );
+          edits.push(...edit.edits);
+        });
+        carets[i].setHasEdited();
       } else {
         assertUnreachable(selection);
       }
@@ -176,6 +184,7 @@ export class MathEditorCarets {
           carets[i].setHasEdited();
 
           /* if(this.isKnownShortcut(characters)) {
+            // Repeatedly reparse the syntax tree
 
           }*/
         } else if (selection.type === "grid") {
