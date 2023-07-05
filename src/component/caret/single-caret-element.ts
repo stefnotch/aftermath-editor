@@ -46,6 +46,11 @@ export class CaretDomElement {
   }
 
   setHeight(v: number) {
+    if (v <= 0) {
+      this.#caretElement.style.display = "none";
+    } else {
+      this.#caretElement.style.display = "";
+    }
     this.#caretElement.style.height = `${v}px`;
     // Grow from the bottom
     this.#caretElement.style.marginTop = `${-v}px`;

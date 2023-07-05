@@ -5,6 +5,7 @@ import { InputNodeContainer } from "../input-tree/input-node";
 import { InputTree } from "../input-tree/input-tree";
 import { InputRowZipper } from "../input-tree/input-zipper";
 import { RowIndices } from "../input-tree/row-indices";
+import { assert } from "../utils/assert";
 import { memoize } from "../utils/memoize";
 import type { MathLayoutSimpleEdit } from "./input-tree-edit";
 import { SerializedCaret } from "./serialized-caret";
@@ -66,15 +67,28 @@ export class EditingCaret {
 
 function getSelection(start: InputRowPosition, end: InputRowPosition): EditingCaretSelection {
   const sharedRange = getSharedCaret(start, end);
-  const isSingleElementSelected = sharedRange.start + 1 === sharedRange.end;
+  const isSingleElementSelected = sharedRange.leftOffset + 1 === sharedRange.rightOffset;
   if (isSingleElementSelected) {
-    const selectedElement = sharedRange.zipper.value.values[sharedRange.start];
+    const indexOfSelectedElement = sharedRange.leftOffset;
+    const selectedElement = sharedRange.zipper.value.values[indexOfSelectedElement];
     if (selectedElement instanceof InputNodeContainer && selectedElement.containerType === "Table") {
       const sharedParentPart = RowIndices.fromZipper(sharedRange.zipper);
-      const startIndex = RowIndices.fromZipper(start.zipper).indices[sharedParentPart.length][0];
-      const endIndex = RowIndices.fromZipper(end.zipper).indices[sharedParentPart.length][0];
+      // It's possible that the table was selected normally
+      const startRowIndex = RowIndices.fromZipper(start.zipper).indices.at(sharedParentPart.length) ?? null;
+      const endRowIndex = RowIndices.fromZipper(end.zipper).indices.at(sharedParentPart.length) ?? null;
+      assert(startRowIndex === null || startRowIndex[0] === indexOfSelectedElement);
+      assert(endRowIndex === null || endRowIndex[0] === indexOfSelectedElement);
+      const startIndex = startRowIndex?.[1] ?? null;
+      const endIndex = endRowIndex?.[1] ?? null;
 
-      const range = new InputGridRange(sharedRange.zipper, sharedRange.start, startIndex, endIndex);
+      if (startIndex === null || endIndex === null) {
+        return {
+          type: "caret",
+          range: sharedRange,
+        };
+      }
+
+      const range = new InputGridRange(sharedRange.zipper, indexOfSelectedElement, startIndex, endIndex);
       return {
         type: "grid",
         range,

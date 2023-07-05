@@ -8,7 +8,7 @@ import { assert, assertUnreachable } from "../../utils/assert";
 import { CaretDomElement } from "./single-caret-element";
 import { insertAtCaret, removeAtCaret, type CaretEdit, removeRange } from "../../editing/caret-edit";
 import type { SerializedCaret } from "../../editing/serialized-caret";
-import { ViewportMath, type ViewportCoordinate, type ViewportRect } from "../../rendering/viewport-coordinate";
+import { ViewportMath, type ViewportRect } from "../../rendering/viewport-coordinate";
 import { EditingCaret } from "../../editing/editing-caret";
 import { moveCaret } from "../../editing/caret-move";
 import { InputNodeContainer, InputNodeSymbol } from "../../input-tree/input-node";
@@ -323,13 +323,19 @@ export class MathEditorCarets {
   }
 
   private updateAutocomplete(syntaxTree: SyntaxNode) {
-    const caretPosition = this.mainCaret?.selection?.range?.endPosition() ?? null;
-    if (caretPosition !== null) {
-      const tokensBeforeCaret = getAutocompleteTokens(syntaxTree, caretPosition).map((v) => v.startPosition());
-      this.#autocompleteResults = this.#autocompleter.autocomplete(tokensBeforeCaret, caretPosition.offset);
-    } else {
+    const selection = this.mainCaret?.selection ?? null;
+    if (selection === null) {
       this.#autocompleteResults = [];
+      return;
     }
+    if (selection.type === "grid") {
+      this.#autocompleteResults = [];
+      return;
+    }
+
+    const caretPosition = selection.range.endPosition();
+    const tokensBeforeCaret = getAutocompleteTokens(syntaxTree, caretPosition).map((v) => v.startPosition());
+    this.#autocompleteResults = this.#autocompleter.autocomplete(tokensBeforeCaret, caretPosition.offset);
   }
 
   get autocompleteResults() {
@@ -521,18 +527,22 @@ class CaretAndSelection {
     } else if (selected.type === "grid") {
       const startIndices = RowIndices.fromZipper(selected.range.zipper).addRowIndex([
         selected.range.index,
-        selected.range.start,
+        selected.range.leftOffset,
       ]);
+      const startRowLength = selected.range.getRow(selected.range.leftOffset)?.values.length ?? 0;
       const renderedStart = renderResult.getViewportSelection({
         indices: startIndices,
         start: 0,
-        end: 0,
+        end: startRowLength,
       });
-      const endIndices = RowIndices.fromZipper(selected.range.zipper).addRowIndex([selected.range.index, selected.range.end]);
-      const endRowLength = selected.range.getRow(selected.range.end)?.values.length ?? 0;
+      const endIndices = RowIndices.fromZipper(selected.range.zipper).addRowIndex([
+        selected.range.index,
+        selected.range.rightOffset,
+      ]);
+      const endRowLength = selected.range.getRow(selected.range.rightOffset)?.values.length ?? 0;
       const renderedEnd = renderResult.getViewportSelection({
         indices: endIndices,
-        start: endRowLength,
+        start: 0,
         end: endRowLength,
       });
       this.#element.clearSelections();
@@ -552,7 +562,7 @@ class CaretAndSelection {
           }
         )
       );
-
+      this.#element.setHeight(0);
       this.setHighlightedElements([]);
     } else {
       assertUnreachable(selected);
