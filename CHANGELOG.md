@@ -1,3 +1,7 @@
+# next
+
+- Add table selections
+
 # v0.2.2
 
 - Render more elements, such as the infinity symbol
