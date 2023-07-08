@@ -11,11 +11,11 @@ export class AutocompleteElement {
 
   constructor() {
     const containerElement = document.createElement("div");
-    containerElement.classList.add("autocomplete-container");
     containerElement.style.position = "absolute";
     this.#container = containerElement;
 
     const element = document.createElement("div");
+    element.classList.add("autocomplete-container");
     element.style.position = "absolute";
     containerElement.append(element);
     this.#element = element;
