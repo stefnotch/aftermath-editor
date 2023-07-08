@@ -93,6 +93,16 @@ export class RowIndices {
     );
   }
 
+  startsWith(indices: RowIndices): boolean {
+    if (indices.length > this.length) return false;
+    for (let i = 0; i < indices.length; i++) {
+      if (indices.indices[i][0] !== this.indices[i][0] || indices.indices[i][1] !== this.indices[i][1]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   equals(other: RowIndices) {
     return (
       this.indices.length === other.indices.length &&

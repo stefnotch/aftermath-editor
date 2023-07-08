@@ -56,40 +56,57 @@ export class InputTree {
     let end = rangeBefore.end;
     if (edit.type === "insert") {
       // An insert edit only moves carets on the same row
-      if (indices.equals(edit.indices)) {
-        const mapOffset = (offset: Offset) => {
-          // Avoid moving elements that are exactly where the inserted symbols are
-          if (edit.offset < offset) {
-            return offset + edit.values.length;
-          } else {
-            return offset;
+      // However, in terms of indices, it also moves indices from rows below it.
+      if (indices.startsWith(edit.indices)) {
+        if (indices.equals(edit.indices)) {
+          const mapOffset = (offset: Offset) => {
+            // Avoid moving elements that are exactly where the inserted symbols are
+            if (edit.offset < offset) {
+              return offset + edit.values.length;
+            } else {
+              return offset;
+            }
+          };
+          start = mapOffset(start);
+          end = mapOffset(end);
+        } else {
+          const containerIndex = indices.indices[edit.indices.length - 1][0];
+          if (edit.offset <= containerIndex) {
+            // If the edit is before the container, move the container
+            indices.indices[edit.indices.length - 1][0] += edit.values.length;
           }
-        };
-        start = mapOffset(start);
-        end = mapOffset(end);
+        }
       }
     } else if (edit.type === "remove") {
       // A remove edit moves carets on the same row
       const editEndOffset = edit.index + edit.values.length;
-      if (indices.equals(edit.indices)) {
-        const mapOffset = (offsetToUpdate: Offset) => {
-          if (edit.index <= offsetToUpdate && offsetToUpdate < editEndOffset) {
-            return edit.index;
-          } else if (editEndOffset <= offsetToUpdate) {
-            return offsetToUpdate - edit.values.length;
-          } else {
-            return offsetToUpdate;
-          }
-        };
-        start = mapOffset(start);
-        end = mapOffset(end);
-      } else if (RowIndices.isContainedIn(indices, start, edit.indices, edit.index, editEndOffset)) {
-        // and a remove edit clamps contained carets in children to the start of the edit
-        // if the start index is in a child, and is contained in the edit, then the end index must be contained too
+      if (indices.startsWith(edit.indices)) {
+        if (indices.equals(edit.indices)) {
+          const mapOffset = (offsetToUpdate: Offset) => {
+            if (edit.index <= offsetToUpdate && offsetToUpdate < editEndOffset) {
+              return edit.index;
+            } else if (editEndOffset <= offsetToUpdate) {
+              return offsetToUpdate - edit.values.length;
+            } else {
+              return offsetToUpdate;
+            }
+          };
+          start = mapOffset(start);
+          end = mapOffset(end);
+        } else if (RowIndices.isContainedIn(indices, start, edit.indices, edit.index, editEndOffset)) {
+          // and a remove edit clamps contained carets in children to the start of the edit
+          // if the start index is in a child, and is contained in the edit, then the end index must be contained too
 
-        start = edit.index;
-        end = edit.index;
-        indices = edit.indices;
+          start = edit.index;
+          end = edit.index;
+          indices = edit.indices;
+        } else {
+          const containerIndex = indices.indices[edit.indices.length - 1][0];
+          if (editEndOffset <= containerIndex) {
+            // If the edit is before the container, move the container
+            indices.indices[edit.indices.length - 1][0] -= edit.values.length;
+          }
+        }
       }
     } else {
       assertUnreachable(edit);
