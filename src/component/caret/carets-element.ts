@@ -538,34 +538,24 @@ class CaretAndSelection {
         selected.range.index,
         selected.range.leftOffset,
       ]);
-      const startRowLength = selected.range.getRow(selected.range.leftOffset)?.values.length ?? 0;
-      const renderedStart = renderResult.getViewportSelection({
-        indices: startIndices,
-        start: 0,
-        end: startRowLength,
-      });
+      const renderedStart = renderResult.getViewportRowBounds(startIndices);
       const endIndices = RowIndices.fromZipper(selected.range.zipper).addRowIndex([
         selected.range.index,
         selected.range.rightOffset,
       ]);
-      const endRowLength = selected.range.getRow(selected.range.rightOffset)?.values.length ?? 0;
-      const renderedEnd = renderResult.getViewportSelection({
-        indices: endIndices,
-        start: 0,
-        end: endRowLength,
-      });
+      const renderedEnd = renderResult.getViewportRowBounds(endIndices);
       this.#element.clearSelections();
       this.#element.addSelection(
         ViewportMath.joinRectangles(
           {
-            x: Math.min(renderedStart.rect.x, renderedEnd.rect.x),
-            y: Math.min(renderedStart.rect.y, renderedEnd.rect.y),
+            x: Math.min(renderedStart.x, renderedEnd.x),
+            y: Math.min(renderedStart.y, renderedEnd.y),
             width: 0,
             height: 0,
           },
           {
-            x: Math.max(renderedStart.rect.x + renderedStart.rect.width, renderedEnd.rect.x + renderedEnd.rect.width),
-            y: Math.max(renderedStart.rect.y + renderedStart.rect.height, renderedEnd.rect.y + renderedEnd.rect.height),
+            x: Math.max(renderedStart.x + renderedStart.width, renderedEnd.x + renderedEnd.width),
+            y: Math.max(renderedStart.y + renderedStart.height, renderedEnd.y + renderedEnd.height),
             width: 0,
             height: 0,
           }

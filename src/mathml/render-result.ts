@@ -73,7 +73,8 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
       baseline
     );
   }
-  getViewportRowSelection(row: RowIndices) {
+  getViewportRowBounds(row: RowIndices) {
+    // TODO: Return bigger bounds when inside a table cell.
     return this.getElement(row).getBounds();
   }
   getViewportCaretSize(row: RowIndices): number {

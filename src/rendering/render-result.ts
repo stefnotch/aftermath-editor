@@ -37,7 +37,7 @@ export interface RenderResult<T> {
    * For getting the position to render a given row selection.
    * This can be used for highlighting a table cell.
    */
-  getViewportRowSelection(row: RowIndices): ViewportRect;
+  getViewportRowBounds(row: RowIndices): ViewportRect;
 
   /**
    * For getting the caret size at a specific position.
