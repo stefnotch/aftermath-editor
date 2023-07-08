@@ -2,12 +2,12 @@ use input_tree::input_node::InputNode;
 
 use crate::{
     nfa_builder::NFABuilder,
-    parse_rules::{StartingTokenMatcher, TokenMatcher},
+    parse_rules::{StartingParser, TokenMatcher},
     syntax_tree::{LeafNodeType, NodeIdentifier},
     AutocompleteRule,
 };
 
-use super::{RuleCollection, TokenDefinition};
+use super::{RuleCollection, TokenParser};
 
 /// Rules for basic arithmetic.
 pub struct ArithmeticRules {}
@@ -18,12 +18,12 @@ impl ArithmeticRules {
     }
 }
 impl RuleCollection for ArithmeticRules {
-    fn get_rules() -> Vec<TokenDefinition> {
+    fn get_rules() -> Vec<TokenParser> {
         vec![
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Number"),
                 (None, None),
-                StartingTokenMatcher::Token(TokenMatcher {
+                StartingParser::Token(TokenMatcher {
                     symbol: NFABuilder::match_character(('0'..='9').into())
                         .one_or_more()
                         .then(
@@ -35,40 +35,40 @@ impl RuleCollection for ArithmeticRules {
                     symbol_type: LeafNodeType::Symbol,
                 }),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Add"),
                 (Some(100), Some(101)),
-                StartingTokenMatcher::operator_from_character('+'),
+                StartingParser::operator_from_character('+'),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Subtract"),
                 (Some(100), Some(101)),
-                StartingTokenMatcher::operator_from_character('-'),
+                StartingParser::operator_from_character('-'),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Add"),
                 (None, Some(400)),
-                StartingTokenMatcher::operator_from_character('+'),
+                StartingParser::operator_from_character('+'),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Subtract"),
                 (None, Some(400)),
-                StartingTokenMatcher::operator_from_character('-'),
+                StartingParser::operator_from_character('-'),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Multiply"),
                 (Some(200), Some(201)),
-                StartingTokenMatcher::operator_from_character('*'),
+                StartingParser::operator_from_character('*'),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Divide"),
                 (Some(200), Some(201)),
-                StartingTokenMatcher::operator_from_character('/'),
+                StartingParser::operator_from_character('/'),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Exponent"),
                 (Some(850), None),
-                StartingTokenMatcher::operator_from_character('^'),
+                StartingParser::operator_from_character('^'),
             ),
         ]
     }

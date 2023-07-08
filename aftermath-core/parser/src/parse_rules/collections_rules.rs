@@ -1,6 +1,6 @@
-use crate::{parse_rules::StartingTokenMatcher, syntax_tree::NodeIdentifier};
+use crate::{parse_rules::StartingParser, syntax_tree::NodeIdentifier};
 
-use super::{RuleCollection, TokenDefinition};
+use super::{RuleCollection, TokenParser};
 
 pub struct CollectionRules {}
 
@@ -10,11 +10,11 @@ impl CollectionRules {
     }
 }
 impl RuleCollection for CollectionRules {
-    fn get_rules() -> Vec<TokenDefinition> {
-        vec![TokenDefinition::new(
+    fn get_rules() -> Vec<TokenParser> {
+        vec![TokenParser::new(
             Self::rule_name("Tuple"),
             (Some(50), Some(51)),
-            StartingTokenMatcher::operator_from_character(','),
+            StartingParser::operator_from_character(','),
         )]
     }
 

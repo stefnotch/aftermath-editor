@@ -1,11 +1,11 @@
 use crate::{
     nfa_builder::NFABuilder,
-    parse_rules::{Argument, ArgumentParserType, StartingTokenMatcher, TokenMatcher},
+    parse_rules::{Argument, ArgumentParserType, StartingParser, TokenMatcher},
     syntax_tree::{LeafNodeType, NodeIdentifier},
     AutocompleteRule,
 };
 
-use super::{RuleCollection, TokenDefinition};
+use super::{RuleCollection, TokenParser};
 
 pub struct FunctionRules {}
 
@@ -15,25 +15,25 @@ impl FunctionRules {
     }
 }
 impl RuleCollection for FunctionRules {
-    fn get_rules() -> Vec<TokenDefinition> {
-        vec![TokenDefinition::new_with_parsers(
+    fn get_rules() -> Vec<TokenParser> {
+        vec![TokenParser::new(
             Self::rule_name("FunctionApplication"),
             (Some(800), None),
-            StartingTokenMatcher::operator_from_character('('),
-            vec![
-                Argument {
-                    parser: ArgumentParserType::Next {
-                        minimum_binding_power: 0,
-                    },
+            StartingParser::operator_from_character('('),
+        )
+        .with_parsers(vec![
+            Argument {
+                parser: ArgumentParserType::Next {
+                    minimum_binding_power: 0,
                 },
-                Argument {
-                    parser: ArgumentParserType::NextToken(TokenMatcher {
-                        symbol: NFABuilder::match_character(')'.into()).build(),
-                        symbol_type: LeafNodeType::Operator,
-                    }),
-                },
-            ],
-        )]
+            },
+            Argument {
+                parser: ArgumentParserType::NextToken(TokenMatcher {
+                    symbol: NFABuilder::match_character(')'.into()).build(),
+                    symbol_type: LeafNodeType::Operator,
+                }),
+            },
+        ])]
     }
 
     fn get_autocomplete_rules() -> Vec<AutocompleteRule> {

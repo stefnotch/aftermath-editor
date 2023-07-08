@@ -2,12 +2,12 @@ use input_tree::input_node::InputNode;
 
 use crate::{
     nfa_builder::NFABuilder,
-    parse_rules::{StartingTokenMatcher, TokenMatcher},
+    parse_rules::{StartingParser, TokenMatcher},
     syntax_tree::{LeafNodeType, NodeIdentifier},
     AutocompleteRule,
 };
 
-use super::{RuleCollection, TokenDefinition};
+use super::{RuleCollection, TokenParser};
 
 /// Rules for basic calculus.
 pub struct CalculusRules {}
@@ -18,30 +18,30 @@ impl CalculusRules {
     }
 }
 impl RuleCollection for CalculusRules {
-    fn get_rules() -> Vec<TokenDefinition> {
+    fn get_rules() -> Vec<TokenParser> {
         vec![
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Infinity"),
                 (None, None),
-                StartingTokenMatcher::from_characters(vec!['∞'], LeafNodeType::Symbol),
+                StartingParser::from_characters(vec!['∞'], LeafNodeType::Symbol),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Lim"),
                 (None, None),
-                StartingTokenMatcher::from_characters(vec!['l', 'i', 'm'], LeafNodeType::Symbol),
+                StartingParser::from_characters(vec!['l', 'i', 'm'], LeafNodeType::Symbol),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("LimSup"),
                 (None, None),
-                StartingTokenMatcher::from_characters(
+                StartingParser::from_characters(
                     vec!['l', 'i', 'm', 's', 'u', 'p'],
                     LeafNodeType::Symbol,
                 ),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("LimInf"),
                 (None, None),
-                StartingTokenMatcher::from_characters(
+                StartingParser::from_characters(
                     vec!['l', 'i', 'm', 'i', 'n', 'f'],
                     LeafNodeType::Symbol,
                 ),

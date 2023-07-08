@@ -1,10 +1,10 @@
 use crate::{
-    parse_rules::StartingTokenMatcher,
+    parse_rules::StartingParser,
     syntax_tree::{LeafNodeType, NodeIdentifier},
     AutocompleteRule,
 };
 
-use super::{RuleCollection, TokenDefinition};
+use super::{RuleCollection, TokenParser};
 
 /// Rules for basic arithmetic.
 pub struct LogicRules {}
@@ -15,42 +15,42 @@ impl LogicRules {
     }
 }
 impl RuleCollection for LogicRules {
-    fn get_rules() -> Vec<TokenDefinition> {
+    fn get_rules() -> Vec<TokenParser> {
         vec![
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("True"),
                 (None, None),
-                StartingTokenMatcher::from_characters(vec!['⊤'], LeafNodeType::Symbol),
+                StartingParser::from_characters(vec!['⊤'], LeafNodeType::Symbol),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("False"),
                 (None, None),
-                StartingTokenMatcher::from_characters(vec!['⊥'], LeafNodeType::Symbol),
+                StartingParser::from_characters(vec!['⊥'], LeafNodeType::Symbol),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("And"),
                 (Some(100), Some(101)),
-                StartingTokenMatcher::operator_from_character('∧'),
+                StartingParser::operator_from_character('∧'),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Or"),
                 (Some(100), Some(101)),
-                StartingTokenMatcher::operator_from_character('∨'),
+                StartingParser::operator_from_character('∨'),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Not"),
                 (Some(100), Some(101)),
-                StartingTokenMatcher::operator_from_character('¬'),
+                StartingParser::operator_from_character('¬'),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Equivalent"),
                 (Some(100), Some(101)),
-                StartingTokenMatcher::operator_from_character('⇔'),
+                StartingParser::operator_from_character('⇔'),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Implies"),
                 (Some(100), Some(101)),
-                StartingTokenMatcher::operator_from_character('⟹'),
+                StartingParser::operator_from_character('⟹'),
             ),
         ]
     }

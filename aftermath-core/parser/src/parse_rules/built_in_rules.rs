@@ -4,12 +4,12 @@ use input_tree::input_node::InputNodeContainer;
 
 use crate::{
     nfa_builder::NFABuilder,
-    parse_rules::{StartingTokenMatcher, TokenMatcher},
+    parse_rules::{StartingParser, TokenMatcher},
     syntax_tree::{LeafNodeType, NodeIdentifier},
     AutocompleteRule, SyntaxLeafNode, SyntaxNode, SyntaxNodes,
 };
 
-use super::{RuleCollection, TokenDefinition};
+use super::{RuleCollection, TokenParser};
 
 pub struct BuiltInRules {}
 
@@ -129,67 +129,67 @@ impl BuiltInRules {
 }
 
 impl RuleCollection for BuiltInRules {
-    fn get_rules() -> Vec<TokenDefinition> {
+    fn get_rules() -> Vec<TokenParser> {
         vec![
             // Matching those as *single* tokens is fine,
             //   since I think that AST transformations are about as powerful as typical parsing techniques.
             // So if we want something like a matrix surrounded with brackets,
             //   we just write the appropriate AST transformation.
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Fraction"),
                 (None, None),
-                StartingTokenMatcher::Token(TokenMatcher {
+                StartingParser::Token(TokenMatcher {
                     symbol: NFABuilder::match_input_node(InputNodeContainer::Fraction).build(),
                     symbol_type: LeafNodeType::Symbol,
                 }),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Root"),
                 (None, None),
-                StartingTokenMatcher::Token(TokenMatcher {
+                StartingParser::Token(TokenMatcher {
                     symbol: NFABuilder::match_input_node(InputNodeContainer::Root).build(),
                     symbol_type: LeafNodeType::Symbol,
                 }),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Under"),
                 (None, None),
-                StartingTokenMatcher::Token(TokenMatcher {
+                StartingParser::Token(TokenMatcher {
                     symbol: NFABuilder::match_input_node(InputNodeContainer::Under).build(),
                     symbol_type: LeafNodeType::Symbol,
                 }),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Over"),
                 (None, None),
-                StartingTokenMatcher::Token(TokenMatcher {
+                StartingParser::Token(TokenMatcher {
                     symbol: NFABuilder::match_input_node(InputNodeContainer::Over).build(),
                     symbol_type: LeafNodeType::Symbol,
                 }),
             ),
             // Yay, thanks to the WYSIWYG editing model, I don't have to deal with "exponent associativity".
             // After all, it's clear if something is inside a superscript or not.
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Sup"),
                 (Some(1000), None),
-                StartingTokenMatcher::Token(TokenMatcher {
+                StartingParser::Token(TokenMatcher {
                     symbol: NFABuilder::match_input_node(InputNodeContainer::Sup).build(),
                     symbol_type: LeafNodeType::Operator,
                 }),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Sub"),
                 (Some(1000), None),
-                StartingTokenMatcher::Token(TokenMatcher {
+                StartingParser::Token(TokenMatcher {
                     symbol: NFABuilder::match_input_node(InputNodeContainer::Sub).build(),
                     symbol_type: LeafNodeType::Operator,
                 }),
             ),
             // TODO: Table row_width
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Table"),
                 (None, None),
-                StartingTokenMatcher::Token(TokenMatcher {
+                StartingParser::Token(TokenMatcher {
                     symbol: NFABuilder::match_input_node(InputNodeContainer::Table).build(),
                     symbol_type: LeafNodeType::Symbol,
                 }),

@@ -46,7 +46,7 @@ pub enum TokenType {
 pub struct ParserRules<'a> {
     // takes the parent context and gives it back afterwards
     parent_context: Option<&'a ParserRules<'a>>,
-    known_tokens: HashMap<TokenType, Vec<TokenDefinition>>,
+    known_tokens: HashMap<TokenType, Vec<TokenParser>>,
     autocomplete_rules: Vec<AutocompleteRule>,
     // rule_collections: Vec<&'a dyn ParseRuleCollection>,
 }
@@ -57,7 +57,7 @@ pub struct ParserRules<'a> {
 impl<'a> ParserRules<'a> {
     pub fn new(
         parent_context: Option<&'a ParserRules<'a>>,
-        tokens: Vec<TokenDefinition>,
+        tokens: Vec<TokenParser>,
         autocomplete_rules: Vec<AutocompleteRule>,
     ) -> Self {
         let known_tokens = tokens
@@ -81,7 +81,7 @@ impl<'a> ParserRules<'a> {
         &self,
         mut lexer_range: LexerRange<'input, 'lexer>,
         token_type: TokenType,
-    ) -> Option<(LexerRange<'input, 'lexer>, &TokenDefinition)> {
+    ) -> Option<(LexerRange<'input, 'lexer>, &TokenParser)> {
         let mut matches: Vec<_> = self
             .known_tokens
             .get(&token_type)?
@@ -96,18 +96,18 @@ impl<'a> ParserRules<'a> {
             .collect();
 
         matches = retain_max_by_key(matches, |(match_result, _)| match_result.get_length());
+        matches = retain_max_by_key(matches, |(_, parser)| parser.get_priority());
 
-        if matches.len() > 0 {
-            if matches.len() > 1 {
-                // TODO: Better error
-                panic!("multiple longest matches for token");
-            } else if matches.len() == 1 {
-                let (match_result, definition) = matches.into_iter().next().unwrap();
-                lexer_range.consume_n(match_result.get_length());
-                Some((lexer_range, definition))
-            } else {
-                panic!("no matches for token");
-            }
+        if matches.len() > 1 {
+            // TODO: Report parse error
+            panic!(
+                "multiple longest matches for token {:?} - {:?}",
+                token_type, matches
+            );
+        } else if matches.len() == 1 {
+            let (match_result, definition) = matches.into_iter().next().unwrap();
+            lexer_range.consume_n(match_result.get_length());
+            Some((lexer_range, definition))
         } else {
             self.parent_context
                 .and_then(|v| v.get_token(lexer_range, token_type))
@@ -202,34 +202,43 @@ impl<'a> ParserRules<'a> {
         // 4. Parser for whitespace
         // 5. Parser for chains of < <=, which could be treated as a "domain restriction"
 
+        let mut priority = 0;
         let mut parse_rules = vec![];
         let mut autocomplete_rules = vec![];
-        parse_rules.extend(BuiltInRules::get_rules());
+        parse_rules.extend(BuiltInRules::get_rules().with_priority(priority));
         autocomplete_rules.extend(BuiltInRules::get_autocomplete_rules());
+        priority += 1;
         // Bonus rules
-        parse_rules.extend(CoreRules::get_rules());
+        parse_rules.extend(CoreRules::get_rules().with_priority(priority));
         autocomplete_rules.extend(CoreRules::get_autocomplete_rules());
-        parse_rules.extend(ArithmeticRules::get_rules());
+        priority += 1;
+        parse_rules.extend(ArithmeticRules::get_rules().with_priority(priority));
         autocomplete_rules.extend(ArithmeticRules::get_autocomplete_rules());
-        parse_rules.extend(CalculusRules::get_rules());
+        priority += 1;
+        parse_rules.extend(CalculusRules::get_rules().with_priority(priority));
         autocomplete_rules.extend(CalculusRules::get_autocomplete_rules());
-        parse_rules.extend(ComparisonRules::get_rules());
+        priority += 1;
+        parse_rules.extend(ComparisonRules::get_rules().with_priority(priority));
         autocomplete_rules.extend(ComparisonRules::get_autocomplete_rules());
-        parse_rules.extend(CollectionRules::get_rules());
+        priority += 1;
+        parse_rules.extend(CollectionRules::get_rules().with_priority(priority));
         autocomplete_rules.extend(CollectionRules::get_autocomplete_rules());
-        parse_rules.extend(FunctionRules::get_rules());
+        priority += 1;
+        parse_rules.extend(FunctionRules::get_rules().with_priority(priority));
         autocomplete_rules.extend(FunctionRules::get_autocomplete_rules());
-        parse_rules.extend(StringRules::get_rules());
+        priority += 1;
+        parse_rules.extend(StringRules::get_rules().with_priority(priority));
         autocomplete_rules.extend(StringRules::get_autocomplete_rules());
-        parse_rules.extend(LogicRules::get_rules());
+        priority += 1;
+        parse_rules.extend(LogicRules::get_rules().with_priority(priority));
         autocomplete_rules.extend(LogicRules::get_autocomplete_rules());
 
         // TODO: The dx at the end of an integral might not even be a closing bracket.
         // After all, it can also sometimes appear inside an integral.
-        parse_rules.push(TokenDefinition::new(
+        parse_rules.push(TokenParser::new(
             NodeIdentifier::new(vec!["Unsorted".into(), "Factorial".into()]),
             (Some(600), None),
-            StartingTokenMatcher::operator_from_character('!'),
+            StartingParser::operator_from_character('!'),
         ));
 
         ParserRules::new(None, parse_rules, autocomplete_rules)
@@ -237,16 +246,16 @@ impl<'a> ParserRules<'a> {
 }
 
 #[derive(Debug)]
-pub enum StartingTokenMatcher {
+pub enum StartingParser {
     Token(TokenMatcher),
 }
-impl StartingTokenMatcher {
+impl StartingParser {
     fn matches<'input>(
         &self,
         input: &'input [InputNode],
     ) -> Result<MatchResult<'input, InputNode>, MatchError> {
         match self {
-            StartingTokenMatcher::Token(TokenMatcher { symbol, .. }) => symbol.matches(input),
+            StartingParser::Token(TokenMatcher { symbol, .. }) => symbol.matches(input),
         }
     }
 
@@ -284,15 +293,16 @@ pub struct TokenMatcher {
 }
 
 #[derive(Debug)]
-pub struct TokenDefinition {
+pub struct TokenParser {
     pub name: NodeIdentifier,
     /// (None, None) is a constant\
     /// (None, Some) is a prefix operator\
     /// (Some, None) is a postfix operator\
     /// (Some, Some) is an infix operator
     pub binding_power: (Option<u32>, Option<u32>),
-    pub starting_parser: StartingTokenMatcher,
+    pub starting_parser: StartingParser,
     arguments_parser: Vec<Argument>,
+    priority: u32,
 }
 
 #[derive(Debug)]
@@ -372,11 +382,11 @@ impl Argument {
     }
 }
 
-impl TokenDefinition {
+impl TokenParser {
     pub fn new(
         name: NodeIdentifier,
         binding_power: (Option<u32>, Option<u32>),
-        starting_parser: StartingTokenMatcher,
+        starting_parser: StartingParser,
     ) -> Self {
         let arguments_parser = match binding_power {
             // infix
@@ -396,22 +406,27 @@ impl TokenDefinition {
             // symbol
             (None, None) => vec![],
         };
-
-        Self::new_with_parsers(name, binding_power, starting_parser, arguments_parser)
-    }
-
-    pub fn new_with_parsers(
-        name: NodeIdentifier,
-        binding_power: (Option<u32>, Option<u32>),
-        starting_parser: StartingTokenMatcher,
-        arguments_parsers: Vec<Argument>,
-    ) -> Self {
         Self {
             name,
             binding_power,
             starting_parser,
-            arguments_parser: arguments_parsers,
+            arguments_parser,
+            priority: 0,
         }
+    }
+
+    pub fn with_parsers(mut self, arguments_parsers: Vec<Argument>) -> Self {
+        self.arguments_parser = arguments_parsers;
+        self
+    }
+
+    pub fn with_priority(mut self, priority: u32) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    fn get_priority(&self) -> u32 {
+        self.priority
     }
 
     fn token_type(&self) -> TokenType {
@@ -500,7 +515,7 @@ impl TokenDefinition {
 
         let leaf_node = SyntaxLeafNode::new(
             match &self.starting_parser {
-                StartingTokenMatcher::Token(v) => v.symbol_type.clone(),
+                StartingParser::Token(v) => v.symbol_type.clone(),
             },
             token.range(),
             token.get_symbols(),
@@ -519,8 +534,21 @@ impl TokenDefinition {
     }
 }
 
+trait TokenParserCollection {
+    fn with_priority(self, priority: u32) -> Self;
+}
+
+impl TokenParserCollection for Vec<TokenParser> {
+    fn with_priority(mut self, priority: u32) -> Self {
+        for parser in &mut self {
+            parser.priority = priority;
+        }
+        self
+    }
+}
+
 pub trait RuleCollection {
-    fn get_rules() -> Vec<TokenDefinition>;
+    fn get_rules() -> Vec<TokenParser>;
     fn get_autocomplete_rules() -> Vec<AutocompleteRule>;
     fn get_extra_rule_names() -> Vec<NodeIdentifier> {
         vec![]

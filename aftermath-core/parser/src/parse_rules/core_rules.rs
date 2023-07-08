@@ -3,12 +3,12 @@ use input_tree::input_node::InputNode;
 use crate::{
     grapheme_matcher::GraphemeMatcher,
     nfa_builder::NFABuilder,
-    parse_rules::{Argument, ArgumentParserType, StartingTokenMatcher, TokenMatcher},
+    parse_rules::{Argument, ArgumentParserType, StartingParser, TokenMatcher},
     syntax_tree::{LeafNodeType, NodeIdentifier},
     AutocompleteRule,
 };
 
-use super::{RuleCollection, TokenDefinition};
+use super::{RuleCollection, TokenParser};
 
 /// Core rules that one basically always wants.
 pub struct CoreRules {}
@@ -19,7 +19,7 @@ impl CoreRules {
     }
 }
 impl RuleCollection for CoreRules {
-    fn get_rules() -> Vec<TokenDefinition> {
+    fn get_rules() -> Vec<TokenParser> {
         vec![
             // TODO: Good whitespace handling
             /*(
@@ -27,10 +27,10 @@ impl RuleCollection for CoreRules {
             ),
                 TokenDefinition::new(minimal_definitions.empty.clone(), (None, None)),
             ),*/
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Variable"),
                 (None, None),
-                StartingTokenMatcher::Token(TokenMatcher {
+                StartingParser::Token(TokenMatcher {
                     symbol: NFABuilder::match_character(GraphemeMatcher::IdentifierStart)
                         .then(
                             NFABuilder::match_character(GraphemeMatcher::IdentifierContinue)
@@ -40,41 +40,38 @@ impl RuleCollection for CoreRules {
                     symbol_type: LeafNodeType::Symbol,
                 }),
             ),
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("Subscript"),
                 (Some(850), None), // Dunno really
-                StartingTokenMatcher::operator_from_character('_'),
+                StartingParser::operator_from_character('_'),
             ),
             // Amusingly, if someone defines the closing bracket as a postfix operator, it'll break the brackets
             // Brackets
 
             // Unit tuple
-            TokenDefinition::new(
+            TokenParser::new(
                 Self::rule_name("RoundBrackets"),
                 (None, None),
-                StartingTokenMatcher::from_characters(
-                    vec!['(', ')'].into(),
-                    LeafNodeType::Operator,
-                ),
+                StartingParser::from_characters(vec!['(', ')'].into(), LeafNodeType::Operator),
             ),
-            TokenDefinition::new_with_parsers(
+            TokenParser::new(
                 Self::rule_name("RoundBrackets"),
                 (None, None),
-                StartingTokenMatcher::from_character('(', LeafNodeType::Operator),
-                vec![
-                    Argument {
-                        parser: ArgumentParserType::Next {
-                            minimum_binding_power: 0,
-                        },
+                StartingParser::from_character('(', LeafNodeType::Operator),
+            )
+            .with_parsers(vec![
+                Argument {
+                    parser: ArgumentParserType::Next {
+                        minimum_binding_power: 0,
                     },
-                    Argument {
-                        parser: ArgumentParserType::NextToken(TokenMatcher {
-                            symbol: NFABuilder::match_character(')'.into()).build(),
-                            symbol_type: LeafNodeType::Operator,
-                        }),
-                    },
-                ],
-            ),
+                },
+                Argument {
+                    parser: ArgumentParserType::NextToken(TokenMatcher {
+                        symbol: NFABuilder::match_character(')'.into()).build(),
+                        symbol_type: LeafNodeType::Operator,
+                    }),
+                },
+            ]),
         ]
     }
 

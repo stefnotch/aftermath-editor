@@ -1,11 +1,11 @@
 use crate::{
     nfa_builder::NFABuilder,
-    parse_rules::{StartingTokenMatcher, TokenMatcher},
+    parse_rules::{StartingParser, TokenMatcher},
     syntax_tree::{LeafNodeType, NodeIdentifier},
     AutocompleteRule,
 };
 
-use super::{RuleCollection, TokenDefinition};
+use super::{RuleCollection, TokenParser};
 
 pub struct StringRules {}
 
@@ -15,8 +15,8 @@ impl StringRules {
     }
 }
 impl RuleCollection for StringRules {
-    fn get_rules() -> Vec<TokenDefinition> {
-        vec![TokenDefinition::new(
+    fn get_rules() -> Vec<TokenParser> {
+        vec![TokenParser::new(
             Self::rule_name("String"),
             (None, None),
             // https://stackoverflow.com/questions/249791/regex-for-quoted-string-with-escaping-quotes
@@ -30,7 +30,7 @@ impl RuleCollection for StringRules {
                 B -->G(Other)
                 G -->B
                 */
-            StartingTokenMatcher::Token(TokenMatcher {
+            StartingParser::Token(TokenMatcher {
                 symbol: NFABuilder::match_character(('"').into())
                     .then(
                         // Skip quote
