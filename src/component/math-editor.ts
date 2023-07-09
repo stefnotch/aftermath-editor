@@ -266,11 +266,13 @@ export class MathEditor extends HTMLElement {
       console.log("copy", copyResult);
     });
 
-    this.inputHandler.element.addEventListener("copy", (ev) => {
+    this.inputHandler.element.addEventListener("cut", (ev) => {
       const copyResult = handleCopy();
       ev.clipboardData?.setData("application/json", copyResult.json);
       ev.preventDefault();
-      this.carets.removeAtCarets("range", this.inputTree, this.renderResult);
+      const edit = this.carets.removeAtCarets("range", this.inputTree, this.renderResult);
+      this.saveEdit(edit);
+      this.updateInput();
     });
 
     this.inputHandler.element.addEventListener("paste", (ev) => {
