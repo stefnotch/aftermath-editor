@@ -6,11 +6,32 @@ import { Grid, InputRow } from "../input-tree/row";
 import { assert } from "../utils/assert";
 import { InputRowRange } from "../input-position/input-row-range";
 import type { InputRowPosition } from "../input-position/input-row-position";
+import { version } from "../../package.json";
 
 // Yay, top level await is neat https://v8.dev/features/top-level-await
 await init();
 
 const parser = MathParser.new();
+
+export type JsonSerializedInput = {
+  version: string;
+  value: string;
+};
+
+export function serializeInput(row: InputRow): JsonSerializedInput {
+  let result = parser.serialize(toCore(row));
+
+  return {
+    version,
+    value: result,
+  };
+}
+
+export function deserializeInput(serialized: JsonSerializedInput): InputRow {
+  assert(serialized.version === version);
+  let result: InputRow = fromCore(parser.deserialize(serialized.value));
+  return result;
+}
 
 export function parse(row: InputRow): ParseResult {
   let result: ParseResult = parser.parse(toCore(row));

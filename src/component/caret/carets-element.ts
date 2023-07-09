@@ -16,6 +16,7 @@ import { InputRowRange } from "../../input-position/input-row-range";
 import { getAutocompleteTokens } from "../../editing/editing-autocomplete";
 import type { Offset } from "../../input-tree/input-offset";
 import type { RenderedSelection } from "../../rendering/rendered-selection";
+import { InputRow } from "../../input-tree/row";
 
 export interface Autocompleter {
   autocomplete(tokenStarts: InputRowPosition[], endPosition: Offset): Autocomplete[];
@@ -115,7 +116,11 @@ export class MathEditorCarets {
   /**
    * Finishes the current carets, and returns the edit that has been applied.
    */
-  removeAtCarets(direction: "left" | "right", tree: InputTree, renderResult: RenderResult<MathMLElement>): MathLayoutEdit {
+  removeAtCarets(
+    direction: "left" | "right" | "range",
+    tree: InputTree,
+    renderResult: RenderResult<MathMLElement>
+  ): MathLayoutEdit {
     // Note: Be very careful about using the syntaxTree here, because it is outdated after the first edit.
     this.finishPointerDown(tree.getSyntaxTree());
     const caretsBefore = this.serialize();
@@ -187,6 +192,57 @@ export class MathEditorCarets {
             // Repeatedly reparse the syntax tree
 
           }*/
+        } else if (selection.type === "grid") {
+          // TODO: Implement grid edits
+        } else {
+          assertUnreachable(selection);
+        }
+      }
+      // TODO: Deduplicate carets/remove overlapping carets
+      return carets;
+    });
+    edits.push(...autocompleteEdits.edits);
+
+    const caretsAfter = this.#carets.map((v) => v.serialize());
+    return new MathLayoutEdit(edits, caretsBefore, caretsAfter);
+  }
+
+  copyAtCarets(): InputRow[] {
+    return this.#carets.map((caret) => {
+      if (caret.selection.type === "grid") {
+        throw new Error("Not implemented"); // TODO: Implement this
+      } else if (caret.selection.type === "caret") {
+        const range = caret.selection.range;
+        return new InputRow(range.zipper.value.values.slice(range.leftOffset, range.rightOffset));
+      } else {
+        assertUnreachable(caret.selection);
+      }
+    });
+  }
+
+  pasteAtCarets(inputRows: InputRow[], tree: InputTree): MathLayoutEdit {
+    this.finishPointerDown(tree.getSyntaxTree());
+    const caretsBefore = this.serialize();
+    const edits: MathLayoutSimpleEdit[] = [];
+
+    let mergedInputRows: InputRow | null = null;
+    if (this.#carets.length !== inputRows.length) {
+      mergedInputRows = new InputRow(inputRows.flatMap((v) => v.values));
+    }
+
+    let autocompleteEdits = this.usingMatchedAutocomplete(tree, (carets, ranges) => {
+      for (let i = 0; i < carets.length; i++) {
+        const selection = carets[i].selection;
+        if (selection.type === "caret") {
+          const edit = MathEditorCarets.applyEdit(
+            insertAtCaret(selection.range, mergedInputRows?.values ?? inputRows[i].values),
+            tree,
+            carets,
+            ranges
+          );
+          edits.push(...edit.edits);
+          carets[i].moveCaretTo(edit.caret);
+          carets[i].setHasEdited();
         } else if (selection.type === "grid") {
           // TODO: Implement grid edits
         } else {

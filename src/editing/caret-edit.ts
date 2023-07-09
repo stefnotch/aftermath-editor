@@ -19,8 +19,20 @@ export type CaretEdit = {
   caret: SerializedInputRowPosition;
 };
 
-export function removeAtCaret<T>(caret: InputRowRange, direction: "left" | "right", renderResult: RenderResult<T>): CaretEdit {
-  if (caret.isCollapsed) {
+/**
+ * @param caret The selected range, can be empty.
+ * @param direction In which direction to delete. If "range", then the selected range is deleted, even if it's empty.
+ * @param renderResult The rendered math layout.
+ * @returns An edit command that needs to be applied for the deletion to have any effect.
+ */
+export function removeAtCaret<T>(
+  caret: InputRowRange,
+  direction: "left" | "right" | "range",
+  renderResult: RenderResult<T>
+): CaretEdit {
+  if (direction === "range") {
+    return removeRange(caret);
+  } else if (caret.isCollapsed) {
     return removeAtPosition(caret.startPosition(), direction, renderResult);
   } else {
     return removeRange(caret);

@@ -2,7 +2,6 @@ import { InputNodeContainer } from "../input-tree/input-node";
 import type { Offset } from "../input-tree/input-offset";
 import type { InputTree } from "../input-tree/input-tree";
 import { InputNodeContainerZipper, InputRowZipper } from "../input-tree/input-zipper";
-import type { InputRow } from "../input-tree/row";
 import { RowIndices } from "../input-tree/row-indices";
 import { assert } from "../utils/assert";
 

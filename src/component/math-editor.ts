@@ -13,7 +13,16 @@ import { UndoRedoManager } from "../editing/undo-redo-manager";
 import { InputRowPosition } from "../input-position/input-row-position";
 import { MathMLRenderer } from "../mathml/renderer";
 import type { RenderResult, RenderedElement } from "../rendering/render-result";
-import { getNodeIdentifiers, joinNodeIdentifier, parse, autocomplete, beginningAutocomplete } from "./../core";
+import {
+  getNodeIdentifiers,
+  joinNodeIdentifier,
+  parse,
+  autocomplete,
+  beginningAutocomplete,
+  serializeInput,
+  type JsonSerializedInput,
+  deserializeInput,
+} from "./../core";
 import { DebugSettings } from "./debug-settings";
 import { MathEditorCarets } from "./caret/carets-element";
 import { InputRow } from "../input-tree/row";
@@ -240,6 +249,46 @@ export class MathEditor extends HTMLElement {
           // TODO: Handle it differently
         }
       });
+    });
+
+    const handleCopy = () => {
+      const copyResult = this.carets.copyAtCarets();
+      const json = copyResult.map((v) => serializeInput(v));
+      return {
+        json: JSON.stringify(json),
+      };
+    };
+
+    this.inputHandler.element.addEventListener("copy", (ev) => {
+      const copyResult = handleCopy();
+      ev.clipboardData?.setData("application/json", copyResult.json);
+      ev.preventDefault();
+      console.log("copy", copyResult);
+    });
+
+    this.inputHandler.element.addEventListener("copy", (ev) => {
+      const copyResult = handleCopy();
+      ev.clipboardData?.setData("application/json", copyResult.json);
+      ev.preventDefault();
+      this.carets.removeAtCarets("range", this.inputTree, this.renderResult);
+    });
+
+    this.inputHandler.element.addEventListener("paste", (ev) => {
+      const json = ev.clipboardData?.getData("application/json");
+      if (!json) return;
+
+      let input;
+      try {
+        const parsed: JsonSerializedInput[] = JSON.parse(json);
+        input = parsed.map((v) => deserializeInput(v));
+      } catch (e) {
+        console.error(e);
+        return;
+      }
+
+      const edit = this.carets.pasteAtCarets(input, this.inputTree);
+      this.saveEdit(edit);
+      this.updateInput();
     });
   }
 

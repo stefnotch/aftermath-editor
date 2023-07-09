@@ -1,8 +1,7 @@
 # v0.2.3
 
 - Add table selections
-- Add parsing priority, to disambiguate between `lim` and variable name
--
+- Add parsing priority, to disambiguate between `lim` and variable names
 
 # v0.2.2
 
