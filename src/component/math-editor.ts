@@ -263,7 +263,6 @@ export class MathEditor extends HTMLElement {
       const copyResult = handleCopy();
       ev.clipboardData?.setData("application/json", copyResult.json);
       ev.preventDefault();
-      console.log("copy", copyResult);
     });
 
     this.inputHandler.element.addEventListener("cut", (ev) => {
@@ -295,10 +294,16 @@ export class MathEditor extends HTMLElement {
   }
 
   private addPointerEventListeners(container: HTMLSpanElement) {
+    const getPointerPosition = (e: MouseEvent): InputRowPosition | null => {
+      const newCaret = this.renderResult.getLayoutPosition({ x: e.clientX, y: e.clientY });
+      if (!newCaret) return null;
+      return new InputRowPosition(InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newCaret.indices), newCaret.offset);
+    };
+
     container.addEventListener("pointerdown", (e) => {
       if (!e.isPrimary) return;
-      const newCaret = this.renderResult.getLayoutPosition({ x: e.clientX, y: e.clientY });
-      if (!newCaret) return;
+      const newPosition = getPointerPosition(e);
+      if (!newPosition) return;
 
       container.setPointerCapture(e.pointerId);
       // If I'm going to prevent default, then I also have to manually trigger the focus!
@@ -306,35 +311,53 @@ export class MathEditor extends HTMLElement {
       // TODO: This is wrong, we shouldn't forcibly finish all carets. Instead, carets that land in a good position should be preserved.
       //this.carets.finishCarets();
       this.carets.clearCarets();
-      this.carets.startPointerDown(
-        new InputRowPosition(InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newCaret.indices), newCaret.offset)
-      );
+      this.carets.startPointerDown(newPosition);
       this.renderCarets();
     });
     container.addEventListener("pointerup", (e) => {
       if (!e.isPrimary) return;
+      const newPosition = getPointerPosition(e);
+      if (newPosition) {
+        this.carets.updatePointerDown(newPosition, this.inputTree.getSyntaxTree());
+      }
       container.releasePointerCapture(e.pointerId);
       this.carets.finishPointerDown(this.inputTree.getSyntaxTree());
       this.renderCarets();
     });
     container.addEventListener("pointercancel", (e) => {
       if (!e.isPrimary) return;
+
+      const newPosition = getPointerPosition(e);
+      if (newPosition) {
+        this.carets.updatePointerDown(newPosition, this.inputTree.getSyntaxTree());
+      }
       container.releasePointerCapture(e.pointerId);
       this.carets.finishPointerDown(this.inputTree.getSyntaxTree());
       this.renderCarets();
+    });
+    // For double clicking
+    // - The dblclick event fires too late for text selection (text selection should happen on pointerdown)
+    // - The mouse event fires *after* the pointer event. And it includes the number of clicks info.
+    container.addEventListener("mousedown", (e) => {
+      if (!this.carets.isPointerDown()) return;
+      const clickCount = e.detail;
+      if (clickCount === 2) {
+        // double click select
+        this.carets.updatePointerDownOptions({ selectionMode: "token" }, this.inputTree.getSyntaxTree());
+        this.renderCarets();
+      } else if (clickCount === 3) {
+        // triple click select
+        this.carets.updatePointerDownOptions({ selectionMode: "line" }, this.inputTree.getSyntaxTree());
+        this.renderCarets();
+      }
     });
     container.addEventListener("pointermove", (e) => {
       if (!e.isPrimary) return;
       if (!this.carets.isPointerDown()) return;
 
-      const newPositionIndices = this.renderResult.getLayoutPosition({ x: e.clientX, y: e.clientY });
-      if (!newPositionIndices) return;
-      const newPosition = new InputRowPosition(
-        InputRowZipper.fromRowIndices(this.inputTree.rootZipper, newPositionIndices.indices),
-        newPositionIndices.offset
-      );
-
-      this.carets.updatePointerDown(newPosition);
+      const newPosition = getPointerPosition(e);
+      if (!newPosition) return;
+      this.carets.updatePointerDown(newPosition, this.inputTree.getSyntaxTree());
       this.renderCarets();
     });
   }

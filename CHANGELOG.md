@@ -1,6 +1,7 @@
 # next
 
 - Copy-pasting
+- Selections with double click and drag. Also with triple click.
 
 # v0.2.3
 

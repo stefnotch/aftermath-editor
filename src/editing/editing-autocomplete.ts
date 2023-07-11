@@ -5,6 +5,10 @@ import type { Offset } from "../input-tree/input-offset";
 import { RowIndices } from "../input-tree/row-indices";
 import { assert } from "../utils/assert";
 
+export function getLineAtPosition(caret: InputRowPosition): InputRowRange {
+  return new InputRowRange(caret.zipper, 0, caret.zipper.children.length);
+}
+
 /**
  * Gets the token that the caret is in the middle of,
  * or a token that is to the left of the caret.
