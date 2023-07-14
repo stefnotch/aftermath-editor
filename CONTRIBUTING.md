@@ -6,13 +6,15 @@ Preferably, features are developed in another branch or fork. After the feature 
 
 ## High Level Overview
 
+If the currently entered equation is $1+x^2$, and the user types `/` then
+
 ```mermaid
 flowchart TD
-Rendered[<b>Rendered</b><br>the MathML on the screen]
-CST[<b>Concrete Syntax Tree</b><br>the parsed mathematics]
-UserInput[<b>User inputs</b><br>such as key presses]
-InputTree[<b>Input Tree</b><br>like the top and bottom parts of a fraction]
-Cosmetics[<b>Cosmetics</b><br>extra annotations like text colors]
+Rendered["<b>Rendered</b><br><div style='text-align: start'><pre><code>&lt;math&gt;<br>  &lt;mfrac&gt;<br>  <br>    &lt;mrow&gt;<br>	  &lt;mn&gt;1&lt;/mn&gt;<br>	  &lt;mo&gt;+&lt;/mo&gt;<br>	  &lt;msup&gt;&lt;mi&gt;x&lt;/mi&gt;&lt;mn&gt;2&lt;/mn&gt;&lt;/msup&gt;<br>	&lt;/mrow&gt;<br>	<br>    &lt;mi&gt;⬚&lt;/mi&gt;<br>	<br>  &lt;/mfrac&gt;<br>&lt;/math&gt;</code></pre></div>"]
+CST["<b>Concrete Syntax Tree</b><br>(fraction (add ('1') (sup ('x') ('2'))) ()) "]
+UserInput["<b>User inputs</b><br>the pressed <code>/</code> key"]
+InputTree["<b>Input Tree</b><br> (row '1' '+' 'x' (sup '2') '/') "]
+Cosmetics["<b>Cosmetics</b><br>extra annotations like text colors"]
 
 UserInput -->|modify the| InputTree
 InputTree -->|parsed into a| CST
