@@ -10,4 +10,5 @@ unicode-segmentation = "1.10.1"
 unicode-normalization = "0.1.22"
 serde = { version = "1.0", features = ["derive"] }
 input_tree = { path = "../input_tree" }
-unicode-ident = "1.0.8"
+unicode-ident = "1.0.11"
+chumsky = { git = "https://github.com/zesterer/chumsky.git", features = ["pratt"] }

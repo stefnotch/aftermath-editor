@@ -59,16 +59,10 @@ export class InputTree {
       // However, in terms of indices, it also moves indices from rows below it.
       if (indices.startsWith(edit.indices)) {
         if (indices.equals(edit.indices)) {
-          const mapOffset = (offset: Offset) => {
-            // Avoid moving elements that are exactly where the inserted symbols are
-            if (edit.offset < offset) {
-              return offset + edit.values.length;
-            } else {
-              return offset;
-            }
-          };
-          start = mapOffset(start);
-          end = mapOffset(end);
+          // Avoid moving the start if it's exactly where the inserted symbols are
+          // but do move the end if it's exactly where the inserted symbols are
+          start = edit.offset < start ? start + edit.values.length : start;
+          end = edit.offset <= end ? end + edit.values.length : end;
         } else {
           const containerIndex = indices.indices[edit.indices.length - 1][0];
           if (edit.offset <= containerIndex) {

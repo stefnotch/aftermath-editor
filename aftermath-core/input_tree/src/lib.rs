@@ -1,9 +1,11 @@
+pub mod input_focus;
 pub mod input_node;
+pub mod input_row_position;
+pub mod input_row_range;
+pub mod print_helpers;
 pub mod row;
 
 /*
-#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
-pub struct Offset(usize);
 
 pub trait CaretPositions {
     fn max_caret_position(&self) -> Offset;

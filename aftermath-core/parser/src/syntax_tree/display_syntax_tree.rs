@@ -1,30 +1,21 @@
 use core::fmt;
 
+use input_tree::print_helpers::{write_with_escaped_double_quotes, write_with_separator};
+
 use crate::{SyntaxLeafNode, SyntaxNode};
 
-use super::{NodeIdentifier, SyntaxNodes};
+use super::{NodeIdentifier, SyntaxTree};
 
-impl fmt::Display for SyntaxNodes {
+impl fmt::Display for SyntaxTree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SyntaxNodes::Containers(children) => {
-                if let Some((first, tail)) = children.split_first() {
-                    write!(f, "{}", first)?;
-                    for child in tail {
-                        write!(f, " {}", child)?;
-                    }
-                }
+            SyntaxTree::Children(children) => {
+                write_with_separator(children, " ", f)?;
             }
-            SyntaxNodes::NewRows(children) => {
-                // TODO: Maybe print grid width and height
-                if let Some((first, tail)) = children.values().split_first() {
-                    write!(f, "{}", first)?;
-                    for child in tail {
-                        write!(f, " {}", child)?;
-                    }
-                }
+            SyntaxTree::NewRows(children) => {
+                write!(f, "{}", children)?;
             }
-            SyntaxNodes::Leaf(child) => {
+            SyntaxTree::Leaf(child) => {
                 write!(f, "{}", child)?;
             }
         };
@@ -59,15 +50,8 @@ impl fmt::Display for SyntaxNode {
 impl fmt::Display for SyntaxLeafNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "\"")?;
-        // Print string, escaping quotes
         for grapheme in &self.symbols {
-            for c in grapheme.chars() {
-                match c {
-                    '"' => write!(f, "\\\"")?,
-                    '\\' => write!(f, "\\\\")?,
-                    _ => write!(f, "{}", c)?,
-                }
-            }
+            write_with_escaped_double_quotes(grapheme, f)?;
         }
         write!(f, "\"")
     }
@@ -75,15 +59,6 @@ impl fmt::Display for SyntaxLeafNode {
 
 impl fmt::Display for NodeIdentifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut values = self.0.iter();
-
-        if let Some(value) = values.next() {
-            write!(f, "{}", value)?;
-            for value in values {
-                write!(f, "::{}", value)?;
-            }
-        }
-
-        Ok(())
+        write_with_separator(&self.0, "::", f)
     }
 }

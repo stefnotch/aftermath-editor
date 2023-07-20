@@ -11,7 +11,7 @@ pub mod string_rules;
 use std::collections::HashMap;
 
 use input_tree::{
-    input_node::{InputNode, InputNodeContainer},
+    input_node::{InputNode, InputNodeVariant},
     row::Grid,
 };
 
@@ -21,7 +21,7 @@ use crate::{
     parse_row,
     syntax_tree::{LeafNodeType, NodeIdentifier, SyntaxLeafNode},
     token_matcher::MatchError,
-    SyntaxNode, SyntaxNodes,
+    SyntaxNode, SyntaxTree,
 };
 
 use self::{
@@ -461,15 +461,15 @@ impl TokenParser {
         (arguments, lexer)
     }
 
-    fn get_new_row_token_name(token: &InputNodeContainer) -> NodeIdentifier {
+    fn get_new_row_token_name(token: &InputNodeVariant) -> NodeIdentifier {
         match token {
-            InputNodeContainer::Fraction => BuiltInRules::fraction_rule_name(),
-            InputNodeContainer::Root => BuiltInRules::root_rule_name(),
-            InputNodeContainer::Under => BuiltInRules::under_rule_name(),
-            InputNodeContainer::Over => BuiltInRules::over_rule_name(),
-            InputNodeContainer::Sup => BuiltInRules::row_rule_name(),
-            InputNodeContainer::Sub => BuiltInRules::row_rule_name(),
-            InputNodeContainer::Table => BuiltInRules::table_rule_name(),
+            InputNodeVariant::Fraction => BuiltInRules::fraction_rule_name(),
+            InputNodeVariant::Root => BuiltInRules::root_rule_name(),
+            InputNodeVariant::Under => BuiltInRules::under_rule_name(),
+            InputNodeVariant::Over => BuiltInRules::over_rule_name(),
+            InputNodeVariant::Sup => BuiltInRules::row_rule_name(),
+            InputNodeVariant::Sub => BuiltInRules::row_rule_name(),
+            InputNodeVariant::Table => BuiltInRules::table_rule_name(),
         }
     }
 
@@ -482,11 +482,7 @@ impl TokenParser {
         match token.value {
             [input_node] => {
                 match input_node {
-                    InputNode::Container {
-                        container_type,
-                        rows,
-                        offset_count: _,
-                    } => {
+                    InputNode::Container(container_type, rows) => {
                         let children = Grid::from_one_dimensional(
                             input_node
                                 .rows()
@@ -504,7 +500,7 @@ impl TokenParser {
                             Self::get_new_row_token_name(container_type),
                             // We're wrapping the new row in a token with a proper width
                             token.range(),
-                            SyntaxNodes::NewRows(children),
+                            SyntaxTree::NewRows(children),
                         );
                     }
                     InputNode::Symbol(_) => {}
@@ -523,7 +519,7 @@ impl TokenParser {
 
         match (self.token_type(), &leaf_node.node_type) {
             (TokenType::Starting, LeafNodeType::Symbol) => {
-                SyntaxNode::new(self.name(), token.range(), SyntaxNodes::Leaf(leaf_node))
+                SyntaxNode::new(self.name(), token.range(), SyntaxTree::Leaf(leaf_node))
             }
             (TokenType::Starting, LeafNodeType::Operator) => BuiltInRules::operator_node(leaf_node),
             (TokenType::Continue, LeafNodeType::Symbol) => {

@@ -1,23 +1,16 @@
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
-use crate::row::Grid;
+use crate::{print_helpers::write_with_escaped_double_quotes, row::Grid};
 
 use super::row::InputRow;
 
 /// A container element which can contain rows
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InputNode {
-    Container {
-        container_type: InputNodeContainer,
-        rows: Grid<InputRow>,
-        /**
-         * If there's one element, then the width is 2.
-         * And the offsets are [0, 1].
-         * Notice how this gives you an exclusive upper bound.
-         */
-        /// The number of valid offsets in all children combined.
-        offset_count: u64,
-    },
+    /// A container with a type
+    Container(InputNodeVariant, Grid<InputRow>),
     /// Leaf node
     /// Stores a NFD-normalized grapheme cluster.
     /// Basically a single character from the perspective of the user.
@@ -25,7 +18,7 @@ pub enum InputNode {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum InputNodeContainer {
+pub enum InputNodeVariant {
     /// A fraction, like $\frac{1}{2}$
     Fraction,
     /// Root, like a square root
@@ -48,14 +41,14 @@ pub enum InputNodeContainer {
 impl InputNode {
     pub fn rows<'a>(&'a self) -> &'a [InputRow] {
         match self {
-            InputNode::Container { rows, .. } => rows.values(),
+            InputNode::Container(_, rows) => rows.values(),
             InputNode::Symbol(_) => &[],
         }
     }
 
     pub fn fraction(values: [InputRow; 2]) -> Self {
         Self::container_with_type(
-            InputNodeContainer::Fraction,
+            InputNodeVariant::Fraction,
             // A fraction is a vertical stack of two rows
             Grid::from_one_dimensional(values.to_vec(), 1),
         )
@@ -63,7 +56,7 @@ impl InputNode {
 
     pub fn root(values: [InputRow; 2]) -> Self {
         Self::container_with_type(
-            InputNodeContainer::Root,
+            InputNodeVariant::Root,
             // A root is mostly horizontal
             Grid::from_one_dimensional(values.to_vec(), 2),
         )
@@ -71,35 +64,35 @@ impl InputNode {
 
     pub fn under(values: [InputRow; 2]) -> Self {
         Self::container_with_type(
-            InputNodeContainer::Under,
+            InputNodeVariant::Under,
             Grid::from_one_dimensional(values.to_vec(), 1),
         )
     }
 
     pub fn over(values: [InputRow; 2]) -> Self {
         Self::container_with_type(
-            InputNodeContainer::Over,
+            InputNodeVariant::Over,
             Grid::from_one_dimensional(values.to_vec(), 1),
         )
     }
 
     pub fn sup(value: InputRow) -> Self {
         Self::container_with_type(
-            InputNodeContainer::Sup,
+            InputNodeVariant::Sup,
             Grid::from_one_dimensional(vec![value], 1),
         )
     }
 
     pub fn sub(value: InputRow) -> Self {
         Self::container_with_type(
-            InputNodeContainer::Sub,
+            InputNodeVariant::Sub,
             Grid::from_one_dimensional(vec![value], 1),
         )
     }
 
     pub fn table(values: Vec<InputRow>, width: usize) -> Self {
         Self::container_with_type(
-            InputNodeContainer::Table,
+            InputNodeVariant::Table,
             Grid::from_one_dimensional(values, width),
         )
     }
@@ -111,20 +104,37 @@ impl InputNode {
             .collect()
     }
 
-    fn container_with_type(container_type: InputNodeContainer, rows: Grid<InputRow>) -> Self {
-        let offset_count = rows.values().iter().map(|row| row.offset_count()).sum();
-        InputNode::Container {
-            container_type,
-            rows,
-            offset_count,
-        }
+    fn container_with_type(container_type: InputNodeVariant, rows: Grid<InputRow>) -> Self {
+        InputNode::Container(container_type, rows)
     }
+}
 
-    pub fn offset_count(&self) -> u64 {
+impl fmt::Display for InputNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            InputNode::Container { offset_count, .. } => *offset_count,
-            // A single symbol by itself doesn't have any valid offsets. The offsets come from the row.
-            InputNode::Symbol(_) => 0,
+            InputNode::Container(container_type, rows) => {
+                write!(f, "({} {})", container_type, rows)?;
+            }
+            InputNode::Symbol(value) => {
+                write!(f, "\"")?;
+                write_with_escaped_double_quotes(value, f)?;
+                write!(f, "\"")?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for InputNodeVariant {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InputNodeVariant::Fraction => write!(f, "frac"),
+            InputNodeVariant::Root => write!(f, "root"),
+            InputNodeVariant::Under => write!(f, "under"),
+            InputNodeVariant::Over => write!(f, "over"),
+            InputNodeVariant::Sup => write!(f, "sup"),
+            InputNodeVariant::Sub => write!(f, "sub"),
+            InputNodeVariant::Table => write!(f, "table"),
         }
     }
 }

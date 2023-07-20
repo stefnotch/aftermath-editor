@@ -1,4 +1,4 @@
-use input_tree::input_node::InputNodeContainer;
+use input_tree::input_node::InputNodeVariant;
 
 use super::{
     grapheme_matcher::GraphemeMatcher,
@@ -9,7 +9,7 @@ use super::{
 #[derive(Debug)]
 pub enum NFABuilder {
     Grapheme(GraphemeMatcher),
-    InputNode(InputNodeContainer),
+    InputNode(InputNodeVariant),
     Concat(Box<NFABuilder>, Box<NFABuilder>),
     Or(Box<NFABuilder>, Box<NFABuilder>),
     ZeroOrOne(Box<NFABuilder>),
@@ -23,7 +23,7 @@ impl NFABuilder {
         NFABuilder::Grapheme(character)
     }
 
-    pub fn match_input_node(node_type: InputNodeContainer) -> NFABuilder {
+    pub fn match_input_node(node_type: InputNodeVariant) -> NFABuilder {
         NFABuilder::InputNode(node_type)
     }
 

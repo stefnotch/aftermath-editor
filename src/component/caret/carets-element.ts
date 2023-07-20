@@ -1,4 +1,4 @@
-import { type Autocomplete, type SyntaxNode } from "../../core";
+import { type Autocomplete, type AutocompleteRuleMatch, type SyntaxNode } from "../../core";
 import { MathLayoutEdit, type MathLayoutSimpleEdit } from "../../editing/input-tree-edit";
 import { InputRowPosition } from "../../input-position/input-row-position";
 import type { InputTree } from "../../input-tree/input-tree";
@@ -17,6 +17,7 @@ import { getAutocompleteTokens, getLineAtPosition, getTokenAtPosition } from "..
 import type { Offset } from "../../input-tree/input-offset";
 import type { RenderedSelection } from "../../rendering/rendered-selection";
 import { InputRow } from "../../input-tree/row";
+import { InputGridRange } from "../../input-position/input-grid-range";
 
 export interface Autocompleter {
   autocomplete(tokenStarts: InputRowPosition[], endPosition: Offset): Autocomplete[];
@@ -89,7 +90,7 @@ export class MathEditorCarets {
     const caretsBefore = this.serialize();
     const edits: MathLayoutSimpleEdit[] = [];
 
-    const autocompleteEdits = this.usingMatchedAutocomplete(inputTree, (carets) => {
+    const autocompleteEdits = this.usingExitingAutocomplete(inputTree, (carets) => {
       for (let i = 0; i < carets.length; i++) {
         const selection = carets[i].selection;
         if (selection.type === "caret") {
@@ -170,9 +171,12 @@ export class MathEditorCarets {
     const caretsBefore = this.serialize();
     const edits: MathLayoutSimpleEdit[] = [];
 
-    let autocompleteEdits = this.usingMatchedAutocomplete(tree, (carets, ranges) => {
+    let autocompleteEdits = this.usingExitingAutocomplete(tree, (carets, ranges) => {
       for (let i = 0; i < carets.length; i++) {
         const selection = carets[i].selection;
+        // Shortcuts are only applied when the selection is a range
+        // If the selection is a collapsed caret, then shortcuts work using the autocorrect mechanism.
+        // The autocorrect mechanism handles stuff like escaped slashes \/ or \_ and so on.
         if (selection.type === "caret" && !selection.range.isCollapsed && this.isKnownShortcut(characters)) {
           // TODO: Select and shortcut
         } else if (selection.type === "caret") {
@@ -188,11 +192,6 @@ export class MathEditorCarets {
           edits.push(...edit.edits);
           carets[i].moveCaretTo(edit.caret);
           carets[i].setHasEdited();
-
-          /* if(this.isKnownShortcut(characters)) {
-            // Repeatedly reparse the syntax tree
-
-          }*/
         } else if (selection.type === "grid") {
           // TODO: Implement grid edits
         } else {
@@ -231,7 +230,7 @@ export class MathEditorCarets {
       mergedInputRows = new InputRow(inputRows.flatMap((v) => v.values));
     }
 
-    let autocompleteEdits = this.usingMatchedAutocomplete(tree, (carets, ranges) => {
+    let autocompleteEdits = this.usingExitingAutocomplete(tree, (carets, ranges) => {
       for (let i = 0; i < carets.length; i++) {
         const selection = carets[i].selection;
         if (selection.type === "caret") {
@@ -317,16 +316,16 @@ export class MathEditorCarets {
   }
 
   /**
-   * Whenever an autocomplete result perfectly matches, we apply it.
+   * Whenever an autocomplete result perfectly matches and we're moving somewhere else, we apply it.
    * (Our autocomplete results can turn text into symbols.)
    */
-  private usingMatchedAutocomplete(
+  private usingExitingAutocomplete(
     tree: InputTree,
     callback: (carets: CaretWithElement[], ranges: InputRowRange[]) => CaretWithElement[]
   ): { edits: MathLayoutSimpleEdit[] } {
-    let autocompleteRange = this.autocompleteRange;
+    let oldAutocompleteRange = this.autocompleteRange;
     // ugh, Rust's &mut would be so pretty here
-    const ranges = autocompleteRange ? [autocompleteRange] : [];
+    const ranges = oldAutocompleteRange ? [oldAutocompleteRange] : [];
 
     // Take ownership of the carets
     const carets = this.#carets;
@@ -334,58 +333,82 @@ export class MathEditorCarets {
     const result = callback(carets, ranges);
     this.#carets = result;
 
-    autocompleteRange = autocompleteRange !== null ? ranges[0] : null;
+    oldAutocompleteRange = oldAutocompleteRange !== null ? ranges[0] : null;
 
-    const movedOutside = autocompleteRange !== null && this.mainCaret?.isContainedIn(autocompleteRange) === false;
-    if (movedOutside && this.mainCaret?.hasEdited) {
-      assert(autocompleteRange !== null);
-      const startPosition = autocompleteRange.startPosition();
-      let perfectMatches = this.#autocompleter.beginningAutocomplete(startPosition, autocompleteRange.end);
-      if (perfectMatches === null || perfectMatches.result.potentialRules.length === 0) {
-        return { edits: [] };
-      }
-      if (perfectMatches.result.potentialRules.length > 1) {
-        console.warn("Multiple rules matched", perfectMatches);
-      }
+    // Treating this shortcut as an autocomplete also allows us to define rules like
+    // =/= being a shortcut for ≠
+    // without accidentally triggering the / fraction shortcut.
+
+    /*const isShortcut = perfectMatches.result.potentialRules[0].result.at(-1) instanceof InputNodeContainer; // Not ideal, but eh
+    if (isShortcut) {
+      const ruleMatch = perfectMatches.result.potentialRules[0];
+      return this.applyAutocomplete(ruleMatch, startPosition, tree);
+    }*/
+
+    if (oldAutocompleteRange === null) {
+      return { edits: [] };
+    }
+
+    // TODO: Replace the hasEdited with a proper autocomplete popup state.
+    // (Autocomplete popup can be displayed or hidden and it can have a line selected or not)
+    if (this.mainCaret?.hasEdited !== true) {
+      return { edits: [] };
+    }
+
+    const startPosition = oldAutocompleteRange.startPosition();
+    let perfectMatches = this.#autocompleter.beginningAutocomplete(startPosition, oldAutocompleteRange.end);
+    if (perfectMatches === null || perfectMatches.result.potentialRules.length === 0) {
+      return { edits: [] };
+    }
+    if (perfectMatches.result.potentialRules.length > 1) {
+      console.warn("Multiple rules matched", perfectMatches);
+    }
+
+    const movedOutside = this.mainCaret?.isContainedIn(oldAutocompleteRange) === false;
+    console.log(perfectMatches.result);
+    if (movedOutside) {
       // TODO: Deal with multiple carets (https://github.com/stefnotch/aftermath-editor/issues/29#issuecomment-1616656705)
       // Currently we're just dealing with the main caret. Very cheapskate
-
       console.log("going to apply", perfectMatches);
       const ruleMatch = perfectMatches.result.potentialRules[0];
-
-      // The start position can change during edits
-      const ranges = [
-        new InputRowRange(startPosition.zipper, startPosition.offset, startPosition.offset + ruleMatch.matchLength),
-      ];
-
-      // Delete existing text
-      const deleteResult = MathEditorCarets.applyEdit(removeRange(ranges[0]), tree, this.#carets, ranges);
-
-      // Input new text
-      let insertResult;
-      if (ruleMatch.result.at(0) instanceof InputNodeContainer) {
-        // TODO: deal with fractions
-        insertResult = MathEditorCarets.applyEdit(
-          insertAtCaret(ranges[0].startPosition().range(), ruleMatch.result),
-          tree,
-          this.#carets
-        );
-      } else {
-        insertResult = MathEditorCarets.applyEdit(
-          insertAtCaret(ranges[0].startPosition().range(), ruleMatch.result),
-          tree,
-          this.#carets
-        );
-      }
-      // Force the main caret to be at the end of the inserted text
-      // this.#carets[0].moveCaretTo(insertResult.caret);
-
-      return {
-        edits: deleteResult.edits.concat(...insertResult.edits),
-      };
+      return this.applyAutocomplete(ruleMatch, startPosition, tree);
       // And the autocomplete range automatically gets recomputed.
     }
     return { edits: [] };
+  }
+
+  private applyAutocomplete(ruleMatch: AutocompleteRuleMatch, startPosition: InputRowPosition, tree: InputTree) {
+    // The start position can change during edits
+    const ranges = [
+      new InputRowRange(startPosition.zipper, startPosition.offset, startPosition.offset + ruleMatch.matchLength),
+    ];
+
+    // Delete existing text
+    const deleteResult = MathEditorCarets.applyEdit(removeRange(ranges[0]), tree, this.#carets, ranges);
+
+    // Input new text
+    let insertResult;
+    const finalNode = ruleMatch.result.at(-1);
+    if (finalNode instanceof InputNodeContainer) {
+      const caretEdit = insertAtCaret(ranges[0].startPosition().range(), ruleMatch.result);
+      caretEdit.caret.indices = caretEdit.caret.indices.addRowIndex([
+        Math.max(0, caretEdit.caret.offset - 1),
+        finalNode.rows.values.length - 1,
+      ]);
+      caretEdit.caret.offset = 0;
+      insertResult = MathEditorCarets.applyEdit(caretEdit, tree, this.#carets);
+    } else {
+      insertResult = MathEditorCarets.applyEdit(
+        insertAtCaret(ranges[0].startPosition().range(), ruleMatch.result),
+        tree,
+        this.#carets
+      );
+    }
+    // Force the main caret to be at the end of the inserted text
+    // this.#carets[0].moveCaretTo(insertResult.caret);
+    return {
+      edits: deleteResult.edits.concat(...insertResult.edits),
+    };
   }
 
   private updateAutocomplete(syntaxTree: SyntaxNode) {
@@ -413,13 +436,14 @@ export class MathEditorCarets {
   }
 
   /**
-   * Range of the currently selected autocomplete
+   * Range of the currently selected autocomplete.
+   * Basically every autocomplete result has its own range of text that it would replace.
    */
   private get autocompleteRange() {
     const selected = this.selectedAutocompleteResult;
     if (selected === null) return null;
     const mainCaretRange = this.mainCaret?.selection.range ?? null;
-    if (mainCaretRange === null) return null;
+    if (mainCaretRange === null || mainCaretRange instanceof InputGridRange) return null;
 
     return new InputRowRange(mainCaretRange.zipper, mainCaretRange.end - selected.matchLength, mainCaretRange.end);
   }

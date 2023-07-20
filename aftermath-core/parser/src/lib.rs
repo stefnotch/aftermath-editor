@@ -19,12 +19,12 @@ use self::parse_rules::ParserRules;
 
 pub use self::autocomplete::{AutocompleteResult, AutocompleteRule, AutocompleteRuleMatch};
 pub use self::parse_result::{ParseError, ParseErrorType, ParseResult};
-pub use self::syntax_tree::{SyntaxLeafNode, SyntaxNode, SyntaxNodes};
+pub use self::syntax_tree::{SyntaxLeafNode, SyntaxNode, SyntaxTree};
 
 pub fn parse_row(input: &InputRow, context: &ParserRules) -> ParseResult<SyntaxNode> {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     // we could also have used https://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/ as the tutorial
-    let mut lexer = Lexer::new(&input.values);
+    let mut lexer = Lexer::new(&input.0);
     let mut parse_result;
     (parse_result, lexer) = context.parse_bp(lexer, 0);
 
@@ -51,11 +51,7 @@ pub fn parse_row(input: &InputRow, context: &ParserRules) -> ParseResult<SyntaxN
         }
     }
 
-    assert_eq!(
-        parse_result.range().end,
-        input.values.len(),
-        "range not until end"
-    );
+    assert_eq!(parse_result.range().end, input.len(), "range not until end");
     assert!(lexer.eof(), "lexer not at end");
 
     ParseResult {
@@ -102,7 +98,7 @@ impl<'a> ParserRules<'a> {
                 children.extend(args);
                 let range = range_start..get_child_range_end(&children);
 
-                SyntaxNode::new(definition.name(), range, SyntaxNodes::Containers(children))
+                SyntaxNode::new(definition.name(), range, SyntaxTree::Children(children))
             }
         } else {
             // Error case. Check if the next token is an appropriate operator
@@ -149,7 +145,7 @@ impl<'a> ParserRules<'a> {
 
                 // Range that includes the left side, and the last child
                 let range = range_start..get_child_range_end(&children);
-                left = SyntaxNode::new(definition.name(), range, SyntaxNodes::Containers(children));
+                left = SyntaxNode::new(definition.name(), range, SyntaxTree::Children(children));
                 continue;
             }
 

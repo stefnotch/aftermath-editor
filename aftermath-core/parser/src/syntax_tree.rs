@@ -24,7 +24,7 @@ pub struct SyntaxNode {
     /// name of the function or constant
     pub name: NodeIdentifier,
     /// children of the node, including the operator token(s)
-    pub children: SyntaxNodes,
+    pub children: SyntaxTree,
     /// value, especially for constants
     /// stored as bytes, and interpreted according to the name
     pub value: Vec<u8>,
@@ -61,19 +61,19 @@ fn is_identifier(value: &str) -> bool {
 }
 
 #[derive(Debug, Serialize)]
-pub enum SyntaxNodes {
-    Containers(Vec<SyntaxNode>),
+pub enum SyntaxTree {
     /// When this syntax node actually starts a new row in the input tree.
     /// TODO: Maybe verify that this has a range of 1?
     NewRows(Grid<SyntaxNode>),
+    Children(Vec<SyntaxNode>),
     Leaf(SyntaxLeafNode),
 }
-impl SyntaxNodes {
+impl SyntaxTree {
     fn is_empty(&self) -> bool {
         match self {
-            SyntaxNodes::Containers(children) => children.is_empty(),
-            SyntaxNodes::NewRows(children) => children.is_empty(),
-            SyntaxNodes::Leaf(_) => false,
+            SyntaxTree::NewRows(children) => children.is_empty(),
+            SyntaxTree::Children(children) => children.is_empty(),
+            SyntaxTree::Leaf(_) => false,
         }
     }
 }
@@ -118,7 +118,7 @@ pub enum LeafNodeType {
 }
 
 impl SyntaxNode {
-    pub fn new(name: NodeIdentifier, range: Range<usize>, children: SyntaxNodes) -> Self {
+    pub fn new(name: NodeIdentifier, range: Range<usize>, children: SyntaxTree) -> Self {
         if let Some(child_range) = SyntaxNode::get_combined_range(&children) {
             assert!(range.start <= child_range.start && child_range.end <= range.end);
         }
@@ -131,13 +131,13 @@ impl SyntaxNode {
     }
 
     /// Returns the range of all the children combined, and verifies the invariants.
-    fn get_combined_range(children: &SyntaxNodes) -> Option<Range<usize>> {
+    fn get_combined_range(children: &SyntaxTree) -> Option<Range<usize>> {
         let binding = match children {
-            SyntaxNodes::Containers(children) => {
+            SyntaxTree::Children(children) => {
                 children.iter().map(|v| v.range()).collect::<Vec<_>>()
             }
-            SyntaxNodes::NewRows(_) => vec![],
-            SyntaxNodes::Leaf(child) => vec![child.range()],
+            SyntaxTree::NewRows(_) => vec![],
+            SyntaxTree::Leaf(child) => vec![child.range()],
         };
         let mut child_iter = binding.iter();
         if let Some(first) = child_iter.next() {

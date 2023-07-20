@@ -13,7 +13,7 @@ mod matcher_state;
 
 use std::fmt::{Debug, Formatter};
 
-use input_tree::input_node::{InputNode, InputNodeContainer};
+use input_tree::input_node::{InputNode, InputNodeVariant};
 
 use super::grapheme_matcher::GraphemeMatcher;
 use super::token_matcher::matcher_state::NFAMatches;
@@ -52,7 +52,7 @@ pub enum StateFragment {
 #[derive(Debug)]
 pub enum MatchIf {
     GraphemeCluster(GraphemeMatcher),
-    InputNode(InputNodeContainer),
+    InputNode(InputNodeVariant),
     Any,
 }
 
@@ -60,7 +60,7 @@ impl MatchIf {
     fn matches(&self, value: &InputNode) -> bool {
         match (self, value) {
             (MatchIf::GraphemeCluster(matcher), InputNode::Symbol(a)) => matcher.matches(a),
-            (MatchIf::InputNode(node_type), InputNode::Container { container_type, .. }) => {
+            (MatchIf::InputNode(node_type), InputNode::Container(container_type, _)) => {
                 container_type == node_type
             }
             (MatchIf::Any, _) => true,
