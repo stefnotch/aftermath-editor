@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use input_tree::input_node::InputNodeVariant;
+use input_tree::node::InputNodeVariant;
 
 use crate::{
     nfa_builder::NFABuilder,

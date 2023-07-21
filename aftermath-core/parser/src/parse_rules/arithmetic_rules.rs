@@ -1,4 +1,4 @@
-use input_tree::input_node::InputNode;
+use input_tree::{node::InputNode, row::InputRow};
 
 use crate::{
     nfa_builder::NFABuilder,
@@ -77,8 +77,8 @@ impl RuleCollection for ArithmeticRules {
         vec![
             AutocompleteRule::new(
                 vec![InputNode::fraction([
-                    Default::default(),
-                    Default::default(),
+                    InputRow::default(),
+                    InputRow::default(),
                 ])],
                 "/",
             ),

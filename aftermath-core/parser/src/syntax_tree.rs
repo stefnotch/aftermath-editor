@@ -5,7 +5,7 @@ use std::ops::Range;
 use serde::Serialize;
 
 pub use display_syntax_tree::*;
-use input_tree::row::Grid;
+use input_tree::grid::Grid;
 use unicode_ident::{is_xid_continue, is_xid_start};
 
 /// A node in a concrete syntax tree that contains other nodes.

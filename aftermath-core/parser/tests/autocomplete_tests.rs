@@ -1,4 +1,4 @@
-use input_tree::input_node::InputNode;
+use input_tree::node::InputNode;
 use parser::{
     parse_rules::{
         arithmetic_rules::ArithmeticRules, built_in_rules::BuiltInRules, ParserRules,

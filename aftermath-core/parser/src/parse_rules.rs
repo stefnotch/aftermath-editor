@@ -11,8 +11,8 @@ pub mod string_rules;
 use std::collections::HashMap;
 
 use input_tree::{
-    input_node::{InputNode, InputNodeVariant},
-    row::Grid,
+    grid::Grid,
+    node::{InputNode, InputNodeVariant},
 };
 
 use crate::{

@@ -1,4 +1,4 @@
-use input_tree::input_node::InputNode;
+use input_tree::node::InputNode;
 
 use crate::{parse_rules::StartingParser, syntax_tree::NodeIdentifier, AutocompleteRule};
 

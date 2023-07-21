@@ -1,4 +1,4 @@
-use input_tree::input_node::InputNodeVariant;
+use input_tree::node::InputNodeVariant;
 
 use super::{
     grapheme_matcher::GraphemeMatcher,

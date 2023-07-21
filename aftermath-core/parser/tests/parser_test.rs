@@ -1,13 +1,13 @@
-use input_tree::{input_node::InputNode, row::InputRow};
+use input_tree::{node::InputNode, row::InputRow};
 use parser::{parse_row, parse_rules::ParserRules};
 
 #[test]
 fn test_parser() {
     let layout = InputRow::new(vec![
-        InputNode::Symbol("-".to_string()),
-        InputNode::Symbol("b".to_string()),
-        InputNode::Symbol("*".to_string()),
-        InputNode::Symbol("C".to_string()),
+        InputNode::symbol("-"),
+        InputNode::symbol("b"),
+        InputNode::symbol("*"),
+        InputNode::symbol("C"),
     ]);
     let context = ParserRules::default();
     let parsed = parse_row(&layout, &context);
@@ -21,10 +21,10 @@ fn test_parser() {
 #[test]
 fn test_postfix() {
     let layout = InputRow::new(vec![
-        InputNode::Symbol("c".to_string()),
-        InputNode::Symbol("+".to_string()),
-        InputNode::Symbol("a".to_string()),
-        InputNode::Symbol("!".to_string()),
+        InputNode::symbol("c"),
+        InputNode::symbol("+"),
+        InputNode::symbol("a"),
+        InputNode::symbol("!"),
     ]);
     let context = ParserRules::default();
     let parsed = parse_row(&layout, &context);
@@ -38,8 +38,8 @@ fn test_postfix() {
 #[test]
 fn test_sub() {
     let layout = InputRow::new(vec![
-        InputNode::Symbol("a".to_string()),
-        InputNode::sub(InputRow::new(vec![InputNode::Symbol("1".to_string())])),
+        InputNode::symbol("a"),
+        InputNode::sub(InputRow::new(vec![InputNode::symbol("1")])),
     ]);
     let context = ParserRules::default();
     let parsed = parse_row(&layout, &context);
@@ -53,9 +53,9 @@ fn test_sub() {
 #[test]
 fn test_sup_sub() {
     let layout = InputRow::new(vec![
-        InputNode::Symbol("a".to_string()),
-        InputNode::sup(InputRow::new(vec![InputNode::Symbol("1".to_string())])),
-        InputNode::sub(InputRow::new(vec![InputNode::Symbol("2".to_string())])),
+        InputNode::symbol("a"),
+        InputNode::sup(InputRow::new(vec![InputNode::symbol("1")])),
+        InputNode::sub(InputRow::new(vec![InputNode::symbol("2")])),
     ]);
     let context = ParserRules::default();
     let parsed = parse_row(&layout, &context);
@@ -74,14 +74,14 @@ fn test_sup_sub() {
 #[test]
 fn test_parser_nested_brackets_and_postfix() {
     let layout = InputRow::new(vec![
-        InputNode::Symbol("(".to_string()),
-        InputNode::Symbol("(".to_string()),
-        InputNode::Symbol("(".to_string()),
-        InputNode::Symbol("a".to_string()),
-        InputNode::Symbol("!".to_string()),
-        InputNode::Symbol(")".to_string()),
-        InputNode::Symbol(")".to_string()),
-        InputNode::Symbol(")".to_string()),
+        InputNode::symbol("("),
+        InputNode::symbol("("),
+        InputNode::symbol("("),
+        InputNode::symbol("a"),
+        InputNode::symbol("!"),
+        InputNode::symbol(")"),
+        InputNode::symbol(")"),
+        InputNode::symbol(")"),
     ]);
     let context = ParserRules::default();
 
@@ -101,9 +101,9 @@ fn test_parser_nested_brackets_and_postfix() {
 #[test]
 fn test_parser_tuple() {
     let layout = InputRow::new(vec![
-        InputNode::Symbol("a".to_string()),
-        InputNode::Symbol(",".to_string()),
-        InputNode::Symbol("b".to_string()),
+        InputNode::symbol("a"),
+        InputNode::symbol(","),
+        InputNode::symbol("b"),
     ]);
 
     let context = ParserRules::default();
@@ -119,13 +119,13 @@ fn test_parser_tuple() {
 #[test]
 fn test_parser_tuple_advanced() {
     let layout = InputRow::new(vec![
-        InputNode::Symbol("(".to_string()),
-        InputNode::Symbol("a".to_string()),
-        InputNode::Symbol(",".to_string()),
-        InputNode::Symbol("b".to_string()),
-        InputNode::Symbol(",".to_string()),
-        InputNode::Symbol("c".to_string()),
-        InputNode::Symbol(")".to_string()),
+        InputNode::symbol("("),
+        InputNode::symbol("a"),
+        InputNode::symbol(","),
+        InputNode::symbol("b"),
+        InputNode::symbol(","),
+        InputNode::symbol("c"),
+        InputNode::symbol(")"),
     ]);
 
     let context = ParserRules::default();
@@ -146,12 +146,12 @@ fn test_parser_tuple_advanced() {
 #[test]
 fn test_parser_function_call() {
     let layout = InputRow::new(vec![
-        InputNode::Symbol("f".to_string()),
-        InputNode::Symbol("(".to_string()),
-        InputNode::Symbol("a".to_string()),
-        InputNode::Symbol(",".to_string()),
-        InputNode::Symbol("b".to_string()),
-        InputNode::Symbol(")".to_string()),
+        InputNode::symbol("f"),
+        InputNode::symbol("("),
+        InputNode::symbol("a"),
+        InputNode::symbol(","),
+        InputNode::symbol("b"),
+        InputNode::symbol(")"),
     ]);
 
     let context = ParserRules::default();
@@ -172,11 +172,11 @@ fn test_parser_function_call() {
 #[test]
 fn test_parser_brackets_with_addition() {
     let layout = InputRow::new(vec![
-        InputNode::Symbol("(".to_string()),
-        InputNode::Symbol("a".to_string()),
-        InputNode::Symbol("+".to_string()),
-        InputNode::Symbol("b".to_string()),
-        InputNode::Symbol(")".to_string()),
+        InputNode::symbol("("),
+        InputNode::symbol("a"),
+        InputNode::symbol("+"),
+        InputNode::symbol("b"),
+        InputNode::symbol(")"),
     ]);
 
     let context = ParserRules::default();
@@ -192,14 +192,14 @@ fn test_parser_brackets_with_addition() {
 #[test]
 fn test_parser_fraction() {
     let layout = InputRow::new(vec![
-        InputNode::Symbol("(".to_string()),
-        InputNode::Symbol("a".to_string()),
-        InputNode::Symbol("+".to_string()),
+        InputNode::symbol("("),
+        InputNode::symbol("a"),
+        InputNode::symbol("+"),
         InputNode::fraction([
-            InputRow::new(vec![InputNode::Symbol("b".to_string())]),
-            InputRow::new(vec![InputNode::Symbol("c".to_string())]),
+            InputRow::new(vec![InputNode::symbol("b")]),
+            InputRow::new(vec![InputNode::symbol("c")]),
         ]),
-        InputNode::Symbol(")".to_string()),
+        InputNode::symbol(")"),
     ]);
 
     let context = ParserRules::default();
@@ -228,7 +228,7 @@ fn test_parser_empty_squareroot() {
     // $ \sqrt{a} = \sqrt[2]{a}$
     let layout = InputRow::new(vec![InputNode::root([
         InputRow::new(vec![]),
-        InputRow::new(vec![InputNode::Symbol("a".to_string())]),
+        InputRow::new(vec![InputNode::symbol("a")]),
     ])]);
     let context = ParserRules::default();
 
@@ -243,10 +243,7 @@ fn test_parser_empty_squareroot() {
 // TODO: Fix those tests to actually do something instead of printing stuff
 #[test]
 fn test_parser_symbol_and_close_bracket() {
-    let layout = InputRow::new(vec![
-        InputNode::Symbol("a".to_string()),
-        InputNode::Symbol(")".to_string()),
-    ]);
+    let layout = InputRow::new(vec![InputNode::symbol("a"), InputNode::symbol(")")]);
     let context = ParserRules::default();
 
     let parsed = parse_row(&layout, &context);
@@ -255,7 +252,7 @@ fn test_parser_symbol_and_close_bracket() {
 
 #[test]
 fn test_parser_close_bracket() {
-    let layout = InputRow::new(vec![InputNode::Symbol(")".to_string())]);
+    let layout = InputRow::new(vec![InputNode::symbol(")")]);
     let context = ParserRules::default();
 
     let parsed = parse_row(&layout, &context);

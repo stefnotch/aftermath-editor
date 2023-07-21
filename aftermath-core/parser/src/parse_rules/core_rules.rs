@@ -1,4 +1,4 @@
-use input_tree::input_node::InputNode;
+use input_tree::{node::InputNode, row::InputRow};
 
 use crate::{
     grapheme_matcher::GraphemeMatcher,
@@ -77,7 +77,7 @@ impl RuleCollection for CoreRules {
 
     fn get_autocomplete_rules() -> Vec<crate::AutocompleteRule> {
         vec![AutocompleteRule::new(
-            vec![InputNode::sub(Default::default())],
+            vec![InputNode::sub(InputRow::default())],
             "_",
         )]
     }

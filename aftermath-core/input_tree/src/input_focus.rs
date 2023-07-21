@@ -1,5 +1,5 @@
 use crate::{
-    input_node::InputNode,
+    node::InputNode,
     row::{InputRow, RowIndex, RowIndices},
 };
 

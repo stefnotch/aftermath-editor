@@ -2,7 +2,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{print_helpers::write_with_escaped_double_quotes, row::Grid};
+use crate::{grid::Grid, print_helpers::write_with_escaped_double_quotes};
 
 use super::row::InputRow;
 
@@ -86,7 +86,7 @@ impl InputNode {
     pub fn sub(value: InputRow) -> Self {
         Self::container_with_type(
             InputNodeVariant::Sub,
-            Grid::from_one_dimensional(vec![value], 1),
+            Grid::from_one_dimensional(vec![value.into()], 1),
         )
     }
 
@@ -95,6 +95,9 @@ impl InputNode {
             InputNodeVariant::Table,
             Grid::from_one_dimensional(values, width),
         )
+    }
+    pub fn symbol<T: Into<String>>(value: T) -> Self {
+        Self::Symbol(value.into())
     }
 
     pub fn symbols<T: Into<String>>(values: Vec<T>) -> Vec<Self> {

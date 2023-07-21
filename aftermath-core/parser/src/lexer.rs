@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use input_tree::input_node::InputNode;
+use input_tree::node::InputNode;
 
 pub struct Lexer<'input> {
     values: &'input [InputNode],
@@ -98,15 +98,15 @@ impl<'input> LexerToken<'input> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use input_tree::{input_node::InputNode, row::InputRow};
+    use input_tree::{node::InputNode, row::InputRow};
 
     #[test]
     fn test_lexer_slicing() {
         let layout = InputRow::new(vec![
-            InputNode::Symbol("a".to_string()),
+            InputNode::symbol("a"),
             InputNode::fraction([
-                InputRow::new(vec![InputNode::Symbol("b".to_string())]),
-                InputRow::new(vec![InputNode::Symbol("c".to_string())]),
+                InputRow::new(vec![InputNode::symbol("b")]),
+                InputRow::new(vec![InputNode::symbol("c")]),
             ]),
         ]);
 
@@ -114,22 +114,22 @@ mod tests {
         let mut lexer_range = lexer.begin_range();
         assert_eq!(
             lexer_range.lexer().get_next_value(),
-            Some(&InputNode::Symbol("a".to_string()))
+            Some(&InputNode::symbol("a"))
         );
         assert_eq!(
             lexer_range.get_next_slice().get(0),
-            Some(&InputNode::Symbol("a".to_string()))
+            Some(&InputNode::symbol("a"))
         );
         lexer_range.consume_n(1);
         assert_eq!(
             lexer_range.lexer().get_next_value(),
-            Some(&InputNode::Symbol("a".to_string()))
+            Some(&InputNode::symbol("a"))
         );
         assert_eq!(
             lexer_range.get_next_slice().get(0),
             Some(&InputNode::fraction([
-                InputRow::new(vec![InputNode::Symbol("b".to_string())]),
-                InputRow::new(vec![InputNode::Symbol("c".to_string())]),
+                InputRow::new(vec![InputNode::symbol("b")]),
+                InputRow::new(vec![InputNode::symbol("c")]),
             ]))
         );
         let _token = lexer_range.end_range();
@@ -138,10 +138,10 @@ mod tests {
     #[test]
     fn test_lexer_token() {
         let layout = InputRow::new(vec![
-            InputNode::Symbol("a".to_string()),
+            InputNode::symbol("a"),
             InputNode::fraction([
-                InputRow::new(vec![InputNode::Symbol("b".to_string())]),
-                InputRow::new(vec![InputNode::Symbol("c".to_string())]),
+                InputRow::new(vec![InputNode::symbol("b")]),
+                InputRow::new(vec![InputNode::symbol("c")]),
             ]),
         ]);
 
@@ -149,25 +149,19 @@ mod tests {
         let mut lexer_range = lexer.begin_range();
         lexer_range.consume_n(1);
         let token = lexer_range.end_range();
-        assert_eq!(
-            token.value.get(0),
-            Some(&InputNode::Symbol("a".to_string()))
-        );
+        assert_eq!(token.value.get(0), Some(&InputNode::symbol("a")));
         assert_eq!(
             lexer.get_next_value(),
             Some(&InputNode::fraction([
-                InputRow::new(vec![InputNode::Symbol("b".to_string())]),
-                InputRow::new(vec![InputNode::Symbol("c".to_string())]),
+                InputRow::new(vec![InputNode::symbol("b")]),
+                InputRow::new(vec![InputNode::symbol("c")]),
             ]))
         );
     }
 
     #[test]
     fn test_lexer_second_token() {
-        let layout = InputRow::new(vec![
-            InputNode::Symbol("a".to_string()),
-            InputNode::Symbol("b".to_string()),
-        ]);
+        let layout = InputRow::new(vec![InputNode::symbol("a"), InputNode::symbol("b")]);
 
         let mut lexer = Lexer::new(&layout.0);
         {
@@ -178,23 +172,20 @@ mod tests {
         let mut lexer_range = lexer.begin_range();
         assert_eq!(
             lexer_range.get_next_slice().get(0),
-            Some(&InputNode::Symbol("b".to_string()))
+            Some(&InputNode::symbol("b"))
         );
         assert_eq!(
             lexer_range.lexer.get_next_value(),
-            Some(&InputNode::Symbol("b".to_string()))
+            Some(&InputNode::symbol("b"))
         );
         lexer_range.consume_n(1);
         assert_eq!(lexer_range.get_next_slice().get(0), None);
         assert_eq!(
             lexer_range.lexer.get_next_value(),
-            Some(&InputNode::Symbol("b".to_string()))
+            Some(&InputNode::symbol("b"))
         );
         let token = lexer_range.end_range();
         assert_eq!(lexer.get_next_value(), None);
-        assert_eq!(
-            token.value.get(0),
-            Some(&InputNode::Symbol("b".to_string()))
-        );
+        assert_eq!(token.value.get(0), Some(&InputNode::symbol("b")));
     }
 }

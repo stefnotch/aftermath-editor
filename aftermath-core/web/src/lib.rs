@@ -1,6 +1,6 @@
 mod utils;
 
-use input_tree::{input_node::InputNode, row::InputRow};
+use input_tree::{node::InputNode, row::InputRow};
 use parser::{parse_rules::ParserRules, ParseError, ParseResult, SyntaxNode};
 use serde::{Deserialize, Serialize};
 use utils::set_panic_hook;

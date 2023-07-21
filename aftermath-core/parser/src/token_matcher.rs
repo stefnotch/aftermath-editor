@@ -13,7 +13,7 @@ mod matcher_state;
 
 use std::fmt::{Debug, Formatter};
 
-use input_tree::input_node::{InputNode, InputNodeVariant};
+use input_tree::node::{InputNode, InputNodeVariant};
 
 use super::grapheme_matcher::GraphemeMatcher;
 use super::token_matcher::matcher_state::NFAMatches;

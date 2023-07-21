@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use input_tree::input_node::InputNode;
+use input_tree::node::InputNode;
 use serde::Serialize;
 
 use crate::token_matcher::MatchResult;
