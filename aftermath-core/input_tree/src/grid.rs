@@ -39,6 +39,15 @@ impl<T> Grid<T> {
         self.values.get(self.xy_to_index(xy))
     }
 
+    pub fn get_mut(&mut self, xy: Index2D) -> Option<&mut T> {
+        let Index2D { x, y } = xy;
+        if x >= self.width() || y >= self.height() {
+            return None;
+        }
+        let index = self.xy_to_index(xy);
+        self.values.get_mut(index)
+    }
+
     pub fn get_by_index(&self, index: usize) -> Option<&T> {
         self.values.get(index)
     }

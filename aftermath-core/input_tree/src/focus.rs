@@ -11,10 +11,11 @@ pub use grid_range::*;
 pub use row_position::*;
 pub use row_range::*;
 
-/**
- * A focus is a pointer to a node in a tree, with a reference to the parent node.
- * Inspired by red-green trees ( https://blog.yaakov.online/red-green-trees/ ) and zippers ( http://learnyouahaskell.com/zippers )
- */
+/// A focus is a pointer to a node in a tree, with a reference to the parent node.
+/// Inspired by red-green trees ( https://blog.yaakov.online/red-green-trees/ ) and zippers ( http://learnyouahaskell.com/zippers )
+///
+/// Note that the "immutable tree with shared parts" optimisation is not implemented, and probably will never need to be implemented.
+/// Instead we have a straightforward mutable tree.
 pub struct InputFocusRow<'a> {
     row: &'a InputRow,
     /// The parent of this row, if it exists.

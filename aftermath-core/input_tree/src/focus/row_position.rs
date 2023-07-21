@@ -6,7 +6,8 @@ use crate::{
     row::{Offset, RowIndices},
 };
 
-/// A position in a row, only stores the minimal amount of data
+/// A offset in a row, only stores the minimal amount of data
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MinimalInputRowPosition {
     pub row_indices: RowIndices,
     pub offset: Offset,

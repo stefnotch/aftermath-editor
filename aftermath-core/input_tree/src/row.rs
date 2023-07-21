@@ -38,6 +38,34 @@ impl From<Vec<InputNode>> for InputRow {
     }
 }
 
+impl InputRow {
+    pub fn apply_edit(&mut self, edit: &super::editing::BasicEdit) {
+        let position = match edit {
+            super::editing::BasicEdit::Insert { position, .. } => position,
+            super::editing::BasicEdit::Delete { position, .. } => position,
+        };
+        let mut row = self;
+        for index in position.row_indices.iter() {
+            row = row
+                .0
+                .get_mut(index.0)
+                .expect("Invalid row index")
+                .row_mut(index.1);
+        }
+
+        let start = position.offset.0;
+        match edit {
+            super::editing::BasicEdit::Insert { values, .. } => {
+                row.0.splice(start..start, values.iter().cloned());
+            }
+            super::editing::BasicEdit::Delete { values, .. } => {
+                row.0
+                    .splice(start..(start + values.len()), std::iter::empty());
+            }
+        }
+    }
+}
+
 /// Points at a given row
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct RowIndices(Vec<RowIndex>);

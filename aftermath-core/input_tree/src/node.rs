@@ -111,6 +111,15 @@ impl InputNode {
     fn container_with_type(container_type: InputNodeVariant, rows: Grid<InputRow>) -> Self {
         InputNode::Container(container_type, rows)
     }
+
+    pub fn row_mut(&mut self, index: usize) -> &mut InputRow {
+        match self {
+            InputNode::Container(_, rows) => rows
+                .get_mut(rows.index_to_xy(index))
+                .expect("Invalid row index"),
+            InputNode::Symbol(_) => panic!("Can't get row of symbol"),
+        }
+    }
 }
 
 impl fmt::Display for InputNode {
