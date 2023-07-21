@@ -1,10 +1,4 @@
-/*
-TODO:
-// mmultiscripts won't be modeled for now
- */
-
 // Parsing notes:
-// Multi character stuff (like == or lim)
 // Implicit multiply vs variable name
 // dx at the end of an integral
 // This stuff happens at the parsing step and doesn't get stored. So, it's possible to first write myF(x) and afterwards define myF

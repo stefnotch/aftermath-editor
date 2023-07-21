@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use crate::{
-    input_focus::InputFocusRow,
-    input_row_position::InputRowPosition,
+    focus::InputFocusRow,
+    focus::InputRowPosition,
     row::{Offset, RowIndices},
 };
 
@@ -11,8 +13,9 @@ pub struct MinimalInputRowRange {
     pub end: Offset,
 }
 
+/// An inclusive range of positions in a row
 pub struct InputRowRange<'a> {
-    pub row_focus: InputFocusRow<'a>,
+    pub row_focus: Arc<InputFocusRow<'a>>,
     pub start: Offset,
     pub end: Offset,
 }
@@ -22,7 +25,7 @@ impl<'a> InputRowRange<'a> {
         assert!(start.0 <= row_focus.len());
         assert!(end.0 <= row_focus.len());
         Self {
-            row_focus,
+            row_focus: Arc::new(row_focus),
             start,
             end,
         }
@@ -52,26 +55,42 @@ impl<'a> InputRowRange<'a> {
         self.start <= self.end
     }
 
-    pub fn start_position(self) -> InputRowPosition<'a> {
-        InputRowPosition::new(self.row_focus, self.start)
+    pub fn start_position(&self) -> InputRowPosition<'a> {
+        InputRowPosition {
+            row_focus: self.row_focus.clone(),
+            offset: self.start,
+        }
     }
 
-    pub fn end_position(self) -> InputRowPosition<'a> {
-        InputRowPosition::new(self.row_focus, self.end)
+    pub fn end_position(&self) -> InputRowPosition<'a> {
+        InputRowPosition {
+            row_focus: self.row_focus.clone(),
+            offset: self.end,
+        }
     }
 
-    pub fn left_position(self) -> InputRowPosition<'a> {
+    pub fn left_position(&self) -> InputRowPosition<'a> {
         let offset = self.left_offset();
-        InputRowPosition::new(self.row_focus, offset)
+        InputRowPosition {
+            row_focus: self.row_focus.clone(),
+            offset,
+        }
     }
 
-    pub fn right_position(self) -> InputRowPosition<'a> {
+    pub fn right_position(&self) -> InputRowPosition<'a> {
         let offset = self.right_offset();
-        InputRowPosition::new(self.row_focus, offset)
+        InputRowPosition {
+            row_focus: self.row_focus.clone(),
+            offset,
+        }
     }
 
     pub fn row_indices(&self) -> &RowIndices {
         &self.row_focus.row_indices()
+    }
+
+    pub fn contains(&self, position: &InputRowPosition<'a>) -> bool {
+        &self.left_position() <= position && position <= &self.right_position()
     }
 
     pub fn to_minimal(&self) -> MinimalInputRowRange {

@@ -2,8 +2,6 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::print_helpers::write_with_separator;
-
 /// A proper grid of values.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Grid<T> {
@@ -12,6 +10,7 @@ pub struct Grid<T> {
 }
 
 /// A 2D index
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Index2D {
     pub x: usize,
     pub y: usize,

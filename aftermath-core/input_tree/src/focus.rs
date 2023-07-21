@@ -1,8 +1,20 @@
+mod grid_range;
+mod row_position;
+mod row_range;
+
 use crate::{
     node::InputNode,
     row::{InputRow, RowIndex, RowIndices},
 };
 
+pub use grid_range::*;
+pub use row_position::*;
+pub use row_range::*;
+
+/**
+ * A focus is a pointer to a node in a tree, with a reference to the parent node.
+ * Inspired by red-green trees ( https://blog.yaakov.online/red-green-trees/ ) and zippers ( http://learnyouahaskell.com/zippers )
+ */
 pub struct InputFocusRow<'a> {
     row: &'a InputRow,
     /// The parent of this row, if it exists.

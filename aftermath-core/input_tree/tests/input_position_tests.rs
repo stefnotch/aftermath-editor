@@ -1,5 +1,4 @@
-use input_tree::input_focus::*;
-use input_tree::input_row_position::InputRowPosition;
+use input_tree::focus::*;
 use input_tree::node::*;
 use input_tree::row::*;
 

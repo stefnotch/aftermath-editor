@@ -100,6 +100,7 @@ impl Default for RowIndices {
 }
 
 /// Offsets in a row are between the indices of the elements.
+/// Goes from zero to the length of the row (inclusive).
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Offset(pub usize);
 

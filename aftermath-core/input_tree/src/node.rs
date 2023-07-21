@@ -17,6 +17,7 @@ pub enum InputNode {
     Symbol(String),
 }
 
+// Could be extended with constructs like <mmultiscripts>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InputNodeVariant {
     /// A fraction, like $\frac{1}{2}$

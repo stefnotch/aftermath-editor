@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use crate::{
-    input_focus::InputFocusRow,
+    focus::InputFocusRow,
+    focus::InputRowRange,
     row::{Offset, RowIndices},
 };
 
@@ -10,14 +13,17 @@ pub struct MinimalInputRowPosition {
 }
 
 pub struct InputRowPosition<'a> {
-    pub row_focus: InputFocusRow<'a>,
+    pub row_focus: Arc<InputFocusRow<'a>>,
     pub offset: Offset,
 }
 
 impl<'a> InputRowPosition<'a> {
     pub fn new(row_focus: InputFocusRow<'a>, offset: Offset) -> Self {
         assert!(offset.0 <= row_focus.len());
-        Self { row_focus, offset }
+        Self {
+            row_focus: Arc::new(row_focus),
+            offset,
+        }
     }
 
     pub fn row_indices(&self) -> &RowIndices {
@@ -33,6 +39,10 @@ impl<'a> InputRowPosition<'a> {
 
     pub fn from_minimal(root: InputFocusRow<'a>, minimal: &MinimalInputRowPosition) -> Self {
         Self::new(root.walk_down_indices(&minimal.row_indices), minimal.offset)
+    }
+
+    pub fn in_range(&self, range: InputRowRange<'a>) -> bool {
+        range.contains(self)
     }
 }
 
