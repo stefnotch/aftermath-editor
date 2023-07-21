@@ -7,3 +7,7 @@ edition = "2021"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
+wasm-bindgen = { version = "0.2", optional = true }
+
+[features]
+wasm = ["dep:wasm-bindgen"]

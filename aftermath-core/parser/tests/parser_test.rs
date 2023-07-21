@@ -45,7 +45,7 @@ fn test_sub() {
     let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        r#"(BuiltIn::Sub (Core::Variable "a") (BuiltIn::Row (Arithmetic::Number "1")))"#
+        r#"(BuiltIn::Sub (Core::Variable "a") (BuiltIn::Row 1x1 (Arithmetic::Number "1")))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -64,8 +64,8 @@ fn test_sup_sub() {
         format!(
             "{}{}{}",
             r#"(BuiltIn::Sub "#,
-            r#"(BuiltIn::Sup (Core::Variable "a") (BuiltIn::Row (Arithmetic::Number "1")))"#,
-            r#" (BuiltIn::Row (Arithmetic::Number "2")))"#
+            r#"(BuiltIn::Sup (Core::Variable "a") (BuiltIn::Row 1x1 (Arithmetic::Number "1")))"#,
+            r#" (BuiltIn::Row 1x1 (Arithmetic::Number "2")))"#
         )
     );
     assert_eq!(parsed.errors.len(), 0);
@@ -207,7 +207,7 @@ fn test_parser_fraction() {
 
     assert_eq!(
         parsed.value.to_string(),
-        r#"(Core::RoundBrackets (BuiltIn::Operator "(") (Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (BuiltIn::Fraction (Core::Variable "b") (Core::Variable "c"))) (BuiltIn::Operator ")"))"#
+        r#"(Core::RoundBrackets (BuiltIn::Operator "(") (Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (BuiltIn::Fraction 1x2 (Core::Variable "b") (Core::Variable "c"))) (BuiltIn::Operator ")"))"#
     );
     assert_eq!(parsed.errors.len(), 0);
 }
@@ -235,7 +235,7 @@ fn test_parser_empty_squareroot() {
     let parsed = parse_row(&layout, &context);
     assert_eq!(
         parsed.value.to_string(),
-        r#"(BuiltIn::Root (BuiltIn::Nothing) (Core::Variable "a"))"#
+        r#"(BuiltIn::Root 2x1 (BuiltIn::Nothing) (Core::Variable "a"))"#
     );
 }
 
