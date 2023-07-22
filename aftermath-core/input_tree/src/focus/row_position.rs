@@ -47,6 +47,16 @@ impl<'a> InputRowPosition<'a> {
     }
 }
 
+impl<'a> Into<InputRowRange<'a>> for &InputRowPosition<'a> {
+    fn into(self) -> InputRowRange<'a> {
+        InputRowRange {
+            row_focus: self.row_focus.clone(),
+            start: self.offset,
+            end: self.offset,
+        }
+    }
+}
+
 impl PartialEq for InputRowPosition<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.row_focus == other.row_focus && self.offset == other.offset
@@ -57,34 +67,12 @@ impl Eq for InputRowPosition<'_> {}
 
 impl PartialOrd for InputRowPosition<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let shared_len = self.row_indices().len().min(other.row_indices().len());
-        let self_indices = self.row_indices();
-        let other_indices = other.row_indices();
-        {
-            let self_slice = self_indices.get_slice(0..shared_len);
-            let other_slice = self_indices.get_slice(0..shared_len);
-            let row_ordering = self_slice.cmp(other_slice);
-            if row_ordering != std::cmp::Ordering::Equal {
-                return Some(row_ordering);
-            }
-        }
-
-        // The *partial* row indices are equal, compare the offsets
-        // Since we have both indices and offsets, we have to compare them in a special way
-        // So we multiply both by 2, and add 1 to the indices
-
-        let self_offset_or_index = if self_indices.len() > shared_len {
-            self_indices.at(shared_len).unwrap().0 * 2 + 1
-        } else {
-            self.offset.0 * 2
-        };
-        let other_offset_or_index = if other_indices.len() > shared_len {
-            other_indices.at(shared_len).unwrap().0 * 2 + 1
-        } else {
-            other.offset.0 * 2
-        };
-
-        return Some(self_offset_or_index.cmp(&other_offset_or_index));
+        Some(RowIndices::cmp_indices_and_offset(
+            self.row_indices(),
+            &self.offset,
+            other.row_indices(),
+            &other.offset,
+        ))
     }
 }
 

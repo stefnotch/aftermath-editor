@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
+    editing::editable::Editable,
     focus::InputFocusRow,
     focus::InputRowPosition,
     row::{Offset, RowIndices},
@@ -117,3 +118,96 @@ impl PartialEq for InputRowRange<'_> {
 }
 
 impl Eq for InputRowRange<'_> {}
+
+impl Editable for MinimalInputRowRange {
+    fn apply_edit(&mut self, edit: &crate::editing::BasicEdit) {
+        // Edits only affect positions that are on the same row, or below.
+        if !self.row_indices.starts_with(&edit.position().row_indices) {
+            return;
+        }
+        let same_row = self.row_indices == edit.position().row_indices;
+        match edit {
+            crate::editing::BasicEdit::Insert {
+                position: edit_position,
+                values,
+            } => {
+                // An insert edit only moves carets on the same row
+                // However, in terms of indices, it also moves indices from rows below it.
+                if same_row {
+                    // Avoid moving the start if it's exactly where the inserted symbols are
+                    // but do move the end if it's exactly where the inserted symbols are
+                    if edit_position.offset < self.start {
+                        self.start = Offset(self.start.0 + values.len())
+                    }
+                    if edit_position.offset <= self.end {
+                        self.end = Offset(self.end.0 + values.len())
+                    }
+                } else {
+                    // If the edit is before the container, move the container
+                    let row_index = self
+                        .row_indices
+                        .at_mut(edit_position.row_indices.len() - 1)
+                        .unwrap();
+                    if edit_position.offset.0 <= row_index.0 {
+                        row_index.0 += values.len();
+                    }
+                }
+            }
+            crate::editing::BasicEdit::Delete {
+                position: edit_position,
+                values,
+            } => {
+                // A remove edit moves carets on the same row
+                // and a remove edit clamps contained carets in children to the start of the edit
+                if same_row {
+                    if edit_position.offset <= self.start {
+                        self.start = Offset(
+                            self.start
+                                .0
+                                .saturating_sub(values.len())
+                                .max(edit_position.offset.0),
+                        );
+                    }
+                    if edit_position.offset <= self.end {
+                        self.end = Offset(
+                            self.end
+                                .0
+                                .saturating_sub(values.len())
+                                .max(edit_position.offset.0),
+                        );
+                    }
+                } else {
+                    // if the start index is in a child, and is contained in the edit, then the end index must be contained too
+                    let in_range = RowIndices::cmp_indices_and_offset(
+                        &edit.position().row_indices,
+                        &edit.position().offset,
+                        &self.row_indices,
+                        &self.start,
+                    )
+                    .is_le()
+                        && RowIndices::cmp_indices_and_offset(
+                            &self.row_indices,
+                            &self.start,
+                            &edit.position().row_indices,
+                            &Offset(edit.position().offset.0 + values.len()),
+                        )
+                        .is_le();
+                    if in_range {
+                        self.start = edit.position().offset;
+                        self.end = edit.position().offset;
+                        self.row_indices = edit.position().row_indices.clone();
+                    } else {
+                        // If the edit is before the container, move the container
+                        let row_index = self
+                            .row_indices
+                            .at_mut(edit_position.row_indices.len() - 1)
+                            .unwrap();
+                        if edit_position.offset.0 + values.len() <= row_index.0 {
+                            row_index.0 -= values.len();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

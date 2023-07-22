@@ -2,6 +2,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::editing::editable::Editable;
+
 use super::node::InputNode;
 
 /// A simple representation of what a math formula looks like.
@@ -38,12 +40,9 @@ impl From<Vec<InputNode>> for InputRow {
     }
 }
 
-impl InputRow {
-    pub fn apply_edit(&mut self, edit: &super::editing::BasicEdit) {
-        let position = match edit {
-            super::editing::BasicEdit::Insert { position, .. } => position,
-            super::editing::BasicEdit::Delete { position, .. } => position,
-        };
+impl Editable for InputRow {
+    fn apply_edit(&mut self, edit: &super::editing::BasicEdit) {
+        let position = edit.position();
         let mut row = self;
         for index in position.row_indices.iter() {
             row = row
@@ -108,6 +107,10 @@ impl RowIndices {
         self.0.get(index).copied()
     }
 
+    pub fn at_mut(&mut self, index: usize) -> Option<&mut RowIndex> {
+        self.0.get_mut(index)
+    }
+
     pub fn get_slice(&self, range: std::ops::Range<usize>) -> &[RowIndex] {
         &self.0[range]
     }
@@ -118,6 +121,42 @@ impl RowIndices {
 
     pub fn iter(&self) -> impl Iterator<Item = &RowIndex> {
         self.0.iter()
+    }
+}
+
+impl RowIndices {
+    pub fn cmp_indices_and_offset(
+        self_indices: &RowIndices,
+        self_offset: &Offset,
+        other_indices: &RowIndices,
+        other_offset: &Offset,
+    ) -> std::cmp::Ordering {
+        let shared_len = self_indices.len().min(other_indices.len());
+        {
+            let self_slice = self_indices.get_slice(0..shared_len);
+            let other_slice = self_indices.get_slice(0..shared_len);
+            let row_ordering = self_slice.cmp(other_slice);
+            if row_ordering != std::cmp::Ordering::Equal {
+                return row_ordering;
+            }
+        }
+
+        // The *partial* row indices are equal, compare the offsets
+        // Since we have both indices and offsets, we have to compare them in a special way
+        // So we multiply both by 2, and add 1 to the indices
+
+        let self_offset_or_index = if self_indices.len() > shared_len {
+            self_indices.at(shared_len).unwrap().0 * 2 + 1
+        } else {
+            self_offset.0 * 2
+        };
+        let other_offset_or_index = if other_indices.len() > shared_len {
+            other_indices.at(shared_len).unwrap().0 * 2 + 1
+        } else {
+            other_offset.0 * 2
+        };
+
+        return self_offset_or_index.cmp(&other_offset_or_index);
     }
 }
 

@@ -1,3 +1,4 @@
+use input_tree::editing::editable::Editable;
 use input_tree::editing::invertible::Invertible;
 use input_tree::editing::*;
 use input_tree::focus::*;

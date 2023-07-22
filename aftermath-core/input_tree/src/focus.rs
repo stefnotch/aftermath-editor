@@ -85,6 +85,8 @@ impl PartialEq for InputFocusRow<'_> {
     }
 }
 
+impl Eq for InputFocusRow<'_> {}
+
 pub struct InputFocusNode<'a> {
     node: &'a InputNode,
     parent: InputFocusRow<'a>,

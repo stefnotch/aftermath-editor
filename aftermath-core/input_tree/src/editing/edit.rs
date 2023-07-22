@@ -20,6 +20,17 @@ pub enum BasicEdit {
         /// The values that were removed, used for undo.
         values: Vec<InputNode>,
     },
+    // We could also account for grid edits,
+    // but it's not neccessary just yet.
+}
+
+impl BasicEdit {
+    pub fn position(&self) -> &MinimalInputRowPosition {
+        match self {
+            BasicEdit::Insert { position, .. } => position,
+            BasicEdit::Delete { position, .. } => position,
+        }
+    }
 }
 
 impl Invertible for BasicEdit {
