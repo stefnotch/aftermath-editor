@@ -2,6 +2,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::row::Offset;
+
 /// A proper grid of values.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Grid<T> {
@@ -14,6 +16,13 @@ pub struct Grid<T> {
 pub struct Index2D {
     pub x: usize,
     pub y: usize,
+}
+
+/// A 2D offset, is between indices. Can be used for exclusive ranges.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Offset2D {
+    pub x: Offset,
+    pub y: Offset,
 }
 
 impl<T> Grid<T> {
@@ -66,6 +75,10 @@ impl<T> Grid<T> {
 
     pub fn values(&self) -> &[T] {
         &self.values
+    }
+
+    pub fn into_iter(self) -> impl Iterator<Item = T> {
+        self.values.into_iter()
     }
 
     pub fn is_empty(&self) -> bool {

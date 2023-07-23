@@ -8,7 +8,7 @@ use input_tree::row::*;
 #[test]
 fn insert_into_empty() {
     let mut input = InputRow::new(vec![]);
-    let insert_edit = BasicEdit::Insert {
+    let insert_edit = BasicRowEdit::Insert {
         position: InputRowPosition::new(InputFocusRow::from_root(&input), Offset(0)).to_minimal(),
         values: vec![InputNode::symbol("b")],
     };
@@ -23,7 +23,7 @@ fn insert_into_non_empty() {
         InputNode::symbol("a"),
         InputNode::sub(InputRow::new(vec![InputNode::symbol("1")])),
     ]);
-    let insert_edit = BasicEdit::Insert {
+    let insert_edit = BasicRowEdit::Insert {
         position: InputRowPosition::new(InputFocusRow::from_root(&input), Offset(1)).to_minimal(),
         values: vec![InputNode::symbol("x")],
     };
@@ -47,7 +47,7 @@ fn delete_nested() {
         ])),
     ]);
 
-    let delete_edit = BasicEdit::Delete {
+    let delete_edit = BasicRowEdit::Delete {
         position: InputRowPosition::new(
             InputFocusRow::from_root(&input)
                 .child_at(1)
@@ -70,7 +70,7 @@ fn delete_nested() {
 #[test]
 fn invert_edit() {
     let mut input = InputRow::new(vec![InputNode::symbol("a")]);
-    let insert_edit = BasicEdit::Insert {
+    let insert_edit = BasicRowEdit::Insert {
         position: InputRowPosition::new(InputFocusRow::from_root(&input), Offset(1)).to_minimal(),
         values: vec![InputNode::fraction([
             InputRow::new(vec![InputNode::symbol("b")]),

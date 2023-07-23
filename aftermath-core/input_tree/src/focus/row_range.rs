@@ -14,7 +14,7 @@ pub struct MinimalInputRowRange {
     pub end: Offset,
 }
 
-/// An inclusive range of positions in a row
+/// An range of positions in a row
 pub struct InputRowRange<'a> {
     pub row_focus: Arc<InputFocusRow<'a>>,
     pub start: Offset,
@@ -121,13 +121,15 @@ impl Eq for InputRowRange<'_> {}
 
 impl Editable for MinimalInputRowRange {
     fn apply_edit(&mut self, edit: &crate::editing::BasicEdit) {
+        let edit = edit.get_row_indices_edit();
+
         // Edits only affect positions that are on the same row, or below.
         if !self.row_indices.starts_with(&edit.position().row_indices) {
             return;
         }
         let same_row = self.row_indices == edit.position().row_indices;
         match edit {
-            crate::editing::BasicEdit::Insert {
+            crate::editing::BasicRowEdit::Insert {
                 position: edit_position,
                 values,
             } => {
@@ -153,7 +155,7 @@ impl Editable for MinimalInputRowRange {
                     }
                 }
             }
-            crate::editing::BasicEdit::Delete {
+            crate::editing::BasicRowEdit::Delete {
                 position: edit_position,
                 values,
             } => {
@@ -179,8 +181,8 @@ impl Editable for MinimalInputRowRange {
                 } else {
                     // if the start index is in a child, and is contained in the edit, then the end index must be contained too
                     let in_range = RowIndices::cmp_indices_and_offset(
-                        &edit.position().row_indices,
-                        &edit.position().offset,
+                        &edit_position.row_indices,
+                        &edit_position.offset,
                         &self.row_indices,
                         &self.start,
                     )
@@ -188,14 +190,14 @@ impl Editable for MinimalInputRowRange {
                         && RowIndices::cmp_indices_and_offset(
                             &self.row_indices,
                             &self.start,
-                            &edit.position().row_indices,
-                            &Offset(edit.position().offset.0 + values.len()),
+                            &edit_position.row_indices,
+                            &Offset(edit_position.offset.0 + values.len()),
                         )
                         .is_le();
                     if in_range {
-                        self.start = edit.position().offset;
-                        self.end = edit.position().offset;
-                        self.row_indices = edit.position().row_indices.clone();
+                        self.start = edit_position.offset;
+                        self.end = edit_position.offset;
+                        self.row_indices = edit_position.row_indices.clone();
                     } else {
                         // If the edit is before the container, move the container
                         let row_index = self

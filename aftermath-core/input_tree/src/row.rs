@@ -2,8 +2,6 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::editing::editable::Editable;
-
 use super::node::InputNode;
 
 /// A simple representation of what a math formula looks like.
@@ -37,31 +35,6 @@ impl Default for InputRow {
 impl From<Vec<InputNode>> for InputRow {
     fn from(values: Vec<InputNode>) -> Self {
         InputRow::new(values)
-    }
-}
-
-impl Editable for InputRow {
-    fn apply_edit(&mut self, edit: &super::editing::BasicEdit) {
-        let position = edit.position();
-        let mut row = self;
-        for index in position.row_indices.iter() {
-            row = row
-                .0
-                .get_mut(index.0)
-                .expect("Invalid row index")
-                .row_mut(index.1);
-        }
-
-        let start = position.offset.0;
-        match edit {
-            super::editing::BasicEdit::Insert { values, .. } => {
-                row.0.splice(start..start, values.iter().cloned());
-            }
-            super::editing::BasicEdit::Delete { values, .. } => {
-                row.0
-                    .splice(start..(start + values.len()), std::iter::empty());
-            }
-        }
     }
 }
 
@@ -111,7 +84,7 @@ impl RowIndices {
         self.0.get_mut(index)
     }
 
-    pub fn get_slice(&self, range: std::ops::Range<usize>) -> &[RowIndex] {
+    fn get_slice(&self, range: std::ops::Range<usize>) -> &[RowIndex] {
         &self.0[range]
     }
 
@@ -168,7 +141,7 @@ impl Default for RowIndices {
 
 /// Offsets in a row are between the indices of the elements.
 /// Goes from zero to the length of the row (inclusive).
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Offset(pub usize);
 
 impl fmt::Display for InputRow {

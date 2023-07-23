@@ -120,6 +120,20 @@ impl InputNode {
             InputNode::Symbol(_) => panic!("Can't get row of symbol"),
         }
     }
+
+    pub fn has_resizable_grid(&self) -> bool {
+        match self {
+            InputNode::Container(variant, _) => variant.has_resizable_grid(),
+            InputNode::Symbol(_) => false,
+        }
+    }
+
+    pub fn grid_mut(&mut self) -> Option<&mut Grid<InputRow>> {
+        match self {
+            InputNode::Container(_, grid) => Some(grid),
+            InputNode::Symbol(_) => None,
+        }
+    }
 }
 
 impl fmt::Display for InputNode {
@@ -135,6 +149,20 @@ impl fmt::Display for InputNode {
             }
         }
         Ok(())
+    }
+}
+
+impl InputNodeVariant {
+    pub fn has_resizable_grid(&self) -> bool {
+        match self {
+            InputNodeVariant::Fraction => false,
+            InputNodeVariant::Root => false,
+            InputNodeVariant::Under => false,
+            InputNodeVariant::Over => false,
+            InputNodeVariant::Sup => false,
+            InputNodeVariant::Sub => false,
+            InputNodeVariant::Table => true,
+        }
     }
 }
 
