@@ -128,6 +128,13 @@ impl InputNode {
         }
     }
 
+    pub fn grid(&self) -> Option<&Grid<InputRow>> {
+        match self {
+            InputNode::Container(_, grid) => Some(grid),
+            InputNode::Symbol(_) => None,
+        }
+    }
+
     pub fn grid_mut(&mut self) -> Option<&mut Grid<InputRow>> {
         match self {
             InputNode::Container(_, grid) => Some(grid),

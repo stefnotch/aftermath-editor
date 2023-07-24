@@ -1,7 +1,8 @@
 use crate::{
     editing::{editable::Editable, BasicEdit, BasicGridEdit, BasicRowEdit},
+    focus::{InputFocusRow, InputRowPosition, InputRowRange},
     grid::Grid,
-    row::InputRow,
+    row::{InputRow, Offset},
 };
 
 pub struct InputTree {
@@ -11,6 +12,39 @@ pub struct InputTree {
 impl InputTree {
     pub fn new(root: InputRow) -> Self {
         InputTree { root }
+    }
+
+    pub fn root_focus(&self) -> InputFocusRow {
+        InputFocusRow::from_root(&self.root)
+    }
+
+    /// Creates a range that contains the positions. The positions do not have to be on the same row.
+    pub fn range_from_positions<'a>(
+        &'a self,
+        start: &InputRowPosition<'a>,
+        end: &InputRowPosition<'a>,
+    ) -> InputRowRange<'a> {
+        let shared = start.row_indices().get_shared(end.row_indices());
+
+        // We need to know the direction of the selection to know whether the caret should be at the start or end of the row
+        // We also have to handle edge cases like first caret is at top of fraction and second caret is at bottom of fraction
+        let is_forwards = start <= end;
+
+        let start_offset = start
+            .row_indices()
+            .at(shared.len())
+            .map(|index| if is_forwards { index.0 } else { index.0 + 1 })
+            .unwrap_or(start.offset.0);
+        let end_offset = end
+            .row_indices()
+            .at(shared.len())
+            .map(|index| if is_forwards { index.0 + 1 } else { index.0 })
+            .unwrap_or(end.offset.0);
+        InputRowRange::new(
+            self.root_focus().walk_down_indices(&shared),
+            Offset(start_offset),
+            Offset(end_offset),
+        )
     }
 }
 

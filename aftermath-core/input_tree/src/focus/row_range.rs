@@ -187,7 +187,7 @@ impl Editable for MinimalInputRowRange {
                     }
                 }
             }
-            RowIndicesEdit::GridIndexEdit { .. } => todo!(),// TODO: Implement
+            RowIndicesEdit::GridIndexEdit { .. } => todo!(), // TODO: Implement
         }
 
         if !is_forwards {

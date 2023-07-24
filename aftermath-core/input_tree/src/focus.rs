@@ -70,6 +70,10 @@ impl<'a> InputFocusRow<'a> {
         Some(InputFocusNode::new(&self.row.0[index], self, index))
     }
 
+    pub fn row(&self) -> &'a InputRow {
+        self.row
+    }
+
     pub fn len(&self) -> usize {
         self.row.len()
     }
