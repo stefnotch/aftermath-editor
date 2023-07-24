@@ -16,6 +16,7 @@ pub use row_range::*;
 ///
 /// Note that the "immutable tree with shared parts" optimisation is not implemented, and probably will never need to be implemented.
 /// Instead we have a straightforward mutable tree.
+#[derive(Clone)]
 pub struct InputFocusRow<'a> {
     row: &'a InputRow,
     /// The parent of this row, if it exists.
@@ -70,6 +71,10 @@ impl<'a> InputFocusRow<'a> {
         Some(InputFocusNode::new(&self.row.0[index], self, index))
     }
 
+    pub fn node_at(&self, index: usize) -> Option<&'a InputNode> {
+        self.row.0.get(index)
+    }
+
     pub fn row(&self) -> &'a InputRow {
         self.row
     }
@@ -81,6 +86,12 @@ impl<'a> InputFocusRow<'a> {
     pub fn row_indices(&self) -> &RowIndices {
         &self.row_indices
     }
+
+    pub fn index_in_parent(&self) -> Option<usize> {
+        self.row_indices
+            .at(self.row_indices.len() - 1)
+            .map(|row_index| row_index.1)
+    }
 }
 
 impl PartialEq for InputFocusRow<'_> {
@@ -91,6 +102,7 @@ impl PartialEq for InputFocusRow<'_> {
 
 impl Eq for InputFocusRow<'_> {}
 
+#[derive(Clone)]
 pub struct InputFocusNode<'a> {
     node: &'a InputNode,
     parent: InputFocusRow<'a>,
@@ -114,17 +126,26 @@ impl<'a> InputFocusNode<'a> {
         self.parent
     }
 
+    /// Get the child at the given index, if it exists.
+    /// TODO: Otherwise returns this focus, to avoid consuming it.
     pub fn child_at(mut self, index: usize) -> Option<InputFocusRow<'a>> {
         match self.node {
-            InputNode::Container(_, grid) => grid.get_by_index(index).map(|row| {
-                // Take the row indices from the parent
-                let mut indices = self.parent.row_indices;
-                self.parent.row_indices = Default::default();
-                indices.push(RowIndex(self.index_in_parent, index));
-                InputFocusRow::new(row, Some(self), indices)
-            }),
+            InputNode::Container(_, grid) => match grid.get_by_index(index) {
+                Some(row) => {
+                    // Take the row indices from the parent
+                    let mut indices = self.parent.row_indices;
+                    self.parent.row_indices = Default::default();
+                    indices.push(RowIndex(self.index_in_parent, index));
+                    Some(InputFocusRow::new(row, Some(self), indices))
+                }
+                None => None,
+            },
             InputNode::Symbol(_) => None,
         }
+    }
+
+    pub fn index_in_parent(&self) -> usize {
+        self.index_in_parent
     }
 }
 

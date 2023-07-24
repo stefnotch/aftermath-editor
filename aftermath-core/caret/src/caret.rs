@@ -63,11 +63,7 @@ impl<'a> CaretSelection<'a> {
         }
 
         // Test for grid selection
-        let selected_element = shared_range
-            .row_focus
-            .row()
-            .0
-            .get(shared_range.left_offset().0);
+        let selected_element = shared_range.row_focus.node_at(shared_range.left_offset().0);
 
         let is_grid_selected = selected_element.map(|node| node.has_resizable_grid()) == Some(true);
         if !is_grid_selected {
@@ -83,10 +79,7 @@ impl<'a> CaretSelection<'a> {
                 assert!(start_row_index.0 == shared_range.left_offset().0);
                 assert!(end_row_index.0 == shared_range.left_offset().0);
 
-                let selected_node = std::sync::Arc::<_>::into_inner(shared_range.row_focus)
-                    .unwrap()
-                    .child_at(start_row_index.0)
-                    .unwrap();
+                let selected_node = shared_range.row_focus.child_at(start_row_index.0).unwrap();
 
                 let selected_grid = selected_node.node().grid().unwrap();
 

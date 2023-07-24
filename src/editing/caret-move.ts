@@ -193,7 +193,7 @@ function moveHorizontalInto(zipper: InputRowZipper, caretOffset: Offset, directi
   const adjacentChild = zipper.children[caretOffset + (direction === "left" ? -1 : 0)];
 
   if (adjacentChild instanceof InputSymbolZipper) {
-    return null;
+    return new InputRowPosition(zipper, caretOffset + (direction === "left" ? -1 : +1));
   } else if (
     adjacentChild.type === "Table" ||
     adjacentChild.type === "Fraction" ||
@@ -227,8 +227,7 @@ function movePositionRecursive(
     if (isTouchingEdge(caret, direction)) {
       return moveHorizontalBeyondEdge(caret.zipper, direction);
     } else {
-      const moveIntoChildTree = moveHorizontalInto(caret.zipper, caret.offset, direction);
-      return moveIntoChildTree ?? new InputRowPosition(caret.zipper, caret.offset + (direction === "left" ? -1 : +1));
+      return moveHorizontalInto(caret.zipper, caret.offset, direction);
     }
   } else if (direction === "up" || direction === "down") {
     return moveVertical(caret.zipper, direction, caretPosition[0], getCaretPosition);

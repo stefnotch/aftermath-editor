@@ -8,6 +8,7 @@ use crate::{
 };
 
 /// A range in a row, only stores the minimal amount of data
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MinimalInputRowRange {
     pub row_indices: RowIndices,
     pub start: Offset,
@@ -15,8 +16,9 @@ pub struct MinimalInputRowRange {
 }
 
 /// An range of positions in a row
+#[derive(Clone, PartialEq, Eq)]
 pub struct InputRowRange<'a> {
-    pub row_focus: Arc<InputFocusRow<'a>>,
+    pub row_focus: InputFocusRow<'a>,
     pub start: Offset,
     pub end: Offset,
 }
@@ -26,7 +28,7 @@ impl<'a> InputRowRange<'a> {
         assert!(start.0 <= row_focus.len());
         assert!(end.0 <= row_focus.len());
         Self {
-            row_focus: Arc::new(row_focus),
+            row_focus,
             start,
             end,
         }
@@ -110,14 +112,6 @@ impl<'a> InputRowRange<'a> {
         )
     }
 }
-
-impl PartialEq for InputRowRange<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.row_focus == other.row_focus && self.start == other.start && self.end == other.end
-    }
-}
-
-impl Eq for InputRowRange<'_> {}
 
 impl Editable for MinimalInputRowRange {
     fn apply_edit(&mut self, edit: &crate::editing::BasicEdit) {

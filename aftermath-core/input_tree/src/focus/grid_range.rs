@@ -17,6 +17,7 @@ pub struct MinimalInputGridRange {
 }
 
 /// An inclusive range of positions in a grid. Imagine a box.
+#[derive(Clone, PartialEq, Eq)]
 pub struct InputGridRange<'a> {
     pub grid_focus: Arc<InputFocusNode<'a>>,
     pub start: Offset2D,
@@ -86,14 +87,6 @@ impl<'a> InputGridRange<'a> {
         )
     }
 }
-
-impl PartialEq for InputGridRange<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.grid_focus == other.grid_focus && self.start == other.start && self.end == other.end
-    }
-}
-
-impl Eq for InputGridRange<'_> {}
 
 impl Editable for MinimalInputGridRange {
     fn apply_edit(&mut self, edit: &crate::editing::BasicEdit) {

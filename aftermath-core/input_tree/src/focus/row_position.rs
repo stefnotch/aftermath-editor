@@ -13,18 +13,16 @@ pub struct MinimalInputRowPosition {
     pub offset: Offset,
 }
 
+#[derive(Clone, PartialEq, Eq)]
 pub struct InputRowPosition<'a> {
-    pub row_focus: Arc<InputFocusRow<'a>>,
+    pub row_focus: InputFocusRow<'a>,
     pub offset: Offset,
 }
 
 impl<'a> InputRowPosition<'a> {
     pub fn new(row_focus: InputFocusRow<'a>, offset: Offset) -> Self {
         assert!(offset.0 <= row_focus.len());
-        Self {
-            row_focus: Arc::new(row_focus),
-            offset,
-        }
+        Self { row_focus, offset }
     }
 
     pub fn row_indices(&self) -> &RowIndices {
@@ -56,14 +54,6 @@ impl<'a> Into<InputRowRange<'a>> for &InputRowPosition<'a> {
         }
     }
 }
-
-impl PartialEq for InputRowPosition<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.row_focus == other.row_focus && self.offset == other.offset
-    }
-}
-
-impl Eq for InputRowPosition<'_> {}
 
 impl PartialOrd for InputRowPosition<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
