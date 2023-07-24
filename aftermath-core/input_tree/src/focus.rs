@@ -123,3 +123,12 @@ impl<'a> InputFocusNode<'a> {
         }
     }
 }
+
+impl PartialEq for InputFocusNode<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.parent.row_indices == other.parent.row_indices
+            && self.index_in_parent == other.index_in_parent
+    }
+}
+
+impl Eq for InputFocusNode<'_> {}

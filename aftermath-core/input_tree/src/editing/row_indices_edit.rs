@@ -25,3 +25,20 @@ pub enum RowIndicesEdit<'a> {
         new_offset: Offset2D,
     },
 }
+
+impl RowIndicesEdit<'_> {
+    pub fn is_insert(&self) -> bool {
+        match self {
+            RowIndicesEdit::RowIndexEdit {
+                old_offset,
+                new_offset,
+                ..
+            } => new_offset > old_offset,
+            RowIndicesEdit::GridIndexEdit {
+                old_offset,
+                new_offset,
+                ..
+            } => new_offset.x > old_offset.x || new_offset.y > old_offset.y,
+        }
+    }
+}

@@ -121,95 +121,77 @@ impl Eq for InputRowRange<'_> {}
 
 impl Editable for MinimalInputRowRange {
     fn apply_edit(&mut self, edit: &crate::editing::BasicEdit) {
-        let edit = edit.get_row_indices_edit();
+        use crate::editing::row_indices_edit::RowIndicesEdit;
 
+        let edit = edit.get_row_indices_edit();
+        let row_indices = match edit {
+            RowIndicesEdit::RowIndexEdit { row_indices, .. } => row_indices,
+            RowIndicesEdit::GridIndexEdit { row_indices, .. } => row_indices,
+        };
         // Edits only affect positions that are on the same row, or below.
-        if !self.row_indices.starts_with(&edit.position().row_indices) {
+        if !self.row_indices.starts_with(row_indices) {
             return;
         }
-        let same_row = self.row_indices == edit.position().row_indices;
+
+        // Keep start and end in a sensible order for the code below
+        let is_forwards = self.start <= self.end;
+        if !is_forwards {
+            std::mem::swap(&mut self.start, &mut self.end);
+        }
+
         match edit {
-            crate::editing::BasicRowEdit::Insert {
-                position: edit_position,
-                values,
+            RowIndicesEdit::RowIndexEdit {
+                row_indices,
+                old_offset,
+                new_offset,
             } => {
-                // An insert edit only moves carets on the same row
-                // However, in terms of indices, it also moves indices from rows below it.
-                if same_row {
-                    // Avoid moving the start if it's exactly where the inserted symbols are
-                    // but do move the end if it's exactly where the inserted symbols are
-                    if edit_position.offset < self.start {
-                        self.start = Offset(self.start.0 + values.len())
+                let same_row = &self.row_indices == row_indices;
+                if edit.is_insert() && same_row {
+                    // Same row insertion
+                    // Special rule: Avoid moving the start if it's exactly where the inserted symbols are
+                    let delta = new_offset.0 - old_offset.0;
+                    if old_offset < self.start {
+                        self.start = Offset(self.start.0 + delta)
                     }
-                    if edit_position.offset <= self.end {
-                        self.end = Offset(self.end.0 + values.len())
+                    if old_offset <= self.end {
+                        self.end = Offset(self.end.0 + delta)
+                    }
+                } else if !edit.is_insert() && same_row {
+                    // Same row deletion
+                    let delta = old_offset.0 - new_offset.0;
+                    if new_offset < self.start {
+                        self.start = Offset(self.start.0.saturating_sub(delta).max(new_offset.0));
+                    }
+                    if new_offset <= self.end {
+                        self.end = Offset(self.end.0.saturating_sub(delta).max(new_offset.0));
+                    }
+                } else if edit.is_insert() {
+                    // Child row insertion, if the edit is before the container, move the container
+                    let row_index = self.row_indices.at_mut(row_indices.len() - 1).unwrap();
+                    if old_offset.0 <= row_index.0 {
+                        let delta = new_offset.0 - old_offset.0;
+                        row_index.0 += delta;
                     }
                 } else {
-                    // If the edit is before the container, move the container
-                    let row_index = self
-                        .row_indices
-                        .at_mut(edit_position.row_indices.len() - 1)
-                        .unwrap();
-                    if edit_position.offset.0 <= row_index.0 {
-                        row_index.0 += values.len();
+                    // Child row deletion
+                    let row_index = self.row_indices.at_mut(row_indices.len() - 1).unwrap();
+                    if new_offset.0 <= row_index.0 && row_index.0 < old_offset.0 {
+                        // I'm inside the deleted range, move to the start of the edit
+                        self.start = new_offset;
+                        self.end = new_offset;
+                        self.row_indices = row_indices.clone();
+                    } else if old_offset.0 <= row_index.0 {
+                        // I'm after the deleted range, move the container
+                        let delta = old_offset.0 - new_offset.0;
+                        row_index.0 -= delta;
                     }
                 }
             }
-            crate::editing::BasicRowEdit::Delete {
-                position: edit_position,
-                values,
-            } => {
-                // A remove edit moves carets on the same row
-                // and a remove edit clamps contained carets in children to the start of the edit
-                if same_row {
-                    if edit_position.offset <= self.start {
-                        self.start = Offset(
-                            self.start
-                                .0
-                                .saturating_sub(values.len())
-                                .max(edit_position.offset.0),
-                        );
-                    }
-                    if edit_position.offset <= self.end {
-                        self.end = Offset(
-                            self.end
-                                .0
-                                .saturating_sub(values.len())
-                                .max(edit_position.offset.0),
-                        );
-                    }
-                } else {
-                    // if the start index is in a child, and is contained in the edit, then the end index must be contained too
-                    let in_range = RowIndices::cmp_indices_and_offset(
-                        &edit_position.row_indices,
-                        &edit_position.offset,
-                        &self.row_indices,
-                        &self.start,
-                    )
-                    .is_le()
-                        && RowIndices::cmp_indices_and_offset(
-                            &self.row_indices,
-                            &self.start,
-                            &edit_position.row_indices,
-                            &Offset(edit_position.offset.0 + values.len()),
-                        )
-                        .is_le();
-                    if in_range {
-                        self.start = edit_position.offset;
-                        self.end = edit_position.offset;
-                        self.row_indices = edit_position.row_indices.clone();
-                    } else {
-                        // If the edit is before the container, move the container
-                        let row_index = self
-                            .row_indices
-                            .at_mut(edit_position.row_indices.len() - 1)
-                            .unwrap();
-                        if edit_position.offset.0 + values.len() <= row_index.0 {
-                            row_index.0 -= values.len();
-                        }
-                    }
-                }
-            }
+            RowIndicesEdit::GridIndexEdit { .. } => todo!(),// TODO: Implement
+        }
+
+        if !is_forwards {
+            std::mem::swap(&mut self.start, &mut self.end);
         }
     }
 }

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::row::Offset;
 
 /// A proper grid of values.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Grid<T> {
     values: Vec<T>,
     width: usize,

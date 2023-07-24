@@ -1,5 +1,6 @@
 use super::{InputFocusNode, InputFocusRow};
 use crate::{
+    editing::editable::Editable,
     grid::{Grid, Offset2D},
     node::InputNode,
     row::{InputRow, RowIndices},
@@ -83,5 +84,30 @@ impl<'a> InputGridRange<'a> {
             minimal.start,
             minimal.end,
         )
+    }
+}
+
+impl PartialEq for InputGridRange<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.grid_focus == other.grid_focus && self.start == other.start && self.end == other.end
+    }
+}
+
+impl Eq for InputGridRange<'_> {}
+
+impl Editable for MinimalInputGridRange {
+    fn apply_edit(&mut self, edit: &crate::editing::BasicEdit) {
+        use crate::editing::row_indices_edit::RowIndicesEdit;
+        let edit = edit.get_row_indices_edit();
+        let row_indices = match edit {
+            RowIndicesEdit::RowIndexEdit { row_indices, .. } => row_indices,
+            RowIndicesEdit::GridIndexEdit { row_indices, .. } => row_indices,
+        };
+        // Edits only affect positions that are on the same row, or below.
+        if !self.row_indices.starts_with(row_indices) {
+            return;
+        }
+
+        todo!(); // TODO: Implement
     }
 }
