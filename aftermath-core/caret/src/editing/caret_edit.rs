@@ -22,6 +22,12 @@ pub struct CaretEdit {
     pub edits: Vec<BasicEdit>,
 }
 
+impl CaretEdit {
+    pub fn is_empty(&self) -> bool {
+        self.edits.is_empty()
+    }
+}
+
 impl Invertible for CaretEdit {
     type Inverse = Self;
 

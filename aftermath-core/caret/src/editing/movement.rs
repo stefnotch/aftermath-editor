@@ -81,10 +81,7 @@ impl CaretMover {
         direction: VerticalDirection,
         caret_viewport_position: Option<(f64, f64)>,
     ) -> Option<InputRowPosition<'a>> {
-        let parent = match caret.row_focus.clone().parent() {
-            Some(parent) => parent,
-            None => return None,
-        };
+        let parent = caret.row_focus.clone().parent()?;
 
         // Leaving subscript or superscript special cases
         match (parent.node(), direction) {
@@ -150,10 +147,7 @@ impl CaretMover {
         caret: &InputRowPosition<'a>,
         direction: HorizontalDirection,
     ) -> Option<InputRowPosition<'a>> {
-        let parent = match caret.row_focus.clone().parent() {
-            Some(parent) => parent,
-            None => return None,
-        };
+        let parent = caret.row_focus.clone().parent()?;
 
         let adjacent_index = caret.row_focus.index_in_parent().map(|v| {
             if direction == HorizontalDirection::Left {
@@ -190,10 +184,7 @@ impl CaretMover {
         caret: &InputRowPosition<'a>,
         direction: HorizontalDirection,
     ) -> Option<InputRowPosition<'a>> {
-        let adjacent_index = match caret.row_focus.offset_to_index(caret.offset, direction) {
-            Some(adjacent_index) => adjacent_index,
-            None => return None,
-        };
+        let adjacent_index = caret.row_focus.offset_to_index(caret.offset, direction)?;
 
         let adjacent_child = caret.row_focus.clone().child_at(adjacent_index).unwrap();
 
