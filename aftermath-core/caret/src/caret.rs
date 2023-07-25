@@ -1,20 +1,14 @@
 use input_tree::{
-    editing::BasicEdit,
     focus::{InputGridRange, InputRowPosition, InputRowRange, MinimalInputRowPosition},
     grid::Offset2D,
     input_tree::InputTree,
     row::Offset,
 };
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MinimalCaret {
     pub start_position: MinimalInputRowPosition,
     pub end_position: MinimalInputRowPosition,
-}
-
-pub struct CaretEdit {
-    pub caret_before: MinimalCaret,
-    pub caret_after: MinimalCaret,
-    pub edits: Vec<BasicEdit>,
 }
 
 pub struct Caret<'a> {

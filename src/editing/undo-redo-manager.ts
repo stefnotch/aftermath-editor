@@ -13,11 +13,6 @@ export class UndoRedoManager<Action> {
    */
   private redoStack: Action[] = [];
 
-  // TODO: Far future
-  // Cap the size of the undo-stack
-  // Store the entire state of the formula in a separate long-term undo stack every once in a while/every x actions/every x seconds
-  // That lets one undo all the way back to the initial state without having a huge undo-stack
-
   private invert: (action: Action) => Action;
 
   constructor(invert: (action: Action) => InverseAction<Action>) {

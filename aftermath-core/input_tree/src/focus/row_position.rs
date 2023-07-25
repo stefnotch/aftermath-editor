@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{
     focus::InputFocusRow,
     focus::InputRowRange,
