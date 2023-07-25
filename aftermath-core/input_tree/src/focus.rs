@@ -3,8 +3,9 @@ mod row_position;
 mod row_range;
 
 use crate::{
+    direction::HorizontalDirection,
     node::InputNode,
-    row::{InputRow, RowIndex, RowIndices},
+    row::{InputRow, Offset, RowIndex, RowIndices},
 };
 
 pub use grid_range::*;
@@ -91,6 +92,10 @@ impl<'a> InputFocusRow<'a> {
         self.row_indices
             .at(self.row_indices.len() - 1)
             .map(|row_index| row_index.1)
+    }
+
+    pub fn offset_to_index(&self, offset: Offset, direction: HorizontalDirection) -> Option<usize> {
+        self.row.offset_to_index(offset, direction)
     }
 }
 

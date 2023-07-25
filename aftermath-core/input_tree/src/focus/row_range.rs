@@ -88,6 +88,15 @@ impl<'a> InputRowRange<'a> {
         }
     }
 
+    pub fn values(&self) -> impl Iterator<Item = &crate::node::InputNode> {
+        self.row_focus
+            .row()
+            .0
+            .iter()
+            .skip(self.start.0)
+            .take(self.end.0 - self.start.0)
+    }
+
     pub fn row_indices(&self) -> &RowIndices {
         &self.row_focus.row_indices()
     }

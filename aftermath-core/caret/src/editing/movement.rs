@@ -1,4 +1,5 @@
 use input_tree::{
+    direction::{Direction, HorizontalDirection, VerticalDirection},
     focus::{InputRowPosition, InputRowRange, MinimalInputRowPosition},
     grid::Index2D,
     node::{InputNode, InputNodeVariant},
@@ -12,26 +13,6 @@ pub struct CaretMover {
     ///
     /// See also https://github.com/stefnotch/aftermath-editor/issues/13
     pub get_caret_viewport_position: Option<Box<fn(MinimalInputRowPosition) -> (f64, f64)>>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Direction {
-    Left,
-    Right,
-    Up,
-    Down,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum HorizontalDirection {
-    Left,
-    Right,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum VerticalDirection {
-    Up,
-    Down,
 }
 
 impl CaretMover {
@@ -115,6 +96,8 @@ impl CaretMover {
             _ => {}
         };
 
+        // TODO: Entering subscript or superscript special cases (next to one of those, and press up/down)
+
         // Grid movement
         let grid = match parent.node() {
             InputNode::Container(_, grid) => grid,
@@ -136,7 +119,11 @@ impl CaretMover {
         match new_row {
             Some(new_row) => {
                 // Moved up or down
-                // TODO: if self.get_caret_viewport_position.is_some() && caret_viewport_position.is_some() { moveVerticalClosestPosition }
+                // TODO: if self.get_caret_viewport_position.is_some() && caret_viewport_position.is_some() {
+                // Get the caret position that is closest to where it was
+                // but constrain it to be somewhere in the new_row.
+                // We already have most of the logic in the renderer.
+                // }
                 let offset = if direction == VerticalDirection::Up {
                     Offset(new_row.len())
                 } else {
@@ -153,60 +140,6 @@ impl CaretMover {
                     caret_viewport_position,
                 )
             }
-        }
-    }
-
-    /* TODO: Make get_caret_viewport_position functional
-        /**
-     * Repeatedly move the caret towards the target position, until we're close enough.
-     */
-    function moveVerticalClosestPosition(
-      newZipper: InputRowZipper,
-      desiredXPosition: number,
-      getCaretPosition: (layoutPosition: InputRowPosition) => [ViewportValue, ViewportValue]
-    ) {
-      // Not fully implemented: Attempt to keep x-screen position. This is not trivial, especially with cases where the top fraction has some nested elements
-      // Also do walk into nested elements if possible.
-      let offset: Offset = 0;
-      while (true) {
-        const caretX = getCaretPosition(new InputRowPosition(newZipper, offset))[0];
-        const newOffset: Offset = offset + (caretX < desiredXPosition ? 1 : -1);
-        if (!offsetInBounds(newZipper, newOffset)) break;
-
-        const newCaretX = getCaretPosition(new InputRowPosition(newZipper, newOffset))[0];
-        const isBetter = Math.abs(newCaretX - desiredXPosition) < Math.abs(caretX - desiredXPosition);
-
-        if (isBetter) {
-          // Update offset
-          offset = newOffset;
-        } else {
-          // Try moving into a nested element: 0 is right, -1 is left
-          const childZipper = newZipper.children[offset + (caretX < desiredXPosition ? 0 : -1)];
-          assert(childZipper !== undefined);
-          if (childZipper instanceof InputSymbolZipper) {
-            break; // We can't go any further
-          } else {
-            // Needs to be implemented
-          }
-        }
-      }
-      return new InputRowPosition(newZipper, offset);
-    }
-
-    function offsetInBounds(zipper: InputRowZipper, offset: number) {
-      return 0 <= offset && offset <= zipper.value.values.length;
-    }
-     */
-
-    /// Checks if the caret is moving at the very edge of its container
-    fn is_touching_edge(
-        &self,
-        position: &InputRowPosition,
-        direction: HorizontalDirection,
-    ) -> bool {
-        match direction {
-            HorizontalDirection::Left => position.offset.0 <= 0,
-            HorizontalDirection::Right => position.offset.0 >= position.row_focus.len(),
         }
     }
 
@@ -257,20 +190,12 @@ impl CaretMover {
         caret: &InputRowPosition<'a>,
         direction: HorizontalDirection,
     ) -> Option<InputRowPosition<'a>> {
-        let is_touching_edge = self.is_touching_edge(caret, direction);
-        if is_touching_edge {
-            return None;
-        }
+        let adjacent_index = match caret.row_focus.offset_to_index(caret.offset, direction) {
+            Some(adjacent_index) => adjacent_index,
+            None => return None,
+        };
 
-        let adjacent_child = caret
-            .row_focus
-            .clone()
-            .child_at(if direction == HorizontalDirection::Left {
-                caret.offset.0 - 1
-            } else {
-                caret.offset.0
-            })
-            .unwrap();
+        let adjacent_child = caret.row_focus.clone().child_at(adjacent_index).unwrap();
 
         match adjacent_child.node() {
             input_tree::node::InputNode::Container(_, grid) => {

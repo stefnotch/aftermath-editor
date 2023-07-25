@@ -2,6 +2,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::direction::HorizontalDirection;
+
 use super::node::InputNode;
 
 /// A simple representation of what a math formula looks like.
@@ -23,6 +25,25 @@ impl InputRow {
 
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+
+    pub fn offset_to_index(&self, offset: Offset, direction: HorizontalDirection) -> Option<usize> {
+        match direction {
+            HorizontalDirection::Left => {
+                if offset.0 <= 0 {
+                    None
+                } else {
+                    Some(offset.0 - 1)
+                }
+            }
+            HorizontalDirection::Right => {
+                if offset.0 >= self.len() {
+                    None
+                } else {
+                    Some(offset.0)
+                }
+            }
+        }
     }
 }
 

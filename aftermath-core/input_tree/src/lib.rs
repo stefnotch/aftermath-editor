@@ -1,3 +1,4 @@
+pub mod direction;
 pub mod editing;
 pub mod focus;
 pub mod grid;

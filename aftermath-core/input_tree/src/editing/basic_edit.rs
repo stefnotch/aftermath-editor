@@ -1,5 +1,5 @@
 use crate::{
-    focus::{MinimalInputGridRange, MinimalInputRowPosition},
+    focus::{InputRowPosition, InputRowRange, MinimalInputGridRange, MinimalInputRowPosition},
     grid::Grid,
     node::InputNode,
     row::{InputRow, Offset},
@@ -7,7 +7,6 @@ use crate::{
 
 use super::{invertible::Invertible, row_indices_edit::RowIndicesEdit};
 
-///
 /// Useless note: A Vec<BasicEdit> together with the .concat() method forms an algebraic group.
 /// It is associative, has an identity element ([]) and can be inverted.
 ///
@@ -20,6 +19,36 @@ pub enum BasicEdit {
 }
 
 impl BasicEdit {
+    pub fn remove_range(range: &InputRowRange<'_>) -> (Vec<BasicEdit>, MinimalInputRowPosition) {
+        (
+            vec![BasicEdit::Row(BasicRowEdit::Delete {
+                position: range.left_position().to_minimal(),
+                values: range.values().cloned().collect(),
+            })],
+            MinimalInputRowPosition {
+                row_indices: range.row_indices().clone(),
+                offset: range.left_offset(),
+            },
+        )
+    }
+
+    pub fn insert_at_position(
+        position: &InputRowPosition<'_>,
+        values: Vec<InputNode>,
+    ) -> (Vec<BasicEdit>, MinimalInputRowPosition) {
+        let end_offset = Offset(position.offset.0 + values.len());
+        (
+            vec![BasicEdit::Row(BasicRowEdit::Insert {
+                position: position.to_minimal(),
+                values,
+            })],
+            MinimalInputRowPosition {
+                row_indices: position.row_indices().clone(),
+                offset: end_offset,
+            },
+        )
+    }
+
     pub fn get_row_indices_edit<'a>(&'a self) -> RowIndicesEdit<'a> {
         match self {
             BasicEdit::Row(edit) => edit.get_row_indices_edit(),
