@@ -1,3 +1,3 @@
 pub mod caret;
-pub mod editing;
+pub mod primitive;
 pub mod undo_redo_manager;

@@ -16,6 +16,7 @@ impl Invertible for UndoAction {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CaretEdit {
     pub caret_before: MinimalCaret,
     pub caret_after: MinimalCaret,
