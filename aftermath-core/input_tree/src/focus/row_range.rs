@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{
     editing::editable::Editable,
     focus::InputFocusRow,
@@ -129,7 +127,9 @@ impl Editable for MinimalInputRowRange {
         let edit = edit.get_row_indices_edit();
         let row_indices = match edit {
             RowIndicesEdit::RowIndexEdit { row_indices, .. } => row_indices,
-            RowIndicesEdit::GridIndexEdit { row_indices, .. } => row_indices,
+            RowIndicesEdit::GridIndexEdit {
+                element_indices, ..
+            } => &element_indices.row_indices,
         };
         // Edits only affect positions that are on the same row, or below.
         if !self.row_indices.starts_with(row_indices) {

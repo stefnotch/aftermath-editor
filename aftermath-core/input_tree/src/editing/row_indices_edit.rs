@@ -1,6 +1,6 @@
 use crate::{
-    grid::Offset2D,
-    row::{Offset, RowIndices},
+    grid::GridDirection,
+    row::{ElementIndices, Offset, RowIndices},
 };
 
 pub enum RowIndicesEdit<'a> {
@@ -17,12 +17,10 @@ pub enum RowIndicesEdit<'a> {
     /// Applied to grids, will move rows around within the same grid.
     /// Can either move horizontally or vertically.
     GridIndexEdit {
-        row_indices: &'a RowIndices,
-        row_index_of_grid: usize,
-        /// Must be on the edge of the grid.
-        old_offset: Offset2D,
-        /// Must be on the edge of the grid.
-        new_offset: Offset2D,
+        element_indices: &'a ElementIndices,
+        direction: GridDirection,
+        old_offset: Offset,
+        new_offset: Offset,
     },
 }
 
@@ -33,12 +31,12 @@ impl RowIndicesEdit<'_> {
                 old_offset,
                 new_offset,
                 ..
-            } => new_offset > old_offset,
-            RowIndicesEdit::GridIndexEdit {
+            }
+            | RowIndicesEdit::GridIndexEdit {
                 old_offset,
                 new_offset,
                 ..
-            } => new_offset.x > old_offset.x || new_offset.y > old_offset.y,
+            } => new_offset > old_offset,
         }
     }
 }

@@ -1,6 +1,6 @@
 use caret::caret::{Caret, CaretSelection};
 use input_tree::{
-    focus::InputRowPosition, grid::Offset2D, input_row, input_tree::InputTree, row::Offset,
+    focus::InputRowPosition, input_row, input_tree::InputTree, row::Offset,
 };
 
 #[test]
@@ -42,20 +42,8 @@ fn test_full_grid_selection() {
     match caret.selection() {
         CaretSelection::Row(_) => panic!("Expected grid selection"),
         CaretSelection::Grid(selection) => {
-            assert_eq!(
-                selection.top_left_index(),
-                Offset2D {
-                    x: Offset(0),
-                    y: Offset(0),
-                }
-            );
-            assert_eq!(
-                selection.bottom_right_index(),
-                Offset2D {
-                    x: Offset(2),
-                    y: Offset(2),
-                }
-            );
+            assert_eq!(selection.top_left_index(), (0, 0).into());
+            assert_eq!(selection.bottom_right_index(), (2, 2).into());
         }
     }
 }

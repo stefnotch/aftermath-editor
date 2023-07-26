@@ -1,7 +1,7 @@
 use crate::{
-    editing::{editable::Editable, BasicEdit, BasicGridEdit, BasicRowEdit},
+    editing::{editable::Editable, BasicEdit, EditType, GridEdit, RowEdit},
     focus::{InputFocusRow, InputRowPosition, InputRowRange},
-    grid::Grid,
+    grid::{Grid, GridDirection},
     row::{InputRow, Offset},
 };
 
@@ -51,10 +51,10 @@ impl InputTree {
 impl Editable for InputTree {
     fn apply_edit(&mut self, edit: &BasicEdit) {
         let row_indices = match edit {
-            BasicEdit::Row(BasicRowEdit::Insert { position, .. }) => &position.row_indices,
-            BasicEdit::Row(BasicRowEdit::Delete { position, .. }) => &position.row_indices,
-            BasicEdit::Grid(BasicGridEdit::Insert { position, .. }) => &position.row_indices,
-            BasicEdit::Grid(BasicGridEdit::Delete { position, .. }) => &position.row_indices,
+            BasicEdit::Row(RowEdit { position, .. }) => &position.row_indices,
+            BasicEdit::Grid(GridEdit {
+                element_indices, ..
+            }) => &element_indices.row_indices,
         };
         let mut row = &mut self.root;
         for index in row_indices.iter() {
@@ -66,19 +66,36 @@ impl Editable for InputTree {
         }
 
         match edit {
-            BasicEdit::Row(BasicRowEdit::Insert { values, position }) => {
+            BasicEdit::Row(RowEdit {
+                edit_type: EditType::Insert,
+                values,
+                position,
+            }) => {
                 let start = position.offset.0;
                 row.0.splice(start..start, values.iter().cloned());
             }
-            BasicEdit::Row(BasicRowEdit::Delete { values, position }) => {
+            BasicEdit::Row(RowEdit {
+                edit_type: EditType::Delete,
+                values,
+                position,
+            }) => {
                 let start = position.offset.0;
                 row.0
                     .splice(start..(start + values.len()), std::iter::empty());
             }
-            BasicEdit::Grid(edit @ BasicGridEdit::Insert { position, values })
-            | BasicEdit::Grid(edit @ BasicGridEdit::Delete { position, values }) => {
-                assert!(position.start == position.end);
-                let node = row.0.get_mut(position.index).expect("Invalid row index");
+            BasicEdit::Grid(
+                edit @ GridEdit {
+                    edit_type,
+                    element_indices,
+                    direction,
+                    offset,
+                    values,
+                },
+            ) => {
+                let node = row
+                    .0
+                    .get_mut(element_indices.index)
+                    .expect("Invalid row index");
                 assert!(node.has_resizable_grid());
                 let grid = node.grid_mut().unwrap();
                 let old_size = grid.size();
@@ -86,39 +103,35 @@ impl Editable for InputTree {
                 let mut old_grid = std::mem::take(grid).into_iter();
                 let mut new_grid = Vec::with_capacity(new_size.0 * new_size.1);
 
-                match (edit, edit.is_row_edit()) {
-                    (BasicGridEdit::Insert { .. }, true) => {
+                match (edit_type, direction) {
+                    (EditType::Insert, GridDirection::Row) => {
                         assert!(values.width() == old_size.0);
                         let insert_grid = values.values().iter().cloned();
-                        new_grid
-                            .extend(old_grid.by_ref().take(values.width() * position.start.y.0));
+                        new_grid.extend(old_grid.by_ref().take(values.width() * offset.0));
                         new_grid.extend(insert_grid);
                         new_grid.extend(old_grid);
                     }
-                    (BasicGridEdit::Insert { .. }, false) => {
+                    (EditType::Insert, GridDirection::Column) => {
                         assert!(values.height() == old_size.1);
                         let mut insert_grid = values.values().iter().cloned();
                         for _ in 0..values.height() {
-                            new_grid.extend(old_grid.by_ref().take(position.start.x.0));
+                            new_grid.extend(old_grid.by_ref().take(offset.0));
                             new_grid.extend(insert_grid.by_ref().take(values.width()));
-                            new_grid
-                                .extend(old_grid.by_ref().take(old_size.0 - position.start.x.0));
+                            new_grid.extend(old_grid.by_ref().take(old_size.0 - offset.0));
                         }
                     }
-                    (BasicGridEdit::Delete { .. }, true) => {
+                    (EditType::Delete, GridDirection::Row) => {
                         assert!(values.width() == old_size.0);
-                        new_grid
-                            .extend(old_grid.by_ref().take(values.width() * position.start.y.0));
+                        new_grid.extend(old_grid.by_ref().take(values.width() * offset.0));
                         let _ = old_grid.by_ref().skip(values.values().len());
                         new_grid.extend(old_grid);
                     }
-                    (BasicGridEdit::Delete { .. }, false) => {
+                    (EditType::Delete, GridDirection::Column) => {
                         assert!(values.height() == old_size.1);
                         for _ in 0..values.height() {
-                            new_grid.extend(old_grid.by_ref().take(position.start.x.0));
+                            new_grid.extend(old_grid.by_ref().take(offset.0));
                             let _ = old_grid.by_ref().skip(values.width());
-                            new_grid
-                                .extend(old_grid.by_ref().take(old_size.0 - position.start.x.0));
+                            new_grid.extend(old_grid.by_ref().take(old_size.0 - offset.0));
                         }
                     }
                 }

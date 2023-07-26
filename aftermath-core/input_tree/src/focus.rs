@@ -5,7 +5,7 @@ mod row_range;
 use crate::{
     direction::HorizontalDirection,
     node::InputNode,
-    row::{InputRow, Offset, RowIndex, RowIndices},
+    row::{ElementIndices, InputRow, Offset, RowIndex, RowIndices},
 };
 
 pub use grid_range::*;
@@ -146,6 +146,13 @@ impl<'a> InputFocusNode<'a> {
                 None => None,
             },
             InputNode::Symbol(_) => None,
+        }
+    }
+
+    pub fn element_indices(&self) -> ElementIndices {
+        ElementIndices {
+            row_indices: self.parent.row_indices.clone(),
+            index: self.index_in_parent,
         }
     }
 

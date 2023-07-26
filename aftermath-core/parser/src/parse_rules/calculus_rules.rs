@@ -1,8 +1,7 @@
 use input_tree::node::InputNode;
 
 use crate::{
-    nfa_builder::NFABuilder,
-    parse_rules::{StartingParser, TokenMatcher},
+    parse_rules::StartingParser,
     syntax_tree::{LeafNodeType, NodeIdentifier},
     AutocompleteRule,
 };

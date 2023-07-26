@@ -28,7 +28,7 @@ macro_rules! input_node {
       let width: usize = $x;
       let height: usize = $y;
       let values = vec![$crate::input_row!($e), $($crate::input_row!($es)),*];
-      assert!(values.len() == width * height);
+      assert!(values.len() == width * height, "Table size does not match the values");
       $crate::node::InputNode::table(values, width)
   }};
   ($s:literal) => {

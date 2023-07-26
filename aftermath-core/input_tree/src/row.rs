@@ -69,6 +69,13 @@ pub struct RowIndices(Vec<RowIndex>);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct RowIndex(pub usize, pub usize);
 
+/// Points at a given element.
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct ElementIndices {
+    pub row_indices: RowIndices,
+    pub index: usize,
+}
+
 impl RowIndices {
     pub fn new(values: Vec<RowIndex>) -> Self {
         RowIndices(values)

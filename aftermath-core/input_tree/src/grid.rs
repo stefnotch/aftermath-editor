@@ -5,10 +5,17 @@ use serde::{Deserialize, Serialize};
 use crate::row::Offset;
 
 /// A proper grid of values.
+/// TODO: Could be replaced with a Rust crate like https://crates.io/crates/grid
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Grid<T> {
     values: Vec<T>,
     width: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GridDirection {
+    Column,
+    Row,
 }
 
 /// A 2D index

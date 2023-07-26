@@ -3,6 +3,7 @@ use input_tree::editing::invertible::Invertible;
 use input_tree::editing::*;
 use input_tree::focus::*;
 use input_tree::grid::Grid;
+use input_tree::grid::GridDirection;
 use input_tree::input_row;
 use input_tree::input_tree::InputTree;
 use input_tree::node::*;
@@ -11,7 +12,8 @@ use input_tree::row::*;
 #[test]
 fn insert_into_empty() {
     let mut input = InputTree::new(InputRow::new(vec![]));
-    let insert_edit = BasicRowEdit::Insert {
+    let insert_edit = RowEdit {
+        edit_type: EditType::Insert,
         position: InputRowPosition::new(input.root_focus(), Offset(0)).to_minimal(),
         values: vec![InputNode::symbol("b")],
     };
@@ -26,7 +28,8 @@ fn insert_into_non_empty() {
         InputNode::symbol("a"),
         InputNode::sub(InputRow::new(vec![InputNode::symbol("1")])),
     ]));
-    let insert_edit = BasicRowEdit::Insert {
+    let insert_edit = RowEdit {
+        edit_type: EditType::Insert,
         position: InputRowPosition::new(input.root_focus(), Offset(1)).to_minimal(),
         values: vec![InputNode::symbol("x")],
     };
@@ -50,7 +53,8 @@ fn delete_nested() {
         ])),
     ]));
 
-    let delete_edit = BasicRowEdit::Delete {
+    let delete_edit = RowEdit {
+        edit_type: EditType::Delete,
         position: InputRowPosition::new(
             input.root_focus().child_at(1).unwrap().child_at(0).unwrap(),
             Offset(0),
@@ -69,7 +73,8 @@ fn delete_nested() {
 #[test]
 fn invert_edit() {
     let mut input = InputTree::new(InputRow::new(vec![InputNode::symbol("a")]));
-    let insert_edit = BasicRowEdit::Insert {
+    let insert_edit = RowEdit {
+        edit_type: EditType::Insert,
         position: InputRowPosition::new(input.root_focus(), Offset(1)).to_minimal(),
         values: vec![InputNode::fraction([
             InputRow::new(vec![InputNode::symbol("b")]),
@@ -100,21 +105,20 @@ fn insert_grid_row() {
             )))
         )
     });
-
-    let row_insert = BasicGridEdit::Insert {
-        position: InputGridRange::new(
-            input
-                .root_focus()
-                .child_at(0)
-                .unwrap()
-                .child_at(1)
-                .unwrap()
-                .child_at(0)
-                .unwrap(),
-            (0, 1).into(),
-            (0, 1).into(),
-        )
-        .to_minimal(),
+    let row_insert = GridEdit {
+        edit_type: EditType::Insert,
+        element_indices: input
+            .root_focus()
+            .child_at(0)
+            .unwrap()
+            .child_at(1)
+            .unwrap()
+            .child_at(0)
+            .unwrap()
+            .element_indices()
+            .clone(),
+        direction: GridDirection::Row,
+        offset: Offset(1),
         values: Grid::from_one_dimensional(
             vec![
                 input_row! {(row "x")},
@@ -124,7 +128,6 @@ fn insert_grid_row() {
             3,
         ),
     };
-
     input.apply_edit(&row_insert.into());
     assert_eq!(
         input.root,
@@ -136,6 +139,32 @@ fn insert_grid_row() {
                     (row "d"), (row "e"), (row "f")
                 )))
             )
+        }
+    );
+}
+
+#[test]
+fn insert_grid_colum() {
+    let mut input = InputTree::new(input_row! {
+        (row (table 1 x 1 (row "a")))
+    });
+    let column_insert = GridEdit {
+        edit_type: EditType::Insert,
+        element_indices: input
+            .root_focus()
+            .child_at(0)
+            .unwrap()
+            .element_indices()
+            .clone(),
+        direction: GridDirection::Column,
+        offset: Offset(1),
+        values: Grid::from_one_dimensional(vec![input_row! {(row "x")}], 1),
+    };
+    input.apply_edit(&column_insert.into());
+    assert_eq!(
+        input.root,
+        input_row! {
+            (row (table 2 x 1 (row "a"), (row "x")))
         }
     );
 }

@@ -8,7 +8,8 @@ use input_tree::row::*;
 #[test]
 fn insert_expand_cursor() {
     let mut input = InputTree::new(InputRow::new(vec![]));
-    let insert_edit = BasicRowEdit::Insert {
+    let insert_edit = RowEdit {
+        edit_type: EditType::Insert,
         position: InputRowPosition::new(input.root_focus(), Offset(0)).to_minimal(),
         values: vec![InputNode::symbol("b")],
     }
@@ -33,7 +34,8 @@ fn remove_shrink_cursor_range() {
         InputNode::symbol("-"),
         InputNode::symbol("1"),
     ]));
-    let remove_edit = BasicRowEdit::Delete {
+    let remove_edit = RowEdit {
+        edit_type: EditType::Delete,
         position: InputRowPosition::new(input.root_focus(), Offset(0)).to_minimal(),
         values: vec![
             InputNode::symbol("a"),

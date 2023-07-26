@@ -1,8 +1,8 @@
 use crate::{
-    focus::{InputRowPosition, InputRowRange, MinimalInputGridRange, MinimalInputRowPosition},
-    grid::Grid,
+    focus::{InputRowPosition, InputRowRange, MinimalInputRowPosition},
+    grid::{Grid, GridDirection},
     node::InputNode,
-    row::{InputRow, Offset},
+    row::{ElementIndices, InputRow, Offset},
 };
 
 use super::{invertible::Invertible, row_indices_edit::RowIndicesEdit};
@@ -14,14 +14,32 @@ use super::{invertible::Invertible, row_indices_edit::RowIndicesEdit};
 /// That way, one edit doesn't afftect the indices of the other edits.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BasicEdit {
-    Row(BasicRowEdit),
-    Grid(BasicGridEdit),
+    Row(RowEdit),
+    Grid(GridEdit),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditType {
+    Delete,
+    Insert,
+}
+
+impl Invertible for EditType {
+    type Inverse = EditType;
+
+    fn inverse(&self) -> Self::Inverse {
+        match self {
+            EditType::Delete => EditType::Insert,
+            EditType::Insert => EditType::Delete,
+        }
+    }
 }
 
 impl BasicEdit {
     pub fn remove_range(range: &InputRowRange<'_>) -> (Vec<BasicEdit>, MinimalInputRowPosition) {
         (
-            vec![BasicEdit::Row(BasicRowEdit::Delete {
+            vec![BasicEdit::Row(RowEdit {
+                edit_type: EditType::Delete,
                 position: range.left_position().to_minimal(),
                 values: range.values().cloned().collect(),
             })],
@@ -38,7 +56,8 @@ impl BasicEdit {
     ) -> (Vec<BasicEdit>, MinimalInputRowPosition) {
         let end_offset = Offset(position.offset.0 + values.len());
         (
-            vec![BasicEdit::Row(BasicRowEdit::Insert {
+            vec![BasicEdit::Row(RowEdit {
+                edit_type: EditType::Insert,
                 position: position.to_minimal(),
                 values,
             })],
@@ -68,137 +87,124 @@ impl Invertible for BasicEdit {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum BasicRowEdit {
-    Insert {
-        position: MinimalInputRowPosition,
-        values: Vec<InputNode>,
-    },
-    Delete {
-        /// Deletes to the right of the position
-        position: MinimalInputRowPosition,
-        /// The values that were removed, used for undo.
-        values: Vec<InputNode>,
-    },
+pub struct RowEdit {
+    pub edit_type: EditType,
+    /// Inserts or deletes to the right of the position
+    pub position: MinimalInputRowPosition,
+    /// The values that were inserted, also used for undo.
+    pub values: Vec<InputNode>,
 }
 
-impl BasicRowEdit {
+impl RowEdit {
     pub fn get_row_indices_edit<'a>(&'a self) -> RowIndicesEdit<'a> {
-        match self {
-            BasicRowEdit::Insert { position, values } => RowIndicesEdit::RowIndexEdit {
-                row_indices: &position.row_indices,
-                old_offset: position.offset.clone(),
-                new_offset: Offset(position.offset.0 + values.len()),
-            },
-            BasicRowEdit::Delete { position, values } => RowIndicesEdit::RowIndexEdit {
-                row_indices: &position.row_indices,
-                old_offset: Offset(position.offset.0 + values.len()),
-                new_offset: position.offset.clone(),
-            },
+        RowIndicesEdit::RowIndexEdit {
+            row_indices: &self.position.row_indices,
+            old_offset: self.position.offset.clone(),
+            new_offset: Offset(self.position.offset.0 + self.values.len()),
         }
     }
 }
 
-impl Into<BasicEdit> for BasicRowEdit {
+impl Into<BasicEdit> for RowEdit {
     fn into(self) -> BasicEdit {
         BasicEdit::Row(self)
     }
 }
 
-impl Invertible for BasicRowEdit {
-    type Inverse = BasicRowEdit;
+impl Invertible for RowEdit {
+    type Inverse = RowEdit;
 
     fn inverse(&self) -> Self::Inverse {
-        match self {
-            BasicRowEdit::Insert { position, values } => BasicRowEdit::Delete {
-                position: position.clone(),
-                values: values.clone(),
-            },
-            BasicRowEdit::Delete { position, values } => BasicRowEdit::Insert {
-                position: position.clone(),
-                values: values.clone(),
-            },
+        RowEdit {
+            edit_type: self.edit_type.inverse(),
+            ..self.clone()
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum BasicGridEdit {
-    Insert {
-        /// Needs to be a collapsed range at an edge of the grid.
-        position: MinimalInputGridRange,
-        /// Needs to have a size that matches the grid
-        values: Grid<InputRow>,
-    },
-    Delete {
-        /// Needs to be a collapsed range at an edge of the grid.
-        position: MinimalInputGridRange,
-        /// Needs to have a size that matches the grid
-        values: Grid<InputRow>,
-    },
+pub struct GridEdit {
+    pub edit_type: EditType,
+    pub element_indices: ElementIndices,
+    pub direction: GridDirection,
+    pub offset: Offset,
+    /// Needs to have a size that matches the grid
+    pub values: Grid<InputRow>,
 }
 
-impl BasicGridEdit {
+impl GridEdit {
     pub fn get_row_indices_edit<'a>(&'a self) -> RowIndicesEdit<'a> {
-        match self {
-            BasicGridEdit::Insert { position, .. } => RowIndicesEdit::GridIndexEdit {
-                row_indices: &position.row_indices,
-                row_index_of_grid: position.index,
-                old_offset: position.start.clone(),
-                new_offset: position.end.clone(),
-            },
-            BasicGridEdit::Delete { position, .. } => RowIndicesEdit::GridIndexEdit {
-                row_indices: &position.row_indices,
-                row_index_of_grid: position.index,
-                old_offset: position.end.clone(),
-                new_offset: position.start.clone(),
-            },
-        }
-    }
-
-    pub fn is_row_edit(&self) -> bool {
-        match self {
-            BasicGridEdit::Insert { values, .. } => values.height() == 1,
-            BasicGridEdit::Delete { values, .. } => values.height() == 1,
+        let mut old_offset = self.offset.clone();
+        let mut new_offset = if self.direction == GridDirection::Column {
+            Offset(self.offset.0 + self.values.width())
+        } else {
+            Offset(self.offset.0 + self.values.height())
+        };
+        match self.edit_type {
+            EditType::Insert => {}
+            EditType::Delete => {
+                std::mem::swap(&mut old_offset, &mut new_offset);
+            }
+        };
+        RowIndicesEdit::GridIndexEdit {
+            element_indices: &self.element_indices,
+            direction: self.direction.clone(),
+            old_offset,
+            new_offset,
         }
     }
 
     pub fn new_grid_size(&self, old_grid: &Grid<InputRow>) -> (usize, usize) {
-        match (self, self.is_row_edit()) {
-            (BasicGridEdit::Insert { values, .. }, true) => {
-                (old_grid.width(), old_grid.height() + values.height())
-            }
-            (BasicGridEdit::Insert { values, .. }, false) => {
-                (old_grid.width() + values.width(), old_grid.height())
-            }
-            (BasicGridEdit::Delete { values, .. }, true) => {
-                (old_grid.width(), old_grid.height() - values.height())
-            }
-            (BasicGridEdit::Delete { values, .. }, false) => {
-                (old_grid.width() - values.width(), old_grid.height())
-            }
+        match (self, self.direction) {
+            (
+                GridEdit {
+                    edit_type: EditType::Insert,
+                    values,
+                    ..
+                },
+                GridDirection::Column,
+            ) => (old_grid.width() + values.width(), old_grid.height()),
+            (
+                GridEdit {
+                    edit_type: EditType::Insert,
+                    values,
+                    ..
+                },
+                GridDirection::Row,
+            ) => (old_grid.width(), old_grid.height() + values.height()),
+            (
+                GridEdit {
+                    edit_type: EditType::Delete,
+                    values,
+                    ..
+                },
+                GridDirection::Column,
+            ) => (old_grid.width() - values.width(), old_grid.height()),
+            (
+                GridEdit {
+                    edit_type: EditType::Delete,
+                    values,
+                    ..
+                },
+                GridDirection::Row,
+            ) => (old_grid.width(), old_grid.height() - values.height()),
         }
     }
 }
 
-impl Into<BasicEdit> for BasicGridEdit {
+impl Into<BasicEdit> for GridEdit {
     fn into(self) -> BasicEdit {
         BasicEdit::Grid(self)
     }
 }
 
-impl Invertible for BasicGridEdit {
-    type Inverse = BasicGridEdit;
+impl Invertible for GridEdit {
+    type Inverse = GridEdit;
 
     fn inverse(&self) -> Self::Inverse {
-        match self {
-            BasicGridEdit::Insert { position, values } => BasicGridEdit::Delete {
-                position: position.clone(),
-                values: values.clone(),
-            },
-            BasicGridEdit::Delete { position, values } => BasicGridEdit::Insert {
-                position: position.clone(),
-                values: values.clone(),
-            },
+        GridEdit {
+            edit_type: self.edit_type.inverse(),
+            ..self.clone()
         }
     }
 }
