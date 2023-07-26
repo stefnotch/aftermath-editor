@@ -6,6 +6,9 @@ macro_rules! input_node {
   ((fraction $a:tt, $b:tt)) => {
       $crate::node::InputNode::fraction([$crate::input_row!($a), $crate::input_row!($b)])
   };
+  ((frac $a:tt, $b:tt)) => {
+      $crate::node::InputNode::fraction([$crate::input_row!($a), $crate::input_row!($b)])
+  };
   ((root $a:tt, $b:tt)) => {
       $crate::node::InputNode::root([$crate::input_row!($a), $crate::input_row!($b)])
   };

@@ -25,6 +25,24 @@ pub struct Offset2D {
     pub y: Offset,
 }
 
+impl Into<Offset2D> for (Offset, Offset) {
+    fn into(self) -> Offset2D {
+        Offset2D {
+            x: self.0,
+            y: self.1,
+        }
+    }
+}
+
+impl Into<Offset2D> for (usize, usize) {
+    fn into(self) -> Offset2D {
+        Offset2D {
+            x: self.0.into(),
+            y: self.1.into(),
+        }
+    }
+}
+
 impl<T> Grid<T> {
     pub fn from_one_dimensional(values: Vec<T>, width: usize) -> Self {
         assert!(width > 0);
@@ -38,6 +56,10 @@ impl<T> Grid<T> {
 
     pub fn height(&self) -> usize {
         self.values.len() / self.width
+    }
+
+    pub fn size(&self) -> (usize, usize) {
+        (self.width(), self.height())
     }
 
     pub fn get(&self, xy: Index2D) -> Option<&T> {

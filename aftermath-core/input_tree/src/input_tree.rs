@@ -75,44 +75,57 @@ impl Editable for InputTree {
                 row.0
                     .splice(start..(start + values.len()), std::iter::empty());
             }
-            BasicEdit::Grid(BasicGridEdit::Insert { position, values }) => {
+            BasicEdit::Grid(edit @ BasicGridEdit::Insert { position, values })
+            | BasicEdit::Grid(edit @ BasicGridEdit::Delete { position, values }) => {
                 assert!(position.start == position.end);
                 let node = row.0.get_mut(position.index).expect("Invalid row index");
                 assert!(node.has_resizable_grid());
                 let grid = node.grid_mut().unwrap();
-                let grid_width = grid.width();
-                let new_size = (
-                    grid.width() + values.width(),
-                    grid.height() + values.height(),
-                );
-                let mut old_grid = std::mem::take(grid).into_iter();
-                let mut insert_grid = values.values().iter().cloned();
-                let mut new_grid = Vec::with_capacity(new_size.0 * new_size.1);
-                for _ in 0..values.height() {
-                    new_grid.extend(old_grid.by_ref().take(position.start.x.0));
-                    new_grid.extend(insert_grid.by_ref().take(values.width()));
-                    new_grid.extend(old_grid.by_ref().take(grid_width - position.start.x.0));
-                }
-                *grid = Grid::from_one_dimensional(new_grid, new_size.0);
-            }
-            BasicEdit::Grid(BasicGridEdit::Delete { position, values }) => {
-                assert!(position.start == position.end);
-                let node = row.0.get_mut(position.index).expect("Invalid row index");
-                assert!(node.has_resizable_grid());
-                let grid = node.grid_mut().unwrap();
-                let grid_width = grid.width();
-                let new_size = (
-                    grid.width() - values.width(),
-                    grid.height() - values.height(),
-                );
+                let old_size = grid.size();
+                let new_size = edit.new_grid_size(grid);
                 let mut old_grid = std::mem::take(grid).into_iter();
                 let mut new_grid = Vec::with_capacity(new_size.0 * new_size.1);
-                for _ in 0..values.height() {
-                    new_grid.extend(old_grid.by_ref().take(position.start.x.0));
-                    let _ = old_grid.by_ref().skip(values.width());
-                    new_grid.extend(old_grid.by_ref().take(grid_width - position.start.x.0));
+
+                match (edit, edit.is_row_edit()) {
+                    (BasicGridEdit::Insert { .. }, true) => {
+                        assert!(values.width() == old_size.0);
+                        let insert_grid = values.values().iter().cloned();
+                        new_grid
+                            .extend(old_grid.by_ref().take(values.width() * position.start.y.0));
+                        new_grid.extend(insert_grid);
+                        new_grid.extend(old_grid);
+                    }
+                    (BasicGridEdit::Insert { .. }, false) => {
+                        assert!(values.height() == old_size.1);
+                        let mut insert_grid = values.values().iter().cloned();
+                        for _ in 0..values.height() {
+                            new_grid.extend(old_grid.by_ref().take(position.start.x.0));
+                            new_grid.extend(insert_grid.by_ref().take(values.width()));
+                            new_grid
+                                .extend(old_grid.by_ref().take(old_size.0 - position.start.x.0));
+                        }
+                    }
+                    (BasicGridEdit::Delete { .. }, true) => {
+                        assert!(values.width() == old_size.0);
+                        new_grid
+                            .extend(old_grid.by_ref().take(values.width() * position.start.y.0));
+                        let _ = old_grid.by_ref().skip(values.values().len());
+                        new_grid.extend(old_grid);
+                    }
+                    (BasicGridEdit::Delete { .. }, false) => {
+                        assert!(values.height() == old_size.1);
+                        for _ in 0..values.height() {
+                            new_grid.extend(old_grid.by_ref().take(position.start.x.0));
+                            let _ = old_grid.by_ref().skip(values.width());
+                            new_grid
+                                .extend(old_grid.by_ref().take(old_size.0 - position.start.x.0));
+                        }
+                    }
                 }
                 *grid = Grid::from_one_dimensional(new_grid, new_size.0);
+
+                assert!(grid.width() == new_size.0);
+                assert!(grid.height() == new_size.1);
             }
         }
     }

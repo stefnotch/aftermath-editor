@@ -165,6 +165,12 @@ impl Default for RowIndices {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Offset(pub usize);
 
+impl Into<Offset> for usize {
+    fn into(self) -> Offset {
+        Offset(self)
+    }
+}
+
 impl fmt::Display for InputRow {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "(row")?;

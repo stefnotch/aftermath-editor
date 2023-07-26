@@ -2,6 +2,8 @@ use input_tree::editing::editable::Editable;
 use input_tree::editing::invertible::Invertible;
 use input_tree::editing::*;
 use input_tree::focus::*;
+use input_tree::grid::Grid;
+use input_tree::input_row;
 use input_tree::input_tree::InputTree;
 use input_tree::node::*;
 use input_tree::row::*;
@@ -86,4 +88,54 @@ fn invert_edit() {
     assert_eq!(input.root, expected);
     input.apply_edit(&insert_edit.inverse());
     assert_eq!(input.root, InputRow::new(vec![InputNode::symbol("a")]));
+}
+
+#[test]
+fn insert_grid_row() {
+    let mut input = InputTree::new(input_row! {
+        (row
+            (root (row "2"), (row (table 3 x 2
+                (row "a"), (row "b"), (row "c"),
+                (row "d"), (row "e"), (row "f")
+            )))
+        )
+    });
+
+    let row_insert = BasicGridEdit::Insert {
+        position: InputGridRange::new(
+            input
+                .root_focus()
+                .child_at(0)
+                .unwrap()
+                .child_at(1)
+                .unwrap()
+                .child_at(0)
+                .unwrap(),
+            (0, 1).into(),
+            (0, 1).into(),
+        )
+        .to_minimal(),
+        values: Grid::from_one_dimensional(
+            vec![
+                input_row! {(row "x")},
+                input_row! {(row "y")},
+                input_row! {(row "z")},
+            ],
+            3,
+        ),
+    };
+
+    input.apply_edit(&row_insert.into());
+    assert_eq!(
+        input.root,
+        input_row! {
+            (row
+                (root (row "2"), (row (table 3 x 3
+                    (row "a"), (row "b"), (row "c"),
+                    (row "x"), (row "y"), (row "z"),
+                    (row "d"), (row "e"), (row "f")
+                )))
+            )
+        }
+    );
 }

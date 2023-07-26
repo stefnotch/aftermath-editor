@@ -146,12 +146,36 @@ impl BasicGridEdit {
                 old_offset: position.start.clone(),
                 new_offset: position.end.clone(),
             },
-            BasicGridEdit::Delete { position, values } => RowIndicesEdit::GridIndexEdit {
+            BasicGridEdit::Delete { position, .. } => RowIndicesEdit::GridIndexEdit {
                 row_indices: &position.row_indices,
                 row_index_of_grid: position.index,
                 old_offset: position.end.clone(),
                 new_offset: position.start.clone(),
             },
+        }
+    }
+
+    pub fn is_row_edit(&self) -> bool {
+        match self {
+            BasicGridEdit::Insert { values, .. } => values.height() == 1,
+            BasicGridEdit::Delete { values, .. } => values.height() == 1,
+        }
+    }
+
+    pub fn new_grid_size(&self, old_grid: &Grid<InputRow>) -> (usize, usize) {
+        match (self, self.is_row_edit()) {
+            (BasicGridEdit::Insert { values, .. }, true) => {
+                (old_grid.width(), old_grid.height() + values.height())
+            }
+            (BasicGridEdit::Insert { values, .. }, false) => {
+                (old_grid.width() + values.width(), old_grid.height())
+            }
+            (BasicGridEdit::Delete { values, .. }, true) => {
+                (old_grid.width(), old_grid.height() - values.height())
+            }
+            (BasicGridEdit::Delete { values, .. }, false) => {
+                (old_grid.width() - values.width(), old_grid.height())
+            }
         }
     }
 }
