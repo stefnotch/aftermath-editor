@@ -97,10 +97,15 @@ pub struct RowEdit {
 
 impl RowEdit {
     pub fn get_row_indices_edit<'a>(&'a self) -> RowIndicesEdit<'a> {
+        let mut old_offset = self.position.offset.clone();
+        let mut new_offset = Offset(self.position.offset.0 + self.values.len());
+        if self.edit_type == EditType::Delete {
+            std::mem::swap(&mut old_offset, &mut new_offset);
+        }
         RowIndicesEdit::RowIndexEdit {
             row_indices: &self.position.row_indices,
-            old_offset: self.position.offset.clone(),
-            new_offset: Offset(self.position.offset.0 + self.values.len()),
+            old_offset,
+            new_offset,
         }
     }
 }
@@ -140,12 +145,9 @@ impl GridEdit {
         } else {
             Offset(self.offset.0 + self.values.height())
         };
-        match self.edit_type {
-            EditType::Insert => {}
-            EditType::Delete => {
-                std::mem::swap(&mut old_offset, &mut new_offset);
-            }
-        };
+        if self.edit_type == EditType::Delete {
+            std::mem::swap(&mut old_offset, &mut new_offset);
+        }
         RowIndicesEdit::GridIndexEdit {
             element_indices: &self.element_indices,
             direction: self.direction.clone(),
@@ -155,39 +157,19 @@ impl GridEdit {
     }
 
     pub fn new_grid_size(&self, old_grid: &Grid<InputRow>) -> (usize, usize) {
-        match (self, self.direction) {
-            (
-                GridEdit {
-                    edit_type: EditType::Insert,
-                    values,
-                    ..
-                },
-                GridDirection::Column,
-            ) => (old_grid.width() + values.width(), old_grid.height()),
-            (
-                GridEdit {
-                    edit_type: EditType::Insert,
-                    values,
-                    ..
-                },
-                GridDirection::Row,
-            ) => (old_grid.width(), old_grid.height() + values.height()),
-            (
-                GridEdit {
-                    edit_type: EditType::Delete,
-                    values,
-                    ..
-                },
-                GridDirection::Column,
-            ) => (old_grid.width() - values.width(), old_grid.height()),
-            (
-                GridEdit {
-                    edit_type: EditType::Delete,
-                    values,
-                    ..
-                },
-                GridDirection::Row,
-            ) => (old_grid.width(), old_grid.height() - values.height()),
+        match (self.edit_type, self.direction) {
+            (EditType::Insert, GridDirection::Column) => {
+                (old_grid.width() + self.values.width(), old_grid.height())
+            }
+            (EditType::Insert, GridDirection::Row) => {
+                (old_grid.width(), old_grid.height() + self.values.height())
+            }
+            (EditType::Delete, GridDirection::Column) => {
+                (old_grid.width() - self.values.width(), old_grid.height())
+            }
+            (EditType::Delete, GridDirection::Row) => {
+                (old_grid.width(), old_grid.height() - self.values.height())
+            }
         }
     }
 }
