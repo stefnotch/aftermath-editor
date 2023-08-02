@@ -69,6 +69,12 @@ pub struct RowIndices(Vec<RowIndex>);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct RowIndex(pub usize, pub usize);
 
+impl Into<RowIndex> for (usize, usize) {
+    fn into(self) -> RowIndex {
+        RowIndex(self.0, self.1)
+    }
+}
+
 /// Points at a given element.
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct ElementIndices {
@@ -135,7 +141,7 @@ impl RowIndices {
         let shared_len = self_indices.len().min(other_indices.len());
         {
             let self_slice = self_indices.get_slice(0..shared_len);
-            let other_slice = self_indices.get_slice(0..shared_len);
+            let other_slice = other_indices.get_slice(0..shared_len);
             let row_ordering = self_slice.cmp(other_slice);
             if row_ordering != std::cmp::Ordering::Equal {
                 return row_ordering;

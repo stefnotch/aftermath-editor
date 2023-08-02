@@ -6,6 +6,16 @@ use input_tree::{
     row::Offset,
 };
 
+use crate::caret::{Caret, CaretSelection};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub enum MoveMode {
+    Char,
+    Word,
+    Line,
+}
+
 pub struct CaretMover {
     /// Used for vertical movement to keep the caret in the same x position on screen.
     /// Returns the caret position on screen.
@@ -22,11 +32,24 @@ impl CaretMover {
         }
     }
 
+    pub fn move_caret<'a>(&self, caret: &mut Caret<'a>, direction: Direction, mode: MoveMode) {
+        let selection = caret.selection();
+        match selection {
+            CaretSelection::Row(row) => {
+                if let Some(new_position) = self.move_caret_range(row.clone(), direction, mode) {
+                    caret.set_selection((&new_position).into());
+                }
+            }
+            CaretSelection::Grid(_) => (),
+        }
+    }
+
     /// Returns the new caret position, or None if the caret was not moved.
-    pub fn move_caret<'a>(
+    pub fn move_caret_range<'a>(
         &self,
         caret: InputRowRange<'a>,
         direction: Direction,
+        mode: MoveMode,
     ) -> Option<InputRowPosition<'a>> {
         let is_collapsed = caret.is_collapsed();
         let caret = match direction {
@@ -38,6 +61,10 @@ impl CaretMover {
             .as_ref()
             .map(|f| f(caret.to_minimal()));
 
+        if mode != MoveMode::Char {
+            // TODO: Use MoveMode
+            todo!();
+        }
         let new_caret = self.move_caret_internal(&caret, direction, caret_viewport_position);
         match new_caret {
             Some(new_caret) => Some(new_caret),

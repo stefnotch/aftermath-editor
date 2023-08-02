@@ -72,6 +72,11 @@ impl<'a> InputFocusRow<'a> {
         Some(InputFocusNode::new(&self.row.0[index], self, index))
     }
 
+    pub fn row_at(self, row_index: impl Into<RowIndex>) -> Option<InputFocusRow<'a>> {
+        let row_index = row_index.into();
+        self.child_at(row_index.0)?.child_at(row_index.1)
+    }
+
     pub fn node_at(&self, index: usize) -> Option<&'a InputNode> {
         self.row.0.get(index)
     }

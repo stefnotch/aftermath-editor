@@ -1,5 +1,5 @@
 use crate::{
-    focus::{InputRowPosition, InputRowRange, MinimalInputRowPosition},
+    focus::{InputRowPosition, InputRowRange, MinimalInputRowPosition, MinimalInputRowRange},
     grid::{Grid, GridDirection},
     node::InputNode,
     row::{ElementIndices, InputRow, Offset},
@@ -64,6 +64,26 @@ impl BasicEdit {
             MinimalInputRowPosition {
                 row_indices: position.row_indices().clone(),
                 offset: end_offset,
+            },
+        )
+    }
+
+    /// Creates an edit that replaces a range, and returns the new range.
+    pub fn replace_range(
+        range: &InputRowRange<'_>,
+        values: Vec<InputNode>,
+    ) -> (Vec<BasicEdit>, MinimalInputRowRange) {
+        let (mut edits, _) = BasicEdit::remove_range(&range);
+        let (mut insert_edits, position) =
+            BasicEdit::insert_at_position(&range.left_position(), values);
+        edits.append(&mut insert_edits);
+        assert!(&position.row_indices == range.row_indices());
+        (
+            edits,
+            MinimalInputRowRange {
+                row_indices: range.row_indices().clone(),
+                start: range.left_offset(),
+                end: position.offset,
             },
         )
     }

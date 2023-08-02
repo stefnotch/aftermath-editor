@@ -19,6 +19,13 @@ where
 }
 
 impl<T: Invertible + Clone> UndoRedoManager<T> {
+    pub fn new() -> Self {
+        Self {
+            undo_stack: vec![],
+            redo_stack: vec![],
+        }
+    }
+
     /// Push a redo-action to the undo-stack and clear the redo-stack.
     pub fn push(&mut self, action: T) {
         self.undo_stack.push(action);

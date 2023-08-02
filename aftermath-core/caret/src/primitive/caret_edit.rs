@@ -2,6 +2,7 @@ use input_tree::editing::{invertible::Invertible, BasicEdit};
 
 use crate::caret::MinimalCaret;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UndoAction {
     CaretEdit(CaretEdit),
 }
@@ -44,5 +45,35 @@ impl Invertible for CaretEdit {
 impl Into<UndoAction> for CaretEdit {
     fn into(self) -> UndoAction {
         UndoAction::CaretEdit(self)
+    }
+}
+
+pub struct CaretEditBuilder {
+    pub caret_before: MinimalCaret,
+    pub edits: Vec<BasicEdit>,
+}
+
+impl CaretEditBuilder {
+    pub fn new(caret: MinimalCaret) -> Self {
+        Self {
+            caret_before: caret,
+            edits: Vec::new(),
+        }
+    }
+
+    pub fn add_edit(&mut self, edit: BasicEdit) {
+        self.edits.push(edit);
+    }
+
+    pub fn add_edits(&mut self, edits: Vec<BasicEdit>) {
+        self.edits.extend(edits);
+    }
+
+    pub fn finish(self, caret_after: MinimalCaret) -> CaretEdit {
+        CaretEdit {
+            caret_before: self.caret_before,
+            caret_after,
+            edits: self.edits,
+        }
     }
 }

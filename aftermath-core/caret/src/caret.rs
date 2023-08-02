@@ -1,5 +1,9 @@
 use input_tree::{
-    focus::{InputGridRange, InputRowPosition, InputRowRange, MinimalInputRowPosition},
+    editing::editable::Editable,
+    focus::{
+        InputGridRange, InputRowPosition, InputRowRange, MinimalInputGridRange,
+        MinimalInputRowPosition, MinimalInputRowRange,
+    },
     grid::Offset2D,
     input_tree::InputTree,
     row::Offset,
@@ -11,7 +15,21 @@ pub struct MinimalCaret {
     pub end_position: MinimalInputRowPosition,
 }
 
+impl Default for MinimalCaret {
+    fn default() -> Self {
+        let position = MinimalInputRowPosition {
+            row_indices: Default::default(),
+            offset: Offset(0),
+        };
+        Self {
+            start_position: position,
+            end_position: position,
+        }
+    }
+}
+
 pub struct Caret<'a> {
+    tree: &'a InputTree,
     start_position: InputRowPosition<'a>,
     end_position: InputRowPosition<'a>,
     selection: CaretSelection<'a>,
@@ -25,23 +43,63 @@ impl<'a> Caret<'a> {
     ) -> Self {
         let selection = CaretSelection::from_positions(tree, &start, &end);
         Caret {
+            tree,
             start_position: start,
             end_position: end,
             selection,
         }
     }
 
+    pub fn to_minimal(&self) -> MinimalCaret {
+        MinimalCaret {
+            start_position: self.start_position.to_minimal(),
+            end_position: self.end_position.to_minimal(),
+        }
+    }
+
+    pub fn from_minimal(tree: &InputTree, minimal: &MinimalCaret) -> Self {
+        let start_position =
+            InputRowPosition::from_minimal(tree.root_focus(), &minimal.start_position);
+        let end_position = InputRowPosition::from_minimal(tree.root_focus(), &minimal.end_position);
+        Self::new(tree, start_position, end_position)
+    }
+
     pub fn start_position(&self) -> &InputRowPosition<'a> {
         &self.start_position
+    }
+
+    pub fn set_start_position(&mut self, position: InputRowPosition<'a>) {
+        self.start_position = position;
+        self.selection =
+            CaretSelection::from_positions(self.tree, &self.start_position, &self.end_position);
     }
 
     pub fn end_position(&self) -> &InputRowPosition<'a> {
         &self.end_position
     }
 
+    pub fn set_end_position(&mut self, position: InputRowPosition<'a>) {
+        self.end_position = position;
+        self.selection =
+            CaretSelection::from_positions(self.tree, &self.start_position, &self.end_position);
+    }
+
     pub fn selection(&self) -> &CaretSelection<'a> {
         &self.selection
     }
+
+    pub fn set_selection(&mut self, selection: InputRowRange<'a>) {
+        self.start_position = selection.start_position();
+        self.end_position = selection.end_position();
+        self.selection =
+            CaretSelection::from_positions(self.tree, &self.start_position, &self.end_position);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MinimalCaretSelection {
+    Row(MinimalInputRowRange),
+    Grid(MinimalInputGridRange),
 }
 
 pub enum CaretSelection<'a> {
@@ -49,10 +107,15 @@ pub enum CaretSelection<'a> {
     Grid(InputGridRange<'a>),
 }
 
-impl<'a> Caret<'a> {}
-
 impl<'a> CaretSelection<'a> {
-    pub fn from_positions(
+    pub fn to_minimal(&self) -> MinimalCaretSelection {
+        match self {
+            CaretSelection::Row(value) => MinimalCaretSelection::Row(value.to_minimal()),
+            CaretSelection::Grid(value) => MinimalCaretSelection::Grid(value.to_minimal()),
+        }
+    }
+
+    pub(crate) fn from_positions(
         tree: &'a InputTree,
         start: &InputRowPosition<'a>,
         end: &InputRowPosition<'a>,

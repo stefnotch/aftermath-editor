@@ -1,4 +1,5 @@
 use input_tree::focus::*;
+use input_tree::input_row;
 use input_tree::node::*;
 use input_tree::row::*;
 
@@ -40,4 +41,27 @@ fn test_positions_nested_ordered() {
     assert!(position_middle < position_inside);
     assert!(position_inside > position_middle);
     assert!(position_inside < position_end);
+}
+
+#[test]
+fn test_positions_in_fractions_ordered() {
+    let input = input_row! {
+      (row
+        (fraction (row "a"), (row "b")),
+        "+",
+        (fraction (row "c"), (row "d")),
+      )
+    };
+
+    let start = InputRowPosition::new(
+        InputFocusRow::from_root(&input).row_at((0, 0)).unwrap(),
+        Offset(1),
+    );
+    let end = InputRowPosition::new(
+        InputFocusRow::from_root(&input).row_at((2, 1)).unwrap(),
+        Offset(0),
+    );
+
+    assert!(start < end);
+    assert!(start <= end);
 }

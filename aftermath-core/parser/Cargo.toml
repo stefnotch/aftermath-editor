@@ -12,3 +12,7 @@ serde = { version = "1.0", features = ["derive"] }
 input_tree = { path = "../input_tree" }
 unicode-ident = "1.0.11"
 chumsky = { git = "https://github.com/zesterer/chumsky.git", features = ["pratt"] }
+wasm-bindgen = { version = "0.2", optional = true }
+
+[features]
+wasm = ["dep:wasm-bindgen", "input_tree/wasm"]

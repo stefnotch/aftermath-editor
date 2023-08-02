@@ -1,6 +1,9 @@
 use caret::caret::{Caret, CaretSelection};
 use input_tree::{
-    focus::InputRowPosition, input_row, input_tree::InputTree, row::Offset,
+    focus::{InputRowPosition, InputRowRange},
+    input_row,
+    input_tree::InputTree,
+    row::Offset,
 };
 
 #[test]
@@ -45,5 +48,36 @@ fn test_full_grid_selection() {
             assert_eq!(selection.top_left_index(), (0, 0).into());
             assert_eq!(selection.bottom_right_index(), (2, 2).into());
         }
+    }
+}
+
+#[test]
+fn expand_when_in_child() {
+    let input = InputTree::new(input_row! {
+      (row
+        (fraction (row "a"), (row "b")),
+        "+",
+        (fraction (row "c"), (row "d")),
+      )
+    });
+
+    let caret = Caret::new(
+        &input,
+        InputRowPosition::new(input.root_focus().row_at((0, 0)).unwrap(), Offset(1)),
+        InputRowPosition::new(input.root_focus().row_at((2, 1)).unwrap(), Offset(0)),
+    );
+
+    assert_eq!(
+        caret.start_position().to_minimal(),
+        InputRowPosition::new(input.root_focus().row_at((0, 0)).unwrap(), Offset(1)).to_minimal()
+    );
+    match caret.selection() {
+        caret::caret::CaretSelection::Row(selection) => {
+            assert_eq!(
+                selection.to_minimal(),
+                InputRowRange::new(input.root_focus(), Offset(0), Offset(3)).to_minimal()
+            );
+        }
+        caret::caret::CaretSelection::Grid(_) => panic!("expected row selection"),
     }
 }

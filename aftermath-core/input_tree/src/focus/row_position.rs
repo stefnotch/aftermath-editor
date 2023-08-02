@@ -1,8 +1,11 @@
 use crate::{
+    editing::editable::Editable,
     focus::InputFocusRow,
     focus::InputRowRange,
     row::{Offset, RowIndices},
 };
+
+use super::MinimalInputRowRange;
 
 /// A offset in a row, only stores the minimal amount of data
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,5 +70,18 @@ impl PartialOrd for InputRowPosition<'_> {
 impl Ord for InputRowPosition<'_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.partial_cmp(other).unwrap()
+    }
+}
+
+impl Editable for MinimalInputRowPosition {
+    fn apply_edit(&mut self, edit: &crate::editing::BasicEdit) {
+        let mut range = MinimalInputRowRange {
+            row_indices: self.row_indices.clone(),
+            start: self.offset,
+            end: self.offset,
+        };
+        range.apply_edit(edit);
+        self.row_indices = range.row_indices;
+        self.offset = range.start;
     }
 }

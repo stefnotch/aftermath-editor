@@ -20,19 +20,18 @@ pub fn insert_at_range(
     caret: &InputRowRange<'_>,
     values: Vec<InputNode>,
 ) -> Option<(Vec<BasicEdit>, MinimalInputRowPosition)> {
-    // Caret specific logic
-    if caret.is_collapsed() {
-        Some(BasicEdit::insert_at_position(
-            &caret.start_position(),
-            values,
-        ))
-    } else {
-        let (mut edits, _) = BasicEdit::remove_range(&caret);
-        let (mut insert_edits, position) =
-            BasicEdit::insert_at_position(&caret.left_position(), values);
-        edits.append(&mut insert_edits);
-        Some((edits, position))
-    }
+    let (edit, range) = BasicEdit::replace_range(caret, values);
+    Some((
+        edit,
+        MinimalInputRowPosition {
+            row_indices: range.row_indices,
+            offset: if range.start < range.end {
+                range.end
+            } else {
+                range.start
+            },
+        },
+    ))
 }
 
 pub fn remove_at_caret(
@@ -69,7 +68,11 @@ fn remove_at_caret_position(
         caret: InputRowPosition<'_>,
         direction: HorizontalDirection,
     ) -> Option<(Vec<BasicEdit>, MinimalInputRowPosition)> {
-        let position = caret_mover.move_caret((&caret).into(), direction.into())?;
+        let position = caret_mover.move_caret_range(
+            (&caret).into(),
+            direction.into(),
+            crate::primitive::MoveMode::Char,
+        )?;
         Some((vec![], position.to_minimal()))
     }
 
