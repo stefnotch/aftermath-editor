@@ -1,5 +1,5 @@
-use crate::caret::MinimalCaretSelection;
-use crate::primitive::primitive_edit::{remove_at_caret, CaretRemoveMode};
+use crate::caret::{CaretSelection, MinimalCaretSelection};
+use crate::primitive::primitive_edit::{insert_at_range, remove_at_caret, CaretRemoveMode};
 use crate::primitive::{CaretEditBuilder, CaretMover, MoveMode};
 use crate::{
     caret::{Caret, MinimalCaret},
@@ -10,12 +10,13 @@ use input_tree::editing::editable::Editable;
 use input_tree::editing::BasicEdit;
 use input_tree::focus::InputRowRange;
 use input_tree::input_tree::InputTree;
+use input_tree::row::Offset;
 use input_tree::{
     direction::{Direction, VerticalDirection},
     focus::{MinimalInputRowPosition, MinimalInputRowRange},
     node::InputNode,
 };
-use parser::{parse_rules::ParserRules, ParseResult, SyntaxNode, SyntaxTree};
+use parser::{parse_rules::ParserRules, ParseResult, SyntaxNode};
 use parser::{AutocompleteRuleMatch, ParseError};
 
 pub enum SerializedDataType {
@@ -69,19 +70,17 @@ impl MathEditor {
 
 impl MathEditor {
     pub fn select_with_caret(&mut self, direction: Direction, mode: MoveMode) -> Option<()> {
-        let mut caret = Caret::from_minimal(&self.input, &self.caret);
-        let selection = caret.selection();
+        let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
         match selection {
-            crate::caret::CaretSelection::Row(range) => {
+            CaretSelection::Row(range) => {
                 let new_end = self.caret_mover.move_caret_range(
                     (&range.end_position()).into(),
                     direction,
                     mode,
                 )?;
-
-                caret.set_end_position(new_end);
+                self.caret.end_position = new_end.to_minimal();
             }
-            crate::caret::CaretSelection::Grid(_) => {
+            CaretSelection::Grid(_) => {
                 // Grid selection changing needs to be implemented
                 todo!()
             }
@@ -89,11 +88,11 @@ impl MathEditor {
         Some(())
     }
     pub fn remove_at_caret(&mut self, mode: CaretRemoveMode) -> Option<()> {
-        let selection = Caret::from_minimal(&self.input, &self.caret).selection();
-        let mut builder = CaretEditBuilder::new(self.caret);
+        let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
+        let mut builder = CaretEditBuilder::new(self.caret.clone());
         let new_caret = match selection {
-            crate::caret::CaretSelection::Row(range) => {
-                let (basic_edit, new_position) = remove_at_caret(&self.caret_mover, range, mode)?;
+            CaretSelection::Row(range) => {
+                let (basic_edit, new_position) = remove_at_caret(&self.caret_mover, &range, mode)?;
                 self.input.apply_edits(&basic_edit);
                 builder.add_edits(basic_edit);
                 MinimalCaret {
@@ -101,51 +100,88 @@ impl MathEditor {
                     end_position: new_position,
                 }
             }
-            crate::caret::CaretSelection::Grid(range) => {
+            CaretSelection::Grid(range) => {
                 // Grid deleting needs to be implemented
                 todo!();
             }
         };
-
+        self.caret = new_caret.clone();
         self.undo_stack.push(builder.finish(new_caret).into());
         Some(())
     }
     /// Can also accept a \n and other special characters
     /// For example, when the user presses enter, we can insert a new row (table)
-    pub fn insert_at_caret(&mut self, values: Vec<String>);
-    pub fn insert_nodes_at_caret(&mut self, values: Vec<InputNode>);
-    pub fn select_all(&mut self);
+    pub fn insert_at_caret(&mut self, values: Vec<String>) -> Option<()> {
+        self.insert_nodes_at_caret(values.into_iter().map(InputNode::Symbol).collect())
+    }
+    pub fn insert_nodes_at_caret(&mut self, values: Vec<InputNode>) -> Option<()> {
+        let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
+        let mut builder = CaretEditBuilder::new(self.caret.clone());
+        let new_caret = match selection {
+            CaretSelection::Row(range) => {
+                let (basic_edit, new_position) = insert_at_range(&range, values)?;
+                self.input.apply_edits(&basic_edit);
+                builder.add_edits(basic_edit);
+                MinimalCaret {
+                    start_position: new_position.clone(),
+                    end_position: new_position,
+                }
+            }
+            CaretSelection::Grid(range) => {
+                // Grid inserting needs to be implemented
+                todo!();
+            }
+        };
+        self.caret = new_caret.clone();
+        self.undo_stack.push(builder.finish(new_caret).into());
+        Some(())
+    }
+    pub fn select_all(&mut self) {
+        self.caret = MinimalCaret {
+            start_position: MinimalInputRowPosition {
+                row_indices: Default::default(),
+                offset: Offset(0),
+            },
+            end_position: MinimalInputRowPosition {
+                row_indices: Default::default(),
+                offset: Offset(self.input.root.len()),
+            },
+        }
+    }
     pub fn undo(&mut self) -> Option<()> {
         let action = self.undo_stack.undo()?;
-        match action {
-            UndoAction::CaretEdit(caret_edit) => {
-                self.caret = caret_edit.caret_before;
-                self.input.apply_edits(&caret_edit.edits);
-            }
-        }
+        self.apply_action(action);
         Some(())
     }
     pub fn redo(&mut self) -> Option<()> {
         let action = self.undo_stack.redo()?;
+        self.apply_action(action);
+        Some(())
+    }
+    fn apply_action(&mut self, action: UndoAction) {
         match action {
             UndoAction::CaretEdit(caret_edit) => {
                 self.caret = caret_edit.caret_after;
                 self.input.apply_edits(&caret_edit.edits);
             }
         }
-        Some(())
     }
 
-    pub fn start_selection(&mut self, position: MinimalInputRowPosition, mode: MoveMode);
-    pub fn update_selection(&mut self, position: MinimalInputRowPosition);
-    pub fn finish_selection(&mut self, position: MinimalInputRowPosition);
+    pub fn start_selection(&mut self, position: MinimalInputRowPosition, mode: MoveMode) {
+        todo!()
+    }
+    pub fn update_selection(&mut self, position: MinimalInputRowPosition) {
+        todo!()
+    }
+    pub fn finish_selection(&mut self, position: MinimalInputRowPosition) {
+        todo!()
+    }
 
     pub fn copy(&mut self, data_type: SerializedDataType) -> String {
-        let caret = Caret::from_minimal(&self.input, &self.caret);
-        let selection = caret.selection();
-        let selected_nodes = match selection {
-            crate::caret::CaretSelection::Row(range) => range.values().collect::<Vec<_>>(),
-            crate::caret::CaretSelection::Grid(range) => {
+        let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
+        let selected_nodes = match &selection {
+            CaretSelection::Row(range) => range.values().collect::<Vec<_>>(),
+            CaretSelection::Grid(range) => {
                 // Grid copying needs to be implemented
                 // For example, we could construct a new, smaller grid and copy that node
                 todo!()
@@ -168,29 +204,37 @@ impl MathEditor {
         Some(())
     }
 
-    pub fn open_autocomplete(&mut self);
-    pub fn apply_autocomplete(&mut self, accept: bool);
-    pub fn move_in_autocomplete(&mut self, direction: VerticalDirection);
+    pub fn open_autocomplete(&mut self) {
+        todo!()
+    }
+    pub fn apply_autocomplete(&mut self, accept: bool) {
+        todo!()
+    }
+    pub fn move_in_autocomplete(&mut self, direction: VerticalDirection) {
+        todo!()
+    }
 
-    pub fn get_autocomplete<'a>(&'a mut self) -> Option<Vec<AutocompleteRuleMatch<'a>>>;
-    pub fn get_syntax_tree<'a>(&mut self) -> &'a SyntaxNode {
+    pub fn get_autocomplete<'a>(&'a mut self) -> Option<Vec<AutocompleteRuleMatch<'a>>> {
+        todo!()
+    }
+    pub fn get_syntax_tree(&mut self) -> &SyntaxNode {
         &self.get_parsed().value
     }
-    pub fn get_parse_errors<'a>(&mut self) -> &'a [ParseError] {
+    pub fn get_parse_errors(&mut self) -> &[ParseError] {
         &self.get_parsed().errors
     }
     pub fn get_caret(&self) -> Vec<MinimalCaretSelection> {
-        let caret = Caret::from_minimal(&self.input, &self.caret);
-        vec![caret.selection().to_minimal()]
+        let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
+        vec![selection.to_minimal()]
     }
-
     fn get_parsed(&mut self) -> &ParseResult<SyntaxNode> {
-        if let Some(result) = self.parsed {
-            return &result;
+        if let Some(ref result) = (self).parsed {
+            return result;
         }
+
         let parsed = parser::parse_row(&self.input.root, &self.parser);
         self.parsed = Some(parsed);
-        &parsed
+        self.parsed.as_ref().unwrap()
     }
 
     /// For setting some parsed MathML, or for inserting a result
@@ -202,7 +246,7 @@ impl MathEditor {
         // Apply edit
         // Merge edit into undo stack
         let mut caret = self.caret.clone();
-        let mut builder = CaretEditBuilder::new(self.caret);
+        let mut builder = CaretEditBuilder::new(self.caret.clone());
         let (basic_edit, _) = BasicEdit::replace_range(
             &InputRowRange::from_minimal(self.input.root_focus(), &range),
             values,

@@ -1,5 +1,4 @@
 use input_tree::{
-    editing::editable::Editable,
     focus::{
         InputGridRange, InputRowPosition, InputRowRange, MinimalInputGridRange,
         MinimalInputRowPosition, MinimalInputRowRange,
@@ -22,7 +21,7 @@ impl Default for MinimalCaret {
             offset: Offset(0),
         };
         Self {
-            start_position: position,
+            start_position: position.clone(),
             end_position: position,
         }
     }
@@ -57,7 +56,7 @@ impl<'a> Caret<'a> {
         }
     }
 
-    pub fn from_minimal(tree: &InputTree, minimal: &MinimalCaret) -> Self {
+    pub fn from_minimal(tree: &'a InputTree, minimal: &MinimalCaret) -> Self {
         let start_position =
             InputRowPosition::from_minimal(tree.root_focus(), &minimal.start_position);
         let end_position = InputRowPosition::from_minimal(tree.root_focus(), &minimal.end_position);
@@ -86,6 +85,10 @@ impl<'a> Caret<'a> {
 
     pub fn selection(&self) -> &CaretSelection<'a> {
         &self.selection
+    }
+
+    pub fn into_selection(self) -> CaretSelection<'a> {
+        self.selection
     }
 
     pub fn set_selection(&mut self, selection: InputRowRange<'a>) {

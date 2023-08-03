@@ -1,3 +1,4 @@
+pub mod math_editor;
 mod utils;
 
 use input_tree::{node::InputNode, row::InputRow};
