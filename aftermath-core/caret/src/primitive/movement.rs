@@ -5,6 +5,7 @@ use input_tree::{
     node::{InputNode, InputNodeVariant},
     row::Offset,
 };
+use parser::SyntaxNode;
 
 use crate::caret::{Caret, CaretSelection};
 

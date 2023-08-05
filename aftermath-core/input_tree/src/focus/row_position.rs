@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     editing::editable::Editable,
     focus::InputFocusRow,
@@ -8,8 +10,10 @@ use crate::{
 use super::MinimalInputRowRange;
 
 /// A offset in a row, only stores the minimal amount of data
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct MinimalInputRowPosition {
+    #[wasm_bindgen(getter_with_clone)]
     pub row_indices: RowIndices,
     pub offset: Offset,
 }

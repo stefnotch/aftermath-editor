@@ -21,7 +21,7 @@ use crate::{
     parse_row,
     syntax_tree::{LeafNodeType, NodeIdentifier, SyntaxLeafNode},
     token_matcher::MatchError,
-    SyntaxNode, SyntaxTree,
+    SyntaxNode, SyntaxNodeChildren,
 };
 
 use self::{
@@ -500,7 +500,7 @@ impl TokenParser {
                             Self::get_new_row_token_name(container_type),
                             // We're wrapping the new row in a token with a proper width
                             token.range(),
-                            SyntaxTree::NewRows(children),
+                            SyntaxNodeChildren::NewRows(children),
                         );
                     }
                     InputNode::Symbol(_) => {}
@@ -518,9 +518,11 @@ impl TokenParser {
         );
 
         match (self.token_type(), &leaf_node.node_type) {
-            (TokenType::Starting, LeafNodeType::Symbol) => {
-                SyntaxNode::new(self.name(), token.range(), SyntaxTree::Leaf(leaf_node))
-            }
+            (TokenType::Starting, LeafNodeType::Symbol) => SyntaxNode::new(
+                self.name(),
+                token.range(),
+                SyntaxNodeChildren::Leaf(leaf_node),
+            ),
             (TokenType::Starting, LeafNodeType::Operator) => BuiltInRules::operator_node(leaf_node),
             (TokenType::Continue, LeafNodeType::Symbol) => {
                 panic!("symbol node in continue token")

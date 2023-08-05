@@ -4,18 +4,18 @@ use input_tree::print_helpers::{write_with_escaped_double_quotes, write_with_sep
 
 use crate::{SyntaxLeafNode, SyntaxNode};
 
-use super::{NodeIdentifier, SyntaxTree};
+use super::SyntaxNodeChildren;
 
-impl fmt::Display for SyntaxTree {
+impl fmt::Display for SyntaxNodeChildren {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SyntaxTree::Children(children) => {
+            SyntaxNodeChildren::Children(children) => {
                 write_with_separator(children, " ", f)?;
             }
-            SyntaxTree::NewRows(children) => {
+            SyntaxNodeChildren::NewRows(children) => {
                 write!(f, "{}", children)?;
             }
-            SyntaxTree::Leaf(child) => {
+            SyntaxNodeChildren::Leaf(child) => {
                 write!(f, "{}", child)?;
             }
         };
@@ -54,11 +54,5 @@ impl fmt::Display for SyntaxLeafNode {
             write_with_escaped_double_quotes(grapheme, f)?;
         }
         write!(f, "\"")
-    }
-}
-
-impl fmt::Display for NodeIdentifier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_with_separator(&self.0, "::", f)
     }
 }

@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     editing::editable::Editable,
     focus::InputFocusRow,
@@ -6,8 +8,10 @@ use crate::{
 };
 
 /// A range in a row, only stores the minimal amount of data
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct MinimalInputRowRange {
+    #[wasm_bindgen(getter_with_clone)]
     pub row_indices: RowIndices,
     pub start: Offset,
     pub end: Offset,

@@ -19,7 +19,7 @@ use self::parse_rules::ParserRules;
 
 pub use self::autocomplete::{AutocompleteResult, AutocompleteRule, AutocompleteRuleMatch};
 pub use self::parse_result::{ParseError, ParseErrorType, ParseResult};
-pub use self::syntax_tree::{SyntaxLeafNode, SyntaxNode, SyntaxTree};
+pub use self::syntax_tree::{SyntaxLeafNode, SyntaxNode, SyntaxNodeChildren};
 
 pub fn parse_row(input: &InputRow, context: &ParserRules) -> ParseResult<SyntaxNode> {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
@@ -98,7 +98,11 @@ impl<'a> ParserRules<'a> {
                 children.extend(args);
                 let range = range_start..get_child_range_end(&children);
 
-                SyntaxNode::new(definition.name(), range, SyntaxTree::Children(children))
+                SyntaxNode::new(
+                    definition.name(),
+                    range,
+                    SyntaxNodeChildren::Children(children),
+                )
             }
         } else {
             // Error case. Check if the next token is an appropriate operator
@@ -145,7 +149,11 @@ impl<'a> ParserRules<'a> {
 
                 // Range that includes the left side, and the last child
                 let range = range_start..get_child_range_end(&children);
-                left = SyntaxNode::new(definition.name(), range, SyntaxTree::Children(children));
+                left = SyntaxNode::new(
+                    definition.name(),
+                    range,
+                    SyntaxNodeChildren::Children(children),
+                );
                 continue;
             }
 

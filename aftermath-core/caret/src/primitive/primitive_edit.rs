@@ -8,6 +8,7 @@ use input_tree::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum CaretRemoveMode {
     Left,
     Right,

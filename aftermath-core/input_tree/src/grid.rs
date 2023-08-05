@@ -27,6 +27,7 @@ pub struct Index2D {
 
 /// A 2D offset, is between indices. Can be used for exclusive ranges.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Offset2D {
     pub x: Offset,
     pub y: Offset,

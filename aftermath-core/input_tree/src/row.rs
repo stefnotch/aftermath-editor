@@ -61,6 +61,7 @@ impl From<Vec<InputNode>> for InputRow {
 
 /// Points at a given row
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct RowIndices(Vec<RowIndex>);
 
 /// We have a repeating row > element > ... hierarchy.
@@ -176,6 +177,7 @@ impl Default for RowIndices {
 /// Offsets in a row are between the indices of the elements.
 /// Goes from zero to the length of the row (inclusive).
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Offset(pub usize);
 
 impl Into<Offset> for usize {

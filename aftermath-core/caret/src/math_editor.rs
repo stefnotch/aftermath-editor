@@ -33,6 +33,8 @@ pub struct MathEditor {
     parsed: Option<ParseResult<SyntaxNode>>,
     /// Main caret
     caret: MinimalCaret,
+    /// Selection mode, describes how the current selection works
+    selection_mode: Option<MoveMode>,
     /// Undo-redo stack, will record actual edits
     undo_stack: UndoRedoManager<UndoAction>,
     caret_mover: CaretMover,
@@ -46,6 +48,7 @@ impl MathEditor {
             parser,
             parsed: None,
             caret: Default::default(),
+            selection_mode: None,
             undo_stack: UndoRedoManager::new(),
             caret_mover: CaretMover::new(),
         }
@@ -114,7 +117,7 @@ impl MathEditor {
     pub fn insert_at_caret(&mut self, values: Vec<String>) -> Option<()> {
         self.insert_nodes_at_caret(values.into_iter().map(InputNode::Symbol).collect())
     }
-    pub fn insert_nodes_at_caret(&mut self, values: Vec<InputNode>) -> Option<()> {
+    fn insert_nodes_at_caret(&mut self, values: Vec<InputNode>) -> Option<()> {
         let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
         let mut builder = CaretEditBuilder::new(self.caret.clone());
         let new_caret = match selection {
@@ -168,13 +171,23 @@ impl MathEditor {
     }
 
     pub fn start_selection(&mut self, position: MinimalInputRowPosition, mode: MoveMode) {
-        todo!()
+        self.selection_mode = Some(mode);
+        // TODO: Use the mode. Kinda like
+        // self.caret_mover.move_mode_to_range(mode) // and then use that info to extend the selection
+        self.caret = MinimalCaret {
+            start_position: position.clone(),
+            end_position: position,
+        }
     }
-    pub fn update_selection(&mut self, position: MinimalInputRowPosition) {
-        todo!()
+    pub fn extend_selection(&mut self, position: MinimalInputRowPosition) {
+        let mode = self.selection_mode.unwrap_or(MoveMode::Char);
+        // TODO: Use the mode. Kinda like
+        // self.caret_mover.move_mode_to_range(mode) // and then use that info to extend the selection
+        self.caret.end_position = position;
     }
     pub fn finish_selection(&mut self, position: MinimalInputRowPosition) {
-        todo!()
+        self.extend_selection(position);
+        self.selection_mode = None;
     }
 
     pub fn copy(&mut self, data_type: SerializedDataType) -> String {

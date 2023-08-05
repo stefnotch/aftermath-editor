@@ -6,7 +6,7 @@ use crate::{
     nfa_builder::NFABuilder,
     parse_rules::{StartingParser, TokenMatcher},
     syntax_tree::{LeafNodeType, NodeIdentifier},
-    AutocompleteRule, SyntaxLeafNode, SyntaxNode, SyntaxTree,
+    AutocompleteRule, SyntaxLeafNode, SyntaxNode, SyntaxNodeChildren,
 };
 
 use super::{RuleCollection, TokenParser};
@@ -27,7 +27,7 @@ impl BuiltInRules {
         SyntaxNode::new(
             BuiltInRules::error_container_name(),
             range,
-            SyntaxTree::Children(children),
+            SyntaxNodeChildren::Children(children),
         )
     }
 
@@ -55,7 +55,7 @@ impl BuiltInRules {
             SyntaxNode::new(
                 BuiltInRules::error_unknown_token_name(),
                 unknown_token.range(),
-                SyntaxTree::Leaf(unknown_token),
+                SyntaxNodeChildren::Leaf(unknown_token),
             ),
         ];
         BuiltInRules::error_container_node(range, children)
@@ -71,7 +71,7 @@ impl BuiltInRules {
         SyntaxNode::new(
             BuiltInRules::error_missing_token_name(),
             range,
-            SyntaxTree::Children(vec![]),
+            SyntaxNodeChildren::Children(vec![]),
         )
     }
 
@@ -80,7 +80,7 @@ impl BuiltInRules {
         SyntaxNode::new(
             BuiltInRules::operator_name(),
             leaf_node.range(),
-            SyntaxTree::Leaf(leaf_node),
+            SyntaxNodeChildren::Leaf(leaf_node),
         )
     }
 
@@ -94,7 +94,7 @@ impl BuiltInRules {
         SyntaxNode::new(
             BuiltInRules::nothing_name(),
             range,
-            SyntaxTree::Children(vec![]),
+            SyntaxNodeChildren::Children(vec![]),
         )
     }
 

@@ -7,6 +7,7 @@ use input_tree::{
     input_tree::InputTree,
     row::Offset,
 };
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MinimalCaret {
@@ -99,7 +100,7 @@ impl<'a> Caret<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MinimalCaretSelection {
     Row(MinimalInputRowRange),
     Grid(MinimalInputGridRange),
