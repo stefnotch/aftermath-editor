@@ -1,4 +1,4 @@
-import init, { MathParser } from "../../aftermath-core/pkg";
+import init, { Direction, MathEditorBindings as MathEditorRustBindings, MathParser, MoveMode } from "../../aftermath-core/pkg";
 import { type InputNode, InputNodeContainer, InputNodeSymbol } from "../input-tree/input-node";
 import type { Offset } from "../input-tree/input-offset";
 import { RowIndices } from "../input-tree/row-indices";
@@ -10,6 +10,33 @@ import { version } from "../../package.json";
 
 // Yay, top level await is neat https://v8.dev/features/top-level-await
 await init();
+
+export class MathEditorBindings {
+  inner: MathEditorRustBindings;
+  constructor() {
+    this.inner = new MathEditorRustBindings();
+  }
+
+  get_syntax_tree(): SyntaxNode {
+    return this.inner.get_syntax_tree();
+  }
+
+  move_caret(direction: Direction, mode: MoveMode) {
+    return this.inner.move_caret(direction, mode);
+  }
+}
+
+export {
+  MoveMode,
+  CaretRemoveMode,
+  Direction,
+  MinimalInputGridRange,
+  MinimalInputRowPosition,
+  MinimalInputRowRange,
+  Offset,
+  Offset2D,
+  RowIndices,
+} from "../../aftermath-core/pkg";
 
 const parser = MathParser.new();
 

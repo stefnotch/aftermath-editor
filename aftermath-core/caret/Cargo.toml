@@ -7,11 +7,11 @@ edition = "2021"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+tsify =  { version = "0.4", optional = true, default-features = false, features = ["js"] }
 input_tree = { path = "../input_tree" }
 parser = { path = "../parser" }
 wasm-bindgen = { version = "0.2", optional = true }
 
 [features]
 default = ["wasm"]
-wasm = ["dep:wasm-bindgen", "input_tree/wasm", "parser/wasm"]
+wasm = ["dep:wasm-bindgen", "dep:tsify", "input_tree/wasm", "parser/wasm"]

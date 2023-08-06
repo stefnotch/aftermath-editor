@@ -1,7 +1,7 @@
 use std::ops::Range;
 
 use input_tree::grid::Grid;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::NodeIdentifier;
 
@@ -16,7 +16,12 @@ use super::NodeIdentifier;
 /// - Leaf nodes always have a nonzero range
 ///
 /// indices reference the input tree
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub struct SyntaxNode {
     /// name of the function or constant
     pub name: NodeIdentifier,
@@ -29,7 +34,12 @@ pub struct SyntaxNode {
     range: Range<usize>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub enum SyntaxNodeChildren {
     /// When this syntax node actually starts a new row in the input tree.
     /// TODO: Maybe verify that this has a range of 1?
@@ -49,7 +59,12 @@ impl SyntaxNodeChildren {
 
 /// A leaf node in a concrete syntax tree.
 /// The range of this node is always non-empty.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub struct SyntaxLeafNode {
     /// Type of the leaf node
     pub node_type: LeafNodeType,
@@ -78,7 +93,12 @@ impl SyntaxLeafNode {
     }
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub enum LeafNodeType {
     /// A symbol node
     Symbol,

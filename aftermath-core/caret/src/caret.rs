@@ -101,6 +101,11 @@ impl<'a> Caret<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub enum MinimalCaretSelection {
     Row(MinimalInputRowRange),
     Grid(MinimalInputGridRange),

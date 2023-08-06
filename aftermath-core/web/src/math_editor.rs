@@ -7,7 +7,7 @@ use input_tree::{
     focus::{MinimalInputRowPosition, MinimalInputRowRange},
     node::InputNode,
 };
-use parser::parse_rules::ParserRules;
+use parser::{parse_rules::ParserRules, ParseError, SyntaxNode};
 use serde::Serialize;
 use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
 
@@ -49,6 +49,23 @@ impl MathEditorBindings {
         self.editor.remove_at_caret(mode).is_some()
     }
 
+    pub fn insert_at_caret(&mut self, values: JsValue) -> Result<bool, JsValue> {
+        let values: Vec<String> = serde_wasm_bindgen::from_value(values)?;
+        Ok(self.editor.insert_at_caret(values).is_some())
+    }
+
+    pub fn select_all(&mut self) {
+        self.editor.select_all();
+    }
+
+    pub fn undo(&mut self) -> bool {
+        self.editor.undo().is_some()
+    }
+
+    pub fn redo(&mut self) -> bool {
+        self.editor.redo().is_some()
+    }
+
     pub fn start_selection(&mut self, position: MinimalInputRowPosition, mode: MoveMode) {
         self.editor.start_selection(position, mode);
     }
@@ -59,23 +76,8 @@ impl MathEditorBindings {
         self.editor.finish_selection(position);
     }
 
-    pub fn select_all(&mut self) {
-        self.editor.select_all();
-    }
-    pub fn undo(&mut self) -> bool {
-        self.editor.undo().is_some()
-    }
-    pub fn redo(&mut self) -> bool {
-        self.editor.redo().is_some()
-    }
-}
-
-#[wasm_bindgen]
-impl MathEditorBindings {
-    pub fn insert_at_caret(&mut self, values: JsValue) -> Result<bool, JsValue> {
-        let values: Vec<String> = serde_wasm_bindgen::from_value(values)?;
-        Ok(self.editor.insert_at_caret(values).is_some())
-    }
+    // copy, paste
+    // autocomplete
 
     pub fn get_syntax_tree(&mut self) -> Result<JsValue, JsValue> {
         let result = self.editor.get_syntax_tree().serialize(&self.serializer)?;

@@ -7,6 +7,11 @@ use crate::row::Offset;
 /// A proper grid of values.
 /// TODO: Could be replaced with a Rust crate like https://crates.io/crates/grid
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub struct Grid<T> {
     values: Vec<T>,
     width: usize,
@@ -27,7 +32,11 @@ pub struct Index2D {
 
 /// A 2D offset, is between indices. Can be used for exclusive ranges.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub struct Offset2D {
     pub x: Offset,
     pub y: Offset,

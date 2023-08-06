@@ -11,9 +11,12 @@ use std::sync::Arc;
 
 /// A range in a grid, only stores the minimal amount of data
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub struct MinimalInputGridRange {
-    #[wasm_bindgen(getter_with_clone)]
     pub row_indices: RowIndices,
     pub index: usize,
     pub start: Offset2D,

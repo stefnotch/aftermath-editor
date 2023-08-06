@@ -9,10 +9,11 @@ edition = "2021"
 unicode-segmentation = "1.10.1"
 unicode-normalization = "0.1.22"
 serde = { version = "1.0", features = ["derive"] }
+tsify =  { version = "0.4", optional = true, default-features = false, features = ["js"] }
 input_tree = { path = "../input_tree" }
 unicode-ident = "1.0.11"
 chumsky = { git = "https://github.com/zesterer/chumsky.git", default-features = false, features = ["pratt"] }
 wasm-bindgen = { version = "0.2", optional = true }
 
 [features]
-wasm = ["dep:wasm-bindgen", "input_tree/wasm"]
+wasm = ["dep:wasm-bindgen", "dep:tsify", "input_tree/wasm"]

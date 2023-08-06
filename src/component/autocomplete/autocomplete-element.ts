@@ -9,6 +9,10 @@ export class AutocompleteElement {
   #element: HTMLElement;
   #listElement: HTMLElement;
 
+  // TODO: Autocompmlete token highlighter,
+  // as in "underline the tokens belonging to the autocomplete".
+  // Remember that different autocomplete results can have different ranges.
+
   constructor() {
     const containerElement = document.createElement("div");
     containerElement.style.position = "absolute";

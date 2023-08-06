@@ -16,6 +16,11 @@ use super::node::InputNode;
 /// Invariants:
 /// - The parent-child order is always Row -> Element -> Row -> Element -> ....
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub struct InputRow(pub Vec<InputNode>);
 
 impl InputRow {
@@ -61,13 +66,22 @@ impl From<Vec<InputNode>> for InputRow {
 
 /// Points at a given row
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub struct RowIndices(Vec<RowIndex>);
 
 /// We have a repeating row > element > ... hierarchy.
 /// So to get from one row to the next, we need two indices.
 /// One to tell us how to get to the element, and another to tell us how to get to the child row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub struct RowIndex(pub usize, pub usize);
 
 impl Into<RowIndex> for (usize, usize) {
@@ -177,7 +191,11 @@ impl Default for RowIndices {
 /// Offsets in a row are between the indices of the elements.
 /// Goes from zero to the length of the row (inclusive).
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub struct Offset(pub usize);
 
 impl Into<Offset> for usize {

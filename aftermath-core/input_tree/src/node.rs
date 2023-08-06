@@ -8,6 +8,11 @@ use super::row::InputRow;
 
 /// A container element which can contain rows
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub enum InputNode {
     /// A container with a type
     Container(InputNodeVariant, Grid<InputRow>),
@@ -19,6 +24,11 @@ pub enum InputNode {
 
 // Could be extended with constructs like <mmultiscripts>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub enum InputNodeVariant {
     /// A fraction, like $\frac{1}{2}$
     Fraction,

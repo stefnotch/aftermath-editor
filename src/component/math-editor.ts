@@ -22,6 +22,7 @@ import {
   serializeInput,
   type JsonSerializedInput,
   deserializeInput,
+  MathEditorBindings,
 } from "./../core";
 import { DebugSettings } from "./debug-settings";
 import { MathEditorCarets } from "./caret/carets-element";
@@ -29,6 +30,7 @@ import { InputRow } from "../input-tree/row";
 import { InputTree } from "../input-tree/input-tree";
 import { AutocompleteElement } from "./autocomplete/autocomplete-element";
 import { SerializedCaret } from "../editing/serialized-caret";
+import { CaretDomElement } from "./caret/single-caret-element";
 
 function createElementFromHtml(html: string) {
   const template = document.createElement("template");
@@ -56,19 +58,16 @@ class RenderTaskQueue {
 }
 
 export class MathEditor extends HTMLElement {
-  carets: MathEditorCarets;
+  mathEditor: MathEditorBindings;
   inputHandler: InputHandlerElement;
   autocomplete: AutocompleteElement;
-
-  readonly inputTree: InputTree = new InputTree(new InputRow([]), parse);
+  caret: CaretDomElement;
 
   renderer: MathMLRenderer;
   renderResult: RenderResult<MathMLElement>;
   renderTaskQueue = new RenderTaskQueue();
 
   mathMlElement: Element;
-
-  undoRedoStack = new UndoRedoManager<MathLayoutEdit>(MathLayoutEdit.inverseEdit);
 
   constructor() {
     super();
@@ -81,8 +80,10 @@ export class MathEditor extends HTMLElement {
     container.style.touchAction = "none"; // Dirty hack to disable pinch zoom on mobile, not ideal
     container.tabIndex = 0;
 
-    this.carets = new MathEditorCarets({ autocomplete, beginningAutocomplete });
-    container.append(this.carets.element);
+    this.mathEditor = new MathEditorBindings();
+
+    this.caret = new CaretDomElement();
+    container.append(this.caret.element);
 
     this.addPointerEventListeners(container);
 
@@ -132,7 +133,7 @@ export class MathEditor extends HTMLElement {
 
     this.renderResult = this.renderer.renderAll({
       errors: [],
-      value: this.inputTree.getSyntaxTree(),
+      value: this.mathEditor.get_syntax_tree(),
     });
 
     const styles = document.createElement("style");

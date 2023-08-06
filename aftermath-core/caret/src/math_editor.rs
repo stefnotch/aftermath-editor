@@ -201,13 +201,14 @@ impl MathEditor {
             }
         };
         // TODO: We should encode the format+version into the data
+        // TODO: Put it in a different crate
         match data_type {
-            SerializedDataType::JsonInputTree => serde_json::to_string(&selected_nodes).unwrap(),
+            SerializedDataType::JsonInputTree => todo!(), //serde_json::to_string(&selected_nodes).unwrap(),
         }
     }
     pub fn paste(&mut self, data: String, data_type: Option<SerializedDataType>) -> Option<()> {
         let parsed = match data_type {
-            Some(SerializedDataType::JsonInputTree) => serde_json::from_str(&data).ok()?,
+            Some(SerializedDataType::JsonInputTree) => todo!(), //serde_json::from_str(&data).ok()?,
             None => {
                 // Auto-detect the data type
                 todo!();
