@@ -36,16 +36,6 @@ export class CaretDomElement {
     this.#caretElement.style.top = `${position.y - parentPos.top}px`;
   }
 
-  getBounds(): ViewportRect | null {
-    const position = this.#caretElement.getBoundingClientRect();
-    return {
-      x: position.x,
-      y: position.y,
-      width: position.width,
-      height: position.height,
-    };
-  }
-
   setHeight(v: number) {
     if (v <= 0) {
       this.#caretElement.style.display = "none";

@@ -403,8 +403,10 @@ export class MathEditor extends HTMLElement {
   renderCarets() {
     if (!this.isConnected) return;
     let carets = MathEditorHelper.getCaret(this.mathEditor);
-    const caretElements = carets.map((caret) => {
+    this.caretsContainer.replaceChildren();
+    for (const caret of carets) {
       const element = new CaretDomElement();
+      this.caretsContainer.append(element.element);
       if (keyIn("Row", caret)) {
         const range = caret.Row;
         const caretIndices = new RowIndices(range.row_indices);
@@ -456,10 +458,7 @@ export class MathEditor extends HTMLElement {
       } else {
         assertUnreachable(caret);
       }
-
-      return element.element;
-    });
-    this.caretsContainer.replaceChildren(...caretElements);
+    }
 
     // TODO: Also draw the result of each autocomplete rule
     // TODO: add a "match length" to the autocomplete results (for proper positioning and such)

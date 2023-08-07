@@ -36,12 +36,12 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
 
     function getSelectionHeight(element: RenderedElement<MathMLElement>): { top: ViewportValue; bottom: ViewportValue } {
       // Assumes that the selection is not zero width.
-      const isDisjoint = selectionLeft <= element.syntaxTree.range.start || element.syntaxTree.range.end <= selectionRight;
+      const isDisjoint = selectionRight <= element.syntaxTree.range.start || element.syntaxTree.range.end <= selectionLeft;
       if (isDisjoint) {
         return emptyHeight;
       }
       const isFullyContained =
-        selectionRight <= element.syntaxTree.range.start && element.syntaxTree.range.end <= selectionLeft;
+        selectionLeft <= element.syntaxTree.range.start && element.syntaxTree.range.end <= selectionRight;
       // If it's just intersecting, try going deeper.
       const isIntersecting = !isDisjoint && !isFullyContained;
       const children = element.getChildren();
@@ -67,7 +67,7 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
     const start = row.getCaretPosition(selection.start);
     const end = row.getCaretPosition(selection.end);
     // y and height depend on what is inside the selection.
-    const contentHeight = selection.start != selection.end ? getSelectionHeight(row) : { top: start.y, bottom: start.y };
+    const contentHeight = selection.start !== selection.end ? getSelectionHeight(row) : { top: start.y, bottom: start.y };
     return new RenderedSelection(
       {
         x: isForwards ? start.x : end.x,
