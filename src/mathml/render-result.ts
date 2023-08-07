@@ -28,6 +28,7 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
     const selectionLeft = isForwards ? selection.start : selection.end;
     const selectionRight = isForwards ? selection.end : selection.start;
 
+    // TODO: This causes CSS errors
     const emptyHeight = {
       top: Infinity,
       bottom: -Infinity,

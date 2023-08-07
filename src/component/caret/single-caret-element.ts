@@ -1,4 +1,5 @@
 import type { ViewportCoordinate, ViewportRect } from "../../rendering/viewport-coordinate";
+import { createNode } from "../../utils/dom-utils";
 
 export class CaretDomElement {
   #element: HTMLElement;
@@ -58,13 +59,16 @@ export class CaretDomElement {
 
   addSelection(rect: ViewportRect) {
     const parentPos = this.#element.getBoundingClientRect();
-    const selection = document.createElement("span");
-    selection.className = "caret-selection";
-    selection.style.position = "absolute";
-    selection.style.left = `${rect.x - parentPos.left}px`;
-    selection.style.top = `${rect.y - parentPos.top}px`;
-    selection.style.width = `${rect.width}px`;
-    selection.style.height = `${rect.height}px`;
+    const selection = createNode("span", {
+      className: "caret-selection",
+      style: {
+        position: "absolute",
+        left: `${rect.x - parentPos.left}px`,
+        top: `${rect.y - parentPos.top}px`,
+        width: `${rect.width}px`,
+        height: `${rect.height}px`,
+      },
+    });
     this.#selectionsContainer.append(selection);
   }
 

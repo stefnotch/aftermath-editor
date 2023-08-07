@@ -1,5 +1,4 @@
-import type { Offset } from "./input-offset";
-import { InputRowZipper } from "./input-zipper";
+import type { Offset } from "../core";
 
 export type RowIndex = [indexOfContainer: number, indexOfRow: number];
 /**
@@ -12,24 +11,6 @@ export class RowIndices {
 
   constructor(indices: readonly RowIndex[]) {
     this.indices = indices;
-  }
-
-  /**
-   * Gets the indices of the given zipper in the tree.
-   * As in, every "indexInParent" of every element that has a parent, including the starting one.
-   */
-  static fromZipper(zipper: InputRowZipper): RowIndices {
-    const ancestorIndices: [number, number][] = [];
-    let current = zipper;
-    while (true) {
-      const parent = current.parent;
-      if (parent === null) break;
-
-      ancestorIndices.push([parent.indexInParent, current.indexInParent]);
-      current = parent.parent;
-    }
-    ancestorIndices.reverse();
-    return new RowIndices(ancestorIndices);
   }
 
   static default(): RowIndices {

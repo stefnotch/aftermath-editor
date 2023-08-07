@@ -279,7 +279,7 @@ export class MathEditor extends HTMLElement {
       container.setPointerCapture(e.pointerId);
       isPointerDown = true;
       this.mathEditor.start_selection(newPosition, "Char");
-      this.renderCarets();
+      this.updateInput();
     });
     container.addEventListener("pointerup", (e) => {
       if (!e.isPrimary) return;
