@@ -93,7 +93,7 @@ fn remove_at_caret_position(
             .expect("Expected a grid")
             .values()
             .iter()
-            .flat_map(|row| row.0.iter().cloned())
+            .flat_map(|row| row.values.iter().cloned())
             .collect();
         let node_index = node_focus.index_in_parent();
         let row = node_focus.parent();
@@ -163,7 +163,7 @@ fn remove_at_caret_position(
         HorizontalDirection::Left => index_in_parent <= 0,
         HorizontalDirection::Right => index_in_parent >= grid.values().len() - 1,
     };
-    if at_edge && grid.values().iter().all(|v| v.0.is_empty()) {
+    if at_edge && grid.values().iter().all(|v| v.values.is_empty()) {
         // Delete the entire node if we are at the start/end *and* the grid is empty
         return flatten_node(parent, Offset(0));
     } else {

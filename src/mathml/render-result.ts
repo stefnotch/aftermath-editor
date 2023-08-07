@@ -24,8 +24,9 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
     // Depending on how line breaks are implemented, we might be able to do "line top + (baseline - first line top)"
     const baseline = row.getCaretPosition(0).y;
 
-    const start = row.getCaretPosition(selection.start);
-    const end = row.getCaretPosition(selection.end);
+    const isForwards = selection.start <= selection.end;
+    const selectionLeft = isForwards ? selection.start : selection.end;
+    const selectionRight = isForwards ? selection.end : selection.start;
 
     const emptyHeight = {
       top: Infinity,
@@ -34,12 +35,12 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
 
     function getSelectionHeight(element: RenderedElement<MathMLElement>): { top: ViewportValue; bottom: ViewportValue } {
       // Assumes that the selection is not zero width.
-      const isDisjoint = selection.end <= element.syntaxTree.range.start || element.syntaxTree.range.end <= selection.start;
+      const isDisjoint = selectionLeft <= element.syntaxTree.range.start || element.syntaxTree.range.end <= selectionRight;
       if (isDisjoint) {
         return emptyHeight;
       }
       const isFullyContained =
-        selection.start <= element.syntaxTree.range.start && element.syntaxTree.range.end <= selection.end;
+        selectionRight <= element.syntaxTree.range.start && element.syntaxTree.range.end <= selectionLeft;
       // If it's just intersecting, try going deeper.
       const isIntersecting = !isDisjoint && !isFullyContained;
       const children = element.getChildren();
@@ -61,13 +62,16 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
         bottom: elementBounds.y + elementBounds.height,
       };
     }
+
+    const start = row.getCaretPosition(selection.start);
+    const end = row.getCaretPosition(selection.end);
     // y and height depend on what is inside the selection.
     const contentHeight = selection.start != selection.end ? getSelectionHeight(row) : { top: start.y, bottom: start.y };
     return new RenderedSelection(
       {
-        x: start.x,
+        x: isForwards ? start.x : end.x,
         y: contentHeight.top,
-        width: end.x - start.x,
+        width: Math.abs(end.x - start.x),
         height: contentHeight.bottom - contentHeight.top,
       },
       baseline
@@ -235,7 +239,7 @@ function getChildWithContainerIndex(
   indexOfContainer: number
 ): RenderedElement<MathMLElement> {
   // Only walk down if we're still on the same row
-  if (hasSyntaxNodeChildren(element.syntaxTree, "Containers")) {
+  if (hasSyntaxNodeChildren(element.syntaxTree, "Children")) {
     for (let childElement of element.getChildren()) {
       // If we find a better matching child, we go deeper. Notice how the end bound, aka length, is exclusive.
       if (childElement.syntaxTree.range.start <= indexOfContainer && indexOfContainer < childElement.syntaxTree.range.end) {

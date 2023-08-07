@@ -96,7 +96,7 @@ impl<'a> InputRowRange<'a> {
     pub fn values(&self) -> impl Iterator<Item = &crate::node::InputNode> {
         self.row_focus
             .row()
-            .0
+            .values
             .iter()
             .skip(self.start.0)
             .take(self.end.0 - self.start.0)

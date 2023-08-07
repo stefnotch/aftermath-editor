@@ -72,8 +72,8 @@ impl MathEditorBindings {
     pub fn extend_selection(&mut self, position: MinimalInputRowPosition) {
         self.editor.extend_selection(position);
     }
-    pub fn finish_selection(&mut self, position: MinimalInputRowPosition) {
-        self.editor.finish_selection(position);
+    pub fn finish_selection(&mut self) {
+        self.editor.finish_selection();
     }
 
     // copy, paste
@@ -102,5 +102,11 @@ impl MathEditorBindings {
         let values: Vec<InputNode> = serde_wasm_bindgen::from_value(values)?;
         self.editor.splice_at_range(range, values);
         Ok(())
+    }
+
+    
+    pub fn get_token_names(&self) -> Result<JsValue, JsValue> {
+        let result = self.editor.get_token_names().serialize(&self.serializer)?;
+        Ok(result)
     }
 }

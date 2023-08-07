@@ -21,15 +21,17 @@ use super::node::InputNode;
     derive(tsify::Tsify),
     tsify(into_wasm_abi, from_wasm_abi)
 )]
-pub struct InputRow(pub Vec<InputNode>);
+pub struct InputRow {
+    pub values: Vec<InputNode>,
+}
 
 impl InputRow {
     pub fn new(values: Vec<InputNode>) -> Self {
-        InputRow(values)
+        InputRow { values }
     }
 
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.values.len()
     }
 
     pub fn offset_to_index(&self, offset: Offset, direction: HorizontalDirection) -> Option<usize> {
@@ -207,7 +209,7 @@ impl Into<Offset> for usize {
 impl fmt::Display for InputRow {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "(row")?;
-        for value in &self.0 {
+        for value in &self.values {
             write!(f, " {}", value)?;
         }
         write!(f, ")")

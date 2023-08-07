@@ -110,7 +110,7 @@ mod tests {
             ]),
         ]);
 
-        let mut lexer = Lexer::new(&layout.0);
+        let mut lexer = Lexer::new(&layout.values);
         let mut lexer_range = lexer.begin_range();
         assert_eq!(
             lexer_range.lexer().get_next_value(),
@@ -145,7 +145,7 @@ mod tests {
             ]),
         ]);
 
-        let mut lexer = Lexer::new(&layout.0);
+        let mut lexer = Lexer::new(&layout.values);
         let mut lexer_range = lexer.begin_range();
         lexer_range.consume_n(1);
         let token = lexer_range.end_range();
@@ -163,7 +163,7 @@ mod tests {
     fn test_lexer_second_token() {
         let layout = InputRow::new(vec![InputNode::symbol("a"), InputNode::symbol("b")]);
 
-        let mut lexer = Lexer::new(&layout.0);
+        let mut lexer = Lexer::new(&layout.values);
         {
             let mut lexer_range = lexer.begin_range();
             lexer_range.consume_n(1);

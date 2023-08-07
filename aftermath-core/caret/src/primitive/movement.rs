@@ -125,7 +125,8 @@ impl CaretMover {
             _ => {}
         };
 
-        // TODO: Entering subscript or superscript special cases (next to one of those, and press up/down)
+        // TODO: subsup supsub underover overunder special cases
+        // When I'm in the top sup of a \sum^_, then pressing down should move me to the bottom sup.
 
         // Grid movement
         let grid = match parent.node() {

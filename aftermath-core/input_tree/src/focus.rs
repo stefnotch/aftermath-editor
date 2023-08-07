@@ -69,7 +69,7 @@ impl<'a> InputFocusRow<'a> {
         if index >= self.row.len() {
             return None;
         }
-        Some(InputFocusNode::new(&self.row.0[index], self, index))
+        Some(InputFocusNode::new(&self.row.values[index], self, index))
     }
 
     pub fn row_at(self, row_index: impl Into<RowIndex>) -> Option<InputFocusRow<'a>> {
@@ -78,7 +78,7 @@ impl<'a> InputFocusRow<'a> {
     }
 
     pub fn node_at(&self, index: usize) -> Option<&'a InputNode> {
-        self.row.0.get(index)
+        self.row.values.get(index)
     }
 
     pub fn row(&self) -> &'a InputRow {

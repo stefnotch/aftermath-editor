@@ -1,4 +1,4 @@
-import { type SyntaxNode, offsetInRange } from "../../core";
+import { offsetInRange, type SyntaxNodeWith } from "../../core";
 import { type Offset } from "../../input-tree/input-offset";
 import { type RowIndex } from "../../input-tree/row-indices";
 import { type RenderedElement } from "../../rendering/render-result";
@@ -15,7 +15,7 @@ export class TextMathMLElement implements RenderedElement<MathMLElement> {
   element: RenderedMathML;
   private textElement: LeafMathMLElement;
 
-  constructor(public syntaxTree: SyntaxNode<"Leaf">, public rowIndex: RowIndex | null, elementName: MathMLTags) {
+  constructor(public syntaxTree: SyntaxNodeWith<"Leaf">, public rowIndex: RowIndex | null, elementName: MathMLTags) {
     this.textElement = new LeafMathMLElement(syntaxTree.children.Leaf);
     let children: Text[] = this.textElement.getElements();
     this.element = new RenderedMathML(createMathElement(elementName, children));

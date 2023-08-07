@@ -691,65 +691,7 @@ class CaretWithElement {
   }
 
   render(renderResult: RenderResult<MathMLElement>) {
-    const selected = this.selection;
-    if (selected.type === "caret") {
-      const range = selected.range;
-      const caretIndices = RowIndices.fromZipper(range.zipper);
-      const renderedCaret = renderResult.getViewportSelection({
-        indices: caretIndices,
-        start: range.leftOffset,
-        end: range.rightOffset,
-      });
-      // Render caret itself
-      const caretSize = renderResult.getViewportCaretSize(caretIndices);
-      this.#element.setPosition({
-        x: renderedCaret.rect.x + (range.isForwards ? renderedCaret.rect.width : 0),
-        y: renderedCaret.baseline + caretSize * 0.1,
-      });
-      this.#element.setHeight(caretSize);
-
-      // Render selection
-      this.#element.clearSelections();
-      if (!range.isCollapsed) {
-        this.#element.addSelection(renderedCaret.rect);
-      }
-
-      // Highlight container (for the caret)
-      const container = renderResult.getElement(caretIndices);
-      this.setHighlightedElements(container.getElements());
-    } else if (selected.type === "grid") {
-      const startIndices = RowIndices.fromZipper(selected.range.zipper).addRowIndex([
-        selected.range.index,
-        selected.range.leftOffset,
-      ]);
-      const renderedStart = renderResult.getViewportRowBounds(startIndices);
-      const endIndices = RowIndices.fromZipper(selected.range.zipper).addRowIndex([
-        selected.range.index,
-        selected.range.rightOffset,
-      ]);
-      const renderedEnd = renderResult.getViewportRowBounds(endIndices);
-      this.#element.clearSelections();
-      this.#element.addSelection(
-        ViewportMath.joinRectangles(
-          {
-            x: Math.min(renderedStart.x, renderedEnd.x),
-            y: Math.min(renderedStart.y, renderedEnd.y),
-            width: 0,
-            height: 0,
-          },
-          {
-            x: Math.max(renderedStart.x + renderedStart.width, renderedEnd.x + renderedEnd.width),
-            y: Math.max(renderedStart.y + renderedStart.height, renderedEnd.y + renderedEnd.height),
-            width: 0,
-            height: 0,
-          }
-        )
-      );
-      this.#element.setHeight(0);
-      this.setHighlightedElements([]);
-    } else {
-      assertUnreachable(selected);
-    }
+    // done
   }
 
   get hasEdited() {

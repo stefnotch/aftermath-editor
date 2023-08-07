@@ -1,4 +1,4 @@
-import type { SyntaxNode } from "../../core";
+import type { SyntaxNodeWith } from "../../core";
 import type { RowIndex } from "../../input-tree/row-indices";
 import type { RenderedElement, Renderer } from "../../rendering/render-result";
 import type { ViewportCoordinate } from "../../rendering/viewport-coordinate";
@@ -15,7 +15,7 @@ export class RowsContainerMathMLElement implements RenderedElement<MathMLElement
   endBaselineReader: MathMLElement;
 
   constructor(
-    public syntaxTree: SyntaxNode<"NewRows">,
+    public syntaxTree: SyntaxNodeWith<"NewRows">,
     public rowIndex: RowIndex | null,
     elementName: MathMLTags,
     renderer: Renderer<MathMLElement>

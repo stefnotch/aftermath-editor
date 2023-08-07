@@ -59,7 +59,7 @@ impl Editable for InputTree {
         let mut row = &mut self.root;
         for index in row_indices.iter() {
             row = row
-                .0
+                .values
                 .get_mut(index.0)
                 .expect("Invalid row index")
                 .row_mut(index.1);
@@ -72,7 +72,7 @@ impl Editable for InputTree {
                 position,
             }) => {
                 let start = position.offset.0;
-                row.0.splice(start..start, values.iter().cloned());
+                row.values.splice(start..start, values.iter().cloned());
             }
             BasicEdit::Row(RowEdit {
                 edit_type: EditType::Delete,
@@ -80,7 +80,7 @@ impl Editable for InputTree {
                 position,
             }) => {
                 let start = position.offset.0;
-                row.0
+                row.values
                     .splice(start..(start + values.len()), std::iter::empty());
             }
             BasicEdit::Grid(
@@ -93,7 +93,7 @@ impl Editable for InputTree {
                 },
             ) => {
                 let node = row
-                    .0
+                    .values
                     .get_mut(element_indices.index)
                     .expect("Invalid row index");
                 assert!(node.has_resizable_grid());

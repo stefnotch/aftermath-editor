@@ -19,12 +19,12 @@ use self::parse_rules::ParserRules;
 
 pub use self::autocomplete::{AutocompleteResult, AutocompleteRule, AutocompleteRuleMatch};
 pub use self::parse_result::{ParseError, ParseErrorType, ParseResult};
-pub use self::syntax_tree::{SyntaxLeafNode, SyntaxNode, SyntaxNodeChildren};
+pub use self::syntax_tree::{NodeIdentifier, SyntaxLeafNode, SyntaxNode, SyntaxNodeChildren};
 
 pub fn parse_row(input: &InputRow, context: &ParserRules) -> ParseResult<SyntaxNode> {
     // see https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     // we could also have used https://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/ as the tutorial
-    let mut lexer = Lexer::new(&input.0);
+    let mut lexer = Lexer::new(&input.values);
     let mut parse_result;
     (parse_result, lexer) = context.parse_bp(lexer, 0);
 

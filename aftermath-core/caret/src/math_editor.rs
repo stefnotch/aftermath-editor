@@ -17,7 +17,7 @@ use input_tree::{
     node::InputNode,
 };
 use parser::{parse_rules::ParserRules, ParseResult, SyntaxNode};
-use parser::{AutocompleteRuleMatch, ParseError};
+use parser::{AutocompleteRuleMatch, NodeIdentifier, ParseError};
 
 pub enum SerializedDataType {
     JsonInputTree,
@@ -68,6 +68,8 @@ impl MathEditor {
         let mut caret = Caret::from_minimal(&self.input, &self.caret);
         self.caret_mover.move_caret(&mut caret, direction, mode);
         self.caret = caret.to_minimal();
+
+        // TODO: Potentially finish autocomplete
     }
 }
 
@@ -97,6 +99,7 @@ impl MathEditor {
             CaretSelection::Row(range) => {
                 let (basic_edit, new_position) = remove_at_caret(&self.caret_mover, &range, mode)?;
                 self.input.apply_edits(&basic_edit);
+                self.parsed = None;
                 builder.add_edits(basic_edit);
                 MinimalCaret {
                     start_position: new_position.clone(),
@@ -124,6 +127,7 @@ impl MathEditor {
             CaretSelection::Row(range) => {
                 let (basic_edit, new_position) = insert_at_range(&range, values)?;
                 self.input.apply_edits(&basic_edit);
+                self.parsed = None;
                 builder.add_edits(basic_edit);
                 MinimalCaret {
                     start_position: new_position.clone(),
@@ -166,6 +170,7 @@ impl MathEditor {
             UndoAction::CaretEdit(caret_edit) => {
                 self.caret = caret_edit.caret_after;
                 self.input.apply_edits(&caret_edit.edits);
+                self.parsed = None;
             }
         }
     }
@@ -185,8 +190,7 @@ impl MathEditor {
         // self.caret_mover.move_mode_to_range(mode) // and then use that info to extend the selection
         self.caret.end_position = position;
     }
-    pub fn finish_selection(&mut self, position: MinimalInputRowPosition) {
-        self.extend_selection(position);
+    pub fn finish_selection(&mut self) {
         self.selection_mode = None;
     }
 
@@ -268,7 +272,13 @@ impl MathEditor {
         caret.start_position.apply_edits(&basic_edit);
         caret.end_position.apply_edits(&basic_edit);
         self.input.apply_edits(&basic_edit);
+        self.parsed = None;
         builder.add_edits(basic_edit);
         self.undo_stack.push(builder.finish(caret).into());
+    }
+
+    /// Get all the known token names
+    pub fn get_token_names(&self) -> Vec<NodeIdentifier> {
+        self.parser.get_token_names()
     }
 }
