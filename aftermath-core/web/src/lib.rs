@@ -1,9 +1,6 @@
 pub mod math_editor;
 mod utils;
 
-use input_tree::{node::InputNode, row::InputRow};
-use parser::{parse_rules::ParserRules, ParseError, ParseResult, SyntaxNode};
-use serde::{Deserialize, Serialize};
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 

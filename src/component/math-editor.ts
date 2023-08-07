@@ -10,6 +10,7 @@ import { RowIndices } from "../input-tree/row-indices";
 import { MathMLRenderer } from "../mathml/renderer";
 import type { RenderResult, RenderedElement } from "../rendering/render-result";
 import {
+  getGridRow,
   joinNodeIdentifier,
   MathEditorBindings,
   MathEditorHelper,
@@ -65,6 +66,7 @@ export class MathEditor extends HTMLElement {
         display: "inline-block", // Needed for the resize observer
         userSelect: "none",
         touchAction: "none", // Dirty hack to disable pinch zoom on mobile, not ideal
+        cursor: "text",
       },
       tabIndex: 0,
     });
@@ -76,7 +78,6 @@ export class MathEditor extends HTMLElement {
       },
     });
     container.append(this.caretsContainer);
-    this.addPointerEventListeners(container);
 
     // Resize - rerender carets in correct locations
     /* Depends on https://github.com/stefnotch/aftermath-editor/issues/58
@@ -112,9 +113,11 @@ export class MathEditor extends HTMLElement {
     });
     this.inputHandler = new InputHandlerElement();
     inputContainer.appendChild(this.inputHandler.element);
+
+    this.addPointerEventListeners(container, () => this.inputHandler.focus());
+    this.addInputEventListeners();
     // Click to focus
     container.addEventListener("focus", () => this.inputHandler.focus());
-    this.addInputEventListeners();
 
     this.autocomplete = new AutocompleteElement();
     inputContainer.appendChild(this.autocomplete.element);
@@ -219,48 +222,48 @@ export class MathEditor extends HTMLElement {
  
     */
 
-    const handleCopy = () => {
-      const copyResult = this.carets.copyAtCarets();
-      const json = copyResult.map((v) => serializeInput(v));
-      return {
-        json: JSON.stringify(json),
-      };
+    const handleCopy = (clipboard: DataTransfer) => {
+      clipboard.setData("application/json", this.mathEditor.copy("JsonInputTree"));
     };
 
     this.inputHandler.element.addEventListener("copy", (ev) => {
-      const copyResult = handleCopy();
-      ev.clipboardData?.setData("application/json", copyResult.json);
+      if (ev.clipboardData === null) {
+        console.error("No clipboard data");
+        return;
+      }
+      handleCopy(ev.clipboardData);
       ev.preventDefault();
     });
 
     this.inputHandler.element.addEventListener("cut", (ev) => {
-      const copyResult = handleCopy();
-      ev.clipboardData?.setData("application/json", copyResult.json);
+      if (ev.clipboardData === null) {
+        console.error("No clipboard data");
+        return;
+      }
+      handleCopy(ev.clipboardData);
       ev.preventDefault();
       this.mathEditor.remove_at_caret("Range");
       this.updateInput();
     });
 
     this.inputHandler.element.addEventListener("paste", (ev) => {
-      const json = ev.clipboardData?.getData("application/json");
-      if (!json) return;
-
-      let input;
-      try {
-        const parsed: JsonSerializedInput[] = JSON.parse(json);
-        input = parsed.map((v) => deserializeInput(v));
-      } catch (e) {
-        console.error(e);
+      if (ev.clipboardData === null) {
+        console.error("No clipboard data");
         return;
       }
-
-      const edit = this.carets.pasteAtCarets(input, this.inputTree);
-      this.saveEdit(edit);
+      const json = ev.clipboardData.getData("application/json");
+      if (json) {
+        this.mathEditor.paste(json, "JsonInputTree");
+      } else {
+        const text = ev.clipboardData.getData("text/plain");
+        // Assume that it's also a JsonInputTree
+        this.mathEditor.paste(text, "JsonInputTree");
+      }
       this.updateInput();
     });
   }
 
-  private addPointerEventListeners(container: HTMLSpanElement) {
+  private addPointerEventListeners(container: HTMLSpanElement, focusCallback: () => void) {
     const getPointerPosition = (e: MouseEvent): MinimalInputRowPosition | null => {
       const newCaret = this.renderResult.getLayoutPosition({ x: e.clientX, y: e.clientY });
       if (!newCaret) return null;
@@ -277,6 +280,7 @@ export class MathEditor extends HTMLElement {
       const newPosition = getPointerPosition(e);
       if (!newPosition) return;
       container.setPointerCapture(e.pointerId);
+      focusCallback();
       isPointerDown = true;
       this.mathEditor.start_selection(newPosition, "Char");
       this.updateInput();
@@ -433,9 +437,22 @@ export class MathEditor extends HTMLElement {
         }
       } else if (keyIn("Grid", caret)) {
         const range = caret.Grid;
-        const startIndices = new RowIndices(range.row_indices).addRowIndex([range.index, range.leftOffset]);
+        const topLeftOffset = {
+          x: Math.min(range.start.x, range.end.x),
+          y: Math.min(range.start.y, range.end.y),
+        };
+        const bottomRightOffset = {
+          x: Math.max(range.start.x, range.end.x),
+          y: Math.max(range.start.y, range.end.y),
+        };
+        const startIndices = new RowIndices(getGridRow(this.syntaxTree, range.row_indices, range.index, topLeftOffset));
         const renderedStart = this.renderResult.getViewportRowBounds(startIndices);
-        const endIndices = new RowIndices(range.row_indices).addRowIndex([range.index, range.rightOffset]);
+        const endIndices = new RowIndices(
+          getGridRow(this.syntaxTree, range.row_indices, range.index, {
+            x: Math.max(0, bottomRightOffset.x - 1),
+            y: Math.max(0, bottomRightOffset.y - 1),
+          })
+        );
         const renderedEnd = this.renderResult.getViewportRowBounds(endIndices);
         element.clearSelections();
         element.addSelection(

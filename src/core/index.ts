@@ -8,6 +8,8 @@ import init, {
   type SyntaxNodeChildren,
   type InputRow,
   type Offset,
+  type RowIndices,
+  type Offset2D,
 } from "../../aftermath-core/pkg";
 import { assert } from "../utils/assert";
 
@@ -190,5 +192,47 @@ export function getRowNode(node: SyntaxNode, indices: RowIndices) {
     return node;
   }
 
+  return node;
+}
+
+export function getGridRow(node: SyntaxNode, indices: RowIndices, indexOfContainer: number, gridOffset: Offset2D): RowIndices {
+  node = getNodeWithRowIndices(node, indices);
+  const gridNode = getChildWithNewRows(node, indexOfContainer);
+
+  const indexInGrid = gridOffset.x + gridOffset.y * gridNode.children.NewRows.width;
+  return [...indices, [indexOfContainer, indexInGrid]];
+}
+
+function getNodeWithRowIndices(node: SyntaxNode, indices: RowIndices) {
+  for (let rowIndex of indices) {
+    let [indexOfContainer, indexOfRow] = rowIndex;
+    assert(node.range.start <= indexOfContainer && indexOfContainer < node.range.end);
+
+    const childNode = getChildWithNewRows(node, indexOfContainer);
+    let rowChildElement: SyntaxNode | undefined;
+    if (hasSyntaxNodeChildren(childNode, "NewRows")) {
+      rowChildElement = childNode.children.NewRows.values[indexOfRow];
+    } else {
+      assert(false, "Expected to find NewRows");
+    }
+    assert(rowChildElement, `Couldn't find row ${indexOfRow} in ${joinNodeIdentifier(node.name)}`);
+    node = rowChildElement;
+  }
+
+  return node;
+}
+
+function getChildWithNewRows(node: SyntaxNode, indexOfContainer: number): SyntaxNodeWith<"NewRows"> {
+  // Only walk down if we're still on the same row
+  if (hasSyntaxNodeChildren(node, "Children")) {
+    for (let childElement of node.children.Children) {
+      // If we find a better matching child, we go deeper. Notice how the end bound, aka length, is exclusive.
+      if (childElement.range.start <= indexOfContainer && indexOfContainer < childElement.range.end) {
+        return getChildWithNewRows(childElement, indexOfContainer);
+      }
+    }
+  }
+
+  assert(hasSyntaxNodeChildren(node, "NewRows"));
   return node;
 }

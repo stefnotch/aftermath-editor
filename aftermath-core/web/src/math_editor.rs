@@ -1,5 +1,5 @@
 use caret::{
-    math_editor::MathEditor,
+    math_editor::{MathEditor, SerializedDataType},
     primitive::{primitive_edit::CaretRemoveMode, MoveMode},
 };
 use input_tree::{
@@ -7,7 +7,7 @@ use input_tree::{
     focus::{MinimalInputRowPosition, MinimalInputRowRange},
     node::InputNode,
 };
-use parser::{parse_rules::ParserRules, ParseError, SyntaxNode};
+use parser::parse_rules::ParserRules;
 use serde::Serialize;
 use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
 
@@ -76,7 +76,19 @@ impl MathEditorBindings {
         self.editor.finish_selection();
     }
 
-    // copy, paste
+    pub fn copy(&mut self, data_type: SerializedDataType) -> Result<String, String> {
+        self.editor.copy(data_type).map_err(|e| e.to_string())
+    }
+
+    pub fn paste(
+        &mut self,
+        data: String,
+        data_type: Option<SerializedDataType>,
+    ) -> Result<(), String> {
+        self.editor
+            .paste(data, data_type)
+            .map_err(|e| e.to_string())
+    }
     // autocomplete
 
     pub fn get_syntax_tree(&mut self) -> Result<JsValue, JsValue> {
@@ -104,7 +116,6 @@ impl MathEditorBindings {
         Ok(())
     }
 
-    
     pub fn get_token_names(&self) -> Result<JsValue, JsValue> {
         let result = self.editor.get_token_names().serialize(&self.serializer)?;
         Ok(result)

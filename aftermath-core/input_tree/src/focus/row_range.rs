@@ -98,8 +98,8 @@ impl<'a> InputRowRange<'a> {
             .row()
             .values
             .iter()
-            .skip(self.start.0)
-            .take(self.end.0 - self.start.0)
+            .skip(self.left_offset().0)
+            .take(self.right_offset().0 - self.left_offset().0)
     }
 
     pub fn row_indices(&self) -> &RowIndices {

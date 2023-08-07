@@ -18,10 +18,9 @@ use input_tree::{
 };
 use parser::{parse_rules::ParserRules, ParseResult, SyntaxNode};
 use parser::{AutocompleteRuleMatch, NodeIdentifier, ParseError};
+use serialization::{deserialize_input_nodes, serialize_input_nodes};
 
-pub enum SerializedDataType {
-    JsonInputTree,
-}
+pub use serialization::SerializedDataType;
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct MathEditor {
@@ -194,7 +193,10 @@ impl MathEditor {
         self.selection_mode = None;
     }
 
-    pub fn copy(&mut self, data_type: SerializedDataType) -> String {
+    pub fn copy(
+        &mut self,
+        data_type: SerializedDataType,
+    ) -> Result<String, serialization::SerializationError> {
         let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
         let selected_nodes = match &selection {
             CaretSelection::Row(range) => range.values().collect::<Vec<_>>(),
@@ -204,22 +206,16 @@ impl MathEditor {
                 todo!()
             }
         };
-        // TODO: We should encode the format+version into the data
-        // TODO: Put it in a different crate
-        match data_type {
-            SerializedDataType::JsonInputTree => todo!(), //serde_json::to_string(&selected_nodes).unwrap(),
-        }
+        serialize_input_nodes(selected_nodes, data_type)
     }
-    pub fn paste(&mut self, data: String, data_type: Option<SerializedDataType>) -> Option<()> {
-        let parsed = match data_type {
-            Some(SerializedDataType::JsonInputTree) => todo!(), //serde_json::from_str(&data).ok()?,
-            None => {
-                // Auto-detect the data type
-                todo!();
-            }
-        };
-        self.insert_nodes_at_caret(parsed);
-        Some(())
+    pub fn paste(
+        &mut self,
+        data: String,
+        data_type: Option<SerializedDataType>,
+    ) -> Result<(), serialization::SerializationError> {
+        let nodes = deserialize_input_nodes(data, data_type)?;
+        self.insert_nodes_at_caret(nodes);
+        Ok(())
     }
 
     pub fn open_autocomplete(&mut self) {
