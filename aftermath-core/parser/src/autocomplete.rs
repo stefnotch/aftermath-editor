@@ -1,28 +1,38 @@
-use std::ops::Range;
-
 use input_tree::node::InputNode;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::token_matcher::MatchResult;
 
-#[derive(Serialize)]
-pub struct AutocompleteResult<'a> {
-    pub range_in_input: Range<usize>,
-    /// Can also be empty if there are no rules that match
-    pub potential_rules: Vec<AutocompleteRuleMatch<'a>>,
+/// Can be empty when no rules matched
+pub struct AutocompleteRuleMatches<'a>(pub Vec<AutocompleteRuleMatch<'a>>);
+
+impl AutocompleteRuleMatches<'_> {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
-#[derive(Serialize)]
+impl Default for AutocompleteRuleMatches<'_> {
+    fn default() -> Self {
+        Self(Vec::new())
+    }
+}
+
 pub struct AutocompleteRuleMatch<'a> {
     pub rule: &'a AutocompleteRule,
     /// How much of the rule value was matched
     pub match_length: usize,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub struct AutocompleteRule {
-    pub result: Vec<InputNode>,
     pub value: String, // Could just as well be a vector of input nodes, or a regex, or something
+    pub result: Vec<InputNode>,
 }
 
 impl AutocompleteRule {

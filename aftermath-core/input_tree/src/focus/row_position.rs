@@ -23,6 +23,8 @@ pub struct MinimalInputRowPosition {
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct InputRowPosition<'a> {
+    // Maybe use something like https://stackoverflow.com/questions/65031642/in-rust-whats-the-pattern-for-when-you-need-a-reference-holding-struct-to-some
+    // in the future
     pub row_focus: InputFocusRow<'a>,
     pub offset: Offset,
 }

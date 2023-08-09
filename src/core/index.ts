@@ -160,40 +160,6 @@ type CoreAutocompleteRule = {
   value: string;
 };
 
-export function getRowNode(node: SyntaxNode, indices: RowIndices) {
-  // Note that similar code exists in render-result.ts
-  for (let rowIndex of indices) {
-    let [indexOfContainer, indexOfRow] = rowIndex;
-    assert(node.range.start <= indexOfContainer && indexOfContainer < node.range.end);
-
-    const childNode = getChildWithContainerIndex(node, indexOfContainer);
-    let rowChildElement: SyntaxNode | undefined;
-    if (hasSyntaxNodeChildren(childNode, "NewRows")) {
-      rowChildElement = childNode.children.NewRows.values[indexOfRow];
-    } else {
-      assert(false, "Expected to find NewRows");
-    }
-    assert(rowChildElement, `Couldn't find row ${indexOfRow} in ${joinNodeIdentifier(node.name)}`);
-    node = rowChildElement;
-  }
-
-  function getChildWithContainerIndex(node: SyntaxNode, indexOfContainer: number): SyntaxNode<"NewRows"> {
-    // Only walk down if we're still on the same row
-    if (hasSyntaxNodeChildren(node, "Containers")) {
-      for (let childElement of node.children.Containers) {
-        // If we find a better matching child, we go deeper. Notice how the end bound, aka length, is exclusive.
-        if (childElement.range.start <= indexOfContainer && indexOfContainer < childElement.range.end) {
-          return getChildWithContainerIndex(childElement, indexOfContainer);
-        }
-      }
-    }
-
-    assert(hasSyntaxNodeChildren(node, "NewRows"));
-    return node;
-  }
-
-  return node;
-}
 
 export function getGridRow(node: SyntaxNode, indices: RowIndices, indexOfContainer: number, gridOffset: Offset2D): RowIndices {
   node = getNodeWithRowIndices(node, indices);

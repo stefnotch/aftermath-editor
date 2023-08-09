@@ -91,12 +91,17 @@ impl MathEditor {
         }
         Some(())
     }
-    pub fn remove_at_caret(&mut self, mode: CaretRemoveMode) -> Option<()> {
+    pub fn remove_at_caret(
+        &mut self,
+        remove_mode: CaretRemoveMode,
+        move_mode: MoveMode,
+    ) -> Option<()> {
         let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
         let mut builder = CaretEditBuilder::new(self.caret.clone());
         let new_caret = match selection {
             CaretSelection::Row(range) => {
-                let (basic_edit, new_position) = remove_at_caret(&self.caret_mover, &range, mode)?;
+                let (basic_edit, new_position) =
+                    remove_at_caret(&self.caret_mover, &range, remove_mode)?;
                 self.input.apply_edits(&basic_edit);
                 self.parsed = None;
                 builder.add_edits(basic_edit);
@@ -138,6 +143,16 @@ impl MathEditor {
                 todo!();
             }
         };
+
+        // TODO:
+        // Forced autocorrect (ligatures anyone?)
+        // - / fraction
+        // - ^ exponent
+        // - _ subscript
+        // \sum_ turns into a (under sum ...)
+        // \sum^ turns into a (over sum ...)
+        // \sum_^ turns into a (under over sum ...)
+
         self.caret = new_caret.clone();
         self.undo_stack.push(builder.finish(new_caret).into());
         Some(())

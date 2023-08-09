@@ -1,4 +1,4 @@
-import { type SyntaxNode, getRowNode, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
+import { type SyntaxNode, getNodeWithRowIndices, hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
 import type { InputRowPosition } from "../input-position/input-row-position";
 import { InputRowRange } from "../input-position/input-row-range";
 import type { Offset } from "../input-tree/input-offset";
@@ -16,7 +16,7 @@ export function getLineAtPosition(caret: InputRowPosition): InputRowRange {
 export function getTokenAtPosition(syntaxTree: SyntaxNode, caret: InputRowPosition): InputRowRange {
   // We walk down the indices, so we should be at the row we want.
   const indices = RowIndices.fromZipper(caret.zipper);
-  const row = getRowNode(syntaxTree, indices);
+  const row = getNodeWithRowIndices(syntaxTree, indices);
 
   if (caret.offset === 0) {
     return new InputRowRange(caret.zipper, 0, 0);
@@ -71,6 +71,6 @@ export function getAutocompleteTokens(syntaxTree: SyntaxNode, caret: InputRowPos
   }
 
   // We walk down the indices, so we should be at the row we want.
-  const row = getRowNode(syntaxTree, RowIndices.fromZipper(caret.zipper));
+  const row = getNodeWithRowIndices(syntaxTree, RowIndices.fromZipper(caret.zipper));
   return getAutocompleteTokensRecursive(row, caret.offset);
 }

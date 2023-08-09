@@ -46,7 +46,7 @@ impl MathEditorBindings {
     }
 
     pub fn remove_at_caret(&mut self, mode: CaretRemoveMode) -> bool {
-        self.editor.remove_at_caret(mode).is_some()
+        self.editor.remove_at_caret(mode, MoveMode::Char).is_some()
     }
 
     pub fn insert_at_caret(&mut self, values: JsValue) -> Result<bool, JsValue> {

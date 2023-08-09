@@ -84,7 +84,7 @@ impl<'a> InputGridRange<'a> {
         }
     }
 
-    pub fn from_minimal(root: InputFocusRow<'a>, minimal: MinimalInputGridRange) -> Self {
+    pub fn from_minimal(root: InputFocusRow<'a>, minimal: &MinimalInputGridRange) -> Self {
         Self::new(
             root.walk_down_indices(&minimal.row_indices)
                 .child_at(minimal.index)

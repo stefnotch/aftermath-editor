@@ -16,7 +16,7 @@ use input_tree::{
 };
 
 use crate::{
-    autocomplete::{AutocompleteResult, AutocompleteRule, AutocompleteRuleMatch},
+    autocomplete::{AutocompleteRule, AutocompleteRuleMatch, AutocompleteRuleMatches},
     lexer::{LexerRange, LexerToken},
     parse_row,
     syntax_tree::{LeafNodeType, NodeIdentifier, SyntaxLeafNode},
@@ -115,9 +115,9 @@ impl<'a> ParserRules<'a> {
     }
 
     /// Gets all autocomplete tokens that start with the given content.
-    pub fn get_autocomplete(&'a self, content: &[InputNode]) -> Option<AutocompleteResult<'a>> {
+    pub fn get_autocomplete(&'a self, content: &[InputNode]) -> AutocompleteRuleMatches<'a> {
         if content.len() == 0 {
-            return None;
+            return AutocompleteRuleMatches::default();
         }
         let autocomplete_partial_matches: Vec<_> = self
             .autocomplete_rules
@@ -125,30 +125,26 @@ impl<'a> ParserRules<'a> {
             .filter_map(|rule| rule.this_starts_with_input(content).map(|v| (v, rule)))
             .collect();
 
-        if autocomplete_partial_matches.len() > 0 {
-            Some(AutocompleteResult {
-                range_in_input: 0..content.len(),
-                potential_rules: autocomplete_partial_matches
-                    .into_iter()
-                    .map(|(match_result, rule)| AutocompleteRuleMatch {
-                        rule,
-                        match_length: match_result.get_length(),
-                    })
-                    .collect(),
-            })
-        } else {
-            None
-        }
+        AutocompleteRuleMatches(
+            autocomplete_partial_matches
+                .into_iter()
+                .map(|(match_result, rule)| AutocompleteRuleMatch {
+                    rule,
+                    match_length: match_result.get_length(),
+                })
+                .collect(),
+        )
     }
 
     /// Find a completed autocomplete token at the start of the content.
     pub fn get_finished_autocomplete_at_beginning(
         &'a self,
         content: &[InputNode],
-    ) -> Option<AutocompleteResult<'a>> {
+    ) -> AutocompleteRuleMatches<'a> {
         if content.len() == 0 {
-            return None;
+            return AutocompleteRuleMatches::default();
         }
+
         let mut finished_autocomplete_matches: Vec<_> = self
             .autocomplete_rules
             .iter()
@@ -159,19 +155,15 @@ impl<'a> ParserRules<'a> {
                 match_result.get_length()
             });
 
-        if finished_autocomplete_matches.len() > 0 {
-            let (match_result, _) = finished_autocomplete_matches.first().unwrap();
-            let match_length = match_result.get_length();
-            Some(AutocompleteResult {
-                range_in_input: 0..match_length,
-                potential_rules: finished_autocomplete_matches
-                    .into_iter()
-                    .map(|(_, rule)| AutocompleteRuleMatch { rule, match_length })
-                    .collect(),
-            })
-        } else {
-            None
-        }
+        AutocompleteRuleMatches(
+            finished_autocomplete_matches
+                .into_iter()
+                .map(|(match_result, rule)| AutocompleteRuleMatch {
+                    rule,
+                    match_length: match_result.get_length(),
+                })
+                .collect(),
+        )
     }
 
     pub fn get_symbol<'input, 'lexer>(

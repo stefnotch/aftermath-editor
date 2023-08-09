@@ -47,10 +47,8 @@ fn test_autocomplete() {
     let input = InputNode::symbols(vec!["l", "i"]);
     let context = test_rules();
     let result = context.get_autocomplete(&input);
-    assert!(result.is_some());
-    let result = result.unwrap();
-    assert_eq!(result.range_in_input, 0..2);
-    assert_eq!(result.potential_rules.len(), 3);
+    assert!(!result.is_empty());
+    assert_eq!(result.0.len(), 3);
 }
 
 #[test]
@@ -58,7 +56,7 @@ fn test_autocomplete_empty() {
     let input = vec![];
     let context = test_rules();
     let result = context.get_autocomplete(&input);
-    assert!(result.is_none());
+    assert!(result.is_empty());
 }
 
 #[test]
@@ -66,10 +64,8 @@ fn test_autocomplete_full_match() {
     let input = InputNode::symbols(vec!["l", "i", "m"]);
     let context = test_rules();
     let result = context.get_autocomplete(&input);
-    assert!(result.is_some());
-    let result = result.unwrap();
-    assert_eq!(result.range_in_input, 0..3);
-    assert_eq!(result.potential_rules.len(), 3);
+    assert!(!result.is_empty());
+    assert_eq!(result.0.len(), 3);
 }
 
 #[test]
@@ -77,10 +73,8 @@ fn test_autocomplete_single_match() {
     let input = InputNode::symbols(vec!["l", "i", "m", "s", "u"]);
     let context = test_rules();
     let result = context.get_autocomplete(&input);
-    assert!(result.is_some());
-    let result = result.unwrap();
-    assert_eq!(result.range_in_input, 0..5);
-    assert_eq!(result.potential_rules.len(), 1);
+    assert!(!result.is_empty());
+    assert_eq!(result.0.len(), 1);
 }
 
 #[test]
@@ -89,7 +83,7 @@ fn test_autocomplete_standard_symbol_match() {
     let input = InputNode::symbols(vec!["l", "i", "g", "m"]);
     let context = test_rules();
     let result = context.get_autocomplete(&input);
-    assert!(result.is_none());
+    assert!(result.is_empty());
 }
 
 #[test]
@@ -97,10 +91,8 @@ fn test_autocomplete_match_followed_by_no_match() {
     let input = InputNode::symbols(vec!["l", "i", "m", "x"]);
     let context = test_rules();
     let result = context.get_finished_autocomplete_at_beginning(&input);
-    assert!(result.is_some());
-    let result = result.unwrap();
-    assert_eq!(result.range_in_input, 0..3);
-    assert_eq!(result.potential_rules.len(), 1);
+    assert!(!result.is_empty());
+    assert_eq!(result.0.len(), 1);
 }
 
 #[test]
@@ -109,9 +101,9 @@ fn test_autocomplete_no_match_followed_by_match() {
     let input = InputNode::symbols(vec!["c", "l", "i", "l", "i", "m"]);
     let context = test_rules();
     let result = context.get_autocomplete(&input);
-    assert!(result.is_none());
+    assert!(result.is_empty());
     let result_b = context.get_finished_autocomplete_at_beginning(&input);
-    assert!(result_b.is_none());
+    assert!(result_b.is_empty());
 }
 
 #[test]
@@ -119,10 +111,8 @@ fn test_autocomplete_match_followed_by_autocomplete_match() {
     let input = InputNode::symbols(vec!["l", "i", "m", "l", "i", "m"]);
     let context = test_rules();
     let result = context.get_autocomplete(&input);
-    assert!(result.is_none());
+    assert!(result.is_empty());
     let result_b = context.get_finished_autocomplete_at_beginning(&input);
-    assert!(result_b.is_some());
-    let result_b = result_b.unwrap();
-    assert_eq!(result_b.range_in_input, 0..3);
-    assert_eq!(result_b.potential_rules.len(), 1);
+    assert!(!result_b.is_empty());
+    assert_eq!(result_b.0.len(), 1);
 }
