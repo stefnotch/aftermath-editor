@@ -457,8 +457,6 @@ impl TokenParser {
         match token {
             InputNodeVariant::Fraction => BuiltInRules::fraction_rule_name(),
             InputNodeVariant::Root => BuiltInRules::root_rule_name(),
-            InputNodeVariant::Under => BuiltInRules::under_rule_name(),
-            InputNodeVariant::Over => BuiltInRules::over_rule_name(),
             InputNodeVariant::Sup => BuiltInRules::row_rule_name(),
             InputNodeVariant::Sub => BuiltInRules::row_rule_name(),
             InputNodeVariant::Table => BuiltInRules::table_rule_name(),
@@ -476,8 +474,7 @@ impl TokenParser {
                 match input_node {
                     InputNode::Container(container_type, rows) => {
                         let children = Grid::from_one_dimensional(
-                            input_node
-                                .rows()
+                            rows.values()
                                 .iter()
                                 .map(|row| {
                                     let row_parse_result = parse_row(row, parser_rules);

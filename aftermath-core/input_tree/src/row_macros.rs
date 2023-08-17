@@ -12,12 +12,6 @@ macro_rules! input_node {
   ((root $a:tt, $b:tt)) => {
       $crate::node::InputNode::root([$crate::input_row!($a), $crate::input_row!($b)])
   };
-  ((under $a:tt, $b:tt)) => {
-      $crate::node::InputNode::under([$crate::input_row!($a), $crate::input_row!($b)])
-  };
-  ((over $a:tt, $b:tt))=> {
-      $crate::node::InputNode::over([$crate::input_row!($a), $crate::input_row!($b)])
-  };
   ((sup $a:tt)) => {
       $crate::node::InputNode::sup($crate::input_row!($a))
   };

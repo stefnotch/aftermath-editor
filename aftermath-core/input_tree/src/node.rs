@@ -34,10 +34,6 @@ pub enum InputNodeVariant {
     Fraction,
     /// Root, like a square root
     Root,
-    /// Behaves like the underset LaTeX command
-    Under,
-    /// Overset
-    Over,
     /// Superscript
     Sup,
     /// Subscript
@@ -47,16 +43,10 @@ pub enum InputNodeVariant {
     /// The selection joining part makes it behave as expected.
     /// And the rendering part makes it look like you're selecting the table.
     Table,
+    // More commands like "under", "over" could be added in the future
 }
 
 impl InputNode {
-    pub fn rows<'a>(&'a self) -> &'a [InputRow] {
-        match self {
-            InputNode::Container(_, rows) => rows.values(),
-            InputNode::Symbol(_) => &[],
-        }
-    }
-
     pub fn fraction(values: [InputRow; 2]) -> Self {
         Self::container_with_type(
             InputNodeVariant::Fraction,
@@ -70,20 +60,6 @@ impl InputNode {
             InputNodeVariant::Root,
             // A root is mostly horizontal
             Grid::from_one_dimensional(values.to_vec(), 2),
-        )
-    }
-
-    pub fn under(values: [InputRow; 2]) -> Self {
-        Self::container_with_type(
-            InputNodeVariant::Under,
-            Grid::from_one_dimensional(values.to_vec(), 1),
-        )
-    }
-
-    pub fn over(values: [InputRow; 2]) -> Self {
-        Self::container_with_type(
-            InputNodeVariant::Over,
-            Grid::from_one_dimensional(values.to_vec(), 1),
         )
     }
 
@@ -174,8 +150,6 @@ impl InputNodeVariant {
         match self {
             InputNodeVariant::Fraction => false,
             InputNodeVariant::Root => false,
-            InputNodeVariant::Under => false,
-            InputNodeVariant::Over => false,
             InputNodeVariant::Sup => false,
             InputNodeVariant::Sub => false,
             InputNodeVariant::Table => true,
@@ -188,8 +162,6 @@ impl fmt::Display for InputNodeVariant {
         match self {
             InputNodeVariant::Fraction => write!(f, "frac"),
             InputNodeVariant::Root => write!(f, "root"),
-            InputNodeVariant::Under => write!(f, "under"),
-            InputNodeVariant::Over => write!(f, "over"),
             InputNodeVariant::Sup => write!(f, "sup"),
             InputNodeVariant::Sub => write!(f, "sub"),
             InputNodeVariant::Table => write!(f, "table"),

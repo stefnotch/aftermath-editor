@@ -125,7 +125,7 @@ impl CaretMover {
             _ => {}
         };
 
-        // TODO: subsup supsub underover overunder special cases
+        // TODO: subsup supsub special cases
         // When I'm in the top sup of a \sum^_, then pressing down should move me to the bottom sup.
 
         // Grid movement

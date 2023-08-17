@@ -111,14 +111,6 @@ impl BuiltInRules {
         BuiltInRules::rule_name("Root")
     }
 
-    pub fn under_rule_name() -> NodeIdentifier {
-        BuiltInRules::rule_name("Under")
-    }
-
-    pub fn over_rule_name() -> NodeIdentifier {
-        BuiltInRules::rule_name("Over")
-    }
-
     pub fn row_rule_name() -> NodeIdentifier {
         BuiltInRules::rule_name("Row")
     }
@@ -148,22 +140,6 @@ impl RuleCollection for BuiltInRules {
                 (None, None),
                 StartingParser::Token(TokenMatcher {
                     symbol: NFABuilder::match_input_node(InputNodeVariant::Root).build(),
-                    symbol_type: LeafNodeType::Symbol,
-                }),
-            ),
-            TokenParser::new(
-                Self::rule_name("Under"),
-                (None, None),
-                StartingParser::Token(TokenMatcher {
-                    symbol: NFABuilder::match_input_node(InputNodeVariant::Under).build(),
-                    symbol_type: LeafNodeType::Symbol,
-                }),
-            ),
-            TokenParser::new(
-                Self::rule_name("Over"),
-                (None, None),
-                StartingParser::Token(TokenMatcher {
-                    symbol: NFABuilder::match_input_node(InputNodeVariant::Over).build(),
                     symbol_type: LeafNodeType::Symbol,
                 }),
             ),

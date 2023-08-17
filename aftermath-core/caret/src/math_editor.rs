@@ -149,9 +149,6 @@ impl MathEditor {
         // - / fraction
         // - ^ exponent
         // - _ subscript
-        // \sum_ turns into a (under sum ...)
-        // \sum^ turns into a (over sum ...)
-        // \sum_^ turns into a (under over sum ...)
 
         self.caret = new_caret.clone();
         self.undo_stack.push(builder.finish(new_caret).into());
