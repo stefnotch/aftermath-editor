@@ -1,13 +1,11 @@
 [package]
-name = "oldparser"
+name = "parser"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-unicode-segmentation = "1.10.1"
-unicode-normalization = "0.1.22"
 serde = { version = "1.0", features = ["derive"] }
 tsify =  { version = "0.4", optional = true, default-features = false, features = ["js"] }
 input_tree = { path = "../input_tree" }
