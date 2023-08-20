@@ -2,6 +2,8 @@ use chumsky::{pratt::*, prelude::*};
 use input_tree::node::InputNode;
 use parser::{SyntaxLeafNode, SyntaxNode};
 
+/*
+Could be used in conjunction with a "instruction transformer"
 #[derive(Debug)]
 pub enum SyntaxTreeInstruction {
     StartNewRows { width: usize, height: usize },
@@ -10,10 +12,9 @@ pub enum SyntaxTreeInstruction {
     EndChildren,
     Append(SyntaxNode),
     Leaf(SyntaxLeafNode),
-}
+} */
 
-fn parser<'a>(/* TODO: Add a "instruction transformer" */
-) -> impl Parser<'a, &'a [InputNode], SyntaxTreeInstruction> {
+fn parser<'a>() -> impl Parser<'a, &'a [InputNode], SyntaxTreeInstruction> {
     let atom = choice(vec![
         just(InputNode::Symbol("cat".into()))
             .map(|node| SyntaxTreeInstruction::StartChildren)
