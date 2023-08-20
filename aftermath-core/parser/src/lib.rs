@@ -1,14 +1,10 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+use input_tree::node::InputNode;
+use syntax_tree::SyntaxNode;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod rule_collection;
+pub mod syntax_tree;
+mod greedy_choice;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+// Oh look, it's a trait alias
+trait TokenParser<'a>: chumsky::Parser<'a, &'a [InputNode], SyntaxNode> {}
+impl<'a, T> TokenParser<'a> for T where T: chumsky::Parser<'a, &'a [InputNode], SyntaxNode> {}
