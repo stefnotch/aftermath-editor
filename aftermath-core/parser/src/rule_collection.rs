@@ -1,4 +1,4 @@
-use crate::{syntax_tree::NodeIdentifier, TokenParser};
+use crate::{autocomplete::AutocompleteRule, syntax_tree::NodeIdentifier, TokenParser};
 
 pub struct TokenRule<'a> {
     pub name: NodeIdentifier,
@@ -19,7 +19,7 @@ pub struct TokenRule<'a> {
     // 1. Insert parse collections in order.
     // 2. Do a choice backwards. Later parse collections take priority.
     // This is somewhat different from what we used to have. The
-    // previous logic did "apply all parsers" followed by
+    // previous logic did "apply all parsers, do greedy" followed by
     // "do parser priority".
 }
 

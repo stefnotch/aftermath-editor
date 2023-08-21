@@ -54,7 +54,7 @@ where
 
 pub type GreedyChoice<T> = Ext<GreedyChoice_<T>>;
 
-pub const fn greedy_choice<T>(parsers: Vec<T>) -> GreedyChoice<T> {
+pub fn greedy_choice<T>(parsers: Vec<T>) -> GreedyChoice<T> {
     assert!(
         parsers.len() > 0,
         "Need at least one parser for greedy choice"

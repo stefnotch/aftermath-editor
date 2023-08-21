@@ -34,9 +34,19 @@ macro_rules! input_node {
 }
 
 #[macro_export]
+macro_rules! input_nodes {
+  ($($e:tt),* $(,)?) => {
+    vec![$($crate::input_node!($e)),*]
+  };
+}
+
+#[macro_export]
 macro_rules! input_row {
   ((row $e:tt $(,$es:tt)* $(,)?))=> {
     $crate::row::InputRow::new(vec![$crate::input_node!($e), $($crate::input_node!($es)),*])
+  };
+  ((row))=> {
+    $crate::row::InputRow::new(vec![])
   };
   ($e:expr) => {
       $e
