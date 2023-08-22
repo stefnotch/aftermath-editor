@@ -16,8 +16,8 @@ use input_tree::{
     focus::{MinimalInputRowPosition, MinimalInputRowRange},
     node::InputNode,
 };
-use parser::{parse_rules::ParserRules, ParseResult, SyntaxNode};
-use parser::{AutocompleteRuleMatch, NodeIdentifier, ParseError};
+use parser::parser::MathParser;
+use parser::syntax_tree::SyntaxNode;
 use serialization::{deserialize_input_nodes, serialize_input_nodes};
 
 pub use serialization::SerializedDataType;
@@ -26,8 +26,8 @@ pub use serialization::SerializedDataType;
 pub struct MathEditor {
     /// User input
     input: InputTree,
-    // TODO: maybe share parser rules in the future? (when we have multiple math editors)
-    parser: ParserRules<'static>,
+    // TODO: maybe share parsers in the future? (when we have multiple math editors)
+    parser: MathParser<'static>,
     /// Parsed content, can be cleared
     parsed: Option<ParseResult<SyntaxNode>>,
     /// Main caret

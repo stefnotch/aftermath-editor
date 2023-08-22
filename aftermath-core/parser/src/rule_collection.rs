@@ -1,4 +1,4 @@
-use crate::{autocomplete::AutocompleteRule, syntax_tree::NodeIdentifier, TokenParser};
+use crate::{autocomplete::AutocompleteRule, syntax_tree::NodeIdentifier, BoxedTokenParser};
 
 pub struct TokenRule<'a> {
     pub name: NodeIdentifier,
@@ -6,11 +6,11 @@ pub struct TokenRule<'a> {
     /// (None, Some) is a prefix operator\
     /// (Some, None) is a postfix operator\
     /// (Some, Some) is an infix operator
-    pub binding_power: (Option<u32>, Option<u32>),
+    pub binding_power: (Option<u8>, Option<u8>),
 
     /// Parser for the token. Is greedy, as in the longest one that matches will win.
     /// This is needed for ">=" instead of ">""
-    pub parser: Box<dyn TokenParser<'a>>,
+    pub parser: BoxedTokenParser<'a, 'a>,
     // Maybe introduce a concept of "priority"
     // When two things match, the one with the highest priority wins
     // e.g. "lim" and "variable parser" both match "lim"
@@ -21,6 +21,33 @@ pub struct TokenRule<'a> {
     // This is somewhat different from what we used to have. The
     // previous logic did "apply all parsers, do greedy" followed by
     // "do parser priority".
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BindingPowerType {
+    Atom,
+    Prefix(u8),
+    Postfix(u8),
+    LeftInfix(u8),
+    RightInfix(u8),
+}
+
+impl TokenRule<'_> {
+    pub fn binding_power_type(&self) -> BindingPowerType {
+        use BindingPowerType::*;
+        match self.binding_power {
+            (None, None) => Atom,
+            (None, Some(a)) => Prefix(a),
+            (Some(a), None) => Postfix(a),
+            (Some(a), Some(b)) => {
+                if a <= b {
+                    LeftInfix(a)
+                } else {
+                    RightInfix(b)
+                }
+            }
+        }
+    }
 }
 
 pub trait RuleCollection<'a> {
