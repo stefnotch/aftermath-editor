@@ -1,6 +1,18 @@
 use crate::{autocomplete::AutocompleteRule, syntax_tree::NodeIdentifier, BoxedTokenParser};
 
-pub struct TokenRule<'a> {
+pub struct InputPhantom<'a> {
+    phantom_data: std::marker::PhantomData<&'a ()>,
+}
+
+impl InputPhantom<'_> {
+    pub fn new<'a>() -> InputPhantom<'a> {
+        InputPhantom {
+            phantom_data: std::marker::PhantomData,
+        }
+    }
+}
+
+pub struct TokenRule {
     pub name: NodeIdentifier,
     /// (None, None) is a constant\
     /// (None, Some) is a prefix operator\
@@ -10,7 +22,7 @@ pub struct TokenRule<'a> {
 
     /// Parser for the token. Is greedy, as in the longest one that matches will win.
     /// This is needed for ">=" instead of ">""
-    pub parser: BoxedTokenParser<'a, 'a>,
+    pub make_parser: for<'a> fn(&TokenRule, input: InputPhantom<'a>) -> BoxedTokenParser<'a, 'a>,
     // Maybe introduce a concept of "priority"
     // When two things match, the one with the highest priority wins
     // e.g. "lim" and "variable parser" both match "lim"
@@ -32,7 +44,7 @@ pub enum BindingPowerType {
     RightInfix(u8),
 }
 
-impl TokenRule<'_> {
+impl TokenRule {
     pub fn binding_power_type(&self) -> BindingPowerType {
         use BindingPowerType::*;
         match self.binding_power {
@@ -50,8 +62,8 @@ impl TokenRule<'_> {
     }
 }
 
-pub trait RuleCollection<'a> {
-    fn get_rules() -> Vec<TokenRule<'a>>;
+pub trait RuleCollection {
+    fn get_rules() -> Vec<TokenRule>;
     fn get_autocomplete_rules() -> Vec<AutocompleteRule>;
     fn get_extra_rule_names() -> Vec<NodeIdentifier> {
         vec![]
