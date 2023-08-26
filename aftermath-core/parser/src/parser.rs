@@ -19,6 +19,90 @@ pub struct MathParser {
 
 // chumsky parser goes in here
 
+struct InputP<'a> {
+    phantom_data: std::marker::PhantomData<&'a ()>,
+}
+
+impl<'a> Default for InputP<'a> {
+    fn default() -> Self {
+        Self {
+            phantom_data: Default::default(),
+        }
+    }
+}
+
+trait LateParser {
+    type P<'a>: Parser<'a, &'a str, &'a str, chumsky::extra::Default>
+    where
+        Self: 'a;
+
+    fn make_parser<'a, 'b: 'a>(&'b self, input: InputP<'a>) -> Self::P<'a>;
+}
+
+struct LateJust {
+    value: String,
+}
+
+impl LateParser for LateJust {
+    type P<'a> = chumsky::primitive::Just<&'a str, &'a str, chumsky::extra::Default>;
+
+    fn make_parser<'a, 'b: 'a>(&'b self, _input: InputP<'a>) -> Self::P<'a> {
+        chumsky::primitive::just(self.value.as_str())
+    }
+}
+
+fn testing() {
+    let late_just = LateJust { value: "a".into() };
+
+    {
+        let parser = late_just.make_parser(InputP::default());
+        parser.parse("a");
+    }
+}
+
+/*
+trait InputOrRef {
+    type Input;
+    type Ref<'a>;
+}
+
+trait OutputOrRef {
+    type Output;
+    type Ref<'a>;
+}
+
+impl InputOrRef for String {
+    type Input = String;
+    type Ref<'a> = &'a str;
+}
+
+impl OutputOrRef for String {
+    type Output = String;
+    type Ref<'a> = &'a str;
+}
+
+struct MakeParser<P, I, O>
+where
+    P: for<'a> Fn(InputP<'a>) -> Parser<'a, I, O, chumsky::extra::Default>,
+    I: InputOrRef,
+    O: OutputOrRef,
+{
+    pub make: fn() -> P,
+    i_type: std::marker::PhantomData<I>,
+    o_type: std::marker::PhantomData<O>,
+}
+
+fn cjust(
+    s: String,
+) -> MakeParser<chumsky::primitive::Just<&'a str, &'a str, chumsky::extra::Default>, String, String>
+{
+    MakeParser {
+        make: || chumsky::primitive::just("a".as_str()),
+        i_type: Default::default(),
+        o_type: Default::default(),
+    }
+}
+*/
 struct CachedMathParser {
     token_rules: Arc<Vec<TokenRule>>,
 }
@@ -54,7 +138,7 @@ impl Cached for CachedMathParser {
             }
         }
 
-        let operator = chumsky::primitive::choice((
+        /*   let operator = greedy_choice(vec![
             chumsky::pratt::left_infix(
                 chumsky::primitive::just(InputNode::Symbol("+".into())),
                 1,
@@ -65,7 +149,16 @@ impl Cached for CachedMathParser {
                 1,
                 |l, r| SyntaxNode::new(todo!(), todo!(), todo!()),
             ),
-        ));
+        ]);*/
+
+        let operator = chumsky::pratt::left_infix(
+            chumsky::primitive::choice(vec![
+                chumsky::primitive::just(InputNode::Symbol("+".into())),
+                chumsky::primitive::just(InputNode::Symbol("-".into())),
+            ]),
+            1,
+            |l, r| SyntaxNode::new(todo!(), todo!(), todo!()),
+        );
 
         let atom = greedy_choice(token_parsers);
         let prefix = chumsky::primitive::choice(prefix_parsers);
