@@ -5,7 +5,7 @@ use input_tree::node::InputNode;
 
 use crate::{
     autocomplete::{AutocompleteMatcher, AutocompleteRule},
-    greedy_choice::{greedy_choice, HasLen},
+    greedy_choice::greedy_choice,
     rule_collection::{BindingPowerType, InputPhantom, RuleCollection, TokenRule},
     syntax_tree::SyntaxNode,
     BoxedTokenParser, TokenParser, TokenParserExtra,
@@ -19,104 +19,15 @@ pub struct MathParser {
 
 // chumsky parser goes in here
 
-struct InputP<'a> {
-    phantom_data: std::marker::PhantomData<&'a ()>,
-}
-
-impl<'a> Default for InputP<'a> {
-    fn default() -> Self {
-        Self {
-            phantom_data: Default::default(),
-        }
-    }
-}
-
-trait LateParser {
-    type P<'a>: Parser<'a, &'a str, &'a str, chumsky::extra::Default>
-    where
-        Self: 'a;
-
-    fn make_parser<'a, 'b: 'a>(&'b self, input: InputP<'a>) -> Self::P<'a>;
-}
-
-struct LateJust {
-    value: String,
-}
-
-impl LateParser for LateJust {
-    type P<'a> = chumsky::primitive::Just<&'a str, &'a str, chumsky::extra::Default>;
-
-    fn make_parser<'a, 'b: 'a>(&'b self, _input: InputP<'a>) -> Self::P<'a> {
-        chumsky::primitive::just(self.value.as_str())
-    }
-}
-
-fn testing() {
-    let late_just = LateJust { value: "a".into() };
-
-    {
-        let parser = late_just.make_parser(InputP::default());
-        parser.parse("a");
-    }
-}
-
-/*
-trait InputOrRef {
-    type Input;
-    type Ref<'a>;
-}
-
-trait OutputOrRef {
-    type Output;
-    type Ref<'a>;
-}
-
-impl InputOrRef for String {
-    type Input = String;
-    type Ref<'a> = &'a str;
-}
-
-impl OutputOrRef for String {
-    type Output = String;
-    type Ref<'a> = &'a str;
-}
-
-struct MakeParser<P, I, O>
-where
-    P: for<'a> Fn(InputP<'a>) -> Parser<'a, I, O, chumsky::extra::Default>,
-    I: InputOrRef,
-    O: OutputOrRef,
-{
-    pub make: fn() -> P,
-    i_type: std::marker::PhantomData<I>,
-    o_type: std::marker::PhantomData<O>,
-}
-
-fn cjust(
-    s: String,
-) -> MakeParser<chumsky::primitive::Just<&'a str, &'a str, chumsky::extra::Default>, String, String>
-{
-    MakeParser {
-        make: || chumsky::primitive::just("a".as_str()),
-        i_type: Default::default(),
-        o_type: Default::default(),
-    }
-}
-*/
 struct CachedMathParser {
     token_rules: Arc<Vec<TokenRule>>,
 }
 
+/// See https://github.com/zesterer/chumsky/blob/f10e56b7eac878cbad98f71fd5485a21d44db226/src/lib.rs#L3456
 impl Cached for CachedMathParser {
-    type Input<'src> = &'src [InputNode];
+    type Parser<'src> = BoxedTokenParser<'src, 'src>;
 
-    type Output<'src> = SyntaxNode;
-
-    type Extra<'src> = TokenParserExtra;
-
-    fn make_parser<'src>(
-        self,
-    ) -> chumsky::Boxed<'src, 'src, Self::Input<'src>, Self::Output<'src>, Self::Extra<'src>> {
+    fn make_parser<'src>(self) -> Self::Parser<'src> {
         let mut token_parsers = vec![];
         let mut prefix_parsers = vec![];
 
@@ -220,11 +131,5 @@ impl AutocompleteMatcher for MathParser {
             matches.extend(rule.matches(input, min_rule_match_length));
         }
         matches
-    }
-}
-
-impl HasLen for SyntaxNode {
-    fn len(&self) -> usize {
-        self.range().end.abs_diff(self.range().start)
     }
 }

@@ -14,15 +14,10 @@ pub struct GreedyChoice_<T> {
     parsers: Vec<T>,
 }
 
-pub trait HasLen {
-    fn len(&self) -> usize;
-}
-
 impl<'a, A, I, O, E> ExtParser<'a, I, O, E> for GreedyChoice_<A>
 where
     A: Parser<'a, I, O, E>,
     I: Input<'a>,
-    O: HasLen,
     E: ParserExtra<'a, I>,
 {
     // Based on https://github.com/zesterer/chumsky/blob/771cfcb8db72388cf83679e74df9f7b75fe49e2e/src/primitive.rs#L875
@@ -38,14 +33,18 @@ where
                 .iter()
                 .map(|parser| {
                     inp.rewind(before);
-                    inp.parse(parser)
+                    let parse_result = inp.parse(parser);
+                    let parse_offset = inp.offset();
+                    (parse_result, parse_offset)
                 })
-                .max_by_key(|a| match a {
-                    Ok(a) => a.len(),
-                    Err(_) => 0,
+                .max_by(|a, b| match (a, b) {
+                    ((Ok(_), a_offset), (Ok(_), b_offset)) => a_offset.cmp(b_offset),
+                    ((Ok(_), _), (Err(_), _)) => std::cmp::Ordering::Greater,
+                    ((Err(_), _), (Ok(_), _)) => std::cmp::Ordering::Less,
+                    ((Err(_), _), (Err(_), _)) => std::cmp::Ordering::Equal,
                 }) {
-                Some(Ok(longest_match)) => Ok(longest_match),
-                Some(Err(e)) => Err(e),
+                Some((Ok(longest_match), _)) => Ok(longest_match),
+                Some((Err(e), _)) => Err(e),
                 None => panic!("Parsers list was empty"),
             }
         }
