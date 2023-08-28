@@ -17,7 +17,7 @@ use input_tree::{
     node::InputNode,
 };
 use parser::parser::MathParser;
-use parser::syntax_tree::SyntaxNode;
+use parser::syntax_tree::{NodeIdentifier, SyntaxNode};
 use serialization::{deserialize_input_nodes, serialize_input_nodes};
 
 pub use serialization::SerializedDataType;
@@ -27,7 +27,7 @@ pub struct MathEditor {
     /// User input
     input: InputTree,
     // TODO: maybe share parsers in the future? (when we have multiple math editors)
-    parser: MathParser<'static>,
+    parser: MathParser,
     /// Parsed content, can be cleared
     parsed: Option<ParseResult<SyntaxNode>>,
     /// Main caret
@@ -286,7 +286,9 @@ impl MathEditor {
     }
 
     /// Get all the known token names
-    pub fn get_token_names(&self) -> Vec<NodeIdentifier> {
-        self.parser.get_token_names()
+    pub fn get_rule_names(&self) -> Vec<NodeIdentifier> {
+        let mut names: Vec<_> = self.parser.get_rule_names().into_iter().collect();
+        names.sort();
+        names
     }
 }

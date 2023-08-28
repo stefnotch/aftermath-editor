@@ -6,7 +6,7 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 
 /// A fully qualified identifier, starting with a namespace and ending with a name.
 /// Must be valid identifiers, as specified by https://www.unicode.org/reports/tr31/.
-#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[cfg_attr(
     feature = "wasm",
     derive(tsify::Tsify),

@@ -8,7 +8,8 @@ pub mod rule_collection;
 pub mod rule_collections;
 pub mod syntax_tree;
 
-pub type TokenParserExtra = chumsky::extra::Default;
+pub type TokenParserError = chumsky::prelude::Cheap;
+pub type TokenParserExtra = chumsky::extra::Err<TokenParserError>;
 // Oh look, it's a trait alias
 pub trait TokenParser<'a>:
     chumsky::Parser<'a, &'a [InputNode], SyntaxNode, TokenParserExtra>

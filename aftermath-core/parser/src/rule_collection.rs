@@ -1,14 +1,22 @@
+use std::collections::HashSet;
+
 use crate::{autocomplete::AutocompleteRule, syntax_tree::NodeIdentifier, BoxedTokenParser};
 
 pub struct InputPhantom<'a> {
     phantom_data: std::marker::PhantomData<&'a ()>,
 }
 
-impl InputPhantom<'_> {
-    pub fn new<'a>() -> InputPhantom<'a> {
-        InputPhantom {
+impl<'a> InputPhantom<'a> {
+    pub fn new() -> Self {
+        Self {
             phantom_data: std::marker::PhantomData,
         }
+    }
+}
+
+impl Default for InputPhantom<'_> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -21,7 +29,10 @@ pub struct TokenRule {
     pub binding_power: (Option<u8>, Option<u8>),
 
     /// Parser for the token. Is greedy, as in the longest one that matches will win.
-    /// This is needed for ">=" instead of ">""
+    /// This is needed for ">=" instead of ">" and "=".
+    /// If the match isn't what the user intended, the user can use spaces to separate the tokens.
+    /// Tokens can also be escaped using a backslash \.
+    /// \x basically means "this has a very specific meaning", such as \| always being a | symbol, and \sum always being a sum symbol.
     pub make_parser: for<'a> fn(&TokenRule, input: InputPhantom<'a>) -> BoxedTokenParser<'a, 'a>,
     // Maybe introduce a concept of "priority"
     // When two things match, the one with the highest priority wins
@@ -68,11 +79,11 @@ pub trait RuleCollection {
     fn get_extra_rule_names() -> Vec<NodeIdentifier> {
         vec![]
     }
-    fn get_rule_names() -> Vec<NodeIdentifier> {
+    fn get_rule_names() -> HashSet<NodeIdentifier> {
         let mut rules_names = Self::get_rules()
             .into_iter()
             .map(|v| v.name)
-            .collect::<Vec<_>>();
+            .collect::<HashSet<_>>();
         rules_names.extend(Self::get_extra_rule_names());
         rules_names
     }

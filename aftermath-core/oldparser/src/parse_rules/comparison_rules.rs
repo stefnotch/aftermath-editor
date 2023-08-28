@@ -5,6 +5,7 @@ use crate::{parse_rules::StartingParser, syntax_tree::NodeIdentifier, Autocomple
 use super::{RuleCollection, TokenParser};
 
 /// Rules for basic comparisons.
+/// Chains of < <= can be treated as "domain restrictions".
 pub struct ComparisonRules {}
 
 impl ComparisonRules {

@@ -1,22 +1,21 @@
 mod pratt_parser;
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
-use chumsky::{cache::Cached, Parser};
+use chumsky::{ParseResult, Parser};
 use input_tree::node::InputNode;
 
 use crate::{
     autocomplete::{AutocompleteMatcher, AutocompleteRule},
-    greedy_choice::greedy_choice,
-    rule_collection::{BindingPowerType, InputPhantom, RuleCollection, TokenRule},
-    syntax_tree::{SyntaxNode, SyntaxNodeChildren},
-    BoxedTokenParser, TokenParser, TokenParserExtra,
+    rule_collection::{RuleCollection, TokenRule},
+    syntax_tree::{NodeIdentifier, SyntaxNode},
+    TokenParserError,
 };
 
 use self::pratt_parser::CachedMathParser;
 
 pub struct MathParser {
-    parser_cache: CachedMathParser,
+    parser_cache: chumsky::cache::Cache<CachedMathParser>,
     token_rules: Arc<Vec<TokenRule>>,
     autocomplete_rules: Vec<AutocompleteRule>,
 }
@@ -24,13 +23,28 @@ pub struct MathParser {
 impl MathParser {
     fn new(token_rules: Vec<TokenRule>, autocomplete_rules: Vec<AutocompleteRule>) -> Self {
         let token_rules = Arc::new(token_rules);
+        let parser_cache = chumsky::cache::Cache::new(CachedMathParser::new(token_rules.clone()));
         Self {
-            parser_cache: CachedMathParser {
-                token_rules: token_rules.clone(),
-            },
+            parser_cache,
             token_rules,
             autocomplete_rules,
         }
+    }
+
+    pub fn parse<'a>(
+        &'a self,
+        input: &'a [InputNode],
+    ) -> ParseResult<SyntaxNode, TokenParserError> {
+        let parser = self.parser_cache.get();
+        let result = parser.parse(input);
+        result
+    }
+
+    pub fn get_rule_names(&self) -> HashSet<NodeIdentifier> {
+        self.token_rules
+            .iter()
+            .map(|v| v.name.clone())
+            .collect::<HashSet<_>>()
     }
 }
 

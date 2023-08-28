@@ -136,16 +136,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chumsky"
-version = "1.0.0-alpha.4"
-source = "git+https://github.com/zesterer/chumsky.git#56762fe5c965880066a068038a18b5ac07afd75c"
-dependencies = [
- "hashbrown 0.14.0",
- "unicode-ident",
- "vergen",
-]
-
-[[package]]
 name = "clru"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1009,20 +999,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "oldparser"
-version = "0.1.0"
-dependencies = [
- "chumsky 1.0.0-alpha.4 (git+https://github.com/zesterer/chumsky.git)",
- "input_tree",
- "serde",
- "tsify",
- "unicode-ident",
- "unicode-normalization",
- "unicode-segmentation",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "once_cell"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1055,7 +1031,7 @@ dependencies = [
 name = "parser"
 version = "0.1.0"
 dependencies = [
- "chumsky 1.0.0-alpha.4 (git+https://github.com/stefnotch/chumsky.git?branch=pratt-with-op-2)",
+ "chumsky",
  "input_tree",
  "serde",
  "tsify",
@@ -1419,12 +1395,6 @@ checksum = "5c5713f0fc4b5db668a2ac63cdb7bb4469d8c9fed047b1d0292cc7b0ce2ba921"
 dependencies = [
  "tinyvec",
 ]
-
-[[package]]
-name = "unicode-segmentation"
-version = "1.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1dd624098567895118886609431a7c3b8f516e41d30e0643f03d94592a147e36"
 
 [[package]]
 name = "url"

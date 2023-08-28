@@ -13,6 +13,12 @@ pub struct CachedMathParser {
     token_rules: Arc<Vec<TokenRule>>,
 }
 
+impl CachedMathParser {
+    pub fn new(token_rules: Arc<Vec<TokenRule>>) -> Self {
+        Self { token_rules }
+    }
+}
+
 fn combine_ranges(a: std::ops::Range<usize>, b: std::ops::Range<usize>) -> std::ops::Range<usize> {
     let start = a.start.min(b.start);
     let end = a.end.max(b.end);
