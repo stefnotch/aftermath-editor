@@ -56,6 +56,17 @@ pub enum BindingPowerType {
 }
 
 impl TokenRule {
+    pub fn new(
+        name: NodeIdentifier,
+        binding_power: (Option<u8>, Option<u8>),
+        make_parser: for<'a> fn(&TokenRule, input: InputPhantom<'a>) -> BoxedTokenParser<'a, 'a>,
+    ) -> Self {
+        Self {
+            name,
+            binding_power,
+            make_parser,
+        }
+    }
     pub fn binding_power_type(&self) -> BindingPowerType {
         use BindingPowerType::*;
         match self.binding_power {
