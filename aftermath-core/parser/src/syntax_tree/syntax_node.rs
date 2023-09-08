@@ -99,7 +99,7 @@ impl SyntaxLeafNode {
     derive(tsify::Tsify),
     tsify(into_wasm_abi, from_wasm_abi)
 )]
-pub enum LeafNodeType {
+pub enum LeafNodeType { // Not really needed, since every leaf node is wrapped in a normal node. And a normal node has a name, which I can map to "is symbol" or "is operator".
     /// A symbol node
     Symbol,
     /// An operator node, this can be skipped in an abstract syntax tree
