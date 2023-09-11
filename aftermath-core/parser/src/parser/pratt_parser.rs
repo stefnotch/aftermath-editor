@@ -1,18 +1,17 @@
 use std::sync::Arc;
 
-use chumsky::{cache::Cached, Parser};
+use chumsky::{cache::Cached, span::SimpleSpan, Boxed, Parser};
 
 use crate::{
     greedy_choice::greedy_choice,
-    rule_collection::{BindingPowerType, InputPhantom, TokenRule},
+    rule_collection::{BindingPowerType, TokenRule},
     syntax_tree::{SyntaxNode, SyntaxNodeChildren},
-    BoxedTokenParser,
+    TokenParserExtra, TokenParserInput,
 };
 
 pub struct CachedMathParser {
     token_rules: Arc<Vec<TokenRule>>,
 }
-
 impl CachedMathParser {
     pub fn new(token_rules: Arc<Vec<TokenRule>>) -> Self {
         Self { token_rules }
@@ -52,16 +51,25 @@ fn build_infix_syntax_node(op: SyntaxNode, children: [SyntaxNode; 2]) -> SyntaxN
 
 /// See https://github.com/zesterer/chumsky/blob/f10e56b7eac878cbad98f71fd5485a21d44db226/src/lib.rs#L3456
 impl Cached for CachedMathParser {
-    type Parser<'src> = BoxedTokenParser<'src, 'src>;
+    type Parser<'src> = Boxed<'src, 'src, TokenParserInput<'src>, SyntaxNode, TokenParserExtra>;
 
     fn make_parser<'src>(self) -> Self::Parser<'src> {
+        let mut chain = chumsky::recursive::Recursive::declare();
+
         let mut token_parsers = vec![];
         let mut prefix_parsers = vec![];
         let mut postfix_parsers = vec![];
         let mut infix_parsers = vec![];
 
-        for rule in self.token_rules.iter() {
-            let rule_parser = (rule.make_parser)(&rule, InputPhantom::new());
+        let token_rules = self.token_rules.clone();
+        for rule in token_rules.iter() {
+            // Okay, so to move something into the closure
+            // I first had to create a copy here
+            // And then had to create a copy inside the closure
+            let rule_name = rule.name.clone();
+            let rule_parser = rule.make_parser.build(chain.clone().boxed()).map_with_span(
+                move |v, range: SimpleSpan| v.build(rule_name.clone(), range.into_range()),
+            );
             match rule.binding_power_type() {
                 BindingPowerType::Atom => {
                     // Or .clone()?
@@ -97,6 +105,7 @@ impl Cached for CachedMathParser {
                 }
             }
         }
+        std::mem::drop(token_rules);
 
         // Here's to hoping that greedy_choice doesn't devolve into exponential time
         let atom = greedy_choice(token_parsers);
@@ -104,11 +113,12 @@ impl Cached for CachedMathParser {
         let prefix = greedy_choice(prefix_parsers);
         let postfix = greedy_choice(postfix_parsers);
 
-        let expr = atom
-            .pratt(operator)
-            .with_prefix_ops(prefix)
-            .with_postfix_ops(postfix);
+        chain.define(
+            atom.pratt(operator)
+                .with_prefix_ops(prefix)
+                .with_postfix_ops(postfix),
+        );
 
-        expr.boxed()
+        chain.boxed()
     }
 }

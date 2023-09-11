@@ -1,5 +1,6 @@
-use crate::syntax_tree::{SyntaxLeafNode, SyntaxNodeChildren};
-use crate::SyntaxNode;
+use crate::make_parser::just_symbol_parser;
+use crate::parser_extensions::just_symbol;
+use crate::syntax_tree::SyntaxNodeBuilder;
 use crate::{
     autocomplete::AutocompleteRule,
     rule_collection::{RuleCollection, TokenRule},
@@ -20,37 +21,67 @@ impl ArithmeticRules {
 
 impl RuleCollection for ArithmeticRules {
     fn get_rules() -> Vec<crate::rule_collection::TokenRule> {
-        let a = TokenRule::new(Self::rule_name("Number"), (None, None), |_, _| {
-            let digits = select! {
-              InputNode::Symbol(a) if a.chars().all(|v| v.is_ascii_digit()) => a,
-            }
-            .repeated()
-            .at_least(1)
-            .collect::<Vec<_>>();
-            digits
-                .then(just(InputNode::symbol(".")).then(digits).or_not())
-                .map(|(mut a, b)| {
-                    if let Some((_, b)) = b {
-                        a.push(".".to_string());
-                        a.extend(b);
+        vec![
+            TokenRule::new(
+                Self::rule_name("Number"),
+                (None, None),
+                crate::make_parser::MakeParserFn(|_| {
+                    let digits = select! {
+                      InputNode::Symbol(a) if a.chars().all(|v| v.is_ascii_digit()) => a,
                     }
-                    a
-                })
-                .map_with_span(|v, range: SimpleSpan| {
-                    SyntaxNode::new(
-                        Self::rule_name("Number"),
-                        range.clone().into_range(),
-                        SyntaxNodeChildren::Leaf(SyntaxLeafNode::new(
-                            crate::syntax_tree::LeafNodeType::Symbol,
-                            range.into_range(),
-                            v,
-                        )),
-                    )
-                })
-                .boxed()
-        });
+                    .repeated()
+                    .at_least(1)
+                    .collect::<Vec<_>>();
 
-        vec![a]
+                    digits
+                        .then(just_symbol(".").then(digits).or_not())
+                        .map(|(mut a, b)| {
+                            if let Some((c, d)) = b {
+                                a.push(c);
+                                a.extend(d);
+                            }
+                            a
+                        })
+                        .map(|v| SyntaxNodeBuilder::new_symbol(v))
+                        .boxed()
+                }),
+            ),
+            TokenRule::new(
+                Self::rule_name("Add"),
+                (Some(100), Some(101)),
+                just_symbol_parser("+"),
+            ),
+            TokenRule::new(
+                Self::rule_name("Subtract"),
+                (Some(100), Some(101)),
+                just_symbol_parser("-"),
+            ),
+            TokenRule::new(
+                Self::rule_name("Add"),
+                (None, Some(400)),
+                just_symbol_parser("+"),
+            ),
+            TokenRule::new(
+                Self::rule_name("Subtract"),
+                (None, Some(400)),
+                just_symbol_parser("-"),
+            ),
+            TokenRule::new(
+                Self::rule_name("Multiply"),
+                (Some(200), Some(201)),
+                just_symbol_parser("*"),
+            ),
+            TokenRule::new(
+                Self::rule_name("Divide"),
+                (Some(200), Some(201)),
+                just_symbol_parser("/"),
+            ),
+            TokenRule::new(
+                Self::rule_name("Exponent"),
+                (Some(850), None),
+                just_symbol_parser("^"),
+            ),
+        ]
     }
 
     fn get_autocomplete_rules() -> Vec<crate::autocomplete::AutocompleteRule> {

@@ -34,6 +34,51 @@ pub struct SyntaxNode {
     range: Range<usize>,
 }
 
+pub struct SyntaxNodeBuilder {
+    /// children of the node, including the operator token(s)
+    pub children: SyntaxNodeChildren,
+    /// value, especially for constants
+    /// stored as bytes, and interpreted according to the name
+    pub value: Vec<u8>,
+}
+
+impl SyntaxNodeBuilder {
+    pub fn new(children: SyntaxNodeChildren) -> Self {
+        Self {
+            children,
+            value: vec![],
+        }
+    }
+
+    pub fn set_value(mut self, value: Vec<u8>) -> Self {
+        self.value = value;
+        self
+    }
+
+    pub fn new_symbol(symbols: Vec<String>) -> Self {
+        Self::new(SyntaxNodeChildren::Leaf(SyntaxLeafNode::new(
+            LeafNodeType::Symbol,
+            symbols,
+        )))
+    }
+
+    pub fn new_operator(symbols: Vec<String>) -> Self {
+        Self::new(SyntaxNodeChildren::Leaf(SyntaxLeafNode::new(
+            LeafNodeType::Operator,
+            symbols,
+        )))
+    }
+
+    pub fn build(self, name: NodeIdentifier, range: Range<usize>) -> SyntaxNode {
+        SyntaxNode {
+            name,
+            children: self.children,
+            value: self.value,
+            range,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(
     feature = "wasm",
@@ -68,28 +113,13 @@ impl SyntaxNodeChildren {
 pub struct SyntaxLeafNode {
     /// Type of the leaf node
     pub node_type: LeafNodeType,
-    /// The range of this in the input tree row.
-    range: Range<usize>,
     /// The symbols that make up this node, stored as a list of grapheme clusters.
     pub symbols: Vec<String>,
 }
 
 impl SyntaxLeafNode {
-    pub fn new(
-        node_type: LeafNodeType,
-        range: Range<usize>,
-        symbols: Vec<String>,
-    ) -> SyntaxLeafNode {
-        assert!(range.start < range.end);
-        SyntaxLeafNode {
-            node_type,
-            range,
-            symbols,
-        }
-    }
-
-    pub fn range(&self) -> Range<usize> {
-        self.range.clone()
+    pub fn new(node_type: LeafNodeType, symbols: Vec<String>) -> SyntaxLeafNode {
+        SyntaxLeafNode { node_type, symbols }
     }
 }
 
@@ -119,6 +149,22 @@ impl SyntaxNode {
         }
     }
 
+    pub fn new_symbol(name: NodeIdentifier, range: Range<usize>, symbols: Vec<String>) -> Self {
+        Self::new(
+            name,
+            range.clone(),
+            SyntaxNodeChildren::Leaf(SyntaxLeafNode::new(LeafNodeType::Symbol, symbols)),
+        )
+    }
+
+    pub fn new_operator(name: NodeIdentifier, range: Range<usize>, symbols: Vec<String>) -> Self {
+        Self::new(
+            name,
+            range.clone(),
+            SyntaxNodeChildren::Leaf(SyntaxLeafNode::new(LeafNodeType::Operator, symbols)),
+        )
+    }
+
     /// Returns the range of all the children combined, and verifies the invariants.
     fn get_combined_range(children: &SyntaxNodeChildren) -> Option<Range<usize>> {
         let binding = match children {
@@ -126,7 +172,7 @@ impl SyntaxNode {
                 children.iter().map(|v| v.range()).collect::<Vec<_>>()
             }
             SyntaxNodeChildren::NewRows(_) => vec![],
-            SyntaxNodeChildren::Leaf(child) => vec![child.range()],
+            SyntaxNodeChildren::Leaf(_) => vec![],
         };
         let mut child_iter = binding.iter();
         if let Some(first) = child_iter.next() {

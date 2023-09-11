@@ -1,24 +1,27 @@
 use std::collections::HashSet;
 
-use crate::{autocomplete::AutocompleteRule, syntax_tree::NodeIdentifier, BoxedTokenParser};
+use crate::{
+    autocomplete::AutocompleteRule,
+    make_parser::MakeParser,
+    syntax_tree::{NodeIdentifier, SyntaxNode, SyntaxNodeBuilder},
+    TokenParserExtra, TokenParserInput,
+};
 
-pub struct InputPhantom<'a> {
-    phantom_data: std::marker::PhantomData<&'a ()>,
+// Oh look, it's a trait alias
+pub trait TokenParser<'a>:
+    chumsky::Parser<'a, TokenParserInput<'a>, SyntaxNodeBuilder, TokenParserExtra>
+{
+}
+impl<'a, T> TokenParser<'a> for T where
+    T: chumsky::Parser<'a, TokenParserInput<'a>, SyntaxNodeBuilder, TokenParserExtra>
+{
 }
 
-impl<'a> InputPhantom<'a> {
-    pub fn new() -> Self {
-        Self {
-            phantom_data: std::marker::PhantomData,
-        }
-    }
-}
+pub type BoxedTokenParser<'a, 'b> =
+    chumsky::Boxed<'a, 'b, TokenParserInput<'a>, SyntaxNodeBuilder, TokenParserExtra>;
 
-impl Default for InputPhantom<'_> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub type BoxedNodeParser<'a, 'b> =
+    chumsky::Boxed<'a, 'b, TokenParserInput<'a>, SyntaxNode, TokenParserExtra>;
 
 pub struct TokenRule {
     pub name: NodeIdentifier,
@@ -26,14 +29,15 @@ pub struct TokenRule {
     /// (None, Some) is a prefix operator\
     /// (Some, None) is a postfix operator\
     /// (Some, Some) is an infix operator
-    pub binding_power: (Option<u8>, Option<u8>),
+    pub binding_power: (Option<u16>, Option<u16>),
 
     /// Parser for the token. Is greedy, as in the longest one that matches will win.
     /// This is needed for ">=" instead of ">" and "=".
     /// If the match isn't what the user intended, the user can use spaces to separate the tokens.
     /// Tokens can also be escaped using a backslash \.
     /// \x basically means "this has a very specific meaning", such as \| always being a | symbol, and \sum always being a sum symbol.
-    pub make_parser: for<'a> fn(&TokenRule, input: InputPhantom<'a>) -> BoxedTokenParser<'a, 'a>,
+    /// The parser is a recursive parser, which can be used to parse nested expressions.
+    pub make_parser: Box<dyn MakeParser>,
     // Maybe introduce a concept of "priority"
     // When two things match, the one with the highest priority wins
     // e.g. "lim" and "variable parser" both match "lim"
@@ -49,22 +53,22 @@ pub struct TokenRule {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BindingPowerType {
     Atom,
-    Prefix(u8),
-    Postfix(u8),
-    LeftInfix(u8),
-    RightInfix(u8),
+    Prefix(u16),
+    Postfix(u16),
+    LeftInfix(u16),
+    RightInfix(u16),
 }
 
 impl TokenRule {
     pub fn new(
         name: NodeIdentifier,
-        binding_power: (Option<u8>, Option<u8>),
-        make_parser: for<'a> fn(&TokenRule, input: InputPhantom<'a>) -> BoxedTokenParser<'a, 'a>,
+        binding_power: (Option<u16>, Option<u16>),
+        make_parser: impl MakeParser + 'static,
     ) -> Self {
         Self {
             name,
             binding_power,
-            make_parser,
+            make_parser: Box::new(make_parser),
         }
     }
     pub fn binding_power_type(&self) -> BindingPowerType {
