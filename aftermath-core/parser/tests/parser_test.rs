@@ -1,5 +1,32 @@
 use input_tree::{node::InputNode, row::InputRow};
-use parser::{parse_row, parse_rules::ParserRules};
+use parser::{
+    parser::ParserBuilder,
+    rule_collections::{
+        arithmetic_rules::ArithmeticRules, built_in_rules::BuiltInRules,
+        calculus_rules::CalculusRules, collections_rules::CollectionsRules,
+        comparison_rules::ComparisonRules, core_rules::CoreRules, function_rules::FunctionRules,
+        logic_rules::LogicRules, string_rules::StringRules,
+    },
+};
+
+fn create_parser() -> parser::parser::MathParser {
+    let builder = ParserBuilder::new()
+        .add_rule_collection::<BuiltInRules>()
+        .add_rule_collection::<CoreRules>()
+        .add_rule_collection::<ArithmeticRules>()
+        .add_rule_collection::<CalculusRules>()
+        .add_rule_collection::<CollectionsRules>()
+        .add_rule_collection::<ComparisonRules>()
+        .add_rule_collection::<FunctionRules>()
+        .add_rule_collection::<LogicRules>()
+        .add_rule_collection::<StringRules>();
+    let parser = builder.build();
+    parser
+}
+
+fn parse_row(row: &InputRow) -> parser::syntax_tree::SyntaxNode {
+    create_parser().parse(&row.values)
+}
 
 #[test]
 fn test_parser() {
@@ -9,13 +36,11 @@ fn test_parser() {
         InputNode::symbol("*"),
         InputNode::symbol("C"),
     ]);
-    let context = ParserRules::default();
-    let parsed = parse_row(&layout, &context);
+    let parsed = parse_row(&layout);
     assert_eq!(
-        parsed.value.to_string(),
+        parsed.to_string(),
         r#"(Arithmetic::Multiply (Arithmetic::Subtract (BuiltIn::Operator "-") (Core::Variable "b")) (BuiltIn::Operator "*") (Core::Variable "C"))"#
     );
-    assert_eq!(parsed.errors.len(), 0);
 }
 
 #[test]
@@ -26,13 +51,11 @@ fn test_postfix() {
         InputNode::symbol("a"),
         InputNode::symbol("!"),
     ]);
-    let context = ParserRules::default();
-    let parsed = parse_row(&layout, &context);
+    let parsed = parse_row(&layout);
     assert_eq!(
-        parsed.value.to_string(),
+        parsed.to_string(),
         r#"(Arithmetic::Add (Core::Variable "c") (BuiltIn::Operator "+") (Unsorted::Factorial (Core::Variable "a") (BuiltIn::Operator "!")))"#
     );
-    assert_eq!(parsed.errors.len(), 0);
 }
 
 #[test]
@@ -41,13 +64,12 @@ fn test_sub() {
         InputNode::symbol("a"),
         InputNode::sub(InputRow::new(vec![InputNode::symbol("1")])),
     ]);
-    let context = ParserRules::default();
-    let parsed = parse_row(&layout, &context);
+
+    let parsed = parse_row(&layout);
     assert_eq!(
-        parsed.value.to_string(),
+        parsed.to_string(),
         r#"(BuiltIn::Sub (Core::Variable "a") (BuiltIn::Row 1x1 (Arithmetic::Number "1")))"#
     );
-    assert_eq!(parsed.errors.len(), 0);
 }
 
 #[test]
@@ -57,10 +79,10 @@ fn test_sup_sub() {
         InputNode::sup(InputRow::new(vec![InputNode::symbol("1")])),
         InputNode::sub(InputRow::new(vec![InputNode::symbol("2")])),
     ]);
-    let context = ParserRules::default();
-    let parsed = parse_row(&layout, &context);
+
+    let parsed = parse_row(&layout);
     assert_eq!(
-        parsed.value.to_string(),
+        parsed.to_string(),
         format!(
             "{}{}{}",
             r#"(BuiltIn::Sub "#,
@@ -68,7 +90,6 @@ fn test_sup_sub() {
             r#" (BuiltIn::Row 1x1 (Arithmetic::Number "2")))"#
         )
     );
-    assert_eq!(parsed.errors.len(), 0);
 }
 
 #[test]
@@ -83,11 +104,10 @@ fn test_parser_nested_brackets_and_postfix() {
         InputNode::symbol(")"),
         InputNode::symbol(")"),
     ]);
-    let context = ParserRules::default();
 
-    let parsed = parse_row(&layout, &context);
+    let parsed = parse_row(&layout);
     assert_eq!(
-        parsed.value.to_string(),
+        parsed.to_string(),
         format!(
             "{}{}{}",
             r#"(Core::RoundBrackets (BuiltIn::Operator "(") (Core::RoundBrackets (BuiltIn::Operator "(") (Core::RoundBrackets (BuiltIn::Operator "(") "#,
@@ -95,7 +115,6 @@ fn test_parser_nested_brackets_and_postfix() {
             r#"(BuiltIn::Operator ")")) (BuiltIn::Operator ")")) (BuiltIn::Operator ")"))"#
         )
     );
-    assert_eq!(parsed.errors.len(), 0);
 }
 
 #[test]
@@ -106,14 +125,11 @@ fn test_parser_tuple() {
         InputNode::symbol("b"),
     ]);
 
-    let context = ParserRules::default();
-
-    let parsed = parse_row(&layout, &context);
+    let parsed = parse_row(&layout);
     assert_eq!(
-        parsed.value.to_string(),
+        parsed.to_string(),
         r#"(Collection::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b"))"#
     );
-    assert_eq!(parsed.errors.len(), 0);
 }
 
 #[test]
@@ -128,11 +144,9 @@ fn test_parser_tuple_advanced() {
         InputNode::symbol(")"),
     ]);
 
-    let context = ParserRules::default();
-
-    let parsed = parse_row(&layout, &context);
+    let parsed = parse_row(&layout);
     assert_eq!(
-        parsed.value.to_string(),
+        parsed.to_string(),
         format!(
             "{}{}{}",
             r#"(Core::RoundBrackets (BuiltIn::Operator "(") "#,
@@ -140,7 +154,6 @@ fn test_parser_tuple_advanced() {
             r#"(BuiltIn::Operator ")"))"#
         )
     );
-    assert_eq!(parsed.errors.len(), 0);
 }
 
 #[test]
@@ -154,11 +167,9 @@ fn test_parser_function_call() {
         InputNode::symbol(")"),
     ]);
 
-    let context = ParserRules::default();
-
-    let parsed = parse_row(&layout, &context);
+    let parsed = parse_row(&layout);
     assert_eq!(
-        parsed.value.to_string(),
+        parsed.to_string(),
         format!(
             "{}{}{}",
             r#"(Function::FunctionApplication (Core::Variable "f") (BuiltIn::Operator "(") ("#,
@@ -166,7 +177,6 @@ fn test_parser_function_call() {
             r#") (BuiltIn::Operator ")"))"#
         )
     );
-    assert_eq!(parsed.errors.len(), 0);
 }
 
 #[test]
@@ -179,14 +189,12 @@ fn test_parser_brackets_with_addition() {
         InputNode::symbol(")"),
     ]);
 
-    let context = ParserRules::default();
-    let parsed = parse_row(&layout, &context);
+    let parsed = parse_row(&layout);
 
     assert_eq!(
-        parsed.value.to_string(),
+        parsed.to_string(),
         r#"(Core::RoundBrackets (BuiltIn::Operator "(") (Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (Core::Variable "b")) (BuiltIn::Operator ")"))"#
     );
-    assert_eq!(parsed.errors.len(), 0);
 }
 
 #[test]
@@ -202,24 +210,21 @@ fn test_parser_fraction() {
         InputNode::symbol(")"),
     ]);
 
-    let context = ParserRules::default();
-    let parsed = parse_row(&layout, &context);
+    let parsed = parse_row(&layout);
 
     assert_eq!(
-        parsed.value.to_string(),
+        parsed.to_string(),
         r#"(Core::RoundBrackets (BuiltIn::Operator "(") (Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (BuiltIn::Fraction 1x2 (Core::Variable "b") (Core::Variable "c"))) (BuiltIn::Operator ")"))"#
     );
-    assert_eq!(parsed.errors.len(), 0);
 }
 
 #[test]
 fn test_parser_empty_input() {
     let layout = InputRow::new(vec![]);
-    let context = ParserRules::default();
 
-    let parsed = parse_row(&layout, &context);
+    let parsed = parse_row(&layout);
     // "Nothing" is taken from https://cortexjs.io/compute-engine/reference/core/
-    assert_eq!(parsed.value.to_string(), "(BuiltIn::Nothing)");
+    assert_eq!(parsed.to_string(), "(BuiltIn::Nothing)");
 }
 
 #[test]
@@ -230,11 +235,10 @@ fn test_parser_empty_squareroot() {
         InputRow::new(vec![]),
         InputRow::new(vec![InputNode::symbol("a")]),
     ])]);
-    let context = ParserRules::default();
 
-    let parsed = parse_row(&layout, &context);
+    let parsed = parse_row(&layout);
     assert_eq!(
-        parsed.value.to_string(),
+        parsed.to_string(),
         r#"(BuiltIn::Root 2x1 (BuiltIn::Nothing) (Core::Variable "a"))"#
     );
 }
@@ -244,17 +248,15 @@ fn test_parser_empty_squareroot() {
 #[test]
 fn test_parser_symbol_and_close_bracket() {
     let layout = InputRow::new(vec![InputNode::symbol("a"), InputNode::symbol(")")]);
-    let context = ParserRules::default();
 
-    let parsed = parse_row(&layout, &context);
+    let parsed = parse_row(&layout);
     println!("{:?}", parsed);
 }
 
 #[test]
 fn test_parser_close_bracket() {
     let layout = InputRow::new(vec![InputNode::symbol(")")]);
-    let context = ParserRules::default();
 
-    let parsed = parse_row(&layout, &context);
+    let parsed = parse_row(&layout);
     println!("{:?}", parsed);
 }
