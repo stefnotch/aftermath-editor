@@ -23,7 +23,7 @@ pub enum InputNode {
 }
 
 // Could be extended with constructs like <mmultiscripts>
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(
     feature = "wasm",
     derive(tsify::Tsify),

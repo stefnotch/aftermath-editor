@@ -1,1 +1,9 @@
 pub mod arithmetic_rules;
+pub mod built_in_rules;
+pub mod calculus_rules;
+pub mod collections_rules;
+pub mod comparison_rules;
+pub mod core_rules;
+pub mod function_rules;
+pub mod logic_rules;
+pub mod string_rules;

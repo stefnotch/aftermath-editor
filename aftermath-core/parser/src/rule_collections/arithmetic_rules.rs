@@ -1,6 +1,6 @@
-use crate::make_parser::just_symbol_parser;
+use crate::make_parser::{just_operator_parser, just_symbol_parser};
 use crate::parser_extensions::just_symbol;
-use crate::syntax_tree::SyntaxNodeBuilder;
+use crate::syntax_tree::{LeafNodeType, SyntaxNodeBuilder};
 use crate::{
     autocomplete::AutocompleteRule,
     rule_collection::{RuleCollection, TokenRule},
@@ -42,53 +42,52 @@ impl RuleCollection for ArithmeticRules {
                             }
                             a
                         })
-                        .map(|v| SyntaxNodeBuilder::new_symbol(v))
+                        .map(|v| SyntaxNodeBuilder::new_leaf_node(v, LeafNodeType::Symbol))
                         .boxed()
                 }),
             ),
             TokenRule::new(
                 Self::rule_name("Add"),
                 (Some(100), Some(101)),
-                just_symbol_parser("+"),
+                just_operator_parser("+"),
             ),
             TokenRule::new(
                 Self::rule_name("Subtract"),
                 (Some(100), Some(101)),
-                just_symbol_parser("-"),
+                just_operator_parser("-"),
             ),
             TokenRule::new(
                 Self::rule_name("Add"),
                 (None, Some(400)),
-                just_symbol_parser("+"),
+                just_operator_parser("+"),
             ),
             TokenRule::new(
                 Self::rule_name("Subtract"),
                 (None, Some(400)),
-                just_symbol_parser("-"),
+                just_operator_parser("-"),
             ),
             TokenRule::new(
                 Self::rule_name("Multiply"),
                 (Some(200), Some(201)),
-                just_symbol_parser("*"),
+                just_operator_parser("*"),
             ),
             TokenRule::new(
                 Self::rule_name("Divide"),
                 (Some(200), Some(201)),
-                just_symbol_parser("/"),
+                just_operator_parser("/"),
             ),
             TokenRule::new(
                 Self::rule_name("Exponent"),
                 (Some(850), None),
-                just_symbol_parser("^"),
+                just_operator_parser("^"),
             ),
         ]
     }
 
     fn get_autocomplete_rules() -> Vec<crate::autocomplete::AutocompleteRule> {
         vec![
-            AutocompleteRule::new(input_nodes! {(fraction (row), (row))}, "/"),
-            AutocompleteRule::new(input_nodes! {(root (row), (row))}, "sqrt"),
-            AutocompleteRule::new(input_nodes! {(sup (row))}, "^"),
+            AutocompleteRule::new("/", input_nodes! {(fraction (row), (row))}),
+            AutocompleteRule::new("sqrt", input_nodes! {(root (row), (row))}),
         ]
     }
 }

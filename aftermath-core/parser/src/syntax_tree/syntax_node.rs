@@ -55,17 +55,9 @@ impl SyntaxNodeBuilder {
         self
     }
 
-    pub fn new_symbol(symbols: Vec<String>) -> Self {
+    pub fn new_leaf_node(symbols: Vec<String>, node_type: LeafNodeType) -> Self {
         Self::new(SyntaxNodeChildren::Leaf(SyntaxLeafNode::new(
-            LeafNodeType::Symbol,
-            symbols,
-        )))
-    }
-
-    pub fn new_operator(symbols: Vec<String>) -> Self {
-        Self::new(SyntaxNodeChildren::Leaf(SyntaxLeafNode::new(
-            LeafNodeType::Operator,
-            symbols,
+            node_type, symbols,
         )))
     }
 
@@ -123,13 +115,14 @@ impl SyntaxLeafNode {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[cfg_attr(
     feature = "wasm",
     derive(tsify::Tsify),
     tsify(into_wasm_abi, from_wasm_abi)
 )]
-pub enum LeafNodeType { // Not really needed, since every leaf node is wrapped in a normal node. And a normal node has a name, which I can map to "is symbol" or "is operator".
+pub enum LeafNodeType {
+    // Not really needed, since every leaf node is wrapped in a normal node. And a normal node has a name, which I can map to "is symbol" or "is operator".
     /// A symbol node
     Symbol,
     /// An operator node, this can be skipped in an abstract syntax tree
@@ -147,22 +140,6 @@ impl SyntaxNode {
             range,
             value: vec![],
         }
-    }
-
-    pub fn new_symbol(name: NodeIdentifier, range: Range<usize>, symbols: Vec<String>) -> Self {
-        Self::new(
-            name,
-            range.clone(),
-            SyntaxNodeChildren::Leaf(SyntaxLeafNode::new(LeafNodeType::Symbol, symbols)),
-        )
-    }
-
-    pub fn new_operator(name: NodeIdentifier, range: Range<usize>, symbols: Vec<String>) -> Self {
-        Self::new(
-            name,
-            range.clone(),
-            SyntaxNodeChildren::Leaf(SyntaxLeafNode::new(LeafNodeType::Operator, symbols)),
-        )
     }
 
     /// Returns the range of all the children combined, and verifies the invariants.

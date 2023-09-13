@@ -3,12 +3,16 @@ use parser::autocomplete::{AutocompleteMatcher, AutocompleteRule, AutocompleteRu
 
 fn test_rules<'a>() -> AutocompleteRules {
     let autocomplete_rules = vec![
-        AutocompleteRule::new(input_nodes! {(frac (row), (row))}, "/"),
-        AutocompleteRule::new(input_nodes! {(sup (row))}, "^"),
-        AutocompleteRule::new(input_nodes! {(sub (row))}, "_"),
-        AutocompleteRule::new(input_nodes! {"l", "i", "m"}, "lim"),
-        AutocompleteRule::new(input_nodes! {"l", "i", "m", "s", "u", "p"}, "limsup"),
-        AutocompleteRule::new(input_nodes! {"l", "i", "m", "i", "n", "f"}, "liminf"),
+        AutocompleteRule::new("/", input_nodes! {(fraction (row), (row))}),
+        AutocompleteRule::new("sqrt", input_nodes! {(root (row), (row))}),
+        AutocompleteRule::new("^", input_nodes! {(sup (row))}),
+        AutocompleteRule::new("infinity", input_nodes! {"∞"}),
+        AutocompleteRule::new("lim", input_nodes! {"l", "i", "m"}),
+        AutocompleteRule::new("limsup", input_nodes! {"l", "i", "m", "s", "u", "p"}),
+        AutocompleteRule::new("liminf", input_nodes! {"l", "i", "m", "i", "n", "f"}),
+        AutocompleteRule::new("sum", input_nodes! {"∑"}),
+        AutocompleteRule::new("integral", input_nodes! {"∫"}),
+        AutocompleteRule::new("integrate", input_nodes! {"∫"}),
     ];
 
     AutocompleteRules(autocomplete_rules)

@@ -1,15 +1,16 @@
+mod greedy_choice;
 mod pratt_parser;
 
 use std::{collections::HashSet, sync::Arc};
 
-use chumsky::{ParseResult, Parser};
+use chumsky::Parser;
 use input_tree::node::InputNode;
 
 use crate::{
     autocomplete::{AutocompleteMatcher, AutocompleteRule},
     rule_collection::{RuleCollection, TokenRule},
+    rule_collections::built_in_rules::BuiltInRules,
     syntax_tree::{NodeIdentifier, SyntaxNode},
-    TokenParserError,
 };
 
 use self::pratt_parser::CachedMathParser;
@@ -31,13 +32,15 @@ impl MathParser {
         }
     }
 
-    pub fn parse<'a>(
-        &'a self,
-        input: &'a [InputNode],
-    ) -> ParseResult<SyntaxNode, TokenParserError> {
+    pub fn parse<'a>(&'a self, input: &'a [InputNode]) -> SyntaxNode {
         let parser = self.parser_cache.get();
-        let result = parser.parse(input);
-        result
+        let (result, errors) = parser.parse(input).into_output_errors();
+
+        if errors.len() > 0 {
+            panic!("Errors: {:?}", errors);
+        }
+
+        result.unwrap_or_else(|| BuiltInRules::nothing_node(0..0))
     }
 
     pub fn get_rule_names(&self) -> HashSet<NodeIdentifier> {

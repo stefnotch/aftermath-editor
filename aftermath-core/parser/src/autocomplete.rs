@@ -1,10 +1,10 @@
 use input_tree::node::InputNode;
 
 pub struct AutocompleteRule {
-    pub result: Vec<InputNode>,
-
     /// Very simplistic parser. Just matches the input exactly.
     pub parser: String,
+
+    pub result: Vec<InputNode>,
 }
 
 pub trait AutocompleteMatcher {
@@ -12,7 +12,7 @@ pub trait AutocompleteMatcher {
     /// Then returns all matches that could be made with these rules.
     /// Of course including prefix-matches.
     /// TODO: remember to filter out autocompletes that might destroy an existing token (done after autocompleting)
-    /// 
+    ///
     fn matches<'input, 'b>(
         &'b self,
         input: &'input [InputNode],
@@ -29,10 +29,10 @@ pub struct AutocompleteRuleMatch<'a> {
 }
 
 impl AutocompleteRule {
-    pub fn new(result: Vec<InputNode>, parser: impl Into<String>) -> Self {
+    pub fn new(parser: impl Into<String>, result: Vec<InputNode>) -> Self {
         Self {
-            result,
             parser: parser.into(),
+            result,
         }
     }
 }

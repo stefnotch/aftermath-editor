@@ -4,24 +4,27 @@ use crate::{
     autocomplete::AutocompleteRule,
     make_parser::MakeParser,
     syntax_tree::{NodeIdentifier, SyntaxNode, SyntaxNodeBuilder},
-    TokenParserExtra, TokenParserInput,
+    NodeParserExtra, ParserInput,
 };
+
+pub type TokenParserExtra = chumsky::extra::Err<chumsky::prelude::Cheap>;
 
 // Oh look, it's a trait alias
 pub trait TokenParser<'a>:
-    chumsky::Parser<'a, TokenParserInput<'a>, SyntaxNodeBuilder, TokenParserExtra>
+    chumsky::Parser<'a, ParserInput<'a>, SyntaxNodeBuilder, TokenParserExtra>
 {
 }
 impl<'a, T> TokenParser<'a> for T where
-    T: chumsky::Parser<'a, TokenParserInput<'a>, SyntaxNodeBuilder, TokenParserExtra>
+    T: chumsky::Parser<'a, ParserInput<'a>, SyntaxNodeBuilder, TokenParserExtra>
 {
 }
 
 pub type BoxedTokenParser<'a, 'b> =
-    chumsky::Boxed<'a, 'b, TokenParserInput<'a>, SyntaxNodeBuilder, TokenParserExtra>;
+    chumsky::Boxed<'a, 'b, ParserInput<'a>, SyntaxNodeBuilder, TokenParserExtra>;
 
+// TODO: This should not be able to return any errors.
 pub type BoxedNodeParser<'a, 'b> =
-    chumsky::Boxed<'a, 'b, TokenParserInput<'a>, SyntaxNode, TokenParserExtra>;
+    chumsky::Boxed<'a, 'b, ParserInput<'a>, SyntaxNode, NodeParserExtra>;
 
 pub struct TokenRule {
     pub name: NodeIdentifier,
