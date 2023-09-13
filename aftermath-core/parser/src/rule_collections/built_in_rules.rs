@@ -1,11 +1,6 @@
 use std::ops::Range;
 
-use crate::make_parser::just_symbol_parser;
-use crate::parser_extensions::just_symbol;
-use crate::rule_collection::{BoxedNodeParser, BoxedTokenParser};
-use crate::syntax_tree::{
-    LeafNodeType, SyntaxLeafNode, SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren,
-};
+use crate::syntax_tree::{SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren};
 use crate::{
     autocomplete::AutocompleteRule,
     rule_collection::{RuleCollection, TokenRule},
@@ -21,6 +16,11 @@ pub struct BuiltInRules;
 impl BuiltInRules {
     fn rule_name(name: &str) -> NodeIdentifier {
         NodeIdentifier::new(vec!["BuiltIn".into(), name.into()])
+    }
+    /// Whenever a syntax tree has an operator, this can be used to wrap the operator leaf.
+    ///
+    pub fn operator_rule_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("Operator")
     }
     fn error_rule_name(name: &str) -> NodeIdentifier {
         NodeIdentifier::new(vec!["Error".into(), name.into()])

@@ -75,16 +75,15 @@ impl TokenRule {
         }
     }
     pub fn binding_power_type(&self) -> BindingPowerType {
-        use BindingPowerType::*;
         match self.binding_power {
-            (None, None) => Atom,
-            (None, Some(a)) => Prefix(a),
-            (Some(a), None) => Postfix(a),
+            (None, None) => BindingPowerType::Atom,
+            (None, Some(a)) => BindingPowerType::Prefix(a),
+            (Some(a), None) => BindingPowerType::Postfix(a),
             (Some(a), Some(b)) => {
                 if a <= b {
-                    LeftInfix(a)
+                    BindingPowerType::LeftInfix(a)
                 } else {
-                    RightInfix(b)
+                    BindingPowerType::RightInfix(b)
                 }
             }
         }

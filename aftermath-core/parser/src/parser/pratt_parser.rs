@@ -4,7 +4,8 @@ use chumsky::{cache::Cached, span::SimpleSpan, Boxed, Parser};
 
 use crate::{
     rule_collection::{BindingPowerType, TokenRule},
-    syntax_tree::{SyntaxNode, SyntaxNodeChildren},
+    rule_collections::built_in_rules::BuiltInRules,
+    syntax_tree::{LeafNodeType, SyntaxLeafNode, SyntaxNode, SyntaxNodeChildren},
     NodeParserExtra, ParserInput,
 };
 
@@ -25,11 +26,16 @@ fn combine_ranges(a: std::ops::Range<usize>, b: std::ops::Range<usize>) -> std::
     start..end
 }
 
+fn with_operator_name(mut op: SyntaxNode) -> SyntaxNode {
+    op.name = BuiltInRules::operator_rule_name();
+    op
+}
+
 fn build_prefix_syntax_node(op: SyntaxNode, rhs: SyntaxNode) -> SyntaxNode {
     SyntaxNode::new(
         op.name.clone(),
         combine_ranges(op.range(), rhs.range()),
-        SyntaxNodeChildren::Children(vec![op, rhs]),
+        SyntaxNodeChildren::Children(vec![with_operator_name(op), rhs]),
     )
 }
 
@@ -37,7 +43,7 @@ fn build_postfix_syntax_node(op: SyntaxNode, lhs: SyntaxNode) -> SyntaxNode {
     SyntaxNode::new(
         op.name.clone(),
         combine_ranges(op.range(), lhs.range()),
-        SyntaxNodeChildren::Children(vec![lhs, op]),
+        SyntaxNodeChildren::Children(vec![lhs, with_operator_name(op)]),
     )
 }
 
@@ -46,7 +52,7 @@ fn build_infix_syntax_node(op: SyntaxNode, children: [SyntaxNode; 2]) -> SyntaxN
     SyntaxNode::new(
         op.name.clone(),
         combine_ranges(op.range(), combine_ranges(lhs.range(), rhs.range())),
-        SyntaxNodeChildren::Children(vec![lhs, op, rhs]),
+        SyntaxNodeChildren::Children(vec![lhs, with_operator_name(op), rhs]),
     )
 }
 
@@ -70,6 +76,7 @@ impl Cached for CachedMathParser {
             // I first had to create a copy here
             // And then had to create a copy inside the closure
             let rule_name = rule.name.clone();
+            // This only parses the basic tokens, it doesn't join them together
             let rule_parser = rule.make_parser.build(chain.clone().boxed()).map_with_span(
                 move |v, range: SimpleSpan| v.build(rule_name.clone(), range.into_range()),
             );

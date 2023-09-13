@@ -37,6 +37,7 @@ fn test_parser() {
         InputNode::symbol("C"),
     ]);
     let parsed = parse_row(&layout);
+
     assert_eq!(
         parsed.to_string(),
         r#"(Arithmetic::Multiply (Arithmetic::Subtract (BuiltIn::Operator "-") (Core::Variable "b")) (BuiltIn::Operator "*") (Core::Variable "C"))"#
