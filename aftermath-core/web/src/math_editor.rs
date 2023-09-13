@@ -7,7 +7,7 @@ use input_tree::{
     focus::{MinimalInputRowPosition, MinimalInputRowRange},
     node::InputNode,
 };
-use parser::parse_rules::ParserRules;
+use parser::parser::ParserBuilder;
 use serde::Serialize;
 use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
 
@@ -23,7 +23,7 @@ impl MathEditorBindings {
     pub fn new() -> Self {
         Self {
             // Hardcoded parser rules for now
-            editor: MathEditor::new(ParserRules::default()),
+            editor: MathEditor::new(ParserBuilder::new().add_default_rules().build()),
             // Do note that large numbers won't be serialized correctly, because JS doesn't have 64 bit integers.
             serializer: serde_wasm_bindgen::Serializer::new(),
         }
@@ -96,11 +96,6 @@ impl MathEditorBindings {
         Ok(result)
     }
 
-    pub fn get_parse_errors(&mut self) -> Result<JsValue, JsValue> {
-        let result = self.editor.get_parse_errors().serialize(&self.serializer)?;
-        Ok(result)
-    }
-
     pub fn get_caret(&self) -> Result<JsValue, JsValue> {
         let result = self.editor.get_caret().serialize(&self.serializer)?;
         Ok(result)
@@ -116,8 +111,8 @@ impl MathEditorBindings {
         Ok(())
     }
 
-    pub fn get_token_names(&self) -> Result<JsValue, JsValue> {
-        let result = self.editor.get_token_names().serialize(&self.serializer)?;
+    pub fn get_rule_names(&self) -> Result<JsValue, JsValue> {
+        let result = self.editor.get_rule_names().serialize(&self.serializer)?;
         Ok(result)
     }
 }

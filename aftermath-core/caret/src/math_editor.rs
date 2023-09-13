@@ -16,6 +16,7 @@ use input_tree::{
     focus::{MinimalInputRowPosition, MinimalInputRowRange},
     node::InputNode,
 };
+use parser::autocomplete::AutocompleteRuleMatch;
 use parser::parser::MathParser;
 use parser::syntax_tree::{NodeIdentifier, SyntaxNode};
 use serialization::{deserialize_input_nodes, serialize_input_nodes};
@@ -29,7 +30,7 @@ pub struct MathEditor {
     // TODO: maybe share parsers in the future? (when we have multiple math editors)
     parser: MathParser,
     /// Parsed content, can be cleared
-    parsed: Option<ParseResult<SyntaxNode>>,
+    parsed: Option<SyntaxNode>,
     /// Main caret
     caret: MinimalCaret,
     /// Selection mode, describes how the current selection works
@@ -40,7 +41,7 @@ pub struct MathEditor {
 }
 
 impl MathEditor {
-    pub fn new(parser: ParserRules<'static>) -> Self {
+    pub fn new(parser: MathParser) -> Self {
         let input: InputTree = Default::default();
         Self {
             input,
@@ -240,29 +241,22 @@ impl MathEditor {
         todo!()
     }
 
-    pub fn get_autocomplete<'a>(&'a mut self) -> Option<Vec<AutocompleteRuleMatch<'a>>> {
+    pub fn get_autocomplete<'a>(&'a mut self) -> Vec<AutocompleteRuleMatch<'a>> {
         todo!()
-    }
-    pub fn get_syntax_tree(&mut self) -> &SyntaxNode {
-        &self.get_parsed().value
-    }
-    pub fn get_parse_errors(&mut self) -> &[ParseError] {
-        &self.get_parsed().errors
     }
     pub fn get_caret(&self) -> Vec<MinimalCaretSelection> {
         let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
         vec![selection.to_minimal()]
     }
-    fn get_parsed(&mut self) -> &ParseResult<SyntaxNode> {
+    pub fn get_syntax_tree(&mut self) -> &SyntaxNode {
         if let Some(ref result) = (self).parsed {
             return result;
         }
 
-        let parsed = parser::parse_row(&self.input.root, &self.parser);
+        let parsed = self.parser.parse(&self.input.root.values);
         self.parsed = Some(parsed);
         self.parsed.as_ref().unwrap()
     }
-
     /// For setting some parsed MathML, or for inserting a result
     /// We have access to the syntax tree, so we know what sensible ranges are (e.g. "range after equals sign" or "range of root node")
     pub fn splice_at_range(&mut self, range: MinimalInputRowRange, values: Vec<InputNode>) {
@@ -285,7 +279,7 @@ impl MathEditor {
         self.undo_stack.push(builder.finish(caret).into());
     }
 
-    /// Get all the known token names
+    /// Get all the known rule names
     pub fn get_rule_names(&self) -> Vec<NodeIdentifier> {
         let mut names: Vec<_> = self.parser.get_rule_names().into_iter().collect();
         names.sort();

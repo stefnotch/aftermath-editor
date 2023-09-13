@@ -5,7 +5,7 @@ use chumsky::{cache::Cached, span::SimpleSpan, Boxed, Parser};
 use crate::{
     rule_collection::{BindingPowerType, TokenRule},
     syntax_tree::{SyntaxNode, SyntaxNodeChildren},
-    NodeParserExtra, ParserInput, PrattParseContext,
+    NodeParserExtra, ParserInput,
 };
 
 use super::greedy_choice::greedy_choice;

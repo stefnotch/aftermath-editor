@@ -9,7 +9,12 @@ use input_tree::node::InputNode;
 use crate::{
     autocomplete::{AutocompleteMatcher, AutocompleteRule},
     rule_collection::{RuleCollection, TokenRule},
-    rule_collections::built_in_rules::BuiltInRules,
+    rule_collections::{
+        arithmetic_rules::ArithmeticRules, built_in_rules::BuiltInRules,
+        calculus_rules::CalculusRules, collections_rules::CollectionsRules,
+        comparison_rules::ComparisonRules, core_rules::CoreRules, function_rules::FunctionRules,
+        logic_rules::LogicRules, string_rules::StringRules,
+    },
     syntax_tree::{NodeIdentifier, SyntaxNode},
 };
 
@@ -75,6 +80,21 @@ impl ParserBuilder {
 
     pub fn build(self) -> MathParser {
         MathParser::new(self.token_rules, self.autocomplete_rules)
+    }
+
+    // Hardcoded parser rules for now
+    pub fn add_default_rules(mut self) -> Self {
+        self = self
+            .add_rule_collection::<BuiltInRules>()
+            .add_rule_collection::<CoreRules>()
+            .add_rule_collection::<ArithmeticRules>()
+            .add_rule_collection::<CalculusRules>()
+            .add_rule_collection::<CollectionsRules>()
+            .add_rule_collection::<ComparisonRules>()
+            .add_rule_collection::<FunctionRules>()
+            .add_rule_collection::<LogicRules>()
+            .add_rule_collection::<StringRules>();
+        self
     }
 }
 
