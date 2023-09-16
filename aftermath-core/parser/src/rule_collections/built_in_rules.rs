@@ -18,9 +18,20 @@ impl BuiltInRules {
         NodeIdentifier::new(vec!["BuiltIn".into(), name.into()])
     }
     /// Whenever a syntax tree has an operator, this can be used to wrap the operator leaf.
-    ///
     pub fn operator_rule_name() -> NodeIdentifier {
         BuiltInRules::rule_name("Operator")
+    }
+    /// Whenever a syntax tree has an new row, this will be used.
+    pub fn new_row_rule_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("Row")
+    }
+    /// Can have Whitespace nodes at the start and/or end.
+    pub fn whitespaces_rule_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("Whitespaces")
+    }
+    /// Whenever we encounter a space between tokens, this will be used.
+    pub fn whitespace_rule_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("Whitespace")
     }
     fn error_rule_name(name: &str) -> NodeIdentifier {
         NodeIdentifier::new(vec!["Error".into(), name.into()])
@@ -109,7 +120,7 @@ impl BuiltInRules {
                             let output = output.unwrap_or_else(|| Self::nothing_node(0..0));
                             // TODO: This should never happen
                             if errors.len() > 0 {
-                                println!("Errors: {:?}", errors);
+                                panic!("Errors: {:?}", errors);
                             }
                             output
                         })

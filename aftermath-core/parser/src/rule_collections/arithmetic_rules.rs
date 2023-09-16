@@ -81,6 +81,11 @@ impl RuleCollection for ArithmeticRules {
                 (Some(850), None),
                 just_operator_parser("^"),
             ),
+            TokenRule::new(
+                Self::rule_name("Factorial"),
+                (Some(600), None),
+                just_operator_parser("!"),
+            ),
         ]
     }
 

@@ -1,5 +1,6 @@
 mod greedy_choice;
-mod pratt_parser;
+mod math_parser;
+pub mod pratt_parser; // TODO: Make non-pub
 
 use std::{collections::HashSet, sync::Arc};
 
@@ -18,7 +19,7 @@ use crate::{
     syntax_tree::{NodeIdentifier, SyntaxNode},
 };
 
-use self::pratt_parser::CachedMathParser;
+use self::math_parser::CachedMathParser;
 
 pub struct MathParser {
     parser_cache: chumsky::cache::Cache<CachedMathParser>,

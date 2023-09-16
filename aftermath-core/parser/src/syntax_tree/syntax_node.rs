@@ -34,43 +34,6 @@ pub struct SyntaxNode {
     range: Range<usize>,
 }
 
-pub struct SyntaxNodeBuilder {
-    /// children of the node, including the operator token(s)
-    pub children: SyntaxNodeChildren,
-    /// value, especially for constants
-    /// stored as bytes, and interpreted according to the name
-    pub value: Vec<u8>,
-}
-
-impl SyntaxNodeBuilder {
-    pub fn new(children: SyntaxNodeChildren) -> Self {
-        Self {
-            children,
-            value: vec![],
-        }
-    }
-
-    pub fn set_value(mut self, value: Vec<u8>) -> Self {
-        self.value = value;
-        self
-    }
-
-    pub fn new_leaf_node(symbols: Vec<String>, node_type: LeafNodeType) -> Self {
-        Self::new(SyntaxNodeChildren::Leaf(SyntaxLeafNode::new(
-            node_type, symbols,
-        )))
-    }
-
-    pub fn build(self, name: NodeIdentifier, range: Range<usize>) -> SyntaxNode {
-        SyntaxNode {
-            name,
-            children: self.children,
-            value: self.value,
-            range,
-        }
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(
     feature = "wasm",
@@ -106,6 +69,7 @@ pub struct SyntaxLeafNode {
     /// Type of the leaf node
     pub node_type: LeafNodeType,
     /// The symbols that make up this node, stored as a list of grapheme clusters.
+    /// Also includes the trivia, like whitespace and comments.
     pub symbols: Vec<String>,
 }
 

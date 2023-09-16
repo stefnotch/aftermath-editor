@@ -1,4 +1,4 @@
-use input_tree::{node::InputNode, row::InputRow};
+use input_tree::{input_row, node::InputNode, row::InputRow};
 use parser::{
     parser::ParserBuilder,
     rule_collections::{
@@ -30,12 +30,7 @@ fn parse_row(row: &InputRow) -> parser::syntax_tree::SyntaxNode {
 
 #[test]
 fn test_parser() {
-    let layout = InputRow::new(vec![
-        InputNode::symbol("-"),
-        InputNode::symbol("b"),
-        InputNode::symbol("*"),
-        InputNode::symbol("C"),
-    ]);
+    let layout = input_row! {(row "-", "b", "*", "C")};
     let parsed = parse_row(&layout);
 
     assert_eq!(
@@ -55,7 +50,7 @@ fn test_postfix() {
     let parsed = parse_row(&layout);
     assert_eq!(
         parsed.to_string(),
-        r#"(Arithmetic::Add (Core::Variable "c") (BuiltIn::Operator "+") (Unsorted::Factorial (Core::Variable "a") (BuiltIn::Operator "!")))"#
+        r#"(Arithmetic::Add (Core::Variable "c") (BuiltIn::Operator "+") (Arithmetic::Factorial (Core::Variable "a") (BuiltIn::Operator "!")))"#
     );
 }
 
@@ -112,7 +107,7 @@ fn test_parser_nested_brackets_and_postfix() {
         format!(
             "{}{}{}",
             r#"(Core::RoundBrackets (BuiltIn::Operator "(") (Core::RoundBrackets (BuiltIn::Operator "(") (Core::RoundBrackets (BuiltIn::Operator "(") "#,
-            r#"(Unsorted::Factorial (Core::Variable "a") (BuiltIn::Operator "!")) "#,
+            r#"(Arithmetic::Factorial (Core::Variable "a") (BuiltIn::Operator "!")) "#,
             r#"(BuiltIn::Operator ")")) (BuiltIn::Operator ")")) (BuiltIn::Operator ")"))"#
         )
     );
