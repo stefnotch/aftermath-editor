@@ -466,7 +466,7 @@ impl PartialOrd for Strength {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(super) struct Precedence {
+struct Precedence {
     strength: u16,
     associativity: Assoc,
 }

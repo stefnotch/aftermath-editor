@@ -3,7 +3,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    grid::{Grid, GridVec, Index2D},
+    grid::{GridVec, Index2D},
     print_helpers::write_with_escaped_double_quotes,
 };
 

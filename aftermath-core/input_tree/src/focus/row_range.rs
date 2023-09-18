@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    editing::editable::Editable,
+    editing::{editable::Editable, row_indices_edit::RowIndicesEdit},
     focus::InputFocusRow,
     focus::InputRowPosition,
     row::{Offset, RowIndices},
@@ -129,8 +129,6 @@ impl<'a> InputRowRange<'a> {
 
 impl Editable for MinimalInputRowRange {
     fn apply_edit(&mut self, edit: &crate::editing::BasicEdit) {
-        use crate::editing::row_indices_edit::RowIndicesEdit;
-
         let edit = edit.get_row_indices_edit();
         let row_indices = match edit {
             RowIndicesEdit::RowIndexEdit { row_indices, .. } => row_indices,

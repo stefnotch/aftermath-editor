@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::caret::{CaretSelection, MinimalCaretSelection};
 use crate::primitive::primitive_edit::{insert_at_range, remove_at_caret, CaretRemoveMode};
 use crate::primitive::{CaretEditBuilder, CaretMover, MoveMode};
@@ -27,8 +29,7 @@ pub use serialization::SerializedDataType;
 pub struct MathEditor {
     /// User input
     input: InputTree,
-    // TODO: maybe share parsers in the future? (when we have multiple math editors)
-    parser: MathParser,
+    parser: Arc<MathParser>,
     /// Parsed content, can be cleared
     parsed: Option<SyntaxNode>,
     /// Main caret
@@ -41,7 +42,7 @@ pub struct MathEditor {
 }
 
 impl MathEditor {
-    pub fn new(parser: MathParser) -> Self {
+    pub fn new(parser: Arc<MathParser>) -> Self {
         let input: InputTree = Default::default();
         Self {
             input,

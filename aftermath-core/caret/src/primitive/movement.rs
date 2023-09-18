@@ -1,7 +1,7 @@
 use input_tree::{
     direction::{Direction, HorizontalDirection, VerticalDirection},
     focus::{InputRowPosition, InputRowRange, MinimalInputRowPosition},
-    grid::Index2D,
+    grid::{Grid, Index2D},
     node::{InputNode, InputNodeVariant},
     row::Offset,
 };
@@ -145,9 +145,9 @@ impl CaretMover {
             },
         };
 
-        let new_row = parent.clone().child_at(new_xy.to_index());
+        let new_row = parent.child_at(new_xy.to_index());
         match new_row {
-            Some(new_row) => {
+            Ok(new_row) => {
                 // Moved up or down
                 // TODO: if self.get_caret_viewport_position.is_some() && caret_viewport_position.is_some() {
                 // Get the caret position that is closest to where it was
@@ -161,7 +161,7 @@ impl CaretMover {
                 };
                 Some(InputRowPosition::new(new_row, offset))
             }
-            None => {
+            Err(parent) => {
                 // Reached the top/bottom
                 let grandparent = parent.parent();
                 self.move_vertical(
@@ -190,7 +190,7 @@ impl CaretMover {
             }
         });
         let adjacent_child =
-            adjacent_index.and_then(|adjacent_index| parent.clone().child_at(adjacent_index));
+            adjacent_index.and_then(|adjacent_index| parent.clone().child_at(adjacent_index).ok());
         if let Some(adjacent_child) = adjacent_child {
             // We're in the middle of the table or fraction
             let offset = if direction == HorizontalDirection::Left {
@@ -224,7 +224,9 @@ impl CaretMover {
         match adjacent_child.node() {
             input_tree::node::InputNode::Container(_, grid) => {
                 let adjacent_row = if direction == HorizontalDirection::Left {
-                    adjacent_child.child_at(grid.values().len() - 1).unwrap()
+                    adjacent_child
+                        .child_at(grid.width() * grid.height() - 1)
+                        .unwrap()
                 } else {
                     adjacent_child.child_at(0).unwrap()
                 };

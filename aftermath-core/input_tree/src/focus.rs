@@ -18,7 +18,7 @@ pub use row_range::*;
 ///
 /// Note that the "immutable tree with shared parts" optimisation is not implemented, and probably will never need to be implemented.
 /// Instead we have a straightforward mutable tree.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct InputFocusRow<'a> {
     row: &'a InputRow,
     /// The parent of this row, if it exists.
@@ -75,7 +75,7 @@ impl<'a> InputFocusRow<'a> {
 
     pub fn row_at(self, row_index: impl Into<RowIndex>) -> Option<InputFocusRow<'a>> {
         let row_index = row_index.into();
-        self.child_at(row_index.0)?.child_at(row_index.1)
+        self.child_at(row_index.0)?.child_at(row_index.1).ok()
     }
 
     pub fn node_at(&self, index: usize) -> Option<&'a InputNode> {
@@ -113,7 +113,7 @@ impl PartialEq for InputFocusRow<'_> {
 
 impl Eq for InputFocusRow<'_> {}
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct InputFocusNode<'a> {
     node: &'a InputNode,
     parent: InputFocusRow<'a>,
@@ -138,8 +138,8 @@ impl<'a> InputFocusNode<'a> {
     }
 
     /// Get the child at the given index, if it exists.
-    /// TODO: Otherwise returns this focus, to avoid consuming it.
-    pub fn child_at(mut self, index: usize) -> Option<InputFocusRow<'a>> {
+    /// Otherwise returns this focus, to avoid consuming it.
+    pub fn child_at(mut self, index: usize) -> Result<InputFocusRow<'a>, Self> {
         match self.node {
             InputNode::Container(_, grid) => match grid.get(Index2D::from_index(index, grid)) {
                 Some(row) => {
@@ -147,11 +147,11 @@ impl<'a> InputFocusNode<'a> {
                     let mut indices = self.parent.row_indices;
                     self.parent.row_indices = Default::default();
                     indices.push(RowIndex(self.index_in_parent, index));
-                    Some(InputFocusRow::new(row, Some(self), indices))
+                    Ok(InputFocusRow::new(row, Some(self), indices))
                 }
-                None => None,
+                None => Err(self),
             },
-            InputNode::Symbol(_) => None,
+            InputNode::Symbol(_) => Err(self),
         }
     }
 
