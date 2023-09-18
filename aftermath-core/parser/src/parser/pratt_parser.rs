@@ -45,9 +45,9 @@ impl<InfixParser, PrefixParser, PostfixParser, Op, O>
     PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>
 {
     fn new(
-        mut infix_ops: Vec<InfixOp<InfixParser, Op, O>>,
-        mut prefix_ops: Vec<PrefixOp<PrefixParser, Op, O>>,
-        mut postfix_ops: Vec<PostfixOp<PostfixParser, Op, O>>,
+        infix_ops: Vec<InfixOp<InfixParser, Op, O>>,
+        prefix_ops: Vec<PrefixOp<PrefixParser, Op, O>>,
+        postfix_ops: Vec<PostfixOp<PostfixParser, Op, O>>,
     ) -> Self {
         Self {
             infix_ops,

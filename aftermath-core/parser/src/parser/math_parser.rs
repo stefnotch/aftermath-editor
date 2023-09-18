@@ -34,7 +34,7 @@ fn combine_ranges(a: std::ops::Range<usize>, b: std::ops::Range<usize>) -> std::
 fn with_operator_name(mut op: SyntaxNode) -> SyntaxNode {
     match &op.children {
         SyntaxNodeChildren::NewRows(_) => op.name = BuiltInRules::new_row_rule_name(),
-        SyntaxNodeChildren::Children(_) => todo!(),
+        SyntaxNodeChildren::Children(_) => op.name = BuiltInRules::argument_name(),
         SyntaxNodeChildren::Leaf(_) => op.name = BuiltInRules::operator_rule_name(),
     }
     op
@@ -96,7 +96,8 @@ impl Cached for CachedMathParser {
         });
 
         let token_rules = self.token_rules.clone();
-        for rule in token_rules.iter() {
+        // Iterate over the token rules in reverse order, so that later rules take priority
+        for rule in token_rules.iter().rev() {
             // Okay, so to move something into the closure
             // I first had to create a copy here
             // And then had to create a copy inside the closure
@@ -164,11 +165,8 @@ impl Cached for CachedMathParser {
         }
         std::mem::drop(token_rules);
 
-        // Here's to hoping that greedy_choice doesn't devolve into exponential time
-        let atom = greedy_choice(token_parsers);
-        // let operator = greedy_choice(infix_parsers);
-        // let prefix = greedy_choice(prefix_parsers);
-        // let postfix = greedy_choice(postfix_parsers);
+        // I'm not using greedy_choice for now.
+        let atom = chumsky::primitive::choice(token_parsers);
 
         // I'll accept two limitations for now
         // - A sequence of commas will end up being nested

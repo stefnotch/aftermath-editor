@@ -23,16 +23,6 @@ where
     }
 }
 
-/*
-impl<T> From<T> for MakeParserFn<T>
-where
-    T: for<'a, 'b> Fn(BoxedNodeParser<'a, 'b>) -> BoxedTokenParser<'a, 'b>,
-{
-    fn from(f: T) -> Self {
-        Self(f)
-    }
-} */
-
 pub trait VecOrString {
     fn into_vec(self) -> Vec<String>;
 }

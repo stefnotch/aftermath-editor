@@ -25,12 +25,20 @@ impl CoreRules {
         NodeIdentifier::new(vec!["Core".into(), name.into()])
     }
 
-    pub fn make_brackets_parser() -> impl crate::make_parser::MakeParser {
-        crate::make_parser::MakeParserFn(|parser| {
-            just_symbol("(")
+    pub fn make_brackets_parser(
+        starting_bracket: impl Into<String>,
+        ending_bracket: impl Into<String>,
+    ) -> impl crate::make_parser::MakeParser {
+        let starting_bracket: String = starting_bracket.into();
+        let ending_bracket: String = ending_bracket.into();
+        crate::make_parser::MakeParserFn(move |parser| {
+            just_symbol(starting_bracket.clone())
                 .map_with_span(|v, span| (v, span.into_range()))
                 .then(parser.or_not()) // With binding power 0
-                .then(just_symbol(")").map_with_span(|v, span| (v, span.into_range())))
+                .then(
+                    just_symbol(ending_bracket.clone())
+                        .map_with_span(|v, span| (v, span.into_range())),
+                )
                 .map(
                     |(
                         ((left_bracket, left_bracket_span), child),
@@ -104,7 +112,7 @@ impl RuleCollection for CoreRules {
             TokenRule::new(
                 Self::rule_name("RoundBrackets"),
                 (None, None),
-                Self::make_brackets_parser(),
+                Self::make_brackets_parser("(", ")"),
             ),
         ]
     }

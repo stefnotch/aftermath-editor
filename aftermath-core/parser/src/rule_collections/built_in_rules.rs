@@ -25,6 +25,11 @@ impl BuiltInRules {
     pub fn new_row_rule_name() -> NodeIdentifier {
         BuiltInRules::rule_name("Row")
     }
+    /// Whenever an operator has one or more arguments, this can be used.
+    /// For example, a function call uses this.
+    pub fn argument_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("Argument")
+    }
     /// Can have Whitespace nodes at the start and/or end.
     pub fn whitespaces_rule_name() -> NodeIdentifier {
         BuiltInRules::rule_name("Whitespaces")

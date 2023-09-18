@@ -1,6 +1,6 @@
 mod greedy_choice;
 mod math_parser;
-pub mod pratt_parser; // TODO: Make non-pub
+pub mod pratt_parser;
 
 use std::{collections::HashSet, sync::Arc};
 

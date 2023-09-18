@@ -28,7 +28,7 @@ impl RuleCollection for FunctionRules {
         vec![TokenRule::new(
             Self::rule_name("FunctionApplication"),
             (Some(800), None),
-            CoreRules::make_brackets_parser(),
+            CoreRules::make_brackets_parser("(", ")"),
         )]
     }
 
