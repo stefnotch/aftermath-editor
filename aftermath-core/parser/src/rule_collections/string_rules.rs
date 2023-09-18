@@ -1,10 +1,10 @@
-use std::ops::Range;
 
-use crate::make_parser::just_symbol_parser;
+
+
 use crate::parser_extensions::just_symbol;
-use crate::rule_collection::{BoxedNodeParser, BoxedTokenParser};
+
 use crate::syntax_tree::{
-    LeafNodeType, SyntaxLeafNode, SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren,
+    LeafNodeType, SyntaxNodeBuilder,
 };
 use crate::{
     autocomplete::AutocompleteRule,
@@ -12,9 +12,9 @@ use crate::{
     syntax_tree::NodeIdentifier,
 };
 use chumsky::{prelude::*, Parser};
-use input_tree::grid::Grid;
-use input_tree::input_nodes;
-use input_tree::node::{InputNode, InputNodeVariant};
+
+
+use input_tree::node::{InputNode};
 
 pub struct StringRules {}
 

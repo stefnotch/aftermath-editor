@@ -1,4 +1,4 @@
-use crate::make_parser::{just_operator_parser, just_symbol_parser};
+use crate::make_parser::{just_operator_parser};
 use crate::parser_extensions::just_symbol;
 use crate::syntax_tree::{LeafNodeType, SyntaxNodeBuilder};
 use crate::{

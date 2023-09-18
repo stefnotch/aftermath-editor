@@ -5,16 +5,11 @@ use chumsky::{cache::Cached, span::SimpleSpan, Boxed, IterParser, Parser};
 use crate::{
     rule_collection::{BindingPowerType, TokenRule},
     rule_collections::built_in_rules::BuiltInRules,
-    syntax_tree::{
-        LeafNodeType, SyntaxLeafNode, SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren,
-    },
+    syntax_tree::{LeafNodeType, SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren},
     NodeParserExtra, ParserInput,
 };
 
-use super::{
-    greedy_choice::greedy_choice,
-    pratt_parser::{self, pratt_parser, PrattParseContext},
-};
+use super::pratt_parser::{self, pratt_parser};
 
 pub struct CachedMathParser {
     token_rules: Arc<Vec<TokenRule>>,

@@ -1,10 +1,10 @@
-use std::ops::Range;
 
-use crate::make_parser::{just_operator_parser, just_symbol_parser};
+
+
 use crate::parser_extensions::just_symbol;
-use crate::rule_collection::{BoxedNodeParser, BoxedTokenParser};
+
 use crate::syntax_tree::{
-    LeafNodeType, SyntaxLeafNode, SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren,
+    LeafNodeType, SyntaxNodeBuilder, SyntaxNodeChildren,
 };
 use crate::{
     autocomplete::AutocompleteRule,
@@ -12,9 +12,9 @@ use crate::{
     syntax_tree::NodeIdentifier,
 };
 use chumsky::{prelude::*, Parser};
-use input_tree::grid::Grid;
-use input_tree::input_nodes;
-use input_tree::node::{InputNode, InputNodeVariant};
+
+
+use input_tree::node::{InputNode};
 use unicode_ident::{is_xid_continue, is_xid_start};
 
 /// Core rules that one basically always wants.
