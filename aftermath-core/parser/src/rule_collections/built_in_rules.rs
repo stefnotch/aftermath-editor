@@ -38,6 +38,14 @@ impl BuiltInRules {
     pub fn whitespace_rule_name() -> NodeIdentifier {
         BuiltInRules::rule_name("Whitespace")
     }
+    /// Whenever we encounter a subscript after an operator, this will be used.
+    pub fn sub_rule_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("Sub")
+    }
+    /// Whenever we encounter a superscript after an operator, this will be used.
+    pub fn sup_rule_name() -> NodeIdentifier {
+        BuiltInRules::rule_name("Sup")
+    }
     fn error_rule_name(name: &str) -> NodeIdentifier {
         NodeIdentifier::new(vec!["Error".into(), name.into()])
     }
@@ -108,7 +116,7 @@ impl BuiltInRules {
         )
     }
 
-    fn make_container_parser(
+    pub fn make_container_parser(
         container_type: InputNodeVariant,
     ) -> impl crate::make_parser::MakeParser {
         crate::make_parser::MakeParserFn(move |parser| {
@@ -155,12 +163,12 @@ impl RuleCollection for BuiltInRules {
             // Yay, thanks to the WYSIWYG editing model, I don't have to deal with "exponent associativity".
             // After all, it's clear if something is inside a superscript or not.
             TokenRule::new(
-                Self::rule_name("Sup"),
+                Self::sup_rule_name(),
                 (Some(1000), None),
                 BuiltInRules::make_container_parser(InputNodeVariant::Sup),
             ),
             TokenRule::new(
-                Self::rule_name("Sub"),
+                Self::sub_rule_name(),
                 (Some(1000), None),
                 BuiltInRules::make_container_parser(InputNodeVariant::Sub),
             ),

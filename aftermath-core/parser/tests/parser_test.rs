@@ -256,3 +256,22 @@ fn test_parser_close_bracket() {
     let parsed = parse_row(&layout);
     println!("{:?}", parsed);
 }
+
+// TODO: Write some tests for error recovery
+// e.g.
+// If the input is "a + \frac{b}{c}" and we don't have a plus parser,
+// then "+ \frac{b}{c}" ends up being an error and not rendered correctly/at all.
+// This is really bad, since a fraction should always be rendered as a fraction!
+
+// So to fix that, we'll just parse the rest of the input repeatedly.
+
+// TODO: Add more default tokens
+// Document that \x basically means "this has a very specific meaning", such as \| always being a | symbol, and \sum always being a sum symbol.
+// Parse || abs || and their escaped \|| variants
+// 4. Parser for whitespace
+// 5. Parser for chains of < <=, which could be treated as a "domain restriction"
+
+// TODO: The dx at the end of an integral might not even be a closing bracket.
+// After all, it can also sometimes appear inside an integral.
+
+// TODO: Write tests for sum_{n=0}^{10} n^2

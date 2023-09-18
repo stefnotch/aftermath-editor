@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
 use chumsky::{cache::Cached, span::SimpleSpan, Boxed, IterParser, Parser};
+use input_tree::node::InputNodeVariant;
 
 use crate::{
+    make_parser::MakeParser,
     rule_collection::{BindingPowerType, TokenRule},
     rule_collections::built_in_rules::BuiltInRules,
     syntax_tree::{LeafNodeType, SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren},
@@ -97,7 +99,9 @@ impl Cached for CachedMathParser {
             // I first had to create a copy here
             // And then had to create a copy inside the closure
             let rule_name = rule.name.clone();
-            // This only parses the basic tokens, it doesn't join them together
+
+            // This parses the basic tokens with spaces around them
+            // And the pratt parser joins them together
             let rule_parser = space_parser
                 .then(rule.make_parser.build(chain.clone().boxed()).map_with_span(
                     move |v, range: SimpleSpan| v.build(rule_name.clone(), range.into_range()),
@@ -123,40 +127,60 @@ impl Cached for CachedMathParser {
                         (None, None) => node,
                     }
                 });
+
+            // For prefix and infix, we will accept "sub" and "sup" after the operator.
+            // e.g. sum_{n=0}^{10} n^2 is a prefix-operator called "sum" with a sub and sup.
+            // e.g. \circ_0 is an infix-operator called "+" with a sub. That can appear when writing down formal grammars.
+
+            let sub_parser = BuiltInRules::make_container_parser(InputNodeVariant::Sub)
+                .build(chain.clone().boxed())
+                .map_with_span(|v, range: SimpleSpan| {
+                    v.build(BuiltInRules::sub_rule_name(), range.into_range())
+                });
+            let sup_parser = BuiltInRules::make_container_parser(InputNodeVariant::Sup)
+                .build(chain.clone().boxed())
+                .map_with_span(|v, range: SimpleSpan| {
+                    v.build(BuiltInRules::sup_rule_name(), range.into_range())
+                });
+
+            let rule_parser = match rule.binding_power_type() {
+                BindingPowerType::Atom | BindingPowerType::Postfix(_) => rule_parser.boxed(),
+                BindingPowerType::Prefix(_)
+                | BindingPowerType::LeftInfix(_)
+                | BindingPowerType::RightInfix(_) => rule_parser
+                    .then(
+                        chumsky::prelude::choice((sub_parser, sup_parser))
+                            .repeated()
+                            .collect::<Vec<_>>(),
+                    )
+                    .map(|(mut node, sub_sups)| {
+                        for postfix_op in sub_sups {
+                            node = build_postfix_syntax_node(postfix_op, node);
+                        }
+                        node
+                    })
+                    .boxed(),
+            };
+
             match rule.binding_power_type() {
-                BindingPowerType::Atom => {
-                    // Or .clone()?
-                    token_parsers.push(rule_parser);
-                }
-                BindingPowerType::Prefix(strength) => {
-                    prefix_parsers.push(pratt_parser::prefix(
-                        rule_parser,
-                        strength,
-                        build_prefix_syntax_node,
-                    ));
-                }
-                BindingPowerType::Postfix(strength) => {
-                    postfix_parsers.push(pratt_parser::postfix(
-                        rule_parser,
-                        strength,
-                        build_postfix_syntax_node,
-                    ));
-                }
-                BindingPowerType::LeftInfix(strength) => {
-                    infix_parsers.push(pratt_parser::left_infix(
-                        rule_parser,
-                        strength,
-                        build_infix_syntax_node,
-                    ));
-                }
-                BindingPowerType::RightInfix(strength) => {
-                    infix_parsers.push(pratt_parser::right_infix(
-                        rule_parser,
-                        strength,
-                        build_infix_syntax_node,
-                    ));
-                }
-            }
+                BindingPowerType::Atom => token_parsers.push(rule_parser),
+                BindingPowerType::Prefix(strength) => prefix_parsers.push(pratt_parser::prefix(
+                    rule_parser,
+                    strength,
+                    build_prefix_syntax_node,
+                )),
+                BindingPowerType::Postfix(strength) => postfix_parsers.push(pratt_parser::postfix(
+                    rule_parser,
+                    strength,
+                    build_postfix_syntax_node,
+                )),
+                BindingPowerType::LeftInfix(strength) => infix_parsers.push(
+                    pratt_parser::left_infix(rule_parser, strength, build_infix_syntax_node),
+                ),
+                BindingPowerType::RightInfix(strength) => infix_parsers.push(
+                    pratt_parser::right_infix(rule_parser, strength, build_infix_syntax_node),
+                ),
+            };
         }
         std::mem::drop(token_rules);
 
