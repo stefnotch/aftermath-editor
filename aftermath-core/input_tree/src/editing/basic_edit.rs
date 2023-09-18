@@ -1,6 +1,6 @@
 use crate::{
     focus::{InputRowPosition, InputRowRange, MinimalInputRowPosition, MinimalInputRowRange},
-    grid::{Grid, GridDirection},
+    grid::{Grid, GridDirection, GridVec},
     node::InputNode,
     row::{ElementIndices, InputRow, Offset},
 };
@@ -152,18 +152,18 @@ pub struct GridEdit {
     pub edit_type: EditType,
     pub element_indices: ElementIndices,
     pub direction: GridDirection,
-    pub offset: Offset,
+    pub row_or_column: Offset,
     /// Needs to have a size that matches the grid
-    pub values: Grid<InputRow>,
+    pub values: GridVec<InputRow>,
 }
 
 impl GridEdit {
     pub fn get_row_indices_edit<'a>(&'a self) -> RowIndicesEdit<'a> {
-        let mut old_offset = self.offset.clone();
+        let mut old_offset = self.row_or_column.clone();
         let mut new_offset = if self.direction == GridDirection::Column {
-            Offset(self.offset.0 + self.values.width())
+            Offset(self.row_or_column.0 + self.values.width())
         } else {
-            Offset(self.offset.0 + self.values.height())
+            Offset(self.row_or_column.0 + self.values.height())
         };
         if self.edit_type == EditType::Delete {
             std::mem::swap(&mut old_offset, &mut new_offset);
@@ -176,7 +176,7 @@ impl GridEdit {
         }
     }
 
-    pub fn new_grid_size(&self, old_grid: &Grid<InputRow>) -> (usize, usize) {
+    pub fn new_grid_size(&self, old_grid: &GridVec<InputRow>) -> (usize, usize) {
         match (self.edit_type, self.direction) {
             (EditType::Insert, GridDirection::Column) => {
                 (old_grid.width() + self.values.width(), old_grid.height())

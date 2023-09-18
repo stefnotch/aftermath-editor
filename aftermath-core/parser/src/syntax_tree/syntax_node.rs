@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use input_tree::grid::Grid;
+use input_tree::grid::GridVec;
 use serde::{Deserialize, Serialize};
 
 use super::NodeIdentifier;
@@ -43,7 +43,7 @@ pub struct SyntaxNode {
 pub enum SyntaxNodeChildren {
     /// When this syntax node actually starts a new row in the input tree.
     /// TODO: Maybe verify that this has a range of 1?
-    NewRows(Grid<SyntaxNode>),
+    NewRows(GridVec<SyntaxNode>),
     Children(Vec<SyntaxNode>),
     Leaf(SyntaxLeafNode),
 }

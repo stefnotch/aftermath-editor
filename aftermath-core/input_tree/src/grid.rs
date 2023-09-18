@@ -1,119 +1,71 @@
+mod grid_view;
+mod index2d;
+pub use grid_view::*;
+pub use index2d::*;
+
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::row::Offset;
+pub trait Grid<T> {
+    fn width(&self) -> usize {
+        self.size().0
+    }
+    fn height(&self) -> usize {
+        self.size().1
+    }
+    fn size(&self) -> (usize, usize);
+    fn get(&self, xy: Index2D) -> Option<&T>;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GridDirection {
+    Row,
+    Column,
+}
 
 /// A proper grid of values.
-/// TODO: Could be replaced with a Rust crate like https://crates.io/crates/grid
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[cfg_attr(
     feature = "wasm",
     derive(tsify::Tsify),
     tsify(into_wasm_abi, from_wasm_abi)
 )]
-pub struct Grid<T> {
+pub struct GridVec<T> {
     values: Vec<T>,
     width: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GridDirection {
-    Column,
-    Row,
-}
+impl<T> Grid<T> for GridVec<T> {
+    fn size(&self) -> (usize, usize) {
+        (self.width, self.values.len() / self.width)
+    }
 
-/// A 2D index
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Index2D {
-    pub x: usize,
-    pub y: usize,
-}
-
-/// A 2D offset, is between indices. Can be used for exclusive ranges.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[cfg_attr(
-    feature = "wasm",
-    derive(tsify::Tsify),
-    tsify(into_wasm_abi, from_wasm_abi)
-)]
-pub struct Offset2D {
-    pub x: Offset,
-    pub y: Offset,
-}
-
-impl Into<Offset2D> for (Offset, Offset) {
-    fn into(self) -> Offset2D {
-        Offset2D {
-            x: self.0,
-            y: self.1,
-        }
+    fn get(&self, xy: Index2D) -> Option<&T> {
+        self.values.get(xy.to_index_checked(self)?)
     }
 }
 
-impl Into<Offset2D> for (usize, usize) {
-    fn into(self) -> Offset2D {
-        Offset2D {
-            x: self.0.into(),
-            y: self.1.into(),
-        }
-    }
-}
-
-impl<T> Grid<T> {
+impl<T> GridVec<T> {
     pub fn from_one_dimensional(values: Vec<T>, width: usize) -> Self {
         assert!(width > 0);
         assert_eq!(values.len() % width, 0);
-        Grid { values, width }
-    }
-
-    pub fn width(&self) -> usize {
-        self.width
-    }
-
-    pub fn height(&self) -> usize {
-        self.values.len() / self.width
-    }
-
-    pub fn size(&self) -> (usize, usize) {
-        (self.width(), self.height())
-    }
-
-    pub fn get(&self, xy: Index2D) -> Option<&T> {
-        let Index2D { x, y } = xy;
-        if x >= self.width() || y >= self.height() {
-            return None;
-        }
-        self.values.get(self.xy_to_index(xy))
+        GridVec { values, width }
     }
 
     pub fn get_mut(&mut self, xy: Index2D) -> Option<&mut T> {
-        let Index2D { x, y } = xy;
-        if x >= self.width() || y >= self.height() {
-            return None;
-        }
-        let index = self.xy_to_index(xy);
+        let index = xy.to_index_checked(self)?;
         self.values.get_mut(index)
     }
 
-    pub fn get_by_index(&self, index: usize) -> Option<&T> {
-        self.values.get(index)
+    pub fn set(&mut self, xy: Index2D, value: T) -> Option<T> {
+        let cell = self.get_mut(xy)?;
+        let old_value = std::mem::replace(cell, value);
+        Some(old_value)
     }
 
-    pub fn index_to_xy(&self, index: usize) -> Index2D {
-        Index2D {
-            x: index % self.width,
-            y: index / self.width,
-        }
-    }
-
-    pub fn xy_to_index(&self, xy: Index2D) -> usize {
-        let Index2D { x, y } = xy;
-        y * self.width + x
-    }
-
-    pub fn values(&self) -> &[T] {
-        &self.values
+    pub fn values(&self) -> impl Iterator<Item = &T> {
+        self.values.iter()
     }
 
     pub fn into_iter(self) -> impl Iterator<Item = T> {
@@ -123,9 +75,13 @@ impl<T> Grid<T> {
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
     }
+
+    pub fn get_view(&self, range: GridRectangle) -> GridView<'_, T> {
+        GridView::new(self, range)
+    }
 }
 
-impl<T: std::fmt::Display> fmt::Display for Grid<T> {
+impl<T: std::fmt::Display> fmt::Display for GridVec<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}x{}", self.width(), self.height())?;
         for value in &self.values {

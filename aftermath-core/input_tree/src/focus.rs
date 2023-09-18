@@ -4,6 +4,7 @@ mod row_range;
 
 use crate::{
     direction::HorizontalDirection,
+    grid::{Grid, Index2D},
     node::InputNode,
     row::{ElementIndices, InputRow, Offset, RowIndex, RowIndices},
 };
@@ -140,7 +141,7 @@ impl<'a> InputFocusNode<'a> {
     /// TODO: Otherwise returns this focus, to avoid consuming it.
     pub fn child_at(mut self, index: usize) -> Option<InputFocusRow<'a>> {
         match self.node {
-            InputNode::Container(_, grid) => match grid.get_by_index(index) {
+            InputNode::Container(_, grid) => match grid.get(Index2D::from_index(index, grid)) {
                 Some(row) => {
                     // Take the row indices from the parent
                     let mut indices = self.parent.row_indices;

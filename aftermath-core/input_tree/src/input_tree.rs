@@ -1,7 +1,7 @@
 use crate::{
     editing::{editable::Editable, BasicEdit, EditType, GridEdit, RowEdit},
     focus::{InputFocusRow, InputRowPosition, InputRowRange},
-    grid::{Grid, GridDirection},
+    grid::{Grid, GridDirection, GridVec},
     row::{InputRow, Offset},
 };
 
@@ -88,7 +88,7 @@ impl Editable for InputTree {
                     edit_type,
                     element_indices,
                     direction,
-                    offset,
+                    row_or_column,
                     values,
                 },
             ) => {
@@ -106,36 +106,36 @@ impl Editable for InputTree {
                 match (edit_type, direction) {
                     (EditType::Insert, GridDirection::Row) => {
                         assert!(values.width() == old_size.0);
-                        let insert_grid = values.values().iter().cloned();
-                        new_grid.extend(old_grid.by_ref().take(values.width() * offset.0));
+                        let insert_grid = values.values().cloned();
+                        new_grid.extend(old_grid.by_ref().take(values.width() * row_or_column.0));
                         new_grid.extend(insert_grid);
                         new_grid.extend(old_grid);
                     }
                     (EditType::Insert, GridDirection::Column) => {
                         assert!(values.height() == old_size.1);
-                        let mut insert_grid = values.values().iter().cloned();
+                        let mut insert_grid = values.values().cloned();
                         for _ in 0..values.height() {
-                            new_grid.extend(old_grid.by_ref().take(offset.0));
+                            new_grid.extend(old_grid.by_ref().take(row_or_column.0));
                             new_grid.extend(insert_grid.by_ref().take(values.width()));
-                            new_grid.extend(old_grid.by_ref().take(old_size.0 - offset.0));
+                            new_grid.extend(old_grid.by_ref().take(old_size.0 - row_or_column.0));
                         }
                     }
                     (EditType::Delete, GridDirection::Row) => {
                         assert!(values.width() == old_size.0);
-                        new_grid.extend(old_grid.by_ref().take(values.width() * offset.0));
-                        let _ = old_grid.by_ref().skip(values.values().len());
+                        new_grid.extend(old_grid.by_ref().take(values.width() * row_or_column.0));
+                        let _ = old_grid.by_ref().skip(values.width() * values.height());
                         new_grid.extend(old_grid);
                     }
                     (EditType::Delete, GridDirection::Column) => {
                         assert!(values.height() == old_size.1);
                         for _ in 0..values.height() {
-                            new_grid.extend(old_grid.by_ref().take(offset.0));
+                            new_grid.extend(old_grid.by_ref().take(row_or_column.0));
                             let _ = old_grid.by_ref().skip(values.width());
-                            new_grid.extend(old_grid.by_ref().take(old_size.0 - offset.0));
+                            new_grid.extend(old_grid.by_ref().take(old_size.0 - row_or_column.0));
                         }
                     }
                 }
-                *grid = Grid::from_one_dimensional(new_grid, new_size.0);
+                *grid = GridVec::from_one_dimensional(new_grid, new_size.0);
 
                 assert!(grid.width() == new_size.0);
                 assert!(grid.height() == new_size.1);

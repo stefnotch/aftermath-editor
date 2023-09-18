@@ -133,7 +133,7 @@ impl CaretMover {
             InputNode::Container(_, grid) => grid,
             _ => return None,
         };
-        let xy = grid.index_to_xy(caret.row_focus.index_in_parent().unwrap());
+        let xy = Index2D::from_index(caret.row_focus.index_in_parent()?, grid);
         let new_xy = match direction {
             VerticalDirection::Up => Index2D {
                 x: xy.x,
@@ -145,7 +145,7 @@ impl CaretMover {
             },
         };
 
-        let new_row = parent.clone().child_at(grid.xy_to_index(new_xy));
+        let new_row = parent.clone().child_at(new_xy.to_index());
         match new_row {
             Some(new_row) => {
                 // Moved up or down

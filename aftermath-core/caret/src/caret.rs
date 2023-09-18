@@ -156,8 +156,8 @@ impl<'a> CaretSelection<'a> {
 
                 let selected_grid = selected_node.node().grid().unwrap();
 
-                let start_index = selected_grid.index_to_xy(start_row_index.1);
-                let end_index = selected_grid.index_to_xy(end_row_index.1);
+                let start_index = Index2D::from_index(start_row_index.1, selected_grid);
+                let end_index = Index2D::from_index(end_row_index.1, selected_grid);
 
                 // Slightly expand the selection so that it includes the end indices
                 CaretSelection::Grid(InputGridRange::new(

@@ -2,8 +2,8 @@ use input_tree::editing::editable::Editable;
 use input_tree::editing::invertible::Invertible;
 use input_tree::editing::*;
 use input_tree::focus::*;
-use input_tree::grid::Grid;
 use input_tree::grid::GridDirection;
+use input_tree::grid::GridVec;
 use input_tree::input_row;
 use input_tree::input_tree::InputTree;
 use input_tree::node::*;
@@ -118,8 +118,8 @@ fn insert_grid_row() {
             .element_indices()
             .clone(),
         direction: GridDirection::Row,
-        offset: Offset(1),
-        values: Grid::from_one_dimensional(
+        row_or_column: Offset(1),
+        values: GridVec::from_one_dimensional(
             vec![
                 input_row! {(row "x")},
                 input_row! {(row "y")},
@@ -157,8 +157,8 @@ fn insert_grid_colum() {
             .element_indices()
             .clone(),
         direction: GridDirection::Column,
-        offset: Offset(1),
-        values: Grid::from_one_dimensional(vec![input_row! {(row "x")}], 1),
+        row_or_column: Offset(1),
+        values: GridVec::from_one_dimensional(vec![input_row! {(row "x")}], 1),
     };
     input.apply_edit(&column_insert.into());
     assert_eq!(

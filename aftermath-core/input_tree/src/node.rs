@@ -2,7 +2,10 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{grid::Grid, print_helpers::write_with_escaped_double_quotes};
+use crate::{
+    grid::{Grid, GridVec, Index2D},
+    print_helpers::write_with_escaped_double_quotes,
+};
 
 use super::row::InputRow;
 
@@ -15,7 +18,7 @@ use super::row::InputRow;
 )]
 pub enum InputNode {
     /// A container with a type
-    Container(InputNodeVariant, Grid<InputRow>),
+    Container(InputNodeVariant, GridVec<InputRow>),
     /// Leaf node
     /// Stores a NFD-normalized grapheme cluster.
     /// Basically a single character from the perspective of the user.
@@ -51,7 +54,7 @@ impl InputNode {
         Self::container_with_type(
             InputNodeVariant::Fraction,
             // A fraction is a vertical stack of two rows
-            Grid::from_one_dimensional(values.to_vec(), 1),
+            GridVec::from_one_dimensional(values.to_vec(), 1),
         )
     }
 
@@ -59,28 +62,28 @@ impl InputNode {
         Self::container_with_type(
             InputNodeVariant::Root,
             // A root is mostly horizontal
-            Grid::from_one_dimensional(values.to_vec(), 2),
+            GridVec::from_one_dimensional(values.to_vec(), 2),
         )
     }
 
     pub fn sup(value: InputRow) -> Self {
         Self::container_with_type(
             InputNodeVariant::Sup,
-            Grid::from_one_dimensional(vec![value], 1),
+            GridVec::from_one_dimensional(vec![value], 1),
         )
     }
 
     pub fn sub(value: InputRow) -> Self {
         Self::container_with_type(
             InputNodeVariant::Sub,
-            Grid::from_one_dimensional(vec![value.into()], 1),
+            GridVec::from_one_dimensional(vec![value.into()], 1),
         )
     }
 
     pub fn table(values: Vec<InputRow>, width: usize) -> Self {
         Self::container_with_type(
             InputNodeVariant::Table,
-            Grid::from_one_dimensional(values, width),
+            GridVec::from_one_dimensional(values, width),
         )
     }
     pub fn symbol<T: Into<String>>(value: T) -> Self {
@@ -94,14 +97,14 @@ impl InputNode {
             .collect()
     }
 
-    fn container_with_type(container_type: InputNodeVariant, rows: Grid<InputRow>) -> Self {
+    fn container_with_type(container_type: InputNodeVariant, rows: GridVec<InputRow>) -> Self {
         InputNode::Container(container_type, rows)
     }
 
     pub fn row_mut(&mut self, index: usize) -> &mut InputRow {
         match self {
             InputNode::Container(_, rows) => rows
-                .get_mut(rows.index_to_xy(index))
+                .get_mut(Index2D::from_index(index, rows))
                 .expect("Invalid row index"),
             InputNode::Symbol(_) => panic!("Can't get row of symbol"),
         }
@@ -114,14 +117,14 @@ impl InputNode {
         }
     }
 
-    pub fn grid(&self) -> Option<&Grid<InputRow>> {
+    pub fn grid(&self) -> Option<&GridVec<InputRow>> {
         match self {
             InputNode::Container(_, grid) => Some(grid),
             InputNode::Symbol(_) => None,
         }
     }
 
-    pub fn grid_mut(&mut self) -> Option<&mut Grid<InputRow>> {
+    pub fn grid_mut(&mut self) -> Option<&mut GridVec<InputRow>> {
         match self {
             InputNode::Container(_, grid) => Some(grid),
             InputNode::Symbol(_) => None,

@@ -7,7 +7,7 @@ use crate::{
     syntax_tree::NodeIdentifier,
 };
 use chumsky::{prelude::*, Parser};
-use input_tree::grid::Grid;
+use input_tree::grid::{Grid, GridVec};
 use input_tree::input_nodes;
 use input_tree::node::{InputNode, InputNodeVariant};
 
@@ -124,7 +124,7 @@ impl BuiltInRules {
               InputNode::Container(c_type, a) if c_type == &container_type => a,
             }
             .map(move |v| {
-                let new_grid = Grid::from_one_dimensional(
+                let new_grid = GridVec::from_one_dimensional(
                     v.values()
                         .into_iter()
                         .map(|row| {

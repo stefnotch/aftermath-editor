@@ -45,8 +45,8 @@ fn test_full_grid_selection() {
     match caret.selection() {
         CaretSelection::Row(_) => panic!("Expected grid selection"),
         CaretSelection::Grid(selection) => {
-            assert_eq!(selection.top_left_index(), (0, 0).into());
-            assert_eq!(selection.bottom_right_index(), (2, 2).into());
+            assert_eq!(selection.top_left_index(), (0, 0));
+            assert_eq!(selection.bottom_right_index(), (2, 2));
         }
     }
 }
