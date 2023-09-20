@@ -69,68 +69,72 @@ impl MathEditor {
         // Do nothing for now
     }
     pub fn move_caret(&mut self, direction: Direction, mode: MoveMode) {
-        let perfect_match = self.get_autocomplete().and_then(|v| v.get_perfect_match());
-
-        let mut caret = Caret::from_minimal(&self.input, &self.caret);
-        self.caret_mover.move_caret(&mut caret, direction, mode);
-        self.caret = caret.to_minimal();
-
-        self.apply_perfect_autocomplete(perfect_match);
+        self.with_caret_movement(|editor| {
+            let mut caret = Caret::from_minimal(&editor.input, &editor.caret);
+            editor.caret_mover.move_caret(&mut caret, direction, mode);
+            editor.caret = caret.to_minimal();
+        })
     }
 }
 
 impl MathEditor {
     pub fn select_with_caret(&mut self, direction: Direction, mode: MoveMode) -> Option<()> {
-        let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
-        match selection {
-            CaretSelection::Row(range) => {
-                let new_end = self.caret_mover.move_caret_range(
-                    (&range.end_position()).into(),
-                    direction,
-                    mode,
-                )?;
-                self.caret.end_position = new_end.to_minimal();
+        self.with_caret_movement(|editor| {
+            let selection = Caret::from_minimal(&editor.input, &editor.caret).into_selection();
+            match selection {
+                CaretSelection::Row(range) => {
+                    let new_end = editor.caret_mover.move_caret_range(
+                        (&range.end_position()).into(),
+                        direction,
+                        mode,
+                    )?;
+                    editor.caret.end_position = new_end.to_minimal();
+                }
+                CaretSelection::Grid(_) => {
+                    // Grid selection changing needs to be implemented
+                    todo!()
+                }
             }
-            CaretSelection::Grid(_) => {
-                // Grid selection changing needs to be implemented
-                todo!()
-            }
-        }
-        Some(())
+            Some(())
+        })
     }
     pub fn remove_at_caret(
         &mut self,
         remove_mode: CaretRemoveMode,
         move_mode: MoveMode,
     ) -> Option<()> {
-        let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
-        let mut builder = CaretEditBuilder::new(self.caret.clone());
-        let new_caret = match selection {
-            CaretSelection::Row(range) => {
-                let (basic_edit, new_position) =
-                    remove_at_caret(&self.caret_mover, &range, remove_mode)?;
-                self.input.apply_edits(&basic_edit);
-                self.parsed = None;
-                builder.add_edits(basic_edit);
-                MinimalCaret {
-                    start_position: new_position.clone(),
-                    end_position: new_position,
+        self.with_caret_movement(|editor| {
+            let selection = Caret::from_minimal(&editor.input, &editor.caret).into_selection();
+            let mut builder = CaretEditBuilder::new(editor.caret.clone());
+            let new_caret = match selection {
+                CaretSelection::Row(range) => {
+                    let (basic_edit, new_position) =
+                        remove_at_caret(&editor.caret_mover, &range, remove_mode)?;
+                    editor.input.apply_edits(&basic_edit);
+                    editor.parsed = None;
+                    builder.add_edits(basic_edit);
+                    MinimalCaret {
+                        start_position: new_position.clone(),
+                        end_position: new_position,
+                    }
                 }
-            }
-            CaretSelection::Grid(range) => {
-                // Grid deleting needs to be implemented
-                todo!();
-            }
-        };
-        self.caret = new_caret.clone();
-        self.undo_stack.push(builder.finish(new_caret).into());
-        Some(())
+                CaretSelection::Grid(range) => {
+                    // Grid deleting needs to be implemented
+                    todo!();
+                }
+            };
+            editor.caret = new_caret.clone();
+            editor.undo_stack.push(builder.finish(new_caret).into());
+            Some(())
+        })
     }
 
     /// Can also accept a \n and other special characters
     /// For example, when the user presses enter, we can insert a new row (table)
     pub fn insert_at_caret(&mut self, values: Vec<String>) -> Option<()> {
-        self.insert_nodes_at_caret(values.into_iter().map(InputNode::Symbol).collect())
+        self.with_caret_movement(|editor| {
+            editor.insert_nodes_at_caret(values.into_iter().map(InputNode::Symbol).collect())
+        })
     }
     fn insert_nodes_at_caret(&mut self, values: Vec<InputNode>) -> Option<()> {
         let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
@@ -195,26 +199,30 @@ impl MathEditor {
     }
 
     pub fn start_selection(&mut self, position: MinimalInputRowPosition, mode: MoveMode) {
-        self.selection_mode = Some(mode);
-        // TODO: Use the mode. Kinda like
-        // self.caret_mover.move_mode_to_range(mode) // and then use that info to extend the selection
-        self.caret = MinimalCaret {
-            start_position: position.clone(),
-            end_position: position,
-        }
+        self.with_caret_movement(|editor| {
+            editor.selection_mode = Some(mode);
+            // TODO: Use the mode. Kinda like
+            // editor.caret_mover.move_mode_to_range(mode) // and then use that info to extend the selection
+            editor.caret = MinimalCaret {
+                start_position: position.clone(),
+                end_position: position,
+            }
+        })
     }
     pub fn extend_selection(&mut self, position: MinimalInputRowPosition) {
-        let mode = self.selection_mode.unwrap_or(MoveMode::Char);
-        // TODO: Use the mode. Kinda like
-        // self.caret_mover.move_mode_to_range(mode) // and then use that info to extend the selection
-        self.caret.end_position = position;
+        self.with_caret_movement(|editor| {
+            let mode = editor.selection_mode.unwrap_or(MoveMode::Char);
+            // TODO: Use the mode. Kinda like
+            // editor.caret_mover.move_mode_to_range(mode) // and then use that info to extend the selection
+            editor.caret.end_position = position;
+        })
     }
     pub fn finish_selection(&mut self) {
         self.selection_mode = None;
     }
 
     pub fn copy(
-        &mut self,
+        &self,
         data_type: SerializedDataType,
     ) -> Result<String, serialization::SerializationError> {
         let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
@@ -233,9 +241,11 @@ impl MathEditor {
         data: String,
         data_type: Option<SerializedDataType>,
     ) -> Result<(), serialization::SerializationError> {
-        let nodes = deserialize_input_nodes(data, data_type)?;
-        self.insert_nodes_at_caret(nodes);
-        Ok(())
+        self.with_caret_movement(|editor| {
+            let nodes = deserialize_input_nodes(data, data_type)?;
+            editor.insert_nodes_at_caret(nodes);
+            Ok(())
+        })
     }
 
     pub fn open_autocomplete(&mut self) -> Option<()> {
@@ -259,6 +269,14 @@ impl MathEditor {
         self.autocomplete_state.set_current_autocomplete(Some(rule));
         Some(())
     }
+
+    fn with_caret_movement<T>(&mut self, callback: impl FnOnce(&mut Self) -> T) -> T {
+        let perfect_match = self.get_autocomplete().and_then(|v| v.get_perfect_match());
+        let result = callback(self);
+        self.apply_perfect_autocomplete(perfect_match);
+        result
+    }
+
     /// When the caret moves, we apply "perfect match" autocompletes
     fn apply_perfect_autocomplete(
         &mut self,
