@@ -69,13 +69,13 @@ impl MathEditor {
         // Do nothing for now
     }
     pub fn move_caret(&mut self, direction: Direction, mode: MoveMode) {
-        let autocomplete = self.get_autocomplete();
+        let perfect_match = self.get_autocomplete().and_then(|v| v.get_perfect_match());
+
         let mut caret = Caret::from_minimal(&self.input, &self.caret);
         self.caret_mover.move_caret(&mut caret, direction, mode);
         self.caret = caret.to_minimal();
 
-        // TODO: Potentially finish autocomplete
-        // if autocomplete does not contain caret && autocomplete has a perfect match { }
+        self.apply_perfect_autocomplete(perfect_match);
     }
 }
 
@@ -126,6 +126,7 @@ impl MathEditor {
         self.undo_stack.push(builder.finish(new_caret).into());
         Some(())
     }
+
     /// Can also accept a \n and other special characters
     /// For example, when the user presses enter, we can insert a new row (table)
     pub fn insert_at_caret(&mut self, values: Vec<String>) -> Option<()> {
@@ -218,7 +219,7 @@ impl MathEditor {
     ) -> Result<String, serialization::SerializationError> {
         let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
         let selected_nodes = match &selection {
-            CaretSelection::Row(range) => range.values().collect::<Vec<_>>(),
+            CaretSelection::Row(range) => range.values(),
             CaretSelection::Grid(range) => {
                 // Grid copying needs to be implemented
                 // For example, we could construct a new, smaller grid and copy that node
@@ -257,6 +258,48 @@ impl MathEditor {
         let rule = autocomplete.get_selected().rule.clone();
         self.autocomplete_state.set_current_autocomplete(Some(rule));
         Some(())
+    }
+    /// When the caret moves, we apply "perfect match" autocompletes
+    fn apply_perfect_autocomplete(
+        &mut self,
+        perfect_match: Option<AutocompletePerfectMatch>,
+        // TODO: Option<Edits>
+    ) -> Option<()> {
+        let perfect_match = perfect_match?;
+
+        let caret_start_position =
+            match Caret::from_minimal(&self.input, &self.caret).into_selection() {
+                CaretSelection::Row(range) => Some(range.start_position()),
+                CaretSelection::Grid(_) => None,
+            }?;
+
+        let autocomplete_range =
+            InputRowRange::from_minimal(self.input.root_focus(), &perfect_match.caret_range);
+        if autocomplete_range.contains(&caret_start_position) {
+            // We're still editing the same token and just moved around in it. We don't have the "editing a different part of the tree" intent yet.
+            return None;
+        }
+
+        // It might no longer be a perfect match, so we need to check again
+        let is_perfect_match = perfect_match
+            .rule
+            .matches(
+                autocomplete_range.values(),
+                autocomplete_range.left_offset().0,
+                1,
+            )
+            .iter()
+            .any(|rule_match| rule_match.is_complete_match());
+
+        if !is_perfect_match {
+            return None;
+        }
+
+        self.splice_at_range(
+            autocomplete_range.to_minimal(),
+            perfect_match.rule.result.to_vec(),
+        );
+        return Some(());
     }
 
     pub fn get_autocomplete<'a>(&'a mut self) -> Option<AutocompleteResults<'a>> {
@@ -350,6 +393,11 @@ impl AutocompleteState {
     }
 }
 
+pub struct AutocompletePerfectMatch {
+    pub rule: AutocompleteRule,
+    pub caret_range: MinimalInputRowRange,
+}
+
 pub struct AutocompleteResults<'a> {
     selected_index: usize,
     matches: Vec<AutocompleteRuleMatch<'a>>,
@@ -368,6 +416,18 @@ impl<'a> AutocompleteResults<'a> {
             matches,
             caret_position,
         }
+    }
+
+    pub fn get_perfect_match(&self) -> Option<AutocompletePerfectMatch> {
+        let selected = self.get_selected();
+        if !selected.is_complete_match() {
+            return None;
+        }
+        let caret_range = self.get_caret_range(selected);
+        Some(AutocompletePerfectMatch {
+            rule: selected.rule.clone(),
+            caret_range,
+        })
     }
 
     pub fn get_selected(&self) -> &AutocompleteRuleMatch<'a> {

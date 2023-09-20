@@ -26,7 +26,7 @@ pub enum SerializationError {
 
 // Later we could also serialize the parse tree, and do smort things like "warning: definition of e has changed"
 pub fn serialize_input_nodes(
-    nodes: Vec<&InputNode>,
+    nodes: &[InputNode],
     data_type: SerializedDataType,
 ) -> Result<String, SerializationError> {
     let data = &SerializedData {

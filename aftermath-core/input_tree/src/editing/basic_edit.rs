@@ -41,7 +41,7 @@ impl BasicEdit {
             vec![BasicEdit::Row(RowEdit {
                 edit_type: EditType::Delete,
                 position: range.left_position().to_minimal(),
-                values: range.values().cloned().collect(),
+                values: range.values().to_vec(),
             })],
             MinimalInputRowPosition {
                 row_indices: range.row_indices().clone(),

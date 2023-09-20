@@ -25,10 +25,17 @@ pub trait AutocompleteMatcher {
 
 pub struct AutocompleteRuleMatch<'a> {
     pub rule: &'a AutocompleteRule,
-    /// How much of the rule value was matched, starting from the start
+    /// How much of the rule value was matched, starting from the start.
     pub rule_match_length: usize,
-    /// How much of the input was matched, starting from the end where the caret is and going backwards
+    /// How much of the input was matched, starting from the end where the caret is and going backwards.
+    /// Used for underlining the input.
     pub input_match_length: usize,
+}
+
+impl<'a> AutocompleteRuleMatch<'a> {
+    pub fn is_complete_match(&self) -> bool {
+        self.rule_match_length == self.rule.parser.len()
+    }
 }
 
 impl AutocompleteRule {
