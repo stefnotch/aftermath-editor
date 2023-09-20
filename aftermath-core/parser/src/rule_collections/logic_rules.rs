@@ -1,18 +1,10 @@
-
-
 use crate::make_parser::{just_operator_parser, just_symbol_parser};
-
-
 
 use crate::{
     autocomplete::AutocompleteRule,
     rule_collection::{RuleCollection, TokenRule},
     syntax_tree::NodeIdentifier,
 };
-use chumsky::{prelude::*};
-
-
-
 
 /// Rules for basic arithmetic.
 pub struct LogicRules {}

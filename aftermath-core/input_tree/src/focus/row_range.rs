@@ -55,6 +55,10 @@ impl<'a> InputRowRange<'a> {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.right_offset().0 - self.left_offset().0
+    }
+
     pub fn is_collapsed(&self) -> bool {
         self.start == self.end
     }

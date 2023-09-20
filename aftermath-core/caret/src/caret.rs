@@ -3,7 +3,7 @@ use input_tree::{
         InputGridRange, InputRowPosition, InputRowRange, MinimalInputGridRange,
         MinimalInputRowPosition, MinimalInputRowRange,
     },
-    grid::Offset2D,
+    grid::{GridRectangle, Index2D},
     input_tree::InputTree,
     row::Offset,
 };
@@ -130,8 +130,7 @@ impl<'a> CaretSelection<'a> {
         end: &InputRowPosition<'a>,
     ) -> Self {
         let shared_range = tree.range_from_positions(start, end);
-        let is_single_element = shared_range.left_offset().0 + 1 == shared_range.right_offset().0;
-        if !is_single_element {
+        if shared_range.len() != 1 {
             return CaretSelection::Row(shared_range);
         }
 
@@ -162,30 +161,7 @@ impl<'a> CaretSelection<'a> {
                 // Slightly expand the selection so that it includes the end indices
                 CaretSelection::Grid(InputGridRange::new(
                     selected_node,
-                    Offset2D {
-                        x: Offset(if start_index.x < end_index.x {
-                            start_index.x
-                        } else {
-                            start_index.x + 1
-                        }),
-                        y: Offset(if start_index.y < end_index.y {
-                            start_index.y
-                        } else {
-                            start_index.y + 1
-                        }),
-                    },
-                    Offset2D {
-                        x: Offset(if start_index.x < end_index.x {
-                            end_index.x + 1
-                        } else {
-                            end_index.x
-                        }),
-                        y: Offset(if start_index.y < end_index.y {
-                            end_index.y + 1
-                        } else {
-                            end_index.y
-                        }),
-                    },
+                    GridRectangle::from_indices_inclusive(start_index, end_index, selected_grid),
                 ))
             }
             (_, _) => CaretSelection::Row(shared_range),

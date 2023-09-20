@@ -103,11 +103,12 @@ impl AutocompleteMatcher for MathParser {
     fn matches<'input, 'b>(
         &'b self,
         input: &'input [input_tree::node::InputNode],
+        caret_position: usize,
         min_rule_match_length: usize,
     ) -> Vec<crate::autocomplete::AutocompleteRuleMatch<'b>> {
         let mut matches = Vec::new();
         for rule in &self.autocomplete_rules {
-            matches.extend(rule.matches(input, min_rule_match_length));
+            matches.extend(rule.matches(input, caret_position, min_rule_match_length));
         }
         matches
     }

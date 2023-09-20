@@ -25,6 +25,7 @@ pub enum GridDirection {
 }
 
 /// A proper grid of values.
+/// Maybe someday I'll be able to use https://docs.rs/ndarray/latest/ndarray/ instead.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[cfg_attr(
     feature = "wasm",

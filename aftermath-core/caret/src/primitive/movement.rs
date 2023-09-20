@@ -21,7 +21,7 @@ pub enum MoveMode {
     Line,
 }
 
-pub struct CaretMover {
+pub struct NavigationSettings {
     /// Used for vertical movement to keep the caret in the same x position on screen.
     /// Returns the caret position on screen.
     /// Can also be left empty, in which case the caret will be placed at the start or end of the row.
@@ -30,9 +30,9 @@ pub struct CaretMover {
     pub get_caret_viewport_position: Option<Box<fn(MinimalInputRowPosition) -> (f64, f64)>>,
 }
 
-impl CaretMover {
+impl NavigationSettings {
     pub fn new() -> Self {
-        CaretMover {
+        NavigationSettings {
             get_caret_viewport_position: None,
         }
     }
@@ -135,17 +135,13 @@ impl CaretMover {
         };
         let xy = Index2D::from_index(caret.row_focus.index_in_parent()?, grid);
         let new_xy = match direction {
-            VerticalDirection::Up => Index2D {
-                x: xy.x,
-                y: xy.y - 1,
-            },
-            VerticalDirection::Down => Index2D {
-                x: xy.x,
-                y: xy.y + 1,
-            },
+            VerticalDirection::Up => xy.sub_checked((0, 1), grid),
+            VerticalDirection::Down => xy.add_checked((0, 1), grid),
         };
-
-        let new_row = parent.child_at(new_xy.to_index());
+        let new_row = match new_xy {
+            Some(new_xy) => parent.child_at(new_xy.to_index()),
+            None => Err(parent),
+        };
         match new_row {
             Ok(new_row) => {
                 // Moved up or down

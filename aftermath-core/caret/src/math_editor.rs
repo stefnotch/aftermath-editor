@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::caret::{CaretSelection, MinimalCaretSelection};
 use crate::primitive::primitive_edit::{insert_at_range, remove_at_caret, CaretRemoveMode};
-use crate::primitive::{CaretEditBuilder, CaretMover, MoveMode};
+use crate::primitive::{CaretEditBuilder, MoveMode, NavigationSettings};
 use crate::{
     caret::{Caret, MinimalCaret},
     primitive::UndoAction,
@@ -10,7 +10,7 @@ use crate::{
 };
 use input_tree::editing::editable::Editable;
 use input_tree::editing::BasicEdit;
-use input_tree::focus::InputRowRange;
+use input_tree::focus::{InputRowPosition, InputRowRange};
 use input_tree::input_tree::InputTree;
 use input_tree::row::Offset;
 use input_tree::{
@@ -18,7 +18,7 @@ use input_tree::{
     focus::{MinimalInputRowPosition, MinimalInputRowRange},
     node::InputNode,
 };
-use parser::autocomplete::AutocompleteRuleMatch;
+use parser::autocomplete::{AutocompleteMatcher, AutocompleteRule, AutocompleteRuleMatch};
 use parser::parser::MathParser;
 use parser::syntax_tree::{NodeIdentifier, SyntaxNode};
 use serialization::{deserialize_input_nodes, serialize_input_nodes};
@@ -36,9 +36,11 @@ pub struct MathEditor {
     caret: MinimalCaret,
     /// Selection mode, describes how the current selection works
     selection_mode: Option<MoveMode>,
+    /// Keeps track of the autocomplete popup
+    autocomplete_state: AutocompleteState,
     /// Undo-redo stack, will record actual edits
     undo_stack: UndoRedoManager<UndoAction>,
-    caret_mover: CaretMover,
+    caret_mover: NavigationSettings,
 }
 
 impl MathEditor {
@@ -50,8 +52,9 @@ impl MathEditor {
             parsed: None,
             caret: Default::default(),
             selection_mode: None,
+            autocomplete_state: AutocompleteState::new(),
             undo_stack: UndoRedoManager::new(),
-            caret_mover: CaretMover::new(),
+            caret_mover: NavigationSettings::new(),
         }
     }
 }
@@ -66,11 +69,13 @@ impl MathEditor {
         // Do nothing for now
     }
     pub fn move_caret(&mut self, direction: Direction, mode: MoveMode) {
+        let autocomplete = self.get_autocomplete();
         let mut caret = Caret::from_minimal(&self.input, &self.caret);
         self.caret_mover.move_caret(&mut caret, direction, mode);
         self.caret = caret.to_minimal();
 
         // TODO: Potentially finish autocomplete
+        // if autocomplete does not contain caret && autocomplete has a perfect match { }
     }
 }
 
@@ -232,18 +237,42 @@ impl MathEditor {
         Ok(())
     }
 
-    pub fn open_autocomplete(&mut self) {
-        todo!()
+    pub fn open_autocomplete(&mut self) -> Option<()> {
+        self.get_autocomplete().map(|_| ())
     }
-    pub fn apply_autocomplete(&mut self, accept: bool) {
-        todo!()
+    pub fn finish_autocomplete(&mut self, accept: bool) -> Option<()> {
+        if !accept {
+            return None;
+        }
+        let autocomplete = self.get_autocomplete()?;
+        let selected_autocomplete = autocomplete.get_selected();
+        let range = autocomplete.get_caret_range(selected_autocomplete);
+        let values = selected_autocomplete.rule.result.to_vec();
+        self.splice_at_range(range, values);
+        Some(())
     }
-    pub fn move_in_autocomplete(&mut self, direction: VerticalDirection) {
-        todo!()
+    pub fn move_in_autocomplete(&mut self, direction: VerticalDirection) -> Option<()> {
+        let mut autocomplete = self.get_autocomplete()?;
+        autocomplete.move_selection(direction);
+        let rule = autocomplete.get_selected().rule.clone();
+        self.autocomplete_state.set_current_autocomplete(Some(rule));
+        Some(())
     }
 
-    pub fn get_autocomplete<'a>(&'a mut self) -> Vec<AutocompleteRuleMatch<'a>> {
-        todo!()
+    pub fn get_autocomplete<'a>(&'a mut self) -> Option<AutocompleteResults<'a>> {
+        let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
+        let position = match selection {
+            CaretSelection::Row(range) if range.is_collapsed() => range.start_position(),
+            CaretSelection::Row(_) => return None,
+            CaretSelection::Grid(_) => return None,
+        };
+        let matches = self
+            .parser
+            .matches(&position.row_focus.row().values, position.offset.0, 2);
+        Some(
+            self.autocomplete_state
+                .get_autocomplete(matches, position.to_minimal()),
+        )
     }
     pub fn get_caret(&self) -> Vec<MinimalCaretSelection> {
         let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
@@ -285,5 +314,91 @@ impl MathEditor {
         let mut names: Vec<_> = self.parser.get_rule_names().into_iter().collect();
         names.sort();
         names
+    }
+}
+
+pub struct AutocompleteState {
+    /// Autocomplete rule that the main caret was last on
+    current_autocomplete: Option<AutocompleteRule>,
+}
+
+impl AutocompleteState {
+    pub fn new() -> Self {
+        Self {
+            current_autocomplete: None,
+        }
+    }
+
+    /// Opens and gets the autocomplete results, taking into account the last selected autocomplete result
+    pub fn get_autocomplete<'a>(
+        &'a mut self,
+        matches: Vec<AutocompleteRuleMatch<'a>>,
+        caret_position: MinimalInputRowPosition,
+    ) -> AutocompleteResults<'a> {
+        let selected_index = self
+            .current_autocomplete
+            .take()
+            .and_then(|last_rule| matches.iter().position(|v| v.rule == &last_rule))
+            .unwrap_or(0);
+
+        self.current_autocomplete = matches.get(selected_index).map(|v| v.rule.clone());
+        AutocompleteResults::new(selected_index, matches, caret_position)
+    }
+
+    pub fn set_current_autocomplete(&mut self, rule: Option<AutocompleteRule>) {
+        self.current_autocomplete = rule;
+    }
+}
+
+pub struct AutocompleteResults<'a> {
+    selected_index: usize,
+    matches: Vec<AutocompleteRuleMatch<'a>>,
+    caret_position: MinimalInputRowPosition,
+}
+
+impl<'a> AutocompleteResults<'a> {
+    pub fn new(
+        selected_index: usize,
+        matches: Vec<AutocompleteRuleMatch<'a>>,
+        caret_position: MinimalInputRowPosition,
+    ) -> Self {
+        assert!(selected_index < matches.len());
+        Self {
+            selected_index,
+            matches,
+            caret_position,
+        }
+    }
+
+    pub fn get_selected(&self) -> &AutocompleteRuleMatch<'a> {
+        self.matches.get(self.selected_index).unwrap()
+    }
+
+    pub fn move_selection(&mut self, direction: VerticalDirection) {
+        match direction {
+            VerticalDirection::Up => {
+                if self.selected_index > 0 {
+                    self.selected_index -= 1;
+                }
+            }
+            VerticalDirection::Down => {
+                if self.selected_index < self.matches.len() - 1 {
+                    self.selected_index += 1;
+                }
+            }
+        }
+    }
+
+    pub fn get_caret_range(&self, rule_match: &AutocompleteRuleMatch<'a>) -> MinimalInputRowRange {
+        MinimalInputRowRange {
+            row_indices: self.caret_position.row_indices.clone(),
+            start: self.caret_position.offset,
+            end: Offset(
+                self.caret_position
+                    .offset
+                    .0
+                    .saturating_sub(rule_match.input_match_length),
+            ),
+        }
     }
 }

@@ -1,5 +1,6 @@
 use input_tree::node::InputNode;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AutocompleteRule {
     /// Very simplistic parser. Just matches the input exactly.
     pub parser: String,
@@ -11,11 +12,13 @@ pub trait AutocompleteMatcher {
     /// Takes an input that goes until the caret.
     /// Then returns all matches that could be made with these rules.
     /// Of course including prefix-matches.
-    /// TODO: remember to filter out autocompletes that might destroy an existing token (done after autocompleting)
-    ///
+    /// TODO:
+    /// When we have text like "sin|(3)", with | being the caret, then we probably should avoid suggesting "into" as an autocomplete.
+    /// So after `matches` happens, we should probably remove all autocompletes that start in the middle of an existing parsed token.
     fn matches<'input, 'b>(
         &'b self,
         input: &'input [InputNode],
+        caret_position: usize,
         min_rule_match_length: usize,
     ) -> Vec<AutocompleteRuleMatch<'b>>;
 }
@@ -24,7 +27,7 @@ pub struct AutocompleteRuleMatch<'a> {
     pub rule: &'a AutocompleteRule,
     /// How much of the rule value was matched, starting from the start
     pub rule_match_length: usize,
-    /// How much of the input was matched, starting from the end
+    /// How much of the input was matched, starting from the end where the caret is and going backwards
     pub input_match_length: usize,
 }
 
@@ -53,9 +56,11 @@ impl AutocompleteMatcher for AutocompleteRule {
     fn matches<'input, 'b>(
         &'b self,
         input: &'input [InputNode],
+        caret_position: usize,
         min_rule_match_length: usize,
     ) -> Vec<AutocompleteRuleMatch<'b>> {
         assert!(self.parser.len() > 0);
+        let input = &input[0..caret_position];
         // Contains the *exclusive* end indices in the parser
         // e.g.
         // parser = "lim"
@@ -108,11 +113,12 @@ impl AutocompleteMatcher for AutocompleteRules {
     fn matches<'input, 'b>(
         &'b self,
         input: &'input [InputNode],
+        caret_position: usize,
         min_rule_match_length: usize,
     ) -> Vec<AutocompleteRuleMatch<'b>> {
         let mut matches = Vec::new();
         for rule in &self.0 {
-            matches.extend(rule.matches(input, min_rule_match_length));
+            matches.extend(rule.matches(input, caret_position, min_rule_match_length));
         }
         matches
     }

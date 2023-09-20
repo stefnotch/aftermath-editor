@@ -98,10 +98,11 @@ impl GridRectangle {
         end_index: Index2D,
         grid: &impl Grid<T>,
     ) -> Self {
-        Self::new(
-            start_index.to_index_checked(grid).unwrap()
-                ..(end_index.to_index_checked(grid).unwrap() + 1),
-            grid.width(),
-        )
+        let mut start_index = start_index.to_index_checked(grid).unwrap();
+        let mut end_index = end_index.to_index_checked(grid).unwrap();
+        if start_index > end_index {
+            std::mem::swap(&mut start_index, &mut end_index);
+        }
+        Self::new(start_index..(end_index + 1), grid.width())
     }
 }

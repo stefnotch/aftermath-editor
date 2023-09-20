@@ -28,15 +28,36 @@ impl Index2D {
         self.y * self.width + self.x
     }
 
-    pub fn to_index_checked<T>(self, grid: &impl Grid<T>) -> Option<usize> {
+    pub fn add_checked<T>(&self, other: (usize, usize), grid: &impl Grid<T>) -> Option<Self> {
+        let mut result = self.clone();
+        let (x, y) = other;
+        result.x = result.x.checked_add(x)?;
+        result.y = result.y.checked_add(y)?;
+        result.with_grid(grid)
+    }
+
+    pub fn sub_checked<T>(&self, other: (usize, usize), grid: &impl Grid<T>) -> Option<Self> {
+        let mut result = self.clone();
+        let (x, y) = other;
+        result.x = result.x.checked_sub(x)?;
+        result.y = result.y.checked_sub(y)?;
+        result.with_grid(grid)
+    }
+
+    fn with_grid<T>(self, grid: &impl Grid<T>) -> Option<Self> {
         let (width, height) = grid.size();
         if self.width != width {
             None
         } else if self.x >= width || self.y >= height {
             None
         } else {
-            Some(self.y * width + self.x)
+            Some(self)
         }
+    }
+
+    pub fn to_index_checked<T>(self, grid: &impl Grid<T>) -> Option<usize> {
+        let checked = self.with_grid(grid);
+        checked.map(|v| v.to_index())
     }
 }
 

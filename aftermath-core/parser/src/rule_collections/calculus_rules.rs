@@ -1,20 +1,12 @@
-
-
-use crate::make_parser::{
-    just_operator_parser, just_symbol_parser,
-};
-
-
+use crate::make_parser::{just_operator_parser, just_symbol_parser};
 
 use crate::{
     autocomplete::AutocompleteRule,
     rule_collection::{RuleCollection, TokenRule},
     syntax_tree::NodeIdentifier,
 };
-use chumsky::{prelude::*};
 
 use input_tree::input_nodes;
-
 
 /// Rules for basic calculus.
 pub struct CalculusRules {}

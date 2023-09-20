@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use caret::{
     math_editor::{MathEditor, SerializedDataType},
     primitive::{primitive_edit::CaretRemoveMode, MoveMode},
@@ -23,7 +25,7 @@ impl MathEditorBindings {
     pub fn new() -> Self {
         Self {
             // Hardcoded parser rules for now
-            editor: MathEditor::new(ParserBuilder::new().add_default_rules().build()),
+            editor: MathEditor::new(Arc::new(ParserBuilder::new().add_default_rules().build())),
             // Do note that large numbers won't be serialized correctly, because JS doesn't have 64 bit integers.
             serializer: serde_wasm_bindgen::Serializer::new(),
         }

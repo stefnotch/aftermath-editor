@@ -1,8 +1,3 @@
-
-
-
-
-
 use crate::rule_collections::core_rules::CoreRules;
 
 use crate::{
@@ -10,9 +5,6 @@ use crate::{
     rule_collection::{RuleCollection, TokenRule},
     syntax_tree::NodeIdentifier,
 };
-use chumsky::{prelude::*};
-
-
 
 pub struct FunctionRules {}
 

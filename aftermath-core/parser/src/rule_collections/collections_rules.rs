@@ -5,7 +5,6 @@ use crate::{
     rule_collection::{RuleCollection, TokenRule},
     syntax_tree::NodeIdentifier,
 };
-use chumsky::prelude::*;
 
 use input_tree::input_nodes;
 
