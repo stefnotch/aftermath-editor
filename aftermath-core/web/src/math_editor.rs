@@ -1,16 +1,16 @@
 use std::sync::Arc;
 
 use caret::{
-    math_editor::{MathEditor, SerializedDataType},
+    math_editor::{AutocompleteResults, MathEditor, SerializedDataType},
     primitive::{primitive_edit::CaretRemoveMode, MoveMode},
 };
 use input_tree::{
-    direction::Direction,
+    direction::{Direction, VerticalDirection},
     focus::{MinimalInputRowPosition, MinimalInputRowRange},
     node::InputNode,
 };
-use parser::parser::ParserBuilder;
-use serde::Serialize;
+use parser::{autocomplete::AutocompleteRule, parser::ParserBuilder};
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
 
 #[wasm_bindgen]
@@ -47,8 +47,10 @@ impl MathEditorBindings {
         self.editor.select_with_caret(direction, mode).is_some()
     }
 
-    pub fn remove_at_caret(&mut self, mode: CaretRemoveMode) -> bool {
-        self.editor.remove_at_caret(mode, MoveMode::Char).is_some()
+    pub fn remove_at_caret(&mut self, remove_mode: CaretRemoveMode, move_mode: MoveMode) -> bool {
+        self.editor
+            .remove_at_caret(remove_mode, move_mode)
+            .is_some()
     }
 
     pub fn insert_at_caret(&mut self, values: JsValue) -> Result<bool, JsValue> {
@@ -91,15 +93,32 @@ impl MathEditorBindings {
             .paste(data, data_type)
             .map_err(|e| e.to_string())
     }
-    // autocomplete
+    pub fn open_autocomplete(&mut self) -> bool {
+        self.editor.open_autocomplete().is_some()
+    }
+    pub fn finish_autocomplete(&mut self, accept: bool) -> bool {
+        self.editor.finish_autocomplete(accept).is_some()
+    }
+    pub fn move_in_autocomplete(&mut self, direction: VerticalDirection) -> bool {
+        self.editor.move_in_autocomplete(direction).is_some()
+    }
+    pub fn get_autocomplete(&mut self) -> Result<JsValue, JsValue> {
+        let autocomplete: Option<AutocompleteResultsBindings> = self
+            .editor
+            .get_autocomplete()
+            .map(|autocomplete| autocomplete.into());
 
-    pub fn get_syntax_tree(&mut self) -> Result<JsValue, JsValue> {
-        let result = self.editor.get_syntax_tree().serialize(&self.serializer)?;
+        let result = autocomplete.serialize(&self.serializer)?;
         Ok(result)
     }
 
     pub fn get_caret(&self) -> Result<JsValue, JsValue> {
         let result = self.editor.get_caret().serialize(&self.serializer)?;
+        Ok(result)
+    }
+
+    pub fn get_syntax_tree(&mut self) -> Result<JsValue, JsValue> {
+        let result = self.editor.get_syntax_tree().serialize(&self.serializer)?;
         Ok(result)
     }
 
@@ -117,4 +136,49 @@ impl MathEditorBindings {
         let result = self.editor.get_rule_names().serialize(&self.serializer)?;
         Ok(result)
     }
+}
+
+impl<'a> From<AutocompleteResults<'a>> for AutocompleteResultsBindings {
+    fn from(value: AutocompleteResults<'a>) -> Self {
+        let (selected_index, matches, caret_position) = value.destructure();
+        AutocompleteResultsBindings {
+            selected_index,
+            matches: matches
+                .into_iter()
+                .map(|rule_match| AutocompleteRuleMatchBindings {
+                    rule: rule_match.rule.clone(),
+                    rule_match_length: rule_match.rule_match_length,
+                    input_match_length: rule_match.input_match_length,
+                })
+                .collect(),
+            caret_position,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
+pub struct AutocompleteResultsBindings {
+    pub selected_index: usize,
+    pub matches: Vec<AutocompleteRuleMatchBindings>,
+    pub caret_position: MinimalInputRowPosition,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
+pub struct AutocompleteRuleMatchBindings {
+    pub rule: AutocompleteRule,
+    /// How much of the rule value was matched, starting from the start.
+    pub rule_match_length: usize,
+    /// How much of the input was matched, starting from the end where the caret is and going backwards.
+    /// Used for underlining the input.
+    pub input_match_length: usize,
 }

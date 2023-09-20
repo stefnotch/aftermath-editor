@@ -59,7 +59,6 @@ impl MathEditor {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl MathEditor {
     /// Focus the editor, can be triggered with the tab key
     pub fn focus(&mut self) {
@@ -75,9 +74,6 @@ impl MathEditor {
             editor.caret = caret.to_minimal();
         })
     }
-}
-
-impl MathEditor {
     pub fn select_with_caret(&mut self, direction: Direction, mode: MoveMode) -> Option<()> {
         self.with_caret_movement(|editor| {
             let selection = Caret::from_minimal(&editor.input, &editor.caret).into_selection();
@@ -272,6 +268,8 @@ impl MathEditor {
 
     fn with_caret_movement<T>(&mut self, callback: impl FnOnce(&mut Self) -> T) -> T {
         let perfect_match = self.get_autocomplete().and_then(|v| v.get_perfect_match());
+
+        // TODO: let range = perfect_match.map(|v| v.caret_range);
         let result = callback(self);
         self.apply_perfect_autocomplete(perfect_match);
         result
@@ -478,5 +476,19 @@ impl<'a> AutocompleteResults<'a> {
                     .saturating_sub(rule_match.input_match_length),
             ),
         }
+    }
+
+    pub fn destructure(
+        &self,
+    ) -> (
+        usize,
+        &Vec<AutocompleteRuleMatch<'a>>,
+        MinimalInputRowPosition,
+    ) {
+        (
+            self.selected_index,
+            &self.matches,
+            self.caret_position.clone(),
+        )
     }
 }

@@ -1,6 +1,12 @@
 use input_tree::node::InputNode;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub struct AutocompleteRule {
     /// Very simplistic parser. Just matches the input exactly.
     pub parser: String,
