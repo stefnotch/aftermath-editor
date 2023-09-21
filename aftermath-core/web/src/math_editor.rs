@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use caret::{
-    math_editor::{AutocompleteResults, MathEditor, SerializedDataType},
+    autocomplete::AutocompleteResults,
+    math_editor::{MathEditor, SerializedDataType},
     primitive::{primitive_edit::CaretRemoveMode, MoveMode},
 };
 use input_tree::{
@@ -53,9 +54,10 @@ impl MathEditorBindings {
             .is_some()
     }
 
-    pub fn insert_at_caret(&mut self, values: JsValue) -> Result<bool, JsValue> {
+    pub fn insert_at_caret(&mut self, values: JsValue) -> Result<(), JsValue> {
         let values: Vec<String> = serde_wasm_bindgen::from_value(values)?;
-        Ok(self.editor.insert_at_caret(values).is_some())
+        self.editor.insert_at_caret(values);
+        Ok(())
     }
 
     pub fn select_all(&mut self) {

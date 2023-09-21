@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
+use crate::autocomplete::{AutocompleteResults, AutocorrectAction, AutocorrectActionBuilder};
 use crate::caret::{CaretSelection, MinimalCaretSelection};
+use crate::editor_action_builder::EditorActionBuilder;
 use crate::primitive::primitive_edit::{insert_at_range, remove_at_caret, CaretRemoveMode};
-use crate::primitive::{CaretEditBuilder, MoveMode, NavigationSettings};
+use crate::primitive::{CaretEdit, MoveMode, NavigationSettings};
 use crate::{
     caret::{Caret, MinimalCaret},
     primitive::UndoAction,
@@ -28,19 +30,19 @@ pub use serialization::SerializedDataType;
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct MathEditor {
     /// User input
-    input: InputTree,
-    parser: Arc<MathParser>,
+    pub(crate) input: InputTree,
+    pub(crate) parser: Arc<MathParser>,
     /// Parsed content, can be cleared
-    parsed: Option<SyntaxNode>,
+    pub(crate) parsed: Option<SyntaxNode>,
     /// Main caret
-    caret: MinimalCaret,
+    pub(crate) caret: MinimalCaret,
     /// Selection mode, describes how the current selection works
-    selection_mode: Option<MoveMode>,
+    pub(crate) selection_mode: Option<MoveMode>,
     /// Keeps track of the autocomplete popup
-    autocomplete_state: AutocompleteState,
+    pub(crate) autocomplete_state: AutocompleteState,
     /// Undo-redo stack, will record actual edits
-    undo_stack: UndoRedoManager<UndoAction>,
-    caret_mover: NavigationSettings,
+    pub(crate) undo_stack: UndoRedoManager<UndoAction>,
+    pub(crate) caret_mover: NavigationSettings,
 }
 
 impl MathEditor {
@@ -68,78 +70,84 @@ impl MathEditor {
         // Do nothing for now
     }
     pub fn move_caret(&mut self, direction: Direction, mode: MoveMode) {
-        self.with_caret_movement(|editor| {
-            let mut caret = Caret::from_minimal(&editor.input, &editor.caret);
-            editor.caret_mover.move_caret(&mut caret, direction, mode);
-            editor.caret = caret.to_minimal();
-        })
+        let autocorrect = self.start_autocorrect();
+        let builder = EditorActionBuilder::new(self);
+        let mut caret = Caret::from_minimal(&builder.input, &builder.caret);
+        builder.caret_mover.move_caret(&mut caret, direction, mode);
+        let caret = caret.to_minimal();
+        let action = builder.finish(caret);
+        self.apply_autocorrect(autocorrect.finish(&action.edits));
     }
     pub fn select_with_caret(&mut self, direction: Direction, mode: MoveMode) -> Option<()> {
-        self.with_caret_movement(|editor| {
-            let selection = Caret::from_minimal(&editor.input, &editor.caret).into_selection();
-            match selection {
-                CaretSelection::Row(range) => {
-                    let new_end = editor.caret_mover.move_caret_range(
-                        (&range.end_position()).into(),
-                        direction,
-                        mode,
-                    )?;
-                    editor.caret.end_position = new_end.to_minimal();
-                }
-                CaretSelection::Grid(_) => {
-                    // Grid selection changing needs to be implemented
-                    todo!()
+        let autocorrect = self.start_autocorrect();
+        let mut builder = EditorActionBuilder::new(self);
+        let selection = Caret::from_minimal(&builder.input, &builder.caret).into_selection();
+        let caret = match selection {
+            CaretSelection::Row(range) => {
+                let new_end = builder.caret_mover.move_caret_range(
+                    (&range.end_position()).into(),
+                    direction,
+                    mode,
+                )?;
+                MinimalCaret {
+                    start_position: builder.caret.start_position.clone(),
+                    end_position: new_end.to_minimal(),
                 }
             }
-            Some(())
-        })
+            CaretSelection::Grid(_) => {
+                // Grid selection changing needs to be implemented
+                todo!()
+            }
+        };
+        let action = builder.finish(caret);
+        self.apply_autocorrect(autocorrect.finish(&action.edits));
+        Some(())
     }
     pub fn remove_at_caret(
         &mut self,
         remove_mode: CaretRemoveMode,
         move_mode: MoveMode,
     ) -> Option<()> {
-        self.with_caret_movement(|editor| {
-            let selection = Caret::from_minimal(&editor.input, &editor.caret).into_selection();
-            let mut builder = CaretEditBuilder::new(editor.caret.clone());
-            let new_caret = match selection {
-                CaretSelection::Row(range) => {
-                    let (basic_edit, new_position) =
-                        remove_at_caret(&editor.caret_mover, &range, remove_mode)?;
-                    editor.input.apply_edits(&basic_edit);
-                    editor.parsed = None;
-                    builder.add_edits(basic_edit);
-                    MinimalCaret {
-                        start_position: new_position.clone(),
-                        end_position: new_position,
-                    }
+        let autocorrect = self.start_autocorrect();
+        let mut builder = EditorActionBuilder::new(self);
+        let selection = Caret::from_minimal(&builder.input, &builder.caret).into_selection();
+        let new_caret = match selection {
+            CaretSelection::Row(range) => {
+                let (basic_edit, new_position) =
+                    remove_at_caret(&builder.caret_mover, &range, remove_mode)?;
+                builder.add_edits(basic_edit);
+                MinimalCaret {
+                    start_position: new_position.clone(),
+                    end_position: new_position,
                 }
-                CaretSelection::Grid(range) => {
-                    // Grid deleting needs to be implemented
-                    todo!();
-                }
-            };
-            editor.caret = new_caret.clone();
-            editor.undo_stack.push(builder.finish(new_caret).into());
-            Some(())
-        })
+            }
+            CaretSelection::Grid(range) => {
+                // Grid deleting needs to be implemented
+                todo!();
+            }
+        };
+
+        let action = builder.finish(new_caret);
+        self.apply_autocorrect(autocorrect.finish(&action.edits));
+        Some(())
     }
 
     /// Can also accept a \n and other special characters
     /// For example, when the user presses enter, we can insert a new row (table)
-    pub fn insert_at_caret(&mut self, values: Vec<String>) -> Option<()> {
-        self.with_caret_movement(|editor| {
-            editor.insert_nodes_at_caret(values.into_iter().map(InputNode::Symbol).collect())
-        })
+    pub fn insert_at_caret(&mut self, values: Vec<String>) {
+        let autocorrect = self.start_autocorrect();
+        let action =
+            self.insert_nodes_at_caret(values.into_iter().map(InputNode::Symbol).collect());
+        if let Some(action) = action {
+            self.apply_autocorrect(autocorrect.finish(&action.edits));
+        }
     }
-    fn insert_nodes_at_caret(&mut self, values: Vec<InputNode>) -> Option<()> {
-        let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
-        let mut builder = CaretEditBuilder::new(self.caret.clone());
+    fn insert_nodes_at_caret(&mut self, values: Vec<InputNode>) -> Option<CaretEdit> {
+        let mut builder = EditorActionBuilder::new(self);
+        let selection = Caret::from_minimal(&builder.input, &builder.caret).into_selection();
         let new_caret = match selection {
             CaretSelection::Row(range) => {
                 let (basic_edit, new_position) = insert_at_range(&range, values)?;
-                self.input.apply_edits(&basic_edit);
-                self.parsed = None;
                 builder.add_edits(basic_edit);
                 MinimalCaret {
                     start_position: new_position.clone(),
@@ -151,16 +159,13 @@ impl MathEditor {
                 todo!();
             }
         };
+        Some(builder.finish(new_caret))
 
         // TODO:
         // Forced autocorrect (ligatures anyone?)
         // - / fraction
         // - ^ exponent
         // - _ subscript
-
-        self.caret = new_caret.clone();
-        self.undo_stack.push(builder.finish(new_caret).into());
-        Some(())
     }
     pub fn select_all(&mut self) {
         self.caret = MinimalCaret {
@@ -195,23 +200,32 @@ impl MathEditor {
     }
 
     pub fn start_selection(&mut self, position: MinimalInputRowPosition, mode: MoveMode) {
-        self.with_caret_movement(|editor| {
-            editor.selection_mode = Some(mode);
-            // TODO: Use the mode. Kinda like
-            // editor.caret_mover.move_mode_to_range(mode) // and then use that info to extend the selection
-            editor.caret = MinimalCaret {
-                start_position: position.clone(),
-                end_position: position,
-            }
-        })
+        self.selection_mode = Some(mode);
+        let autocorrect = self.start_autocorrect();
+        let builder = EditorActionBuilder::new(self);
+        // TODO: Use the mode. Kinda like
+        // editor.caret_mover.move_mode_to_range(mode) // and then use that info to extend the selection
+        let action = builder.finish(MinimalCaret {
+            start_position: position.clone(),
+            end_position: position,
+        });
+        self.apply_autocorrect(autocorrect.finish(&action.edits));
     }
     pub fn extend_selection(&mut self, position: MinimalInputRowPosition) {
-        self.with_caret_movement(|editor| {
-            let mode = editor.selection_mode.unwrap_or(MoveMode::Char);
-            // TODO: Use the mode. Kinda like
-            // editor.caret_mover.move_mode_to_range(mode) // and then use that info to extend the selection
-            editor.caret.end_position = position;
-        })
+        let mode = self.selection_mode.unwrap_or(MoveMode::Char);
+
+        let autocorrect = self.start_autocorrect();
+        let builder = EditorActionBuilder::new(self);
+        // TODO: Use the mode. Kinda like
+        // editor.caret_mover.move_mode_to_range(mode) // and then use that info to extend the selection
+
+        let caret = MinimalCaret {
+            start_position: builder.caret.start_position.clone(),
+            end_position: position,
+        };
+        let action = builder.finish(caret);
+
+        self.apply_autocorrect(autocorrect.finish(&action.edits));
     }
     pub fn finish_selection(&mut self) {
         self.selection_mode = None;
@@ -237,11 +251,13 @@ impl MathEditor {
         data: String,
         data_type: Option<SerializedDataType>,
     ) -> Result<(), serialization::SerializationError> {
-        self.with_caret_movement(|editor| {
-            let nodes = deserialize_input_nodes(data, data_type)?;
-            editor.insert_nodes_at_caret(nodes);
-            Ok(())
-        })
+        let autocorrect = self.start_autocorrect();
+        let nodes = deserialize_input_nodes(data, data_type)?;
+        let action = self.insert_nodes_at_caret(nodes);
+        if let Some(action) = action {
+            self.apply_autocorrect(autocorrect.finish(&action.edits));
+        }
+        Ok(())
     }
 
     pub fn open_autocomplete(&mut self) -> Option<()> {
@@ -266,23 +282,14 @@ impl MathEditor {
         Some(())
     }
 
-    fn with_caret_movement<T>(&mut self, callback: impl FnOnce(&mut Self) -> T) -> T {
-        let perfect_match = self.get_autocomplete().and_then(|v| v.get_perfect_match());
-
-        // TODO: let range = perfect_match.map(|v| v.caret_range);
-        let result = callback(self);
-        self.apply_perfect_autocomplete(perfect_match);
-        result
+    fn start_autocorrect(&mut self) -> AutocorrectActionBuilder {
+        self.get_autocomplete()
+            .map(|v| v.start_autocorrect())
+            .unwrap_or_default()
     }
-
     /// When the caret moves, we apply "perfect match" autocompletes
-    fn apply_perfect_autocomplete(
-        &mut self,
-        perfect_match: Option<AutocompletePerfectMatch>,
-        // TODO: Option<Edits>
-    ) -> Option<()> {
-        let perfect_match = perfect_match?;
-
+    fn apply_autocorrect(&mut self, autocorrect: Option<AutocorrectAction>) -> Option<()> {
+        let autocorrect = autocorrect?;
         let caret_start_position =
             match Caret::from_minimal(&self.input, &self.caret).into_selection() {
                 CaretSelection::Row(range) => Some(range.start_position()),
@@ -290,14 +297,14 @@ impl MathEditor {
             }?;
 
         let autocomplete_range =
-            InputRowRange::from_minimal(self.input.root_focus(), &perfect_match.caret_range);
+            InputRowRange::from_minimal(self.input.root_focus(), &autocorrect.caret_range);
         if autocomplete_range.contains(&caret_start_position) {
             // We're still editing the same token and just moved around in it. We don't have the "editing a different part of the tree" intent yet.
             return None;
         }
 
         // It might no longer be a perfect match, so we need to check again
-        let is_perfect_match = perfect_match
+        let is_perfect_match = autocorrect
             .rule
             .matches(
                 autocomplete_range.values(),
@@ -313,7 +320,7 @@ impl MathEditor {
 
         self.splice_at_range(
             autocomplete_range.to_minimal(),
-            perfect_match.rule.result.to_vec(),
+            autocorrect.rule.result.to_vec(),
         );
         return Some(());
     }
@@ -354,18 +361,18 @@ impl MathEditor {
         // Move caret
         // Apply edit
         // Merge edit into undo stack
+        let caret_before = self.caret.clone();
         let mut caret = self.caret.clone();
-        let mut builder = CaretEditBuilder::new(self.caret.clone());
+        let mut builder = EditorActionBuilder::new(self);
         let (basic_edit, _) = BasicEdit::replace_range(
-            &InputRowRange::from_minimal(self.input.root_focus(), &range),
+            &InputRowRange::from_minimal(builder.input.root_focus(), &range),
             values,
         );
         caret.start_position.apply_edits(&basic_edit);
         caret.end_position.apply_edits(&basic_edit);
-        self.input.apply_edits(&basic_edit);
-        self.parsed = None;
         builder.add_edits(basic_edit);
-        self.undo_stack.push(builder.finish(caret).into());
+        builder.finish(caret);
+        self.caret = caret_before;
     }
 
     /// Get all the known rule names
@@ -406,89 +413,5 @@ impl AutocompleteState {
 
     pub fn set_current_autocomplete(&mut self, rule: Option<AutocompleteRule>) {
         self.current_autocomplete = rule;
-    }
-}
-
-pub struct AutocompletePerfectMatch {
-    pub rule: AutocompleteRule,
-    pub caret_range: MinimalInputRowRange,
-}
-
-pub struct AutocompleteResults<'a> {
-    selected_index: usize,
-    matches: Vec<AutocompleteRuleMatch<'a>>,
-    caret_position: MinimalInputRowPosition,
-}
-
-impl<'a> AutocompleteResults<'a> {
-    pub fn new(
-        selected_index: usize,
-        matches: Vec<AutocompleteRuleMatch<'a>>,
-        caret_position: MinimalInputRowPosition,
-    ) -> Self {
-        assert!(selected_index < matches.len());
-        Self {
-            selected_index,
-            matches,
-            caret_position,
-        }
-    }
-
-    pub fn get_perfect_match(&self) -> Option<AutocompletePerfectMatch> {
-        let selected = self.get_selected();
-        if !selected.is_complete_match() {
-            return None;
-        }
-        let caret_range = self.get_caret_range(selected);
-        Some(AutocompletePerfectMatch {
-            rule: selected.rule.clone(),
-            caret_range,
-        })
-    }
-
-    pub fn get_selected(&self) -> &AutocompleteRuleMatch<'a> {
-        self.matches.get(self.selected_index).unwrap()
-    }
-
-    pub fn move_selection(&mut self, direction: VerticalDirection) {
-        match direction {
-            VerticalDirection::Up => {
-                if self.selected_index > 0 {
-                    self.selected_index -= 1;
-                }
-            }
-            VerticalDirection::Down => {
-                if self.selected_index < self.matches.len() - 1 {
-                    self.selected_index += 1;
-                }
-            }
-        }
-    }
-
-    pub fn get_caret_range(&self, rule_match: &AutocompleteRuleMatch<'a>) -> MinimalInputRowRange {
-        MinimalInputRowRange {
-            row_indices: self.caret_position.row_indices.clone(),
-            start: self.caret_position.offset,
-            end: Offset(
-                self.caret_position
-                    .offset
-                    .0
-                    .saturating_sub(rule_match.input_match_length),
-            ),
-        }
-    }
-
-    pub fn destructure(
-        &self,
-    ) -> (
-        usize,
-        &Vec<AutocompleteRuleMatch<'a>>,
-        MinimalInputRowPosition,
-    ) {
-        (
-            self.selected_index,
-            &self.matches,
-            self.caret_position.clone(),
-        )
     }
 }

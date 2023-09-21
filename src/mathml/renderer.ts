@@ -113,14 +113,14 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
         return new TextMathMLElement(syntaxTree, rowIndex, "mn");
       });
-      arithmetic.add(["Add", "Subtract", "Multiply", "Divide", "Exponent"], (syntaxTree, rowIndex) => {
+      arithmetic.add(["Add", "Subtract", "Multiply", "Divide", "Exponent", "Factorial"], (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
         return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });
     }
     {
       const calculus = this.rendererCollection("Calculus");
-      calculus.add(["Infinity", "Lim", "LimSup", "LimInf"], (syntaxTree, rowIndex) => {
+      calculus.add(["Infinity", "Lim", "LimSup", "LimInf", "Integral", "Sum"], (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
         return new TextMathMLElement(syntaxTree, rowIndex, "mi");
       });
@@ -138,13 +138,6 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
     {
       const collection = this.rendererCollection("Collection");
       collection.add("Tuple", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
-        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
-      });
-    }
-    {
-      const unsorted = this.rendererCollection("Unsorted");
-      unsorted.add("Factorial", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
         return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });

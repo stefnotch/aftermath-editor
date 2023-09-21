@@ -9,7 +9,6 @@ import init, {
   type InputRow,
   type Offset,
   type RowIndices,
-  type Offset2D,
 } from "../../aftermath-core/pkg";
 import { assert } from "../utils/assert";
 
@@ -30,7 +29,7 @@ export const MathEditorHelper = {
     return mathEditor.splice_at_range(range, values);
   },
   getTokenNames(mathEditor: MathEditorBindings): NodeIdentifier[] {
-    return mathEditor.get_token_names();
+    return mathEditor.get_rule_names();
   },
 };
 
@@ -159,7 +158,6 @@ type CoreAutocompleteRule = {
   result: CoreElement[];
   value: string;
 };
-
 
 export function getGridRow(node: SyntaxNode, indices: RowIndices, indexOfContainer: number, gridOffset: Offset2D): RowIndices {
   node = getNodeWithRowIndices(node, indices);
