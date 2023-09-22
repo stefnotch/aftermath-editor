@@ -1,13 +1,18 @@
 import {
   type NodeIdentifier,
   type NodeIdentifierJoined,
-  type ParseResult,
   type SyntaxNode,
   hasSyntaxNodeChildren,
   joinNodeIdentifier,
 } from "../core";
 import type { RowIndex } from "../input-tree/row-indices";
-import type { RenderedElement, RenderResult, Renderer, ImmediateRenderingOptions } from "../rendering/render-result";
+import type {
+  RenderedElement,
+  RenderResult,
+  Renderer,
+  ImmediateRenderingOptions,
+  ParseResult,
+} from "../rendering/render-result";
 import { assert } from "../utils/assert";
 import { MathMLRenderResult } from "./render-result";
 import { SimpleContainerMathMLElement } from "./renderer/rendered-container-element";
@@ -229,8 +234,8 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
     return this.renderers.has(joinNodeIdentifier(nodeIdentifier));
   }
 
+  // TODO: Rendering errors is like rendering non-semantic annotations
   renderAll(parsed: ParseResult): RenderResult<MathMLElement> {
-    // TODO: Rendering errors is like rendering non-semantic annotations
     const element = this.render(parsed.value, null);
     return new MathMLRenderResult(element);
   }

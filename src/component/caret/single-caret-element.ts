@@ -50,7 +50,7 @@ export class CaretDomElement {
   addSelection(rect: ViewportRect) {
     const parentPos = this.#element.getBoundingClientRect();
     const selection = createNode("span", {
-      className: "caret-selection",
+      classList: ["caret-selection"],
       style: {
         position: "absolute",
         left: `${rect.x - parentPos.left}px`,

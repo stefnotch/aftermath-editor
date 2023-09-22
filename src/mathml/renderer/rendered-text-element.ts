@@ -16,7 +16,7 @@ export class TextMathMLElement implements RenderedElement<MathMLElement> {
   private textElement: LeafMathMLElement;
 
   constructor(public syntaxTree: SyntaxNodeWith<"Leaf">, public rowIndex: RowIndex | null, elementName: MathMLTags) {
-    this.textElement = new LeafMathMLElement(syntaxTree.children.Leaf);
+    this.textElement = new LeafMathMLElement(syntaxTree.children.Leaf, syntaxTree.range);
     let children: Text[] = this.textElement.getElements();
     this.element = new RenderedMathML(createMathElement(elementName, children));
   }

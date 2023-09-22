@@ -1,4 +1,4 @@
-import { type SyntaxLeafNode, offsetInRange } from "../../core";
+import { type SyntaxLeafNode, offsetInRange, type SyntaxNode } from "../../core";
 import { type Offset } from "../../input-tree/input-offset";
 import { type ViewportValue } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
@@ -10,11 +10,11 @@ export class LeafMathMLElement {
    */
   private textElements: Text[];
 
-  constructor(public syntaxTree: SyntaxLeafNode) {
+  constructor(public syntaxTree: SyntaxLeafNode, public range: SyntaxNode["range"]) {
     this.textElements = syntaxTree.symbols.map((v) => document.createTextNode(v)) ?? [createPlaceholder()];
   }
   getViewportXPosition(offset: Offset): { x: ViewportValue } {
-    assert(offsetInRange(offset, this.syntaxTree.range), "Invalid offset");
+    assert(offsetInRange(offset, this.range), "Invalid offset");
     const { graphemeText, atEnd } = this.getTextNodeAt(offset);
     const graphemeBounds = getTextBoundingBox(graphemeText);
 
@@ -24,14 +24,14 @@ export class LeafMathMLElement {
   }
 
   private getTextNodeAt(offset: Offset) {
-    const graphemeOffset = offset - this.syntaxTree.range.start;
+    const graphemeOffset = offset - this.range.start;
     const atEnd = graphemeOffset >= this.textElements.length;
     const graphemeText = this.textElements[atEnd ? this.textElements.length - 1 : graphemeOffset];
     return { graphemeText, atEnd };
   }
 
   getBaseline(offset: Offset): { y: ViewportValue } {
-    assert(offsetInRange(offset, this.syntaxTree.range), "Invalid offset");
+    assert(offsetInRange(offset, this.range), "Invalid offset");
     const { graphemeText } = this.getTextNodeAt(offset);
 
     // This is correct, since we're creating one text element per grapheme

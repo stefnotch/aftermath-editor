@@ -23,7 +23,7 @@ export class SymbolMathMLElement implements RenderedElement<MathMLElement> {
       isStretchy: boolean;
     }> = {}
   ) {
-    this.textElement = new LeafMathMLElement(syntaxTree.children.Leaf);
+    this.textElement = new LeafMathMLElement(syntaxTree.children.Leaf, syntaxTree.range);
     let children: Text[] = this.textElement.getElements();
     const mathElement = createMathElement(elementName, children);
     mathElement.style.whiteSpace = "nowrap";

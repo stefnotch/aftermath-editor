@@ -23,21 +23,3 @@ extern "C" {
 fn main() {
     set_panic_hook();
 }
-
-/*
-    pub fn autocomplete(&self, input_nodes: JsValue) -> Result<JsValue, JsValue> {
-        let nodes: Vec<InputNode> = serde_wasm_bindgen::from_value(input_nodes)?;
-        let result = self.parser_rules.get_autocomplete(&nodes);
-        let serialized_result = result.serialize(&self.serializer)?;
-        Ok(serialized_result)
-    }
-
-    pub fn beginning_autocomplete(&self, input_nodes: JsValue) -> Result<JsValue, JsValue> {
-        let nodes: Vec<InputNode> = serde_wasm_bindgen::from_value(input_nodes)?;
-        let result = self
-            .parser_rules
-            .get_finished_autocomplete_at_beginning(&nodes);
-        let serialized_result = result.serialize(&self.serializer)?;
-        Ok(serialized_result)
-    }
-*/

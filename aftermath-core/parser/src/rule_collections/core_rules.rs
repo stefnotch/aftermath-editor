@@ -1,11 +1,6 @@
-
-
-
 use crate::parser_extensions::just_symbol;
 
-use crate::syntax_tree::{
-    LeafNodeType, SyntaxNodeBuilder, SyntaxNodeChildren,
-};
+use crate::syntax_tree::{LeafNodeType, SyntaxNodeBuilder, SyntaxNodeChildren};
 use crate::{
     autocomplete::AutocompleteRule,
     rule_collection::{RuleCollection, TokenRule},
@@ -13,9 +8,10 @@ use crate::{
 };
 use chumsky::{prelude::*, Parser};
 
-
-use input_tree::node::{InputNode};
+use input_tree::node::InputNode;
 use unicode_ident::{is_xid_continue, is_xid_start};
+
+use super::built_in_rules::BuiltInRules;
 
 /// Core rules that one basically always wants.
 pub struct CoreRules {}
@@ -50,7 +46,7 @@ impl CoreRules {
                                 vec![left_bracket],
                                 LeafNodeType::Operator,
                             )
-                            .build(Self::rule_name("RoundBracket"), left_bracket_span),
+                            .build(BuiltInRules::operator_rule_name(), left_bracket_span),
                         );
                         if let Some(child) = child {
                             children.push(child);
@@ -60,7 +56,7 @@ impl CoreRules {
                                 vec![right_bracket],
                                 LeafNodeType::Operator,
                             )
-                            .build(Self::rule_name("RoundBracket"), right_bracket_span),
+                            .build(BuiltInRules::operator_rule_name(), right_bracket_span),
                         );
                         SyntaxNodeBuilder::new(SyntaxNodeChildren::Children(children))
                     },

@@ -124,13 +124,13 @@ export class MathEditor extends HTMLElement {
 
     // Rendering
     this.renderer = new MathMLRenderer();
-    MathEditorHelper.getTokenNames(this.mathEditor).forEach((name) => {
+    MathEditorHelper.getRuleNames(this.mathEditor).forEach((name) => {
       assert(this.renderer.canRender(name), "Cannot render " + joinNodeIdentifier(name) + ".");
     });
 
     this.syntaxTree = MathEditorHelper.getSyntaxTree(this.mathEditor);
     this.renderResult = this.renderer.renderAll({
-      errors: [],
+      errors: null,
       value: this.syntaxTree,
     });
 
@@ -163,10 +163,10 @@ export class MathEditor extends HTMLElement {
       // Woah, apparently running this code later fixes a Firefox textarea bug
       this.renderTaskQueue.add(() => {
         if (ev.inputType === "deleteContentBackward" || ev.inputType === "deleteWordBackward") {
-          this.mathEditor.remove_at_caret("Left");
+          this.mathEditor.remove_at_caret("Left", "Char");
           this.updateInput();
         } else if (ev.inputType === "deleteContentForward" || ev.inputType === "deleteWordForward") {
-          this.mathEditor.remove_at_caret("Right");
+          this.mathEditor.remove_at_caret("Right", "Char");
           this.updateInput();
         } else if (ev.inputType === "insertText") {
           const data = ev.data;
@@ -179,48 +179,6 @@ export class MathEditor extends HTMLElement {
         }
       });
     });
-
-    /*
-        
- 
-    function applySymbolShortcuts(zipper: InputRowZipper, syntaxNode: SyntaxNode): { rangeEnd: number } {
-      // First operate on the children
-      if (hasSyntaxNodeChildren(syntaxNode, "Leaf")) {
-        // Done
-      } else if (hasSyntaxNodeChildren(syntaxNode, "NewRows")) {
-        const newRows = syntaxNode.children.NewRows.values;
-        assert(syntaxNode.range.start + 1 === syntaxNode.range.end);
-        for (let i = 0; i < newRows.length; i++) {
-          applySymbolShortcuts(zipper.children[syntaxNode.range.start].children[i], newRows[i]);
-        }
-      } else if (hasSyntaxNodeChildren(syntaxNode, "Containers")) {
-        // TODO: Maybe refactor the syntax node range to only be a width. (We have a ton of constraints on the range anyways.)
-        for (const child of syntaxNode.children.Containers) {
-          applySymbolShortcuts(zipper, child);
-        }
-      } else {
-        throw new Error("Unknown syntax node children type");
-      }
- 
-      if (syntaxNode.name[0] === "SymbolShortcut") {
-        const type = syntaxNode.name[1];
-        const operandValues = syntaxNode.children;
-        const deletionEdit = deleteRange(zipper, syntaxNode.range);
-        // Do something
-      } else {
-        return { rangeEnd: syntaxNode.range.end };
-      }
-    }
- 
-    // Handle symbol shortcuts
-    const result = applyEdit(this.inputTree, edit);
-    const parsed = parse(result.root.value);
-    // 1. Get shortcut symbols in syntax tree (nested stuff - indices will change no matter what I do)
-    // 2. Get the ranges of the operator symbols and ranges of arguments
-    // 3. Delete the ranges
-    // 4. Insert the new symbol
- 
-    */
 
     const handleCopy = (clipboard: DataTransfer) => {
       clipboard.setData("application/json", this.mathEditor.copy("JsonInputTree"));
@@ -242,7 +200,7 @@ export class MathEditor extends HTMLElement {
       }
       handleCopy(ev.clipboardData);
       ev.preventDefault();
-      this.mathEditor.remove_at_caret("Range");
+      this.mathEditor.remove_at_caret("Range", "Char");
       this.updateInput();
     });
 
@@ -381,10 +339,11 @@ export class MathEditor extends HTMLElement {
    * Updates the user input. Then reparses and rerenders the math formula.
    */
   updateInput() {
+    console.log("about to get the syntax tree for", MathEditorHelper.getInputTree(this.mathEditor));
     this.syntaxTree = MathEditorHelper.getSyntaxTree(this.mathEditor);
     this.renderResult = this.renderer.renderAll({
       value: this.syntaxTree,
-      errors: [],
+      errors: null,
     });
     console.log("Rendered", this.renderResult);
 
@@ -515,107 +474,4 @@ export class MathEditor extends HTMLElement {
       }
     }
   }
-
-  /**
-   * User typed some text
-   
-  insertAtCaret(caret: MathCaret, text: string) {
-    return;     
-    function takeElementOrBracket(mathAst: MathAst, caret: MathCaret, direction: "left" | "right"): MathLayoutRow | null {
-      if (caret.row.type == "row") {
-        const elementIndex = caret.offset + (direction == "left" ? -1 : 0);
-        const element = arrayUtils.get(caret.row.values, elementIndex) ?? null;
-
-        if (element == null) return null;
-        if (element.type == "bracket") {
-          if (
-            (direction == "left" && startingBrackets.has(element.value)) ||
-            (direction == "right" && endingBrackets.has(element.value))
-          ) {
-            return null;
-          }
-
-          const otherBracketIndex = findOtherBracket(caret.row.values, elementIndex, direction);
-          if (otherBracketIndex) {
-            const start = Math.min(elementIndex, otherBracketIndex);
-            const end = Math.max(elementIndex, otherBracketIndex);
-            const newRow: MathLayoutRow = {
-              type: "row",
-              values: [],
-            };
-            const bracketedElements = caret.row.values.slice(start, end + 1);
-            for (let i = 0; i < bracketedElements.length; i++) {
-              mathAst.removeChild(caret.row, bracketedElements[i]);
-              mathAst.insertChild(newRow, bracketedElements[i], i);
-            }
-            if (direction == "left") {
-              caret.offset -= bracketedElements.length;
-            }
-            return newRow;
-          }
-        } else {
-          mathAst.removeChild(caret.row, element);
-          // So that the caret's location never becomes invalid
-          if (direction == "left") {
-            caret.offset -= 1;
-          }
-          return { type: "row", values: [element] };
-        }
-      }
-      return null;
-    }
-
-    const mathAst = this.mathAst;
-    function insertMathLayout<T extends MathLayoutElement>(mathIR: T): T {
-      assert(caret.row.type == "row");
-      mathAst.setParents(null, [mathIR]);
-      mathAst.insertChild(caret.row, mathIR, caret.offset);
-
-      return mathIR;
-    }
-
-    if (caret.row.type == "row") {
-      if (text == "^") {
-        const mathIR = insertMathLayout({
-          type: "sup",
-          values: [takeElementOrBracket(this.mathAst, caret, "right") ?? { type: "row", values: [] }],
-        });
-        caret.row = mathIR.values[0];
-        caret.offset = 0;
-      } else if (text == "_") {
-        const mathIR = insertMathLayout({
-          type: "sub",
-          values: [takeElementOrBracket(this.mathAst, caret, "right") ?? { type: "row", values: [] }],
-        });
-        caret.row = mathIR.values[0];
-        caret.offset = 0;
-      } else if (text == "/") {
-        const mathIR = insertMathLayout({
-          type: "fraction",
-          values: [
-            takeElementOrBracket(this.mathAst, caret, "left") ?? { type: "row", values: [] },
-            takeElementOrBracket(this.mathAst, caret, "right") ?? { type: "row", values: [] },
-          ],
-        });
-        caret.row = mathIR.values[1];
-        caret.offset = 0;
-      } else if (text.length == 1) {
-        // Broken unicode support ^
-        this.mathAst.insertChild(
-          caret.row,
-          {
-            type: "symbol",
-            value: text,
-          },
-          caret.offset
-        );
-        caret.offset += 1;
-      } else {
-        // Attempted to insert multiple things
-      }
-    } else {
-      caret.row.value = caret.row.value.slice(0, caret.offset) + text + caret.row.value.slice(caret.offset);
-      caret.offset += text.length;
-    }
-  }*/
 }

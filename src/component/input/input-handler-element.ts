@@ -1,3 +1,5 @@
+import { createNode } from "../../utils/dom-utils";
+
 export class InputHandlerElement {
   #element: HTMLTextAreaElement;
 
@@ -5,12 +7,14 @@ export class InputHandlerElement {
     const isVisible = false;
 
     // See also https://github.com/stefnotch/quantum-sheet/blob/6b445476559ab5354b8a1c68c24a4ceb24e050e9/src/ui/QuantumDocument.vue#L23
-    const element = document.createElement("textarea");
-    element.classList.add("input-textarea");
-    element.autocomplete = "off";
-    element.spellcheck = false;
-    element.setAttribute("autocorrect", "off");
-    element.classList.add("math-input-area");
+    const element = createNode("textarea", {
+      classList: ["input-textarea", "math-input-area"],
+      autocomplete: "off",
+      spellcheck: false,
+      attributes: {
+        autocorrect: "off",
+      },
+    });
 
     if (isVisible) {
       element.style.transform = "scale(1)";

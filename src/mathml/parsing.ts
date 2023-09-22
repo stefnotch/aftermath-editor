@@ -61,28 +61,6 @@ function sub(value: InputRow): InputNode {
     ],
   };
 }
-function under(values: [InputRow, InputRow]): InputNode {
-  return {
-    Container: [
-      "Under",
-      {
-        values,
-        width: 1,
-      },
-    ],
-  };
-}
-function over(values: [InputRow, InputRow]): InputNode {
-  return {
-    Container: [
-      "Over",
-      {
-        values,
-        width: 1,
-      },
-    ],
-  };
-}
 function table(values: InputRow[], width: number): InputNode {
   return {
     Container: [
@@ -148,22 +126,27 @@ function toMathLayout(element: Element, errors: Error[]): (InputRow | InputNode)
       ]
     );
   } else if (tagIs(element, "munder")) {
+    // It's usually a sub/sup
     return (
-      expectNChildren(element, 2, errors) ??
-      under([wrapInRow(toMathLayout(children[0], errors)), wrapInRow(toMathLayout(children[1], errors))])
+      expectNChildren(element, 2, errors) ?? [
+        ...wrapInRow(toMathLayout(children[0], errors)).values,
+        sub(wrapInRow(toMathLayout(children[1], errors))),
+      ]
     );
   } else if (tagIs(element, "mover")) {
     return (
-      expectNChildren(element, 2, errors) ??
-      over([wrapInRow(toMathLayout(children[0], errors)), wrapInRow(toMathLayout(children[1], errors))])
+      expectNChildren(element, 2, errors) ?? [
+        ...wrapInRow(toMathLayout(children[0], errors)).values,
+        sup(wrapInRow(toMathLayout(children[1], errors))),
+      ]
     );
   } else if (tagIs(element, "munderover")) {
     return (
-      expectNChildren(element, 3, errors) ??
-      over([
-        wrapInRow(under([wrapInRow(toMathLayout(children[0], errors)), wrapInRow(toMathLayout(children[1], errors))])),
-        wrapInRow(toMathLayout(children[2], errors)),
-      ])
+      expectNChildren(element, 3, errors) ?? [
+        ...wrapInRow(toMathLayout(children[0], errors)).values,
+        sub(wrapInRow(toMathLayout(children[1], errors))),
+        sup(wrapInRow(toMathLayout(children[2], errors))),
+      ]
     );
   } else if (tagIs(element, "mtable")) {
     if (!children.every((c) => tagIs(c, "mtr") && [...c.children].every((cc) => tagIs(cc, "mtd")))) {

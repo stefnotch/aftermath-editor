@@ -119,6 +119,10 @@ impl MathEditorBindings {
         Ok(result)
     }
 
+    pub fn get_input_tree(&self) -> Result<JsValue, JsValue> {
+        let result = self.editor.get_input_tree().serialize(&self.serializer)?;
+        Ok(result)
+    }
     pub fn get_syntax_tree(&mut self) -> Result<JsValue, JsValue> {
         let result = self.editor.get_syntax_tree().serialize(&self.serializer)?;
         Ok(result)

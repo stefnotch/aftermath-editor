@@ -106,9 +106,9 @@ fn test_parser_nested_brackets_and_postfix() {
         parsed.to_string(),
         format!(
             "{}{}{}",
-            r#"(Core::RoundBrackets (Core::RoundBracket "(") (Core::RoundBrackets (Core::RoundBracket "(") (Core::RoundBrackets (Core::RoundBracket "(") "#,
+            r#"(Core::RoundBrackets (Core::Operator "(") (Core::RoundBrackets (Core::Operator "(") (Core::RoundBrackets (Core::Operator "(") "#,
             r#"(Arithmetic::Factorial (Core::Variable "a") (BuiltIn::Operator "!")) "#,
-            r#"(Core::RoundBracket ")")) (Core::RoundBracket ")")) (Core::RoundBracket ")"))"#
+            r#"(Core::Operator ")")) (Core::Operator ")")) (Core::Operator ")"))"#
         )
     );
 }
@@ -145,9 +145,9 @@ fn test_parser_tuple_advanced() {
         parsed.to_string(),
         format!(
             "{}{}{}",
-            r#"(Core::RoundBrackets (Core::RoundBracket "(") "#,
+            r#"(Core::RoundBrackets (Core::Operator "(") "#,
             r#"(Collection::Tuple (Collection::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b")) (BuiltIn::Operator ",") (Core::Variable "c")) "#,
-            r#"(Core::RoundBracket ")"))"#
+            r#"(Core::Operator ")"))"#
         )
     );
 }
@@ -168,9 +168,9 @@ fn test_parser_function_call() {
         parsed.to_string(),
         format!(
             "{}{}{}",
-            r#"(Function::FunctionApplication (Core::Variable "f") (BuiltIn::Argument (Core::RoundBracket "(") ("#,
+            r#"(Function::FunctionApplication (Core::Variable "f") (BuiltIn::Argument (Core::Operator "(") ("#,
             r#"Collection::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b")"#,
-            r#") (Core::RoundBracket ")")))"#
+            r#") (Core::Operator ")")))"#
         )
     );
 }
@@ -189,7 +189,7 @@ fn test_parser_brackets_with_addition() {
 
     assert_eq!(
         parsed.to_string(),
-        r#"(Core::RoundBrackets (Core::RoundBracket "(") (Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (Core::Variable "b")) (Core::RoundBracket ")"))"#
+        r#"(Core::RoundBrackets (Core::Operator "(") (Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (Core::Variable "b")) (Core::Operator ")"))"#
     );
 }
 
@@ -210,7 +210,7 @@ fn test_parser_fraction() {
 
     assert_eq!(
         parsed.to_string(),
-        r#"(Core::RoundBrackets (Core::RoundBracket "(") (Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (BuiltIn::Fraction 1x2 (Core::Variable "b") (Core::Variable "c"))) (Core::RoundBracket ")"))"#
+        r#"(Core::RoundBrackets (Core::Operator "(") (Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (BuiltIn::Fraction 1x2 (Core::Variable "b") (Core::Variable "c"))) (Core::Operator ")"))"#
     );
 }
 

@@ -1,4 +1,5 @@
 import type { ViewportCoordinate } from "../../rendering/viewport-coordinate";
+import { createNode } from "../../utils/dom-utils";
 
 /**
  * There's only one autocomplete element.
@@ -14,19 +15,22 @@ export class AutocompleteElement {
   // Remember that different autocomplete results can have different ranges.
 
   constructor() {
-    const containerElement = document.createElement("div");
-    containerElement.style.position = "absolute";
-    this.#container = containerElement;
+    this.#container = createNode("div", {
+      style: {
+        position: "absolute",
+      },
+    });
 
-    const element = document.createElement("div");
-    element.classList.add("autocomplete-container");
-    element.style.position = "absolute";
-    containerElement.append(element);
-    this.#element = element;
+    this.#element = createNode("div", {
+      classList: ["autocomplete-container"],
+      style: {
+        position: "absolute",
+      },
+    });
+    this.#container.append(this.#element);
 
-    const listElement = document.createElement("ul");
-    element.append(listElement);
-    this.#listElement = listElement;
+    this.#listElement = createNode("ul", {});
+    this.#element.append(this.#listElement);
 
     this.setVisibility(false);
   }

@@ -9,6 +9,8 @@ import init, {
   type InputRow,
   type Offset,
   type RowIndices,
+  type SerializedDataType,
+  type AutocompleteResultsBindings,
 } from "../../aftermath-core/pkg";
 import { assert } from "../utils/assert";
 
@@ -16,19 +18,28 @@ import { assert } from "../utils/assert";
 await init();
 
 export const MathEditorHelper = {
-  getSyntaxTree(mathEditor: MathEditorBindings): SyntaxNode {
-    return mathEditor.get_syntax_tree();
-  },
   insertAtCaret(mathEditor: MathEditorBindings, values: string[]) {
     return mathEditor.insert_at_caret(values);
+  },
+  paste(mathEditor: MathEditorBindings, data: string, data_type?: SerializedDataType) {
+    return mathEditor.paste(data, data_type);
   },
   getCaret(mathEditor: MathEditorBindings): MinimalCaretSelection[] {
     return mathEditor.get_caret();
   },
+  getAutocomplete(mathEditor: MathEditorBindings): AutocompleteResultsBindings | undefined {
+    return mathEditor.get_autocomplete();
+  },
+  getInputTree(mathEditor: MathEditorBindings): InputRow {
+    return mathEditor.get_input_tree();
+  },
+  getSyntaxTree(mathEditor: MathEditorBindings): SyntaxNode {
+    return mathEditor.get_syntax_tree();
+  },
   spliceAtRange(mathEditor: MathEditorBindings, range: MinimalInputRowRange, values: InputNode[]) {
     return mathEditor.splice_at_range(range, values);
   },
-  getTokenNames(mathEditor: MathEditorBindings): NodeIdentifier[] {
+  getRuleNames(mathEditor: MathEditorBindings): NodeIdentifier[] {
     return mathEditor.get_rule_names();
   },
 };
@@ -42,11 +53,6 @@ export function isInputRow(value: InputRow | InputNode | (InputRow | InputNode)[
   }
   return false;
 }
-
-export type ParseResult = {
-  value: SyntaxNode;
-  errors: any[];
-};
 
 type SyntaxNodesKeys = "NewRows" | "Children" | "Leaf";
 
@@ -73,91 +79,11 @@ export function offsetInRange(
 
 export * from "../../aftermath-core/pkg";
 
-export type Autocomplete = {
-  input: InputRowRange;
-  result: AutocompleteResult;
-};
-
-export type AutocompleteResult = {
-  potentialRules: AutocompleteRuleMatch[];
-};
-
-export type AutocompleteRuleMatch = {
-  value: string;
-  result: InputNode[];
-  matchLength: number;
-};
-
-export function autocomplete(tokenStarts: InputRowPosition[], endPosition: Offset): Autocomplete[] {
-  return tokenStarts.flatMap((token) => {
-    let inputNodes = token.zipper.value.values.slice(token.offset, endPosition);
-    let result: CoreAutocompleteResult | null = parser.autocomplete(inputNodes.map((n) => toCoreNode(n))) ?? null;
-    if (result !== null) {
-      let autocomplete: Autocomplete = {
-        input: new InputRowRange(token.zipper, token.offset, endPosition),
-        result: fromCoreAutocompleteResult(result),
-      };
-      return [autocomplete];
-    } else {
-      return [];
-    }
-  });
-}
-
-export function beginningAutocomplete(token: InputRowPosition, endPosition: Offset): Autocomplete | null {
-  let inputNodes = token.zipper.value.values.slice(token.offset, endPosition);
-  let result: CoreAutocompleteResult | null = parser.beginning_autocomplete(inputNodes.map((n) => toCoreNode(n))) ?? null;
-  if (result !== null) {
-    let autocomplete: Autocomplete = {
-      input: new InputRowRange(token.zipper, token.offset, endPosition),
-      result: fromCoreAutocompleteResult(result),
-    };
-    return autocomplete;
-  } else {
-    return null;
-  }
-}
-
-function fromCoreAutocompleteResult(result: CoreAutocompleteResult): AutocompleteResult {
-  return {
-    potentialRules: result.potential_rules.map((r) => {
-      return {
-        value: r.rule.value,
-        result: r.rule.result.map((e) => fromCoreNode(e)),
-        matchLength: r.match_length,
-      };
-    }),
-  };
-}
-
 // TODO: I want tuples and records for this https://github.com/tc39/proposal-record-tuple
 export type NodeIdentifierJoined = string;
 export function joinNodeIdentifier(nodeIdentifier: NodeIdentifier): NodeIdentifierJoined {
   return nodeIdentifier.join("::");
 }
-
-// TODO:
-// We're maintaining the types by hand for now, since we tried out mostly everything else.
-// Directly using WASM-bindgen's Typescript stuff doesn't work, because they don't support enums. https://github.com/rustwasm/wasm-bindgen/issues/2407
-// https://github.com/cloudflare/serde-wasm-bindgen/issues/19 doesn't generate Typescript types.
-// typeshare is only for JSON https://github.com/1Password/typeshare/issues/100 and is annoying to use (needs a CLI and such).
-//
-// Maybe in the future we can move to WebAssembly Interface Types, e.g. https://github.com/tauri-apps/tauri-bindgen
-
-type CoreAutocompleteResult = {
-  range_in_input: Range<number>;
-  potential_rules: CoreAutocompleteRuleMatch[];
-};
-
-type CoreAutocompleteRuleMatch = {
-  rule: CoreAutocompleteRule;
-  match_length: number;
-};
-
-type CoreAutocompleteRule = {
-  result: CoreElement[];
-  value: string;
-};
 
 export function getGridRow(node: SyntaxNode, indices: RowIndices, indexOfContainer: number, gridOffset: Offset2D): RowIndices {
   node = getNodeWithRowIndices(node, indices);

@@ -14,7 +14,7 @@ use input_tree::editing::editable::Editable;
 use input_tree::editing::BasicEdit;
 use input_tree::focus::{InputRowPosition, InputRowRange};
 use input_tree::input_tree::InputTree;
-use input_tree::row::Offset;
+use input_tree::row::{InputRow, Offset};
 use input_tree::{
     direction::{Direction, VerticalDirection},
     focus::{MinimalInputRowPosition, MinimalInputRowRange},
@@ -343,6 +343,9 @@ impl MathEditor {
     pub fn get_caret(&self) -> Vec<MinimalCaretSelection> {
         let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
         vec![selection.to_minimal()]
+    }
+    pub fn get_input_tree(&self) -> &InputRow {
+        &self.input.root
     }
     pub fn get_syntax_tree(&mut self) -> &SyntaxNode {
         if let Some(ref result) = (self).parsed {
