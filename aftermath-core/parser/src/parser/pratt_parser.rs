@@ -18,7 +18,7 @@ where
     E: ParserExtra<'a, I>,
 {
     pub min_binding_power: u16,
-    // Ew
+    // Wait, no, it's not that easy: There might be multiple type of possible ending tokens. Think nested fractions of different types ({[ a })
     pub end_parser: Boxed<'a, 'a, I, (), E>,
 }
 
