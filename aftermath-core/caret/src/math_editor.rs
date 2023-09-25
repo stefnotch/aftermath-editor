@@ -318,6 +318,13 @@ impl MathEditor {
             return None;
         }
 
+        // TODO:
+        // if autocomplete_range.left < caret.start_position && we have a valid autocomplete option at (autocomplete_range.left..caret.start_position) {
+        // then we're in a case like "lim|" -> "lims|" -> "limsup|"
+        // in that case, we don't want to overzealously apply the autocorrect
+        //  return None;
+        //}
+
         self.splice_at_range(
             autocomplete_range.to_minimal(),
             autocorrect.rule.result.to_vec(),
@@ -401,9 +408,11 @@ impl AutocompleteState {
     /// Opens and gets the autocomplete results, taking into account the last selected autocomplete result
     pub fn get_autocomplete<'a>(
         &'a mut self,
-        matches: Vec<AutocompleteRuleMatch<'a>>,
+        mut matches: Vec<AutocompleteRuleMatch<'a>>,
         caret_position: MinimalInputRowPosition,
     ) -> AutocompleteResults<'a> {
+        matches.sort();
+
         let selected_index = self
             .current_autocomplete
             .take()

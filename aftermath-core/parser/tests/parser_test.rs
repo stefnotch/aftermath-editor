@@ -106,9 +106,9 @@ fn test_parser_nested_brackets_and_postfix() {
         parsed.to_string(),
         format!(
             "{}{}{}",
-            r#"(Core::RoundBrackets (Core::Operator "(") (Core::RoundBrackets (Core::Operator "(") (Core::RoundBrackets (Core::Operator "(") "#,
+            r#"(Core::RoundBrackets (BuiltIn::Operator "(") (Core::RoundBrackets (BuiltIn::Operator "(") (Core::RoundBrackets (BuiltIn::Operator "(") "#,
             r#"(Arithmetic::Factorial (Core::Variable "a") (BuiltIn::Operator "!")) "#,
-            r#"(Core::Operator ")")) (Core::Operator ")")) (Core::Operator ")"))"#
+            r#"(BuiltIn::Operator ")")) (BuiltIn::Operator ")")) (BuiltIn::Operator ")"))"#
         )
     );
 }
@@ -145,9 +145,9 @@ fn test_parser_tuple_advanced() {
         parsed.to_string(),
         format!(
             "{}{}{}",
-            r#"(Core::RoundBrackets (Core::Operator "(") "#,
+            r#"(Core::RoundBrackets (BuiltIn::Operator "(") "#,
             r#"(Collection::Tuple (Collection::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b")) (BuiltIn::Operator ",") (Core::Variable "c")) "#,
-            r#"(Core::Operator ")"))"#
+            r#"(BuiltIn::Operator ")"))"#
         )
     );
 }
@@ -168,9 +168,9 @@ fn test_parser_function_call() {
         parsed.to_string(),
         format!(
             "{}{}{}",
-            r#"(Function::FunctionApplication (Core::Variable "f") (BuiltIn::Argument (Core::Operator "(") ("#,
+            r#"(Function::FunctionApplication (Core::Variable "f") (BuiltIn::Argument (BuiltIn::Operator "(") ("#,
             r#"Collection::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b")"#,
-            r#") (Core::Operator ")")))"#
+            r#") (BuiltIn::Operator ")")))"#
         )
     );
 }
@@ -189,7 +189,7 @@ fn test_parser_brackets_with_addition() {
 
     assert_eq!(
         parsed.to_string(),
-        r#"(Core::RoundBrackets (Core::Operator "(") (Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (Core::Variable "b")) (Core::Operator ")"))"#
+        r#"(Core::RoundBrackets (BuiltIn::Operator "(") (Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (Core::Variable "b")) (BuiltIn::Operator ")"))"#
     );
 }
 
@@ -210,7 +210,7 @@ fn test_parser_fraction() {
 
     assert_eq!(
         parsed.to_string(),
-        r#"(Core::RoundBrackets (Core::Operator "(") (Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (BuiltIn::Fraction 1x2 (Core::Variable "b") (Core::Variable "c"))) (Core::Operator ")"))"#
+        r#"(Core::RoundBrackets (BuiltIn::Operator "(") (Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (BuiltIn::Fraction 1x2 (Core::Variable "b") (Core::Variable "c"))) (BuiltIn::Operator ")"))"#
     );
 }
 
@@ -239,32 +239,17 @@ fn test_parser_empty_squareroot() {
     );
 }
 
+#[test]
+fn test_parser_empty_brackets() {
+    let layout = input_row! {(row "a", "+", "(", ")")};
+    let parsed = parse_row(&layout);
+    assert_eq!(
+        parsed.to_string(),
+        r#"(Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (Core::RoundBrackets (BuiltIn::Operator "(") (BuiltIn::Operator ")")))"#
+    );
+}
+
 // TODO: Add tests for tables
-// TODO: Fix those tests to actually do something instead of printing stuff
-#[test]
-fn test_parser_symbol_and_close_bracket() {
-    let layout = InputRow::new(vec![InputNode::symbol("a"), InputNode::symbol(")")]);
-
-    let parsed = parse_row(&layout);
-    println!("{:?}", parsed);
-}
-
-#[test]
-fn test_parser_close_bracket() {
-    let layout = InputRow::new(vec![InputNode::symbol(")")]);
-
-    let parsed = parse_row(&layout);
-    println!("{:?}", parsed);
-}
-
-// TODO: Write some tests for error recovery
-// e.g.
-// If the input is "a + \frac{b}{c}" and we don't have a plus parser,
-// then "+ \frac{b}{c}" ends up being an error and not rendered correctly/at all.
-// This is really bad, since a fraction should always be rendered as a fraction!
-
-// So to fix that, we'll just parse the rest of the input repeatedly.
-
 // TODO: Add more default tokens
 // Document that \x basically means "this has a very specific meaning", such as \| always being a | symbol, and \sum always being a sum symbol.
 // Parse || abs || and their escaped \|| variants

@@ -29,6 +29,7 @@ pub trait AutocompleteMatcher {
     ) -> Vec<AutocompleteRuleMatch<'b>>;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct AutocompleteRuleMatch<'a> {
     pub rule: &'a AutocompleteRule,
     /// How much of the rule value was matched, starting from the start.
@@ -41,6 +42,18 @@ pub struct AutocompleteRuleMatch<'a> {
 impl<'a> AutocompleteRuleMatch<'a> {
     pub fn is_complete_match(&self) -> bool {
         self.rule_match_length == self.rule.parser.len()
+    }
+}
+
+impl<'a> PartialOrd for AutocompleteRuleMatch<'a> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<'a> Ord for AutocompleteRuleMatch<'a> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.rule_match_length.cmp(&other.rule_match_length)
     }
 }
 

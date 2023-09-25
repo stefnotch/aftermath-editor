@@ -461,6 +461,38 @@ export class MathEditor extends HTMLElement {
         y: mainCaretBounds.y + mainCaretBounds.height,
       });
     }*/
+
+    /*
+
+  **
+   * Range of the currently selected autocomplete.
+   * Basically every autocomplete result has its own range of text that it would replace.
+   *
+  private get autocompleteRange() {
+    const selected = this.selectedAutocompleteResult;
+    if (selected === null) return null;
+    const mainCaretRange = this.mainCaret?.selection.range ?? null;
+    if (mainCaretRange === null || mainCaretRange instanceof InputGridRange) return null;
+
+    return new InputRowRange(mainCaretRange.zipper, mainCaretRange.end - selected.matchLength, mainCaretRange.end);
+  }
+
+  renderAutocompleteToken(selection: RenderedSelection | null) {
+    if (selection === null) {
+      this.#autocompleteTokenElement.style.display = "none";
+    } else if (selection.isCollapsed) {
+      this.#autocompleteTokenElement.style.display = "none";
+    } else {
+      this.#autocompleteTokenElement.style.display = "block";
+      const parentPos = this.#containerElement.getBoundingClientRect();
+      this.#autocompleteTokenElement.style.left = `${selection.rect.x - parentPos.left}px`;
+      this.#autocompleteTokenElement.style.top = `${selection.rect.y - parentPos.top}px`;
+      this.#autocompleteTokenElement.style.width = `${selection.rect.width}px`;
+      this.#autocompleteTokenElement.style.height = `${selection.rect.height}px`;
+    }
+  }
+  */
+
     if (import.meta.env.DEV) {
       if (DebugSettings.renderRows) {
         function debugRenderRows(renderedElement: RenderedElement<MathMLElement>) {

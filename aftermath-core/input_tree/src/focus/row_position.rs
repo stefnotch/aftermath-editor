@@ -67,18 +67,18 @@ impl<'a> Into<InputRowRange<'a>> for &InputRowPosition<'a> {
 
 impl PartialOrd for InputRowPosition<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(RowIndices::cmp_indices_and_offset(
-            self.row_indices(),
-            &self.offset,
-            other.row_indices(),
-            &other.offset,
-        ))
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for InputRowPosition<'_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
+        RowIndices::cmp_indices_and_offset(
+            self.row_indices(),
+            &self.offset,
+            other.row_indices(),
+            &other.offset,
+        )
     }
 }
 

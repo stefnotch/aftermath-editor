@@ -3,13 +3,12 @@ use std::collections::HashSet;
 use crate::{
     autocomplete::AutocompleteRule,
     make_parser::MakeParser,
-    parser::pratt_parser::PrattParseContext,
     syntax_tree::{NodeIdentifier, SyntaxNode, SyntaxNodeBuilder},
     NodeParserExtra, ParserDebugError, ParserInput,
 };
 
 pub type TokenParserExtra =
-    chumsky::extra::Full<ParserDebugError<input_tree::node::InputNode>, (), PrattParseContext>;
+    chumsky::extra::Full<ParserDebugError<input_tree::node::InputNode>, (), ()>;
 
 // Oh look, it's a trait alias
 pub trait TokenParser<'a>:
@@ -26,7 +25,7 @@ pub type BoxedTokenParser<'a, 'b> =
 
 // TODO: This should not be able to return any errors.
 pub type BoxedNodeParser<'a, 'b> =
-    chumsky::Boxed<'a, 'b, ParserInput<'a>, SyntaxNode, NodeParserExtra>;
+    chumsky::Boxed<'a, 'b, ParserInput<'a>, SyntaxNode, NodeParserExtra<'a>>;
 
 pub struct TokenRule {
     pub name: NodeIdentifier,

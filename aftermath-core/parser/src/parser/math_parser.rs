@@ -11,7 +11,7 @@ use crate::{
     NodeParserExtra, ParserInput,
 };
 
-use super::pratt_parser::{self, pratt_parser};
+use super::pratt_parser::{self, pratt_parser, PrattParseContext};
 
 pub struct CachedMathParser {
     token_rules: Arc<Vec<TokenRule>>,
@@ -37,7 +37,8 @@ fn with_operator_name(mut op: SyntaxNode) -> SyntaxNode {
     op
 }
 
-fn build_prefix_syntax_node(op: SyntaxNode, rhs: SyntaxNode) -> SyntaxNode {
+fn build_prefix_syntax_node(op: SyntaxNode, rhs: Option<SyntaxNode>) -> SyntaxNode {
+    let rhs = rhs.unwrap(); // TODO: fix this
     SyntaxNode::new(
         op.name.clone(),
         combine_ranges(op.range(), rhs.range()),
@@ -53,8 +54,13 @@ fn build_postfix_syntax_node(op: SyntaxNode, lhs: SyntaxNode) -> SyntaxNode {
     )
 }
 
-fn build_infix_syntax_node(op: SyntaxNode, children: [SyntaxNode; 2]) -> SyntaxNode {
-    let [lhs, rhs] = children;
+fn build_infix_syntax_node(
+    op: SyntaxNode,
+    children: (SyntaxNode, Option<SyntaxNode>),
+) -> SyntaxNode {
+    let (lhs, rhs) = children;
+    let rhs = rhs.unwrap(); // TODO: fix this
+
     SyntaxNode::new(
         op.name.clone(),
         combine_ranges(op.range(), combine_ranges(lhs.range(), rhs.range())),
@@ -64,7 +70,7 @@ fn build_infix_syntax_node(op: SyntaxNode, children: [SyntaxNode; 2]) -> SyntaxN
 
 /// See https://github.com/zesterer/chumsky/blob/f10e56b7eac878cbad98f71fd5485a21d44db226/src/lib.rs#L3456
 impl Cached for CachedMathParser {
-    type Parser<'src> = Boxed<'src, 'src, ParserInput<'src>, SyntaxNode, NodeParserExtra>;
+    type Parser<'src> = Boxed<'src, 'src, ParserInput<'src>, SyntaxNode, NodeParserExtra<'src>>;
 
     fn make_parser<'src>(self) -> Self::Parser<'src> {
         // For whitespace handling, we'll extend every parser to accept whitespaces around it.
@@ -161,6 +167,15 @@ impl Cached for CachedMathParser {
                     })
                     .boxed(),
             };
+
+            // with_ctx(...) is such a weird function. It fully specifies a parser context, and then lets you use it as a parser with a different context.
+            let rule_parser: Boxed<
+                '_,
+                '_,
+                _,
+                _,
+                chumsky::extra::Full<_, _, PrattParseContext<'_, _, chumsky::extra::Err<_>>>,
+            > = rule_parser.with_ctx(()).boxed();
 
             match rule.binding_power_type() {
                 BindingPowerType::Atom => token_parsers.push(rule_parser),

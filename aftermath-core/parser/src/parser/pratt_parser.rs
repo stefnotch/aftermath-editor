@@ -2,19 +2,48 @@ use std::cmp::{self, Ordering};
 
 use chumsky::{
     extension::v1::{Ext, ExtParser},
+    extra::ParserExtra,
     input::InputRef,
     prelude::*,
 };
 
-#[derive(Clone)]
-pub struct PrattParseContext {
+// TODO:
+// - The pratt parser can be created from parsers. However, those parsers are forced to accept the same type of context as the pratt parser. This is not ideal.
+// - We might be abusing the concept of a context?
+
+pub struct PrattParseContext<'a, I, E>
+where
+    I: Input<'a>,
+    Self: Sized + 'a,
+    E: ParserExtra<'a, I>,
+{
     pub min_binding_power: u16,
+    // Ew
+    pub end_parser: Boxed<'a, 'a, I, (), E>,
 }
 
-impl Default for PrattParseContext {
+impl<'a, I, E> Clone for PrattParseContext<'a, I, E>
+where
+    I: Input<'a>,
+    E: ParserExtra<'a, I>,
+{
+    fn clone(&self) -> Self {
+        Self {
+            min_binding_power: self.min_binding_power.clone(),
+            end_parser: self.end_parser.clone(),
+        }
+    }
+}
+
+impl<'a, I, E> Default for PrattParseContext<'a, I, E>
+where
+    I: Input<'a>,
+    E: ParserExtra<'a, I>,
+{
     fn default() -> Self {
         Self {
             min_binding_power: 0,
+            end_parser: chumsky::primitive::end().boxed(),
         }
     }
 }
@@ -57,14 +86,14 @@ impl<InfixParser, PrefixParser, PostfixParser, Op, O>
     }
 }
 
-pub struct PrattParser_<I, O, E, Atom, Operators> {
+pub struct PrattParser_<I, O, E, ExtraE, Atom, Operators> {
     /// Atom parser, will usually be a choice parser
     atom: Atom,
     operators: Operators,
-    _phantom: std::marker::PhantomData<(I, O, E)>,
+    _phantom: std::marker::PhantomData<(I, O, E, ExtraE)>,
 }
 
-impl<I, O, E, Atom, Operators> Clone for PrattParser_<I, O, E, Atom, Operators>
+impl<I, O, E, ExtraE, Atom, Operators> Clone for PrattParser_<I, O, E, ExtraE, Atom, Operators>
 where
     Atom: Clone,
     Operators: Clone,
@@ -78,17 +107,19 @@ where
     }
 }
 
-impl<'a, I, O, E, Atom, InfixParser, PrefixParser, PostfixParser, Op>
+impl<'a, I, O, E, ExtraE, Atom, InfixParser, PrefixParser, PostfixParser, Op>
     PrattParser_<
         I,
         O,
         E,
+        ExtraE,
         Atom,
         PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>,
     >
 where
     I: Input<'a>,
-    E: extra::ParserExtra<'a, I>,
+    ExtraE: ParserExtra<'a, I>,
+    E: ParserExtra<'a, I, Context = PrattParseContext<'a, I, ExtraE>>,
     Atom: Parser<'a, I, O, E>,
     InfixParser: Parser<'a, I, Op, E>,
     PrefixParser: Parser<'a, I, Op, E>,
@@ -98,6 +129,7 @@ where
         &self,
         inp: &mut InputRef<'a, '_, I, E>,
         min_binding_power: Strength,
+        ending_parser: Boxed<'a, '_, I, (), ExtraE>,
     ) -> Result<O, E::Error> {
         let pre_op = inp.save();
         // Find first matching prefix operator
@@ -107,19 +139,34 @@ where
         });
         let mut left = match prefix_op {
             Some((value, op)) => {
-                let right = self.pratt_parse(inp, op.precedence.strength_right())?;
-                (op.build)(value, right)
+                let right =
+                    self.pratt_parse(inp, op.precedence.strength_right(), ending_parser.clone());
+                match right {
+                    Ok(right) => (op.build)(value, Some(right)),
+                    Err(_) => {
+                        // We are missing an atom after the prefix operator.
+                        // So it's time to do error recovery.
+                        // Note:
+                        // The "unknown atom" case is handled separately elsewhere. As in, we might as well report "missing atom", "unknown atom" as two separate errors, right after one another.
+                        (op.build)(value, None)
+                    }
+                }
             }
             None => {
                 inp.rewind(pre_op);
                 inp.parse(&self.atom)?
+                // Not finding an atom is an error, but we don't handle it here.
+                // Instead, we let the calling parser choose how to handle it.
+                // e.g. Prefix parsers will return a "missing atom" error.
+                // e.g. Bracket parsers can be happy about not finding an atom, since it means that the bracket might be empty.
+                // e.g. Row parsers can also be happy, since it means that the row might be empty.
             }
         };
 
         loop {
             let pre_op = inp.save();
 
-            // TODO: Postfix and infix could be joined? (aka postfix is a special case of infix, or the other way around)
+            // Future note: Postfix and infix could be joined? (aka postfix is a special case of infix, or the other way around)
             let infix_op = self.operators.infix_ops.iter().find_map(|op| {
                 inp.rewind(pre_op);
                 inp.parse(&op.parser).ok().map(|v| (v, op))
@@ -130,8 +177,20 @@ where
                         inp.rewind(pre_op);
                         return Ok(left);
                     }
-                    let right = self.pratt_parse(inp, op.precedence.strength_right())?;
-                    left = (op.build)(value, [left, right]);
+                    let right = self.pratt_parse(
+                        inp,
+                        op.precedence.strength_right(),
+                        ending_parser.clone(),
+                    );
+                    // Same idea as prefix parsing
+                    match right {
+                        Ok(right) => {
+                            left = (op.build)(value, (left, Some(right)));
+                        }
+                        Err(_) => {
+                            left = (op.build)(value, (left, None));
+                        }
+                    }
                     continue;
                 }
                 None => {
@@ -157,23 +216,28 @@ where
                 }
             };
 
-            // Nothing matched, return
+            // No operator matched, so we either are
+            // - at the end of the input
+            // - before a closing bracket (bracket parser do pratt parsing themselves)
+            // - or we have an error
             return Ok(left);
         }
     }
 }
 
-impl<'a, I, O, E, Atom, InfixParser, PrefixParser, PostfixParser, Op> ExtParser<'a, I, O, E>
+impl<'a, I, O, E, ExtraE, Atom, InfixParser, PrefixParser, PostfixParser, Op> ExtParser<'a, I, O, E>
     for PrattParser_<
         I,
         O,
         E,
+        ExtraE,
         Atom,
         PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>,
     >
 where
     I: Input<'a>,
-    E: extra::ParserExtra<'a, I, Context = PrattParseContext>,
+    ExtraE: ParserExtra<'a, I>,
+    E: ParserExtra<'a, I, Context = PrattParseContext<'a, I, ExtraE>>,
     Atom: Parser<'a, I, O, E>,
     InfixParser: Parser<'a, I, Op, E>,
     PrefixParser: Parser<'a, I, Op, E>,
@@ -181,12 +245,14 @@ where
 {
     fn parse(&self, inp: &mut InputRef<'a, '_, I, E>) -> Result<O, E::Error> {
         let min_binding_power = Strength::Weak(inp.ctx().min_binding_power); // TODO: Obviously not perfect
-        self.pratt_parse(inp, min_binding_power)
+        let ending_parser = inp.ctx().end_parser.clone();
+        self.pratt_parse(inp, min_binding_power, ending_parser)
     }
 }
-pub type PrattParser<I, O, E, Atom, Operators> = Ext<PrattParser_<I, O, E, Atom, Operators>>;
+pub type PrattParser<I, O, E, ExtraE, Atom, Operators> =
+    Ext<PrattParser_<I, O, E, ExtraE, Atom, Operators>>;
 
-pub fn pratt_parser<I, O, ExtraE, ExtraS, Atom, InfixParser, PrefixParser, PostfixParser, Op>(
+pub fn pratt_parser<'a, I, O, E, ExtraE, Atom, InfixParser, PrefixParser, PostfixParser, Op>(
     atom: Atom,
     infix_ops: Vec<InfixOp<InfixParser, Op, O>>,
     prefix_ops: Vec<PrefixOp<PrefixParser, Op, O>>,
@@ -194,10 +260,14 @@ pub fn pratt_parser<I, O, ExtraE, ExtraS, Atom, InfixParser, PrefixParser, Postf
 ) -> PrattParser<
     I,
     O,
-    chumsky::extra::Full<ExtraE, ExtraS, PrattParseContext>,
+    E,
+    ExtraE,
     Atom,
     PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>,
-> {
+>
+where
+    I: Input<'a>,
+{
     Ext(PrattParser_ {
         atom,
         operators: PrattParseOperators::new(infix_ops, prefix_ops, postfix_ops),
@@ -414,9 +484,9 @@ enum Assoc {
     Right,
 }
 
-type InfixBuilder<Op, O> = fn(op: Op, children: [O; 2]) -> O;
+type InfixBuilder<Op, O> = fn(op: Op, children: (O, Option<O>)) -> O;
 
-type PrefixBuilder<Op, O> = fn(op: Op, child: O) -> O;
+type PrefixBuilder<Op, O> = fn(op: Op, child: Option<O>) -> O;
 
 type PostfixBuilder<Op, O> = fn(op: Op, child: O) -> O;
 

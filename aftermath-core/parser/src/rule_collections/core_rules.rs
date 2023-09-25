@@ -1,3 +1,4 @@
+use crate::parser::pratt_parser::PrattParseContext;
 use crate::parser_extensions::just_symbol;
 
 use crate::syntax_tree::{LeafNodeType, SyntaxNodeBuilder, SyntaxNodeChildren};
@@ -30,7 +31,15 @@ impl CoreRules {
         crate::make_parser::MakeParserFn(move |parser| {
             just_symbol(starting_bracket.clone())
                 .map_with_span(|v, span| (v, span.into_range()))
-                .then(parser.or_not()) // With binding power 0
+                .then(
+                    parser
+                        .with_ctx(PrattParseContext {
+                            min_binding_power: 0,
+                            end_parser: just_symbol(ending_bracket.clone()).map(|_| ()).boxed(),
+                        })
+                        .boxed()
+                        .or_not(),
+                ) // With binding power 0
                 .then(
                     just_symbol(ending_bracket.clone())
                         .map_with_span(|v, span| (v, span.into_range())),

@@ -42,6 +42,7 @@ impl MathParser {
         let parser = self.parser_cache.get();
         let (result, errors) = parser.parse(input).into_output_errors();
 
+        // Panic here, because this place is too late for error recovery.
         if errors.len() > 0 {
             panic!("Errors: {:?}", errors);
         }

@@ -24,7 +24,7 @@ fn test_autocomplete() {
     let context = test_rules();
     let result = context.matches(&input, input.len(), 0);
     assert!(!result.is_empty());
-    assert_eq!(result.len(), 3);
+    assert_eq!(result.len(), 6);
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn test_autocomplete_full_match() {
 fn test_autocomplete_single_match() {
     let input = input_nodes! {"l", "i", "m", "s", "u"};
     let context = test_rules();
-    let result = context.matches(&input, input.len(), 0);
+    let result = context.matches(&input, input.len(), 5);
     assert!(!result.is_empty());
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].input_match_length, 5);
