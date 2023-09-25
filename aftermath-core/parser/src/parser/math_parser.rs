@@ -1,6 +1,10 @@
 use std::sync::Arc;
 
-use chumsky::{cache::Cached, span::SimpleSpan, Boxed, IterParser, Parser};
+use chumsky::{
+    cache::Cached,
+    span::{SimpleSpan, Span},
+    Boxed, IterParser, Parser,
+};
 use input_tree::node::InputNodeVariant;
 
 use crate::{
@@ -38,7 +42,7 @@ fn with_operator_name(mut op: SyntaxNode) -> SyntaxNode {
 }
 
 fn build_prefix_syntax_node(op: SyntaxNode, rhs: Option<SyntaxNode>) -> SyntaxNode {
-    let rhs = rhs.unwrap(); // TODO: fix this
+    let rhs = rhs.unwrap_or_else(|| BuiltInRules::error_missing_token(op.range().end));
     SyntaxNode::new(
         op.name.clone(),
         combine_ranges(op.range(), rhs.range()),
@@ -59,7 +63,7 @@ fn build_infix_syntax_node(
     children: (SyntaxNode, Option<SyntaxNode>),
 ) -> SyntaxNode {
     let (lhs, rhs) = children;
-    let rhs = rhs.unwrap(); // TODO: fix this
+    let rhs = rhs.unwrap_or_else(|| BuiltInRules::error_missing_token(op.range().end));
 
     SyntaxNode::new(
         op.name.clone(),
@@ -204,7 +208,7 @@ impl Cached for CachedMathParser {
 
         let empty_row_parser = chumsky::primitive::end()
             .boxed()
-            .map(|_| BuiltInRules::nothing_node(0..0));
+            .map(|_| BuiltInRules::nothing_node(0));
 
         chain.define(
             pratt_parser(atom, infix_parsers, prefix_parsers, postfix_parsers).or(empty_row_parser),

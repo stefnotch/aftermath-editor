@@ -47,7 +47,7 @@ impl MathParser {
             panic!("Errors: {:?}", errors);
         }
 
-        result.unwrap_or_else(|| BuiltInRules::nothing_node(0..0))
+        result.unwrap_or_else(|| BuiltInRules::nothing_node(0))
     }
 
     pub fn get_rule_names(&self) -> HashSet<NodeIdentifier> {

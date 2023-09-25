@@ -194,6 +194,7 @@ where
             // - at the end of the input
             // - before a closing bracket (bracket parser do pratt parsing themselves)
             // - or we have an error
+            // in all of those cases, we say that we're finished and let the parent deal with it
             return Ok(left);
         }
     }

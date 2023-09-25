@@ -50,22 +50,21 @@ impl BuiltInRules {
         NodeIdentifier::new(vec!["Error".into(), name.into()])
     }
 
-    fn error_missing_operator_name() -> NodeIdentifier {
-        BuiltInRules::error_rule_name("MissingOperator")
-    }
-
     fn error_missing_token_name() -> NodeIdentifier {
         BuiltInRules::error_rule_name("MissingToken")
     }
 
     /// Either an operator or an operand token is missing.
-    pub fn error_missing_token(range: Range<usize>) -> SyntaxNode {
-        assert!(range.is_empty());
+    pub fn error_missing_token(position: usize) -> SyntaxNode {
         SyntaxNode::new(
             BuiltInRules::error_missing_token_name(),
-            range,
+            position..position,
             SyntaxNodeChildren::Children(vec![]),
         )
+    }
+
+    fn error_missing_operator_name() -> NodeIdentifier {
+        BuiltInRules::error_rule_name("MissingOperator")
     }
 
     pub fn error_missing_operator(
@@ -73,8 +72,7 @@ impl BuiltInRules {
         child_a: SyntaxNode,
         child_b: SyntaxNode,
     ) -> SyntaxNode {
-        let missing_operator_node =
-            BuiltInRules::error_missing_token(child_a.range().end..child_b.range().start);
+        let missing_operator_node = BuiltInRules::error_missing_token(child_a.range().end);
         SyntaxNode::new(
             BuiltInRules::error_missing_operator_name(),
             range,
@@ -107,11 +105,10 @@ impl BuiltInRules {
         BuiltInRules::rule_name("Nothing")
     }
 
-    pub fn nothing_node(range: Range<usize>) -> SyntaxNode {
-        assert!(range.is_empty());
+    pub fn nothing_node(position: usize) -> SyntaxNode {
         SyntaxNode::new(
             BuiltInRules::nothing_name(),
-            range,
+            position..position,
             SyntaxNodeChildren::Children(vec![]),
         )
     }
@@ -130,7 +127,7 @@ impl BuiltInRules {
                         .map(|row| {
                             let parsed = parser.parse(&row.values);
                             let (output, errors) = parsed.into_output_errors();
-                            let output = output.unwrap_or_else(|| Self::nothing_node(0..0));
+                            let output = output.unwrap_or_else(|| Self::nothing_node(0));
                             // TODO: This should never happen
                             if errors.len() > 0 {
                                 panic!("Errors: {:?}", errors);
