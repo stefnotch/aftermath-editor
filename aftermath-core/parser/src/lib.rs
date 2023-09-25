@@ -14,17 +14,5 @@ pub mod syntax_tree;
 pub type ParserInput<'a> = &'a [InputNode];
 
 // chumsky::prelude::Cheap
-pub type NodeParserExtra<'a> = chumsky::extra::Full<
-    ParserDebugError<InputNode>,
-    (),
-    PrattParseContext<
-        'a,
-        ParserInput<'a>,
-        chumsky::extra::Err<
-            ParserDebugError<
-                <ParserInput<'a> as chumsky::input::Input<'a>>::Token,
-                <ParserInput<'a> as chumsky::input::Input<'a>>::Span,
-            >,
-        >,
-    >,
->;
+pub type NodeParserExtra<'a> =
+    chumsky::extra::Full<ParserDebugError<InputNode>, (), PrattParseContext>;

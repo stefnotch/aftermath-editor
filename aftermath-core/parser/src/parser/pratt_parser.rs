@@ -9,41 +9,23 @@ use chumsky::{
 
 // TODO:
 // - The pratt parser can be created from parsers. However, those parsers are forced to accept the same type of context as the pratt parser. This is not ideal.
-// - We might be abusing the concept of a context?
 
-pub struct PrattParseContext<'a, I, E>
-where
-    I: Input<'a>,
-    Self: Sized + 'a,
-    E: ParserExtra<'a, I>,
-{
+pub struct PrattParseContext {
     pub min_binding_power: u16,
-    // Wait, no, it's not that easy: There might be multiple type of possible ending tokens. Think nested fractions of different types ({[ a })
-    pub end_parser: Boxed<'a, 'a, I, (), E>,
 }
 
-impl<'a, I, E> Clone for PrattParseContext<'a, I, E>
-where
-    I: Input<'a>,
-    E: ParserExtra<'a, I>,
-{
+impl Clone for PrattParseContext {
     fn clone(&self) -> Self {
         Self {
             min_binding_power: self.min_binding_power.clone(),
-            end_parser: self.end_parser.clone(),
         }
     }
 }
 
-impl<'a, I, E> Default for PrattParseContext<'a, I, E>
-where
-    I: Input<'a>,
-    E: ParserExtra<'a, I>,
-{
+impl Default for PrattParseContext {
     fn default() -> Self {
         Self {
             min_binding_power: 0,
-            end_parser: chumsky::primitive::end().boxed(),
         }
     }
 }
@@ -86,14 +68,14 @@ impl<InfixParser, PrefixParser, PostfixParser, Op, O>
     }
 }
 
-pub struct PrattParser_<I, O, E, ExtraE, Atom, Operators> {
+pub struct PrattParser_<I, O, E, Atom, Operators> {
     /// Atom parser, will usually be a choice parser
     atom: Atom,
     operators: Operators,
-    _phantom: std::marker::PhantomData<(I, O, E, ExtraE)>,
+    _phantom: std::marker::PhantomData<(I, O, E)>,
 }
 
-impl<I, O, E, ExtraE, Atom, Operators> Clone for PrattParser_<I, O, E, ExtraE, Atom, Operators>
+impl<I, O, E, Atom, Operators> Clone for PrattParser_<I, O, E, Atom, Operators>
 where
     Atom: Clone,
     Operators: Clone,
@@ -107,19 +89,17 @@ where
     }
 }
 
-impl<'a, I, O, E, ExtraE, Atom, InfixParser, PrefixParser, PostfixParser, Op>
+impl<'a, I, O, E, Atom, InfixParser, PrefixParser, PostfixParser, Op>
     PrattParser_<
         I,
         O,
         E,
-        ExtraE,
         Atom,
         PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>,
     >
 where
     I: Input<'a>,
-    ExtraE: ParserExtra<'a, I>,
-    E: ParserExtra<'a, I, Context = PrattParseContext<'a, I, ExtraE>>,
+    E: ParserExtra<'a, I, Context = PrattParseContext>,
     Atom: Parser<'a, I, O, E>,
     InfixParser: Parser<'a, I, Op, E>,
     PrefixParser: Parser<'a, I, Op, E>,
@@ -129,7 +109,6 @@ where
         &self,
         inp: &mut InputRef<'a, '_, I, E>,
         min_binding_power: Strength,
-        ending_parser: Boxed<'a, '_, I, (), ExtraE>,
     ) -> Result<O, E::Error> {
         let pre_op = inp.save();
         // Find first matching prefix operator
@@ -139,8 +118,7 @@ where
         });
         let mut left = match prefix_op {
             Some((value, op)) => {
-                let right =
-                    self.pratt_parse(inp, op.precedence.strength_right(), ending_parser.clone());
+                let right = self.pratt_parse(inp, op.precedence.strength_right());
                 match right {
                     Ok(right) => (op.build)(value, Some(right)),
                     Err(_) => {
@@ -177,11 +155,7 @@ where
                         inp.rewind(pre_op);
                         return Ok(left);
                     }
-                    let right = self.pratt_parse(
-                        inp,
-                        op.precedence.strength_right(),
-                        ending_parser.clone(),
-                    );
+                    let right = self.pratt_parse(inp, op.precedence.strength_right());
                     // Same idea as prefix parsing
                     match right {
                         Ok(right) => {
@@ -225,19 +199,17 @@ where
     }
 }
 
-impl<'a, I, O, E, ExtraE, Atom, InfixParser, PrefixParser, PostfixParser, Op> ExtParser<'a, I, O, E>
+impl<'a, I, O, E, Atom, InfixParser, PrefixParser, PostfixParser, Op> ExtParser<'a, I, O, E>
     for PrattParser_<
         I,
         O,
         E,
-        ExtraE,
         Atom,
         PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>,
     >
 where
     I: Input<'a>,
-    ExtraE: ParserExtra<'a, I>,
-    E: ParserExtra<'a, I, Context = PrattParseContext<'a, I, ExtraE>>,
+    E: ParserExtra<'a, I, Context = PrattParseContext>,
     Atom: Parser<'a, I, O, E>,
     InfixParser: Parser<'a, I, Op, E>,
     PrefixParser: Parser<'a, I, Op, E>,
@@ -245,26 +217,17 @@ where
 {
     fn parse(&self, inp: &mut InputRef<'a, '_, I, E>) -> Result<O, E::Error> {
         let min_binding_power = Strength::Weak(inp.ctx().min_binding_power); // TODO: Obviously not perfect
-        let ending_parser = inp.ctx().end_parser.clone();
-        self.pratt_parse(inp, min_binding_power, ending_parser)
+        self.pratt_parse(inp, min_binding_power)
     }
 }
-pub type PrattParser<I, O, E, ExtraE, Atom, Operators> =
-    Ext<PrattParser_<I, O, E, ExtraE, Atom, Operators>>;
+pub type PrattParser<I, O, E, Atom, Operators> = Ext<PrattParser_<I, O, E, Atom, Operators>>;
 
-pub fn pratt_parser<'a, I, O, E, ExtraE, Atom, InfixParser, PrefixParser, PostfixParser, Op>(
+pub fn pratt_parser<'a, I, O, E, Atom, InfixParser, PrefixParser, PostfixParser, Op>(
     atom: Atom,
     infix_ops: Vec<InfixOp<InfixParser, Op, O>>,
     prefix_ops: Vec<PrefixOp<PrefixParser, Op, O>>,
     postfix_ops: Vec<PostfixOp<PostfixParser, Op, O>>,
-) -> PrattParser<
-    I,
-    O,
-    E,
-    ExtraE,
-    Atom,
-    PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>,
->
+) -> PrattParser<I, O, E, Atom, PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>>
 where
     I: Input<'a>,
 {

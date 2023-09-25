@@ -169,13 +169,8 @@ impl Cached for CachedMathParser {
             };
 
             // with_ctx(...) is such a weird function. It fully specifies a parser context, and then lets you use it as a parser with a different context.
-            let rule_parser: Boxed<
-                '_,
-                '_,
-                _,
-                _,
-                chumsky::extra::Full<_, _, PrattParseContext<'_, _, chumsky::extra::Err<_>>>,
-            > = rule_parser.with_ctx(()).boxed();
+            let rule_parser: Boxed<'_, '_, _, _, chumsky::extra::Full<_, _, PrattParseContext>> =
+                rule_parser.with_ctx(()).boxed();
 
             match rule.binding_power_type() {
                 BindingPowerType::Atom => token_parsers.push(rule_parser),
