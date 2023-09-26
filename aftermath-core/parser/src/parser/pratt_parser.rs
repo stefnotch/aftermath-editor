@@ -1,4 +1,7 @@
-use std::cmp::{self, Ordering};
+use std::{
+    cmp::{self, Ordering},
+    sync::Arc,
+};
 
 use chumsky::{
     extension::v1::{Ext, ExtParser},
@@ -9,23 +12,72 @@ use chumsky::{
 
 // TODO:
 // - The pratt parser can be created from parsers. However, those parsers are forced to accept the same type of context as the pratt parser. This is not ideal.
+// - We're abusing the context to get better error recovery (ending parsers)
 
-pub struct PrattParseContext {
+// TODO: Create helper functions for this
+pub struct PrattParseContext<P>
+// TODO: Migrate the "where" part further down
+// where
+//     I: Input<'a>,
+//     Self: Sized + 'a,
+//     E: ParserExtra<'a, I>,
+{
     pub min_binding_power: u16,
+    pub ending_parsers: ArcList<P>,
 }
 
-impl Clone for PrattParseContext {
+pub enum ArcList<T> {
+    Empty,
+    Cons(Arc<T>, ArcList<T>),
+}
+
+impl<T> Clone for ArcList<T> {
     fn clone(&self) -> Self {
-        Self {
-            min_binding_power: self.min_binding_power.clone(),
+        match self {
+            Self::Empty => Self::Empty,
+            Self::Cons(a, b) => Self::Cons(a.clone(), b.clone()),
         }
     }
 }
 
-impl Default for PrattParseContext {
+impl<T> Default for ArcList<T> {
+    fn default() -> Self {
+        Self::Empty
+    }
+}
+
+impl<P> Clone for PrattParseContext<P> {
+    fn clone(&self) -> Self {
+        Self {
+            min_binding_power: self.min_binding_power.clone(),
+            ending_parsers: self.ending_parsers.clone(),
+        }
+    }
+}
+
+impl<P> Default for PrattParseContext<P> {
     fn default() -> Self {
         Self {
             min_binding_power: 0,
+            ending_parsers: Default::default(),
+        }
+    }
+}
+
+pub struct PrattParseErrorHandler<I, O> {
+    pub make_missing_atom: fn() -> O,
+    pub make_missing_operator: fn(O, O) -> O,
+    pub make_unknown_atom: fn(I) -> O,
+    pub missing_operator_precedence: Precedence,
+}
+
+impl<I, O> Clone for PrattParseErrorHandler<I, O> {
+    fn clone(&self) -> Self {
+        Self {
+            make_missing_atom: self.make_missing_atom,
+            make_missing_operator: self.make_missing_operator,
+            make_unknown_atom: self.make_unknown_atom,
+            missing_operator_precedence: self.missing_operator_precedence,
         }
     }
 }
@@ -72,9 +124,7 @@ pub struct PrattParser_<I, O, E, Atom, Operators> {
     /// Atom parser, will usually be a choice parser
     atom: Atom,
     operators: Operators,
-    make_missing_atom: fn() -> O,
-    make_missing_operator: fn(O, O) -> O,
-    make_unknown_atom: fn(I) -> O,
+    error_handler: PrattParseErrorHandler<I, O>,
     _phantom: std::marker::PhantomData<(I, O, E)>,
 }
 
@@ -87,9 +137,7 @@ where
         Self {
             atom: self.atom.clone(),
             operators: self.operators.clone(),
-            make_missing_atom: self.make_missing_atom.clone(),
-            make_missing_operator: self.make_missing_operator.clone(),
-            make_unknown_atom: self.make_unknown_atom.clone(),
+            error_handler: self.error_handler.clone(),
             _phantom: std::marker::PhantomData,
         }
     }
@@ -100,7 +148,20 @@ enum PrattParseResult<T> {
     End,
 }
 
-impl<'a, I, O, E, Atom, InfixParser, PrefixParser, PostfixParser, Op>
+impl<
+        'a,
+        I,
+        O,
+        E,
+        ContextEndParser,
+        ContextEndOutput,
+        ContextEndExtra,
+        Atom,
+        InfixParser,
+        PrefixParser,
+        PostfixParser,
+        Op,
+    >
     PrattParser_<
         I,
         O,
@@ -110,7 +171,8 @@ impl<'a, I, O, E, Atom, InfixParser, PrefixParser, PostfixParser, Op>
     >
 where
     I: Input<'a>,
-    E: ParserExtra<'a, I, Context = PrattParseContext>,
+    E: ParserExtra<'a, I, Context = PrattParseContext<ContextEndParser>>,
+    ContextEndParser: Parser<'a, I, ContextEndOutput, ContextEndExtra>,
     Atom: Parser<'a, I, O, E>,
     InfixParser: Parser<'a, I, Op, E>,
     PrefixParser: Parser<'a, I, Op, E>,
@@ -148,6 +210,7 @@ where
         &self,
         inp: &mut InputRef<'a, '_, I, E>,
         min_binding_power: Strength,
+        ending_parsers: ArcList<ContextEndParser>,
     ) -> Result<O, E::Error> {
         // Iterative-ish version of the above
 
@@ -241,7 +304,20 @@ where
     }
 }
 
-impl<'a, I, O, E, Atom, InfixParser, PrefixParser, PostfixParser, Op> ExtParser<'a, I, O, E>
+impl<
+        'a,
+        I,
+        O,
+        E,
+        ContextEndParser,
+        ContextEndOutput,
+        ContextEndExtra,
+        Atom,
+        InfixParser,
+        PrefixParser,
+        PostfixParser,
+        Op,
+    > ExtParser<'a, I, O, E>
     for PrattParser_<
         I,
         O,
@@ -251,7 +327,8 @@ impl<'a, I, O, E, Atom, InfixParser, PrefixParser, PostfixParser, Op> ExtParser<
     >
 where
     I: Input<'a>,
-    E: ParserExtra<'a, I, Context = PrattParseContext>,
+    E: ParserExtra<'a, I, Context = PrattParseContext<ContextEndParser>>,
+    ContextEndParser: Parser<'a, I, ContextEndOutput, ContextEndExtra>,
     Atom: Parser<'a, I, O, E>,
     InfixParser: Parser<'a, I, Op, E>,
     PrefixParser: Parser<'a, I, Op, E>,
@@ -259,7 +336,8 @@ where
 {
     fn parse(&self, inp: &mut InputRef<'a, '_, I, E>) -> Result<O, E::Error> {
         let min_binding_power = Strength::Weak(inp.ctx().min_binding_power); // TODO: Obviously not perfect
-        self.pratt_parse(inp, min_binding_power)
+        let ending_parsers = inp.ctx().ending_parsers.clone();
+        self.pratt_parse(inp, min_binding_power, ending_parsers)
     }
 }
 pub type PrattParser<I, O, E, Atom, Operators> = Ext<PrattParser_<I, O, E, Atom, Operators>>;
@@ -269,6 +347,9 @@ pub fn pratt_parser<'a, I, O, E, Atom, InfixParser, PrefixParser, PostfixParser,
     infix_ops: Vec<InfixOp<InfixParser, Op, O>>,
     prefix_ops: Vec<PrefixOp<PrefixParser, Op, O>>,
     postfix_ops: Vec<PostfixOp<PostfixParser, Op, O>>,
+    make_missing_atom: fn() -> O,
+    make_missing_operator: fn(O, O) -> O,
+    make_unknown_atom: fn(I) -> O,
 ) -> PrattParser<I, O, E, Atom, PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>>
 where
     I: Input<'a>,
