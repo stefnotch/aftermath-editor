@@ -35,7 +35,7 @@ fn combine_ranges(a: std::ops::Range<usize>, b: std::ops::Range<usize>) -> std::
 fn with_operator_name(mut op: SyntaxNode) -> SyntaxNode {
     match &op.children {
         SyntaxNodeChildren::NewRows(_) => op.name = BuiltInRules::new_row_rule_name(),
-        SyntaxNodeChildren::Children(_) => op.name = BuiltInRules::argument_name(),
+        SyntaxNodeChildren::Children(_) => op.name = BuiltInRules::argument_rule_name(),
         SyntaxNodeChildren::Leaf(_) => op.name = BuiltInRules::operator_rule_name(),
     }
     op

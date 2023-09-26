@@ -27,7 +27,7 @@ impl BuiltInRules {
     }
     /// Whenever an operator has one or more arguments, this can be used.
     /// For example, a function call uses this.
-    pub fn argument_name() -> NodeIdentifier {
+    pub fn argument_rule_name() -> NodeIdentifier {
         BuiltInRules::rule_name("Argument")
     }
     /// Can have Whitespace nodes at the start and/or end.
@@ -178,8 +178,12 @@ impl RuleCollection for BuiltInRules {
     }
 
     fn get_extra_rule_names() -> Vec<NodeIdentifier> {
-        // TODO: Remove most of those
         vec![
+            Self::operator_rule_name(),
+            Self::new_row_rule_name(),
+            Self::argument_rule_name(),
+            Self::whitespaces_rule_name(),
+            Self::whitespace_rule_name(),
             Self::error_missing_operator_name(),
             Self::error_unknown_token_name(),
             Self::error_missing_token_name(),

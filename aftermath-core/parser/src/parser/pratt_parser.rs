@@ -72,6 +72,9 @@ pub struct PrattParser_<I, O, E, Atom, Operators> {
     /// Atom parser, will usually be a choice parser
     atom: Atom,
     operators: Operators,
+    make_missing_atom: fn() -> O,
+    make_missing_operator: fn(O, O) -> O,
+    make_unknown_atom: fn(I) -> O,
     _phantom: std::marker::PhantomData<(I, O, E)>,
 }
 
@@ -84,9 +87,17 @@ where
         Self {
             atom: self.atom.clone(),
             operators: self.operators.clone(),
+            make_missing_atom: self.make_missing_atom.clone(),
+            make_missing_operator: self.make_missing_operator.clone(),
+            make_unknown_atom: self.make_unknown_atom.clone(),
             _phantom: std::marker::PhantomData,
         }
     }
+}
+
+enum PrattParseResult<T> {
+    Expression(T),
+    End,
 }
 
 impl<'a, I, O, E, Atom, InfixParser, PrefixParser, PostfixParser, Op>
@@ -105,11 +116,41 @@ where
     PrefixParser: Parser<'a, I, Op, E>,
     PostfixParser: Parser<'a, I, Op, E>,
 {
+    /// At every step of the pratt parsing, we are in a given state. And we have a min strength.
+    /// Then we parse a token, and go into a new state.
+    ///
+    /// ### Parse(strength)
+    /// ParseExpression(strength), then deal with result
+    /// - Expression: return Expression
+    /// -
+    ///
+    /// ### ParseExpression(strength)
+    /// We're expecting an expression. So we try out the parsers in order.
+    /// - Prefix: ParseExpression(strength), then ParseOperator(left, strength)
+    /// - Atom: ParseOperator(left, strength)
+    /// and the fallbacks
+    /// - End: rewind, return End;
+    /// - Infix: rewind, then ParseOperator(None, strength);
+    /// - Postfix: rewind, then ParseOperator(None, strength);
+    /// - Unknown: skip until End or Prefix/Atom/Infix/Postfix, then ParseExpression(strength) or ParseOperator(left, strength)
+    /// the unknown token case is also why I even need the "End" case.
+    ///
+    /// ### Operator Loop
+    /// - Infix: ParseExpression(strength), then ParseOperator(left, strength)
+    /// - Postfix: ParseOperator(left, strength)
+    /// and the fallbacks
+    /// - End: rewind, return End;
+    /// - Atom: rewind, missing operator with strength, ParseExpression(strength), then ParseOperator(left, strength)
+    /// - Prefix: same
+    /// - Unknown: skip until End or Prefix/Atom/Infix/Postfix, then ParseExpression(strength) or ParseOperator(left, strength)
+    ///
     fn pratt_parse(
         &self,
         inp: &mut InputRef<'a, '_, I, E>,
         min_binding_power: Strength,
     ) -> Result<O, E::Error> {
+        // Iterative-ish version of the above
+
         let pre_op = inp.save();
         // Find first matching prefix operator
         let prefix_op = self.operators.prefix_ops.iter().find_map(|op| {
@@ -448,9 +489,9 @@ enum Assoc {
     Right,
 }
 
-type InfixBuilder<Op, O> = fn(op: Op, children: (O, Option<O>)) -> O;
+type InfixBuilder<Op, O> = fn(op: Op, children: (O, O)) -> O;
 
-type PrefixBuilder<Op, O> = fn(op: Op, child: Option<O>) -> O;
+type PrefixBuilder<Op, O> = fn(op: Op, child: O) -> O;
 
 type PostfixBuilder<Op, O> = fn(op: Op, child: O) -> O;
 
