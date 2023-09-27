@@ -49,7 +49,6 @@ impl RuleCollection for StringRules {
                         symbols.push(c);
                         SyntaxNodeBuilder::new_leaf_node(symbols, LeafNodeType::Symbol)
                     })
-                    .with_ctx(())
                     .boxed()
             }),
         )]

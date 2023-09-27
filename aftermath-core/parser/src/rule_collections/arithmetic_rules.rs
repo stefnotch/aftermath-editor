@@ -43,7 +43,6 @@ impl RuleCollection for ArithmeticRules {
                             a
                         })
                         .map(|v| SyntaxNodeBuilder::new_leaf_node(v, LeafNodeType::Symbol))
-                        .with_ctx(())
                         .boxed()
                 }),
             ),
