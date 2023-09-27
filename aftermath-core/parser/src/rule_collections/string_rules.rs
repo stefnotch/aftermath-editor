@@ -1,11 +1,6 @@
-
-
-
 use crate::parser_extensions::just_symbol;
 
-use crate::syntax_tree::{
-    LeafNodeType, SyntaxNodeBuilder,
-};
+use crate::syntax_tree::{LeafNodeType, SyntaxNodeBuilder};
 use crate::{
     autocomplete::AutocompleteRule,
     rule_collection::{RuleCollection, TokenRule},
@@ -13,8 +8,7 @@ use crate::{
 };
 use chumsky::{prelude::*, Parser};
 
-
-use input_tree::node::{InputNode};
+use input_tree::node::InputNode;
 
 pub struct StringRules {}
 
@@ -55,6 +49,7 @@ impl RuleCollection for StringRules {
                         symbols.push(c);
                         SyntaxNodeBuilder::new_leaf_node(symbols, LeafNodeType::Symbol)
                     })
+                    .with_ctx(())
                     .boxed()
             }),
         )]

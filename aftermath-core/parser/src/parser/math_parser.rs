@@ -9,13 +9,12 @@ use input_tree::node::InputNodeVariant;
 
 use crate::{
     make_parser::MakeParser,
-    rule_collection::{BindingPowerType, TokenRule},
+    rule_collection::{BindingPowerType, ContextualParserExtra, ParserInput, TokenRule},
     rule_collections::built_in_rules::BuiltInRules,
     syntax_tree::{LeafNodeType, SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren},
-    NodeParserExtra, ParserInput,
 };
 
-use super::pratt_parser::{self, pratt_parser, PrattParseContext};
+use super::pratt_parser::{self, pratt_parser, PrattParseContext, PrattParseErrorHandler};
 
 pub struct CachedMathParser {
     token_rules: Arc<Vec<TokenRule>>,
@@ -41,8 +40,7 @@ fn with_operator_name(mut op: SyntaxNode) -> SyntaxNode {
     op
 }
 
-fn build_prefix_syntax_node(op: SyntaxNode, rhs: Option<SyntaxNode>) -> SyntaxNode {
-    let rhs = rhs.unwrap_or_else(|| BuiltInRules::error_missing_token(op.range().end));
+fn build_prefix_syntax_node(op: SyntaxNode, rhs: SyntaxNode) -> SyntaxNode {
     SyntaxNode::new(
         op.name.clone(),
         combine_ranges(op.range(), rhs.range()),
@@ -58,13 +56,8 @@ fn build_postfix_syntax_node(op: SyntaxNode, lhs: SyntaxNode) -> SyntaxNode {
     )
 }
 
-fn build_infix_syntax_node(
-    op: SyntaxNode,
-    children: (SyntaxNode, Option<SyntaxNode>),
-) -> SyntaxNode {
+fn build_infix_syntax_node(op: SyntaxNode, children: (SyntaxNode, SyntaxNode)) -> SyntaxNode {
     let (lhs, rhs) = children;
-    let rhs = rhs.unwrap_or_else(|| BuiltInRules::error_missing_token(op.range().end));
-
     SyntaxNode::new(
         op.name.clone(),
         combine_ranges(op.range(), combine_ranges(lhs.range(), rhs.range())),
@@ -74,7 +67,8 @@ fn build_infix_syntax_node(
 
 /// See https://github.com/zesterer/chumsky/blob/f10e56b7eac878cbad98f71fd5485a21d44db226/src/lib.rs#L3456
 impl Cached for CachedMathParser {
-    type Parser<'src> = Boxed<'src, 'src, ParserInput<'src>, SyntaxNode, NodeParserExtra<'src>>;
+    type Parser<'src> =
+        Boxed<'src, 'src, ParserInput<'src>, SyntaxNode, ContextualParserExtra<'src>>;
 
     fn make_parser<'src>(self) -> Self::Parser<'src> {
         // For whitespace handling, we'll extend every parser to accept whitespaces around it.
@@ -173,8 +167,8 @@ impl Cached for CachedMathParser {
             };
 
             // with_ctx(...) is such a weird function. It fully specifies a parser context, and then lets you use it as a parser with a different context.
-            let rule_parser: Boxed<'_, '_, _, _, chumsky::extra::Full<_, _, PrattParseContext>> =
-                rule_parser.with_ctx(()).boxed();
+            // let rule_parser: Boxed<'_, '_, _, _, chumsky::extra::Full<_, _, PrattParseContext>> =
+            // rule_parser.with_ctx(()).boxed();
 
             match rule.binding_power_type() {
                 BindingPowerType::Atom => token_parsers.push(rule_parser),
@@ -211,7 +205,19 @@ impl Cached for CachedMathParser {
             .map(|_| BuiltInRules::nothing_node(0));
 
         chain.define(
-            pratt_parser(atom, infix_parsers, prefix_parsers, postfix_parsers).or(empty_row_parser),
+            pratt_parser(
+                atom,
+                infix_parsers,
+                prefix_parsers,
+                postfix_parsers,
+                PrattParseErrorHandler {
+                    make_missing_atom: todo!(), // || BuiltInRules::error_missing_token(op.range().end),
+                    make_missing_operator: todo!(),
+                    make_unknown_atom: todo!(),
+                    missing_operator_precedence: todo!(),
+                },
+            )
+            .or(empty_row_parser),
         );
 
         chain.boxed()

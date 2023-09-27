@@ -70,6 +70,7 @@ impl MakeParser for MakeSymbolsParser {
         let node_type = self.node_type;
         just_symbols(&self.symbols)
             .map(move |v| SyntaxNodeBuilder::new_leaf_node(vec![v], node_type))
+            .with_ctx(())
             .boxed()
     }
 }

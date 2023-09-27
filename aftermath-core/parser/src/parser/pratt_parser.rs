@@ -15,32 +15,19 @@ use chumsky::{
 // - We're abusing the context to get better error recovery (ending parsers)
 
 // TODO: Create helper functions for this
-pub struct PrattParseContext<P>
-// TODO: Migrate the "where" part further down
-// where
-//     I: Input<'a>,
-//     Self: Sized + 'a,
-//     E: ParserExtra<'a, I>,
-{
+pub struct PrattParseContext<P> {
     pub min_binding_power: u16,
     pub ending_parsers: ArcList<P>,
 }
 
-pub enum ArcList<T> {
+pub type ArcList<T> = Arc<ArcList_<T>>;
+
+pub enum ArcList_<T> {
     Empty,
-    Cons(Arc<T>, ArcList<T>),
+    Cons(T, ArcList<T>),
 }
 
-impl<T> Clone for ArcList<T> {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Empty => Self::Empty,
-            Self::Cons(a, b) => Self::Cons(a.clone(), b.clone()),
-        }
-    }
-}
-
-impl<T> Default for ArcList<T> {
+impl<T> Default for ArcList_<T> {
     fn default() -> Self {
         Self::Empty
     }
@@ -68,7 +55,7 @@ pub struct PrattParseErrorHandler<I, O> {
     pub make_missing_atom: fn() -> O,
     pub make_missing_operator: fn(O, O) -> O,
     pub make_unknown_atom: fn(I) -> O,
-    pub missing_operator_precedence: Precedence,
+    pub missing_operator_precedence: u16,
 }
 
 impl<I, O> Clone for PrattParseErrorHandler<I, O> {
@@ -120,15 +107,16 @@ impl<InfixParser, PrefixParser, PostfixParser, Op, O>
     }
 }
 
-pub struct PrattParser_<I, O, E, Atom, Operators> {
+pub struct PrattParser_<I, O, E, Atom, Operators, EndParser, EndParserExtra> {
     /// Atom parser, will usually be a choice parser
     atom: Atom,
     operators: Operators,
     error_handler: PrattParseErrorHandler<I, O>,
-    _phantom: std::marker::PhantomData<(I, O, E)>,
+    _phantom: std::marker::PhantomData<(I, O, E, EndParser, EndParserExtra)>,
 }
 
-impl<I, O, E, Atom, Operators> Clone for PrattParser_<I, O, E, Atom, Operators>
+impl<I, O, E, Atom, Operators, EndParser, EndParserExtra> Clone
+    for PrattParser_<I, O, E, Atom, Operators, EndParser, EndParserExtra>
 where
     Atom: Clone,
     Operators: Clone,
@@ -153,9 +141,8 @@ impl<
         I,
         O,
         E,
-        ContextEndParser,
-        ContextEndOutput,
-        ContextEndExtra,
+        EndParser,
+        EndParserExtra,
         Atom,
         InfixParser,
         PrefixParser,
@@ -168,11 +155,14 @@ impl<
         E,
         Atom,
         PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>,
+        EndParser,
+        EndParserExtra,
     >
 where
     I: Input<'a>,
-    E: ParserExtra<'a, I, Context = PrattParseContext<ContextEndParser>>,
-    ContextEndParser: Parser<'a, I, ContextEndOutput, ContextEndExtra>,
+    E: ParserExtra<'a, I, Context = PrattParseContext<EndParser>>,
+    EndParser: Parser<'a, I, (), EndParserExtra>,
+    EndParserExtra: ParserExtra<'a, I>,
     Atom: Parser<'a, I, O, E>,
     InfixParser: Parser<'a, I, Op, E>,
     PrefixParser: Parser<'a, I, Op, E>,
@@ -191,7 +181,7 @@ where
     /// - Prefix: ParseExpression(strength), then ParseOperator(left, strength)
     /// - Atom: ParseOperator(left, strength)
     /// and the fallbacks
-    /// - End: rewind, return End;
+    /// - End: rewind, return End; (could also be moved down in this list)
     /// - Infix: rewind, then ParseOperator(None, strength);
     /// - Postfix: rewind, then ParseOperator(None, strength);
     /// - Unknown: skip until End or Prefix/Atom/Infix/Postfix, then ParseExpression(strength) or ParseOperator(left, strength)
@@ -210,7 +200,7 @@ where
         &self,
         inp: &mut InputRef<'a, '_, I, E>,
         min_binding_power: Strength,
-        ending_parsers: ArcList<ContextEndParser>,
+        ending_parsers: &ArcList<EndParser>,
     ) -> Result<O, E::Error> {
         // Iterative-ish version of the above
 
@@ -218,19 +208,20 @@ where
         // Find first matching prefix operator
         let prefix_op = self.operators.prefix_ops.iter().find_map(|op| {
             inp.rewind(pre_op);
+            // Parse the child with our current pratt parsing context
             inp.parse(&op.parser).ok().map(|v| (v, op))
         });
         let mut left = match prefix_op {
             Some((value, op)) => {
-                let right = self.pratt_parse(inp, op.precedence.strength_right());
+                let right = self.pratt_parse(inp, op.precedence.strength_right(), ending_parsers);
                 match right {
-                    Ok(right) => (op.build)(value, Some(right)),
+                    Ok(right) => (op.build)(value, right),
                     Err(_) => {
                         // We are missing an atom after the prefix operator.
                         // So it's time to do error recovery.
                         // Note:
                         // The "unknown atom" case is handled separately elsewhere. As in, we might as well report "missing atom", "unknown atom" as two separate errors, right after one another.
-                        (op.build)(value, None)
+                        (op.build)(value, (self.error_handler.make_missing_atom)())
                     }
                 }
             }
@@ -259,14 +250,16 @@ where
                         inp.rewind(pre_op);
                         return Ok(left);
                     }
-                    let right = self.pratt_parse(inp, op.precedence.strength_right());
+                    let right =
+                        self.pratt_parse(inp, op.precedence.strength_right(), ending_parsers);
                     // Same idea as prefix parsing
                     match right {
                         Ok(right) => {
-                            left = (op.build)(value, (left, Some(right)));
+                            left = (op.build)(value, (left, right));
                         }
                         Err(_) => {
-                            left = (op.build)(value, (left, None));
+                            left =
+                                (op.build)(value, (left, (self.error_handler.make_missing_atom)()));
                         }
                     }
                     continue;
@@ -309,9 +302,8 @@ impl<
         I,
         O,
         E,
-        ContextEndParser,
-        ContextEndOutput,
-        ContextEndExtra,
+        EndParser,
+        EndParserExtra,
         Atom,
         InfixParser,
         PrefixParser,
@@ -324,11 +316,14 @@ impl<
         E,
         Atom,
         PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>,
+        EndParser,
+        EndParserExtra,
     >
 where
     I: Input<'a>,
-    E: ParserExtra<'a, I, Context = PrattParseContext<ContextEndParser>>,
-    ContextEndParser: Parser<'a, I, ContextEndOutput, ContextEndExtra>,
+    E: ParserExtra<'a, I, Context = PrattParseContext<EndParser>>,
+    EndParser: Parser<'a, I, (), EndParserExtra>,
+    EndParserExtra: ParserExtra<'a, I>,
     Atom: Parser<'a, I, O, E>,
     InfixParser: Parser<'a, I, Op, E>,
     PrefixParser: Parser<'a, I, Op, E>,
@@ -337,26 +332,46 @@ where
     fn parse(&self, inp: &mut InputRef<'a, '_, I, E>) -> Result<O, E::Error> {
         let min_binding_power = Strength::Weak(inp.ctx().min_binding_power); // TODO: Obviously not perfect
         let ending_parsers = inp.ctx().ending_parsers.clone();
-        self.pratt_parse(inp, min_binding_power, ending_parsers)
+        self.pratt_parse(inp, min_binding_power, &ending_parsers)
     }
 }
-pub type PrattParser<I, O, E, Atom, Operators> = Ext<PrattParser_<I, O, E, Atom, Operators>>;
+pub type PrattParser<I, O, E, Atom, Operators, EndParser, EndParserExtra> =
+    Ext<PrattParser_<I, O, E, Atom, Operators, EndParser, EndParserExtra>>;
 
-pub fn pratt_parser<'a, I, O, E, Atom, InfixParser, PrefixParser, PostfixParser, Op>(
+pub fn pratt_parser<
+    'a,
+    I,
+    O,
+    E,
+    EndParser,
+    EndParserExtra,
+    Atom,
+    InfixParser,
+    PrefixParser,
+    PostfixParser,
+    Op,
+>(
     atom: Atom,
     infix_ops: Vec<InfixOp<InfixParser, Op, O>>,
     prefix_ops: Vec<PrefixOp<PrefixParser, Op, O>>,
     postfix_ops: Vec<PostfixOp<PostfixParser, Op, O>>,
-    make_missing_atom: fn() -> O,
-    make_missing_operator: fn(O, O) -> O,
-    make_unknown_atom: fn(I) -> O,
-) -> PrattParser<I, O, E, Atom, PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>>
+    error_handler: PrattParseErrorHandler<I, O>,
+) -> PrattParser<
+    I,
+    O,
+    E,
+    Atom,
+    PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>,
+    EndParser,
+    EndParserExtra,
+>
 where
     I: Input<'a>,
 {
     Ext(PrattParser_ {
         atom,
         operators: PrattParseOperators::new(infix_ops, prefix_ops, postfix_ops),
+        error_handler,
         _phantom: std::marker::PhantomData,
     })
 }

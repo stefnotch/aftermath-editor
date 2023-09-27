@@ -1,31 +1,41 @@
 use std::collections::HashSet;
 
+use input_tree::node::InputNode;
+
 use crate::{
     autocomplete::AutocompleteRule,
     make_parser::MakeParser,
+    parser::pratt_parser::PrattParseContext,
     syntax_tree::{NodeIdentifier, SyntaxNode, SyntaxNodeBuilder},
-    NodeParserExtra, ParserDebugError, ParserInput,
+    ParserDebugError,
 };
 
-pub type TokenParserExtra =
-    chumsky::extra::Full<ParserDebugError<input_tree::node::InputNode>, (), ()>;
+pub type ParserInput<'a> = &'a [InputNode];
+
+pub type ParseContext<'a> =
+    PrattParseContext<chumsky::Boxed<'a, 'a, ParserInput<'a>, (), BasicParserExtra>>;
+
+// chumsky::prelude::Cheap
+type BasicParserExtra = chumsky::extra::Full<ParserDebugError<InputNode>, (), ()>;
+pub type ContextualParserExtra<'a> =
+    chumsky::extra::Full<ParserDebugError<InputNode>, (), ParseContext<'a>>;
 
 // Oh look, it's a trait alias
 pub trait TokenParser<'a>:
-    chumsky::Parser<'a, ParserInput<'a>, SyntaxNodeBuilder, TokenParserExtra>
+    chumsky::Parser<'a, ParserInput<'a>, SyntaxNodeBuilder, ContextualParserExtra<'a>>
 {
 }
 impl<'a, T> TokenParser<'a> for T where
-    T: chumsky::Parser<'a, ParserInput<'a>, SyntaxNodeBuilder, TokenParserExtra>
+    T: chumsky::Parser<'a, ParserInput<'a>, SyntaxNodeBuilder, ContextualParserExtra<'a>>
 {
 }
 
 pub type BoxedTokenParser<'a, 'b> =
-    chumsky::Boxed<'a, 'b, ParserInput<'a>, SyntaxNodeBuilder, TokenParserExtra>;
+    chumsky::Boxed<'a, 'b, ParserInput<'a>, SyntaxNodeBuilder, ContextualParserExtra<'a>>;
 
 // TODO: This should not be able to return any errors.
 pub type BoxedNodeParser<'a, 'b> =
-    chumsky::Boxed<'a, 'b, ParserInput<'a>, SyntaxNode, NodeParserExtra<'a>>;
+    chumsky::Boxed<'a, 'b, ParserInput<'a>, SyntaxNode, ContextualParserExtra<'a>>;
 
 pub struct TokenRule {
     pub name: NodeIdentifier,

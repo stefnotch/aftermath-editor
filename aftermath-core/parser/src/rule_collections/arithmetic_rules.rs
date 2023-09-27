@@ -1,4 +1,4 @@
-use crate::make_parser::{just_operator_parser};
+use crate::make_parser::just_operator_parser;
 use crate::parser_extensions::just_symbol;
 use crate::syntax_tree::{LeafNodeType, SyntaxNodeBuilder};
 use crate::{
@@ -43,6 +43,7 @@ impl RuleCollection for ArithmeticRules {
                             a
                         })
                         .map(|v| SyntaxNodeBuilder::new_leaf_node(v, LeafNodeType::Symbol))
+                        .with_ctx(())
                         .boxed()
                 }),
             ),
