@@ -32,8 +32,7 @@ fn test_chumsky_basic_context() {
         number.clone().with_ctx(TestContext { value: '1' }).boxed();
     assert_eq!(parse_one.parse("1").into_output(), Some(Some('1')));
 
-    let parse_two: Boxed<_, _, extra::Full<_, _, TestContext>> =
-        number.with_ctx(TestContext { value: '2' }).boxed();
+    let parse_two = number.with_ctx(TestContext { value: '2' }).boxed();
     assert_eq!(parse_two.parse("2").into_output(), Some(Some('2')));
 
     let parse_one_two = parse_one.then(parse_two).boxed();
@@ -95,13 +94,9 @@ fn test_chumsky_recursive_context() {
     .boxed();
 
     let number_tree = recursive(|parser| {
-        let base_number = map_ctx::<_, _, _, extra::Full<EmptyErr, (), _>, _, _>(
-            |ctx: &TestContext| ctx.clone(),
-            number,
-        )
-        .boxed();
+        let base_number = map_ctx(|ctx: &TestContext| ctx.clone(), number.clone()).boxed();
 
-        let nested_parser = map_ctx::<_, _, _, extra::Full<EmptyErr, (), _>, _, _>(
+        let nested_parser = map_ctx(
             |ctx: &TestContext| {
                 let mut copy = ctx.clone();
                 copy.value = add1_char(copy.value);
@@ -114,7 +109,6 @@ fn test_chumsky_recursive_context() {
         base_number
             .clone()
             .then(nested_parser.or_not())
-            .map_with_ctx(|v, ctx| v)
             .then(base_number)
             .map(|((a, b), c)| NumberTree {
                 a,
