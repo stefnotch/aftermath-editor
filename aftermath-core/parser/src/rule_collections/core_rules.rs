@@ -33,29 +33,17 @@ impl CoreRules {
             just_symbol(starting_bracket.clone())
                 .map_with_span(|v, span| (v, span.into_range()))
                 .then(
-                    empty()
-                        // This child obtained the pratt parsing context from the pratt parser calling it.
-                        // Since "then_with_ctx" is an absolutely wild function that takes the output of a parser and turns it into a context, we gotta do this
-                        .map_with_ctx(|_output, ctx: &ParseContext<'_>| ctx.clone())
-                        .ignore_with_ctx(map_ctx::<
-                            '_,
-                            _,
-                            SyntaxNode,
-                            &[InputNode],
-                            ContextualParserExtra<'_>,
-                            _,
-                            _,
-                        >(
-                            |ctx: &ParseContext<'_>| {
-                                let mut ctx: ParseContext<'_> = ctx.clone();
-                                ctx.min_binding_power = 0;
-                                // ctx.ending_parsers
-                                ctx
-                            },
-                            parser,
-                        ))
-                        .boxed()
-                        .or_not(), // TODO: I maybe don't need the "or_not"
+                    map_ctx(
+                        |ctx: &ParseContext<'_>| {
+                            let mut ctx = ctx.clone();
+                            ctx.min_binding_power = 0;
+                            // ctx.ending_parsers
+                            ctx
+                        },
+                        parser,
+                    )
+                    .boxed()
+                    .or_not(), // TODO: I maybe don't need the "or_not"
                 )
                 .then(
                     just_symbol(ending_bracket.clone())

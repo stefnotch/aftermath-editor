@@ -148,3 +148,46 @@ fn test_chumsky_recursive_context() {
 fn add1_char(c: char) -> char {
     char::from_u32(c as u32 + 1).unwrap_or(c)
 }
+
+//////// Weird tests around Chumsky + lifetimes
+
+fn parser_fn_dum<P>(parser: P) -> ParserFn<P> {
+    Ext(ParserFn_ {
+        parser: Arc::new(parser),
+    })
+}
+
+fn dum<'a>(
+    inp: &mut chumsky::input::InputRef<'a, '_, &'a str, extra::Full<EmptyErr, (), TestContext>>,
+) -> Result<char, EmptyErr> {
+    let ctx_value = inp.ctx().value;
+    inp.next()
+        .map(move |c| {
+            if c == ctx_value {
+                Ok(c)
+            } else {
+                Err(EmptyErr::default())
+            }
+        })
+        .unwrap_or_else(move || Err(EmptyErr::default()))
+}
+
+#[test]
+fn parser_fn_testing() {
+    {
+        let number = parser_fn_dum(dum); // You can't box this without chumsky complaining about lifetimes.
+        for _ in 0..2 {
+            let s = "hello".to_string();
+            let parse_result = number.parse(&s);
+            assert!(parse_result.has_errors());
+        }
+    }
+    {
+        let s = "hello".to_string();
+        for _ in 0..2 {
+            let number = parser_fn_dum(dum);
+            let parse_result = number.parse(&s);
+            assert!(parse_result.has_errors());
+        }
+    }
+}
