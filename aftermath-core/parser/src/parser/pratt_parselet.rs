@@ -1,9 +1,26 @@
+use std::{fmt, sync::Arc};
+
 use itertools::Itertools;
 
+#[derive(Debug)]
 pub struct PrattParselets<AtomParser, OpParser, Op, O> {
     pub(crate) parselets_starting_with_atom: Vec<PrattParselet<AtomParser, OpParser, Op, O>>,
     pub(crate) parselets_starting_with_expression: Vec<PrattParselet<AtomParser, OpParser, Op, O>>,
     pub(crate) parselets_starting_with_op: Vec<PrattParselet<AtomParser, OpParser, Op, O>>,
+}
+
+impl<AtomParser, OpParser, Op, O> Clone for PrattParselets<AtomParser, OpParser, Op, O>
+where
+    AtomParser: Clone,
+    OpParser: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            parselets_starting_with_atom: self.parselets_starting_with_atom.clone(),
+            parselets_starting_with_expression: self.parselets_starting_with_expression.clone(),
+            parselets_starting_with_op: self.parselets_starting_with_op.clone(),
+        }
+    }
 }
 
 impl<AtomParser, OpParser, Op, O> PrattParselets<AtomParser, OpParser, Op, O> {
@@ -48,7 +65,7 @@ impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op
     pub fn add_atom_parselet(mut self, parser: AtomParser) -> Self {
         self.parselets.push(PrattParselet {
             parsers: vec![PrattParseletKind::Atom(PrattAtom { parser })],
-            build: Box::new(|results: Vec<PrattParseResult<Op, O>>| {
+            build: Arc::new(|results: Vec<PrattParseResult<Op, O>>| {
                 if let Some((PrattParseResult::Atom(v),)) = results.into_iter().collect_tuple() {
                     v
                 } else {
@@ -68,13 +85,13 @@ impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op
         self.parselets.push(PrattParselet {
             parsers: vec![
                 PrattParseletKind::Op(PrattOp {
-                    op: parser,
+                    parser: parser,
                     // TODO: Left or right?
                     binding_power: BindingPower::new_left(binding_power),
                 }),
                 PrattParseletKind::Expression(PrattExpression {}),
             ],
-            build: Box::new(move |results: Vec<PrattParseResult<Op, O>>| {
+            build: Arc::new(move |results: Vec<PrattParseResult<Op, O>>| {
                 if let Some((PrattParseResult::Op(op), PrattParseResult::Atom(expr))) =
                     results.into_iter().collect_tuple()
                 {
@@ -96,12 +113,12 @@ impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op
             parsers: vec![
                 PrattParseletKind::Expression(PrattExpression {}),
                 PrattParseletKind::Op(PrattOp {
-                    op: parser,
+                    parser: parser,
                     binding_power,
                 }),
                 PrattParseletKind::Expression(PrattExpression {}),
             ],
-            build: Box::new(move |results: Vec<PrattParseResult<Op, O>>| {
+            build: Arc::new(move |results: Vec<PrattParseResult<Op, O>>| {
                 if let Some((
                     PrattParseResult::Atom(lhs),
                     PrattParseResult::Op(op),
@@ -126,12 +143,12 @@ impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op
             parsers: vec![
                 PrattParseletKind::Expression(PrattExpression {}),
                 PrattParseletKind::Op(PrattOp {
-                    op: parser,
+                    parser: parser,
                     // TODO: Left or right?
                     binding_power: BindingPower::new_right(binding_power),
                 }),
             ],
-            build: Box::new(move |results: Vec<PrattParseResult<Op, O>>| {
+            build: Arc::new(move |results: Vec<PrattParseResult<Op, O>>| {
                 if let Some((PrattParseResult::Atom(expr), PrattParseResult::Op(op))) =
                     results.into_iter().collect_tuple()
                 {
@@ -152,16 +169,16 @@ impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op
         self.parselets.push(PrattParselet {
             parsers: vec![
                 PrattParseletKind::Op(PrattOp {
-                    op: open,
+                    parser: open,
                     binding_power: BindingPower::new_left(0),
                 }),
                 PrattParseletKind::Expression(PrattExpression {}),
                 PrattParseletKind::Op(PrattOp {
-                    op: close,
+                    parser: close,
                     binding_power: BindingPower::new_right(0),
                 }),
             ],
-            build: Box::new(move |results: Vec<PrattParseResult<Op, O>>| {
+            build: Arc::new(move |results: Vec<PrattParseResult<Op, O>>| {
                 if let Some((
                     PrattParseResult::Op(open),
                     PrattParseResult::Atom(expr),
@@ -191,8 +208,34 @@ impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op
 /// Also note that every parselet is *finite*. No infinite comma separated lists or anything like that.
 pub struct PrattParselet<AtomParser, OpParser, Op, O> {
     pub parsers: Vec<PrattParseletKind<AtomParser, OpParser>>,
-    pub build: Box<dyn Fn(Vec<PrattParseResult<Op, O>>) -> O>,
+    pub build: Arc<dyn Fn(Vec<PrattParseResult<Op, O>>) -> O>,
     // TODO: Actual parsing implementation lives elsewhere
+}
+
+impl<AtomParser, OpParser, Op, O> Clone for PrattParselet<AtomParser, OpParser, Op, O>
+where
+    AtomParser: Clone,
+    OpParser: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            parsers: self.parsers.clone(),
+            build: self.build.clone(),
+        }
+    }
+}
+
+impl<AtomParser, OpParser, Op, O> fmt::Debug for PrattParselet<AtomParser, OpParser, Op, O>
+where
+    AtomParser: fmt::Debug,
+    OpParser: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("PrattParselet")
+            .field("parsers", &self.parsers)
+            .field("build", &"...")
+            .finish()
+    }
 }
 
 impl<AtomParser, OpParser, Op, O> PrattParselet<AtomParser, OpParser, Op, O> {
@@ -202,30 +245,35 @@ impl<AtomParser, OpParser, Op, O> PrattParselet<AtomParser, OpParser, Op, O> {
     ) -> Self {
         Self {
             parsers,
-            build: Box::new(build),
+            build: Arc::new(build),
         }
     }
 }
 
+#[derive(Debug)]
 pub enum PrattParseResult<Op, O> {
     Atom(O),
     Op(Op),
 }
 
+#[derive(Debug, Clone)]
 pub enum PrattParseletKind<AtomParser, OpParser> {
     Atom(PrattAtom<AtomParser>),
     Expression(PrattExpression),
     Op(PrattOp<OpParser>),
 }
 
+#[derive(Debug, Clone)]
 pub struct PrattAtom<AtomParser> {
     pub parser: AtomParser,
 }
 
+#[derive(Debug, Clone)]
 pub struct PrattExpression {}
 
+#[derive(Debug, Clone)]
 pub struct PrattOp<OpParser> {
-    pub op: OpParser,
+    pub parser: OpParser,
     pub binding_power: BindingPower,
 }
 
@@ -250,24 +298,6 @@ impl BindingPower {
     pub fn new_right(binding_power: u32) -> Self {
         Self::new(binding_power, Associativity::Right)
     }
-
-    // TODO: Move those Strength functions to PrattParser where they belongs.
-    // Rusty impls can live anywhere after all.
-    /// Note that strength is pretty much "reversed".
-    /// See https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
-    pub(crate) fn strength_left(&self) -> (u32, Strength) {
-        match self.associativity {
-            Associativity::Left => (self.binding_power, Strength::Weak),
-            Associativity::Right => (self.binding_power, Strength::Strong),
-        }
-    }
-
-    pub(crate) fn strength_right(&self) -> (u32, Strength) {
-        match self.associativity {
-            Associativity::Left => (self.binding_power, Strength::Strong),
-            Associativity::Right => (self.binding_power, Strength::Weak),
-        }
-    }
 }
 
 /// Indicates which argument binds more strongly with a binary infix operator.
@@ -282,11 +312,4 @@ pub enum Associativity {
     ///
     /// For example `a ^ b ^ c` is parsed as `a ^ (b ^ c)`.
     Right,
-}
-
-// TODO: Move Strength to PrattParser where it belongs.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Ord, PartialOrd)]
-pub(crate) enum Strength {
-    Weak,
-    Strong,
 }

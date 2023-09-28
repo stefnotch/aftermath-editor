@@ -1,6 +1,7 @@
 mod greedy_choice;
 mod math_parser;
 pub mod pratt_parselet;
+pub mod pratt_parser;
 pub mod pratt_parser_old;
 
 use std::{collections::HashSet, sync::Arc};
