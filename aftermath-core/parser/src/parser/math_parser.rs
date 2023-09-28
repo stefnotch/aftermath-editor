@@ -219,11 +219,6 @@ impl Cached for CachedMathParser {
             },
         ));
 
-        chain
-            .with_ctx(PrattParseContext::new(
-                Default::default(),
-                chumsky::primitive::end().boxed(),
-            ))
-            .boxed()
+        chain.with_ctx(PrattParseContext::default()).boxed()
     }
 }

@@ -1,5 +1,7 @@
 use std::ops::Range;
 
+use crate::parser::pratt_parser::PrattParseContext;
+use crate::rule_collection::BoxedNodeParser;
 use crate::syntax_tree::{SyntaxLeafNode, SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren};
 use crate::{
     autocomplete::AutocompleteRule,
@@ -126,7 +128,11 @@ impl BuiltInRules {
                     v.values()
                         .into_iter()
                         .map(|row| {
-                            let parsed = parser.parse(&row.values);
+                            let p: BoxedNodeParser = parser
+                                .clone()
+                                .with_ctx(PrattParseContext::default())
+                                .boxed();
+                            let parsed = p.parse(&row.values);
                             let (output, errors) = parsed.into_output_errors();
                             let output = output.unwrap_or_else(|| Self::nothing_node(0));
                             // TODO: This should never happen

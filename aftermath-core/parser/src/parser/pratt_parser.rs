@@ -287,6 +287,10 @@ where
     ) -> bool {
         let offset = inp.offset();
 
+        if inp.next_maybe().is_none() {
+            return true;
+        }
+
         for parser in ending_parsers.iter() {
             let input = inp.slice_from(offset..);
             let parse_result = parser.check(input);
