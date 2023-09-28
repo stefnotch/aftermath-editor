@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::parser::pratt_parser::PrattParseContext;
+use crate::parser::pratt_parser_old::PrattParseContext;
 use crate::rule_collection::BoxedNodeParser;
 use crate::syntax_tree::{SyntaxLeafNode, SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren};
 use crate::{

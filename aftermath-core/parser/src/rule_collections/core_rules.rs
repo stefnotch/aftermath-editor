@@ -1,4 +1,4 @@
-use crate::parser::pratt_parser::PrattParseContext;
+use crate::parser::pratt_parser_old::PrattParseContext;
 use crate::parser_extensions::just_symbol;
 
 use crate::rule_collection::{ContextualParserExtra, ParseContext};

@@ -10,7 +10,7 @@ use crate::{
     syntax_tree::{LeafNodeType, SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren},
 };
 
-use super::pratt_parser::{
+use super::pratt_parser_old::{
     self, pratt_parser, Assoc, PrattParseContext, PrattParseErrorHandler, Precedence,
 };
 
@@ -170,21 +170,17 @@ impl Cached for CachedMathParser {
 
             match rule.binding_power_type() {
                 BindingPowerType::Atom => token_parsers.push(rule_parser),
-                BindingPowerType::Prefix(strength) => prefix_parsers.push(pratt_parser::prefix(
-                    rule_parser,
-                    strength,
-                    build_prefix_syntax_node,
-                )),
-                BindingPowerType::Postfix(strength) => postfix_parsers.push(pratt_parser::postfix(
-                    rule_parser,
-                    strength,
-                    build_postfix_syntax_node,
-                )),
+                BindingPowerType::Prefix(strength) => prefix_parsers.push(
+                    pratt_parser_old::prefix(rule_parser, strength, build_prefix_syntax_node),
+                ),
+                BindingPowerType::Postfix(strength) => postfix_parsers.push(
+                    pratt_parser_old::postfix(rule_parser, strength, build_postfix_syntax_node),
+                ),
                 BindingPowerType::LeftInfix(strength) => infix_parsers.push(
-                    pratt_parser::left_infix(rule_parser, strength, build_infix_syntax_node),
+                    pratt_parser_old::left_infix(rule_parser, strength, build_infix_syntax_node),
                 ),
                 BindingPowerType::RightInfix(strength) => infix_parsers.push(
-                    pratt_parser::right_infix(rule_parser, strength, build_infix_syntax_node),
+                    pratt_parser_old::right_infix(rule_parser, strength, build_infix_syntax_node),
                 ),
             };
         }
