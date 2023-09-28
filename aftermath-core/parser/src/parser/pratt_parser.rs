@@ -6,7 +6,7 @@ use std::{
 use chumsky::{
     extension::v1::{Ext, ExtParser},
     extra::ParserExtra,
-    input::InputRef,
+    input::{InputRef, Marker},
     prelude::*,
 };
 
@@ -20,6 +20,22 @@ pub struct PrattParseContext<P> {
     pub ending_parsers: ArcList<P>,
 }
 
+impl<P> PrattParseContext<P> {
+    pub fn new(min_binding_power: u16, ending_parsers: ArcList<P>) -> Self {
+        Self {
+            min_binding_power,
+            ending_parsers,
+        }
+    }
+
+    pub fn with(&self, min_binding_power: u16, ending_parser: P) -> Self {
+        Self {
+            min_binding_power,
+            ending_parsers: Arc::new(ArcList_::Cons(ending_parser, self.ending_parsers.clone())),
+        }
+    }
+}
+
 pub type ArcList<T> = Arc<ArcList_<T>>;
 
 pub enum ArcList_<T> {
@@ -30,6 +46,35 @@ pub enum ArcList_<T> {
 impl<T> Default for ArcList_<T> {
     fn default() -> Self {
         Self::Empty
+    }
+}
+
+impl<T> ArcList_<T> {
+    pub fn iter(&self) -> ArcListIter<T> {
+        ArcListIter {
+            list: self,
+            index: 0,
+        }
+    }
+}
+
+pub struct ArcListIter<'a, T> {
+    list: &'a ArcList_<T>,
+    index: usize,
+}
+
+impl<'a, T> Iterator for ArcListIter<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.list {
+            ArcList_::Empty => None,
+            ArcList_::Cons(v, next) => {
+                self.list = next;
+                self.index += 1;
+                Some(v)
+            }
+        }
     }
 }
 
@@ -51,14 +96,14 @@ impl<P> Default for PrattParseContext<P> {
     }
 }
 
-pub struct PrattParseErrorHandler<I, O> {
-    pub make_missing_atom: fn() -> O,
-    pub make_missing_operator: fn(O, O) -> O,
-    pub make_unknown_atom: fn(I) -> O,
+pub struct PrattParseErrorHandler<I, Span, O> {
+    pub make_missing_atom: fn(Span) -> O,
+    pub make_missing_operator: fn(Span, (O, O)) -> O,
     pub missing_operator_precedence: u16,
+    pub make_unknown_atom: fn(Span, I) -> O,
 }
 
-impl<I, O> Clone for PrattParseErrorHandler<I, O> {
+impl<I, Span, O> Clone for PrattParseErrorHandler<I, Span, O> {
     fn clone(&self) -> Self {
         Self {
             make_missing_atom: self.make_missing_atom,
@@ -107,17 +152,21 @@ impl<InfixParser, PrefixParser, PostfixParser, Op, O>
     }
 }
 
-pub struct PrattParser_<I, O, E, Atom, Operators, EndParser, EndParserExtra> {
+pub struct PrattParser_<'a, I, O, E, Atom, Operators, EndParser, EndParserExtra>
+where
+    I: Input<'a>,
+{
     /// Atom parser, will usually be a choice parser
     atom: Atom,
     operators: Operators,
-    error_handler: PrattParseErrorHandler<I, O>,
+    error_handler: PrattParseErrorHandler<I, I::Span, O>,
     _phantom: std::marker::PhantomData<(I, O, E, EndParser, EndParserExtra)>,
 }
 
-impl<I, O, E, Atom, Operators, EndParser, EndParserExtra> Clone
-    for PrattParser_<I, O, E, Atom, Operators, EndParser, EndParserExtra>
+impl<'a, I, O, E, Atom, Operators, EndParser, EndParserExtra> Clone
+    for PrattParser_<'a, I, O, E, Atom, Operators, EndParser, EndParserExtra>
 where
+    I: Input<'a>,
     Atom: Clone,
     Operators: Clone,
 {
@@ -150,6 +199,7 @@ impl<
         Op,
     >
     PrattParser_<
+        'a,
         I,
         O,
         E,
@@ -168,6 +218,77 @@ where
     PrefixParser: Parser<'a, I, Op, E>,
     PostfixParser: Parser<'a, I, Op, E>,
 {
+    fn try_parse_prefix<'parse>(
+        &self,
+        inp: &mut InputRef<'a, 'parse, I, E>,
+    ) -> Option<(Op, &PrefixOp<PrefixParser, Op, O>)> {
+        let marker = inp.save();
+        for op in self.operators.prefix_ops.iter() {
+            // Parse the child with our current pratt parsing context
+            if let Some(v) = inp.parse(&op.parser).ok() {
+                return Some((v, op));
+            }
+            inp.rewind(marker);
+        }
+        None
+    }
+
+    fn try_parse_atom<'parse>(&self, inp: &mut InputRef<'a, 'parse, I, E>) -> Option<O> {
+        let marker = inp.save();
+        match inp.parse(&self.atom).ok() {
+            Some(v) => Some(v),
+            None => {
+                inp.rewind(marker);
+                None
+            }
+        }
+    }
+
+    fn try_parse_infix<'parse>(
+        &self,
+        inp: &mut InputRef<'a, 'parse, I, E>,
+    ) -> Option<(Op, &InfixOp<InfixParser, Op, O>)> {
+        let marker = inp.save();
+        for op in self.operators.infix_ops.iter() {
+            if let Some(v) = inp.parse(&op.parser).ok() {
+                return Some((v, op));
+            }
+            inp.rewind(marker);
+        }
+        None
+    }
+
+    fn try_parse_postfix<'parse>(
+        &self,
+        inp: &mut InputRef<'a, 'parse, I, E>,
+    ) -> Option<(Op, &PostfixOp<PostfixParser, Op, O>)> {
+        let marker = inp.save();
+        for op in self.operators.postfix_ops.iter() {
+            if let Some(v) = inp.parse(&op.parser).ok() {
+                return Some((v, op));
+            }
+            inp.rewind(marker);
+        }
+        None
+    }
+
+    fn try_parse_end<'parse>(
+        &self,
+        inp: &mut InputRef<'a, 'parse, I, E>,
+        ending_parsers: &ArcList<EndParser>,
+    ) {
+        let marker = inp.save();
+
+        for parser in ending_parsers.iter() {
+            let a = parser.check(inp.to_end());
+            // if let Some(v) = inp.parse(parser).ok() {
+            // return Some(v);
+            // }
+            inp.rewind(marker);
+        }
+        None
+    }
+
     /// At every step of the pratt parsing, we are in a given state. And we have a min strength.
     /// Then we parse a token, and go into a new state.
     ///
@@ -214,6 +335,8 @@ where
         let mut left = match prefix_op {
             Some((value, op)) => {
                 let right = self.pratt_parse(inp, op.precedence.strength_right(), ending_parsers);
+
+                // TODO: Unknown yet?
                 match right {
                     Ok(right) => (op.build)(value, right),
                     Err(_) => {
@@ -221,6 +344,7 @@ where
                         // So it's time to do error recovery.
                         // Note:
                         // The "unknown atom" case is handled separately elsewhere. As in, we might as well report "missing atom", "unknown atom" as two separate errors, right after one another.
+                        let a = inp.parse(empty().map_with_span(|_, span| span));
                         (op.build)(value, (self.error_handler.make_missing_atom)())
                     }
                 }
@@ -311,6 +435,7 @@ impl<
         Op,
     > ExtParser<'a, I, O, E>
     for PrattParser_<
+        'a,
         I,
         O,
         E,
@@ -335,8 +460,8 @@ where
         self.pratt_parse(inp, min_binding_power, &ending_parsers)
     }
 }
-pub type PrattParser<I, O, E, Atom, Operators, EndParser, EndParserExtra> =
-    Ext<PrattParser_<I, O, E, Atom, Operators, EndParser, EndParserExtra>>;
+pub type PrattParser<'a, I, O, E, Atom, Operators, EndParser, EndParserExtra> =
+    Ext<PrattParser_<'a, I, O, E, Atom, Operators, EndParser, EndParserExtra>>;
 
 pub fn pratt_parser<
     'a,
@@ -355,8 +480,9 @@ pub fn pratt_parser<
     infix_ops: Vec<InfixOp<InfixParser, Op, O>>,
     prefix_ops: Vec<PrefixOp<PrefixParser, Op, O>>,
     postfix_ops: Vec<PostfixOp<PostfixParser, Op, O>>,
-    error_handler: PrattParseErrorHandler<I, O>,
+    error_handler: PrattParseErrorHandler<I, I::Span, O>,
 ) -> PrattParser<
+    'a,
     I,
     O,
     E,

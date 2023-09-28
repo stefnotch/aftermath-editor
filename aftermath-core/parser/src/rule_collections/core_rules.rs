@@ -30,15 +30,14 @@ impl CoreRules {
         let starting_bracket: String = starting_bracket.into();
         let ending_bracket: String = ending_bracket.into();
         crate::make_parser::MakeParserFn(move |parser| {
+            let ending_bracket_1: String = ending_bracket.clone();
+
             just_symbol(starting_bracket.clone())
                 .map_with_span(|v, span| (v, span.into_range()))
                 .then(
                     map_ctx(
-                        |ctx: &ParseContext<'_>| {
-                            let mut ctx = ctx.clone();
-                            ctx.min_binding_power = 0;
-                            // ctx.ending_parsers
-                            ctx
+                        move |ctx: &ParseContext<'_>| {
+                            ctx.with(0, just_symbol(ending_bracket_1.clone()).map(|_| ()).boxed())
                         },
                         parser,
                     )
