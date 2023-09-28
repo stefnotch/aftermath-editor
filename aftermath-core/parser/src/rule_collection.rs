@@ -6,8 +6,8 @@ use crate::{
     autocomplete::AutocompleteRule,
     make_parser::MakeParser,
     parser::pratt_parser::PrattParseContext,
+    parser_debug_error::ParserDebugError,
     syntax_tree::{NodeIdentifier, SyntaxNode, SyntaxNodeBuilder},
-    ParserDebugError,
 };
 
 pub type ParserInput<'a> = &'a [InputNode];

@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::syntax_tree::{SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren};
+use crate::syntax_tree::{SyntaxLeafNode, SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren};
 use crate::{
     autocomplete::AutocompleteRule,
     rule_collection::{RuleCollection, TokenRule},
@@ -84,21 +84,22 @@ impl BuiltInRules {
         BuiltInRules::error_rule_name("UnknownToken")
     }
 
-    // pub fn error_unknown_next_token(
-    //     range: Range<usize>,
-    //     child_a: SyntaxNode,
-    //     unknown_token: SyntaxLeafNode,
-    // ) -> SyntaxNode {
-    //     let children: Vec<SyntaxNode> = vec![
-    //         child_a,
-    //         SyntaxNode::new(
-    //             BuiltInRules::error_unknown_token_name(),
-    //             unknown_token.range(),
-    //             SyntaxNodeChildren::Leaf(unknown_token),
-    //         ),
-    //     ];
-    //     BuiltInRules::error_container_node(range, children)
-    // }
+    pub fn error_unknown_token(range: Range<usize>, values: &[InputNode]) -> SyntaxNode {
+        SyntaxNode::new(
+            BuiltInRules::error_unknown_token_name(),
+            range,
+            SyntaxNodeChildren::Leaf(SyntaxLeafNode::new(
+                crate::syntax_tree::LeafNodeType::Symbol,
+                values
+                    .iter()
+                    .map(|v| match v {
+                        InputNode::Symbol(v) => v.clone(),
+                        _ => panic!("Expected symbol"),
+                    })
+                    .collect::<Vec<_>>(),
+            )),
+        )
+    }
 
     /// An empty node, this happens when a row is empty.
     fn nothing_name() -> NodeIdentifier {

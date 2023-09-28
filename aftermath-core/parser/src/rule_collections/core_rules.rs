@@ -37,12 +37,14 @@ impl CoreRules {
                 .then(
                     map_ctx(
                         move |ctx: &ParseContext<'_>| {
-                            ctx.with(0, just_symbol(ending_bracket_1.clone()).map(|_| ()).boxed())
+                            ctx.with(
+                                Default::default(),
+                                just_symbol(ending_bracket_1.clone()).map(|_| ()).boxed(),
+                            )
                         },
                         parser,
                     )
-                    .boxed()
-                    .or_not(), // TODO: I maybe don't need the "or_not"
+                    .boxed(),
                 )
                 .then(
                     just_symbol(ending_bracket.clone())
@@ -61,9 +63,7 @@ impl CoreRules {
                             )
                             .build(BuiltInRules::operator_rule_name(), left_bracket_span),
                         );
-                        if let Some(child) = child {
-                            children.push(child);
-                        }
+                        children.push(child);
                         children.push(
                             SyntaxNodeBuilder::new_leaf_node(
                                 vec![right_bracket],

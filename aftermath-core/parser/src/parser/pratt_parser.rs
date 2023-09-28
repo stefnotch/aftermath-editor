@@ -6,7 +6,7 @@ use std::{
 use chumsky::{
     extension::v1::{Ext, ExtParser},
     extra::ParserExtra,
-    input::{InputRef, Marker},
+    input::InputRef,
     prelude::*,
 };
 
@@ -21,10 +21,10 @@ pub struct PrattParseContext<P> {
 }
 
 impl<P> PrattParseContext<P> {
-    pub fn new(min_binding_power: Strength, ending_parsers: ArcList<P>) -> Self {
+    pub fn new(min_binding_power: Strength, ending_parser: P) -> Self {
         Self {
             min_binding_power,
-            ending_parsers,
+            ending_parsers: Arc::new(ArcList_::Cons(ending_parser, Arc::new(ArcList_::Empty))),
         }
     }
 
@@ -285,9 +285,10 @@ where
         inp: &mut InputRef<'a, 'parse, I, E>,
         ending_parsers: &ArcList<EndParser>,
     ) -> bool {
-        let input = inp.slice_from(inp.offset()..);
+        let offset = inp.offset();
 
         for parser in ending_parsers.iter() {
+            let input = inp.slice_from(offset..);
             let parse_result = parser.check(input);
             if !parse_result.has_errors() {
                 return true;
@@ -302,6 +303,7 @@ where
         ending_parsers: &ArcList<EndParser>,
     ) -> O {
         let start_offset = get_position(inp);
+
         let offset = inp.offset();
         let _v = inp.next_maybe();
         loop {
@@ -764,7 +766,7 @@ pub fn postfix<P, Op, O>(
 
 /// Indicates which argument binds more strongly with a binary infix operator.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Assoc {
+pub enum Assoc {
     /// The operator binds more strongly with the argument to the left.
     ///
     /// For example `a + b + c` is parsed as `(a + b) + c`.
@@ -790,6 +792,12 @@ pub enum Strength {
 
     /// This is the weakly associated side of the operator.
     Weak(u16),
+}
+
+impl Default for Strength {
+    fn default() -> Self {
+        Self::Weak(0)
+    }
 }
 
 impl Strength {

@@ -1,11 +1,7 @@
 use std::sync::Arc;
 
-use chumsky::{
-    cache::Cached,
-    span::{SimpleSpan, Span},
-    Boxed, IterParser, Parser,
-};
-use input_tree::node::InputNodeVariant;
+use chumsky::{cache::Cached, span::SimpleSpan, Boxed, IterParser, Parser};
+use input_tree::node::{InputNode, InputNodeVariant};
 
 use crate::{
     make_parser::MakeParser,
@@ -14,7 +10,9 @@ use crate::{
     syntax_tree::{LeafNodeType, SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren},
 };
 
-use super::pratt_parser::{self, pratt_parser, PrattParseContext, PrattParseErrorHandler};
+use super::pratt_parser::{
+    self, pratt_parser, Assoc, PrattParseContext, PrattParseErrorHandler, Precedence,
+};
 
 pub struct CachedMathParser {
     token_rules: Arc<Vec<TokenRule>>,
@@ -200,26 +198,32 @@ impl Cached for CachedMathParser {
         // - |abs| works, because it acts like an atom. So we start parsing a | and invoke the main parser which parses the abs atom.
         //   Then the main parser encounters a | atom, and bails out. At this point, the |abs| parser can finish parsing the |.
 
-        let empty_row_parser = chumsky::primitive::end()
-            .boxed()
-            .map(|_| BuiltInRules::nothing_node(0));
-
-        chain.define(
-            pratt_parser(
-                atom,
-                infix_parsers,
-                prefix_parsers,
-                postfix_parsers,
-                PrattParseErrorHandler {
-                    make_missing_atom: todo!(), // || BuiltInRules::error_missing_token(op.range().end),
-                    make_missing_operator: todo!(),
-                    make_unknown_atom: todo!(),
-                    missing_operator_precedence: todo!(),
+        chain.define(pratt_parser(
+            atom,
+            infix_parsers,
+            prefix_parsers,
+            postfix_parsers,
+            PrattParseErrorHandler {
+                make_missing_atom: |span: SimpleSpan| BuiltInRules::error_missing_token(span.end),
+                make_missing_operator: |span: SimpleSpan, (child_a, child_b)| {
+                    BuiltInRules::error_missing_operator(span.into_range(), child_a, child_b)
                 },
-            )
-            .or(empty_row_parser),
-        );
+                make_unknown_atom: |span: SimpleSpan, values: &[InputNode]| {
+                    BuiltInRules::error_unknown_token(
+                        // Meh
+                        span.start..(span.start + values.len()),
+                        values,
+                    )
+                },
+                missing_operator_precedence: Precedence::new(100, Assoc::Left),
+            },
+        ));
 
-        chain.boxed()
+        chain
+            .with_ctx(PrattParseContext::new(
+                Default::default(),
+                chumsky::primitive::end().boxed(),
+            ))
+            .boxed()
     }
 }
