@@ -16,19 +16,19 @@ use chumsky::{
 
 // TODO: Create helper functions for this
 pub struct PrattParseContext<P> {
-    pub min_binding_power: u16,
+    pub min_binding_power: Strength,
     pub ending_parsers: ArcList<P>,
 }
 
 impl<P> PrattParseContext<P> {
-    pub fn new(min_binding_power: u16, ending_parsers: ArcList<P>) -> Self {
+    pub fn new(min_binding_power: Strength, ending_parsers: ArcList<P>) -> Self {
         Self {
             min_binding_power,
             ending_parsers,
         }
     }
 
-    pub fn with(&self, min_binding_power: u16, ending_parser: P) -> Self {
+    pub fn with(&self, min_binding_power: Strength, ending_parser: P) -> Self {
         Self {
             min_binding_power,
             ending_parsers: Arc::new(ArcList_::Cons(ending_parser, self.ending_parsers.clone())),
@@ -90,7 +90,7 @@ impl<P> Clone for PrattParseContext<P> {
 impl<P> Default for PrattParseContext<P> {
     fn default() -> Self {
         Self {
-            min_binding_power: 0,
+            min_binding_power: Strength::Weak(0),
             ending_parsers: Default::default(),
         }
     }
@@ -99,7 +99,7 @@ impl<P> Default for PrattParseContext<P> {
 pub struct PrattParseErrorHandler<I, Span, O> {
     pub make_missing_atom: fn(Span) -> O,
     pub make_missing_operator: fn(Span, (O, O)) -> O,
-    pub missing_operator_precedence: u16,
+    pub missing_operator_precedence: Precedence,
     pub make_unknown_atom: fn(Span, I) -> O,
 }
 
@@ -180,9 +180,15 @@ where
     }
 }
 
-enum PrattParseResult<T> {
-    Expression(T),
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PrattParseResultType {
+    Expression,
     End,
+}
+
+struct PrattParseResult<T> {
+    variant: PrattParseResultType,
+    value: T,
 }
 
 impl<
@@ -209,10 +215,12 @@ impl<
         EndParserExtra,
     >
 where
-    I: Input<'a>,
+    I: chumsky::input::SliceInput<'a, Slice = I>,
     E: ParserExtra<'a, I, Context = PrattParseContext<EndParser>>,
     EndParser: Parser<'a, I, (), EndParserExtra>,
     EndParserExtra: ParserExtra<'a, I>,
+    EndParserExtra::State: Default,
+    EndParserExtra::Context: Default,
     Atom: Parser<'a, I, O, E>,
     InfixParser: Parser<'a, I, Op, E>,
     PrefixParser: Parser<'a, I, Op, E>,
@@ -272,23 +280,55 @@ where
         None
     }
 
-    fn try_parse_end<'parse>(
+    fn try_check_end<'parse>(
         &self,
         inp: &mut InputRef<'a, 'parse, I, E>,
         ending_parsers: &ArcList<EndParser>,
-    ) {
-        let marker = inp.save();
+    ) -> bool {
+        let input = inp.slice_from(inp.offset()..);
 
         for parser in ending_parsers.iter() {
-            let a = parser.check(inp.to_end());
-            // if let Some(v) = inp.parse(parser).ok() {
-            // return Some(v);
-            // }
-            inp.rewind(marker);
+            let parse_result = parser.check(input);
+            if !parse_result.has_errors() {
+                return true;
+            }
         }
-        None
+        return false;
     }
 
+    fn parse_unknown<'parse>(
+        &self,
+        inp: &mut InputRef<'a, 'parse, I, E>,
+        ending_parsers: &ArcList<EndParser>,
+    ) -> O {
+        let start_offset = get_position(inp);
+        let offset = inp.offset();
+        let _v = inp.next_maybe();
+        loop {
+            if self.try_check_end(inp, ending_parsers) {
+                break;
+            }
+            if let Some(_) = self.try_parse_prefix(inp) {
+                break;
+            }
+            if let Some(_) = self.try_parse_atom(inp) {
+                break;
+            }
+            if let Some(_) = self.try_parse_infix(inp) {
+                break;
+            }
+            if let Some(_) = self.try_parse_postfix(inp) {
+                break;
+            }
+            let _v = inp.next_maybe();
+        }
+        let unknown_input = inp.slice(offset..inp.offset());
+        let unknown_atom = (&self.error_handler.make_unknown_atom)(start_offset, unknown_input);
+        unknown_atom
+    }
+
+    /// Pratt parsing can either succeed, or parse nothing.
+    ///
     /// At every step of the pratt parsing, we are in a given state. And we have a min strength.
     /// Then we parse a token, and go into a new state.
     ///
@@ -302,9 +342,9 @@ where
     /// - Prefix: ParseExpression(strength), then ParseOperator(left, strength)
     /// - Atom: ParseOperator(left, strength)
     /// and the fallbacks
-    /// - End: rewind, return End; (could also be moved down in this list)
     /// - Infix: rewind, then ParseOperator(None, strength);
     /// - Postfix: rewind, then ParseOperator(None, strength);
+    /// - End: rewind, return End; (could also be moved down in this list)
     /// - Unknown: skip until End or Prefix/Atom/Infix/Postfix, then ParseExpression(strength) or ParseOperator(left, strength)
     /// the unknown token case is also why I even need the "End" case.
     ///
@@ -312,9 +352,9 @@ where
     /// - Infix: ParseExpression(strength), then ParseOperator(left, strength)
     /// - Postfix: ParseOperator(left, strength)
     /// and the fallbacks
+    /// - Prefix: rewind, missing operator with strength, ParseExpression(strength), then ParseOperator(left, strength)
+    /// - Atom: same
     /// - End: rewind, return End;
-    /// - Atom: rewind, missing operator with strength, ParseExpression(strength), then ParseOperator(left, strength)
-    /// - Prefix: same
     /// - Unknown: skip until End or Prefix/Atom/Infix/Postfix, then ParseExpression(strength) or ParseOperator(left, strength)
     ///
     fn pratt_parse(
@@ -322,103 +362,122 @@ where
         inp: &mut InputRef<'a, '_, I, E>,
         min_binding_power: Strength,
         ending_parsers: &ArcList<EndParser>,
-    ) -> Result<O, E::Error> {
-        // Iterative-ish version of the above
-
+    ) -> PrattParseResult<O> {
         let pre_op = inp.save();
-        // Find first matching prefix operator
-        let prefix_op = self.operators.prefix_ops.iter().find_map(|op| {
+        // Iterative-ish version of the above
+        let mut left = if let Some((value, op)) = self.try_parse_prefix(inp) {
+            let right = self.pratt_parse(inp, op.precedence.strength_right(), ending_parsers);
+            let value = (op.build)(value, right.value);
+            if right.variant == PrattParseResultType::End {
+                return PrattParseResult {
+                    variant: PrattParseResultType::End,
+                    value,
+                };
+            }
+            value
+        } else if let Some(v) = self.try_parse_atom(inp) {
+            v
+        }
+        // Failure cases with graceful recovery
+        else if self.try_parse_infix(inp).is_some() || self.try_parse_postfix(inp).is_some() {
             inp.rewind(pre_op);
-            // Parse the child with our current pratt parsing context
-            inp.parse(&op.parser).ok().map(|v| (v, op))
-        });
-        let mut left = match prefix_op {
-            Some((value, op)) => {
-                let right = self.pratt_parse(inp, op.precedence.strength_right(), ending_parsers);
-
-                // TODO: Unknown yet?
-                match right {
-                    Ok(right) => (op.build)(value, right),
-                    Err(_) => {
-                        // We are missing an atom after the prefix operator.
-                        // So it's time to do error recovery.
-                        // Note:
-                        // The "unknown atom" case is handled separately elsewhere. As in, we might as well report "missing atom", "unknown atom" as two separate errors, right after one another.
-                        let a = inp.parse(empty().map_with_span(|_, span| span));
-                        (op.build)(value, (self.error_handler.make_missing_atom)())
-                    }
-                }
-            }
-            None => {
-                inp.rewind(pre_op);
-                inp.parse(&self.atom)?
-                // Not finding an atom is an error, but we don't handle it here.
-                // Instead, we let the calling parser choose how to handle it.
-                // e.g. Prefix parsers will return a "missing atom" error.
-                // e.g. Bracket parsers can be happy about not finding an atom, since it means that the bracket might be empty.
-                // e.g. Row parsers can also be happy, since it means that the row might be empty.
-            }
+            (&self.error_handler.make_missing_atom)(get_position(inp))
+        } else if self.try_check_end(inp, ending_parsers) {
+            // Don't try to parse more if we're at the end
+            inp.rewind(pre_op);
+            return PrattParseResult {
+                variant: PrattParseResultType::End,
+                value: (&self.error_handler.make_missing_atom)(get_position(inp)),
+            };
+        } else {
+            self.parse_unknown(inp, ending_parsers)
         };
 
         loop {
             let pre_op = inp.save();
 
-            // Future note: Postfix and infix could be joined? (aka postfix is a special case of infix, or the other way around)
-            let infix_op = self.operators.infix_ops.iter().find_map(|op| {
-                inp.rewind(pre_op);
-                inp.parse(&op.parser).ok().map(|v| (v, op))
-            });
-            match infix_op {
-                Some((value, op)) => {
-                    if op.precedence.strength_left() < min_binding_power {
-                        inp.rewind(pre_op);
-                        return Ok(left);
-                    }
-                    let right =
-                        self.pratt_parse(inp, op.precedence.strength_right(), ending_parsers);
-                    // Same idea as prefix parsing
-                    match right {
-                        Ok(right) => {
-                            left = (op.build)(value, (left, right));
-                        }
-                        Err(_) => {
-                            left =
-                                (op.build)(value, (left, (self.error_handler.make_missing_atom)()));
-                        }
-                    }
-                    continue;
-                }
-                None => {
+            if let Some((value, op)) = self.try_parse_infix(inp) {
+                if op.precedence.strength_left() < min_binding_power {
                     inp.rewind(pre_op);
+                    // Or return Ok((left, op.precedence.strength_left(), op, self.pratt_parse(op.precedence.strength_right())))?
+                    return PrattParseResult {
+                        variant: PrattParseResultType::Expression,
+                        value: left,
+                    };
                 }
-            };
 
-            let postfix_op = self.operators.postfix_ops.iter().find_map(|op| {
-                inp.rewind(pre_op);
-                inp.parse(&op.parser).ok().map(|v| (v, op))
-            });
-            match postfix_op {
-                Some((value, op)) => {
-                    if op.precedence.strength_left() < min_binding_power {
-                        inp.rewind(pre_op);
-                        return Ok(left);
-                    }
-                    left = (op.build)(value, left);
-                    continue;
+                let right = self.pratt_parse(inp, op.precedence.strength_right(), ending_parsers);
+                let value = (op.build)(value, (left, right.value));
+                if right.variant == PrattParseResultType::End {
+                    return PrattParseResult {
+                        variant: PrattParseResultType::End,
+                        value,
+                    };
                 }
-                None => {
+                left = value;
+            } else if let Some((value, op)) = self.try_parse_postfix(inp) {
+                if op.precedence.strength_left() < min_binding_power {
                     inp.rewind(pre_op);
+                    return PrattParseResult {
+                        variant: PrattParseResultType::Expression,
+                        value: left,
+                    };
                 }
-            };
-
-            // No operator matched, so we either are
-            // - at the end of the input
-            // - before a closing bracket (bracket parser do pratt parsing themselves)
-            // - or we have an error
-            // in all of those cases, we say that we're finished and let the parent deal with it
-            return Ok(left);
+                left = (op.build)(value, left);
+            }
+            // Failure cases with graceful recovery
+            else if self.try_parse_prefix(inp).is_some() || self.try_parse_atom(inp).is_some() {
+                inp.rewind(pre_op);
+                let start_offset = get_position(inp);
+                if self
+                    .error_handler
+                    .missing_operator_precedence
+                    .strength_left()
+                    < min_binding_power
+                {
+                    return PrattParseResult {
+                        variant: PrattParseResultType::Expression,
+                        value: left,
+                    };
+                }
+                let right = self.pratt_parse(
+                    inp,
+                    self.error_handler
+                        .missing_operator_precedence
+                        .strength_right(),
+                    ending_parsers,
+                );
+                let value =
+                    (self.error_handler.make_missing_operator)(start_offset, (left, right.value));
+                if right.variant == PrattParseResultType::End {
+                    return PrattParseResult {
+                        variant: PrattParseResultType::End,
+                        value,
+                    };
+                }
+                left = value;
+            } else if self.try_check_end(inp, ending_parsers) {
+                // Don't try to parse more if we're at the end
+                inp.rewind(pre_op);
+                return PrattParseResult {
+                    variant: PrattParseResultType::End,
+                    value: left,
+                };
+            } else {
+                // Unknown
+                let start_offset = get_position(inp);
+                let right = self.parse_unknown(inp, ending_parsers);
+                left = (self.error_handler.make_missing_operator)(start_offset, (left, right));
+            }
         }
     }
+}
+
+fn get_position<'a, I: Input<'a>, E: ParserExtra<'a, I>>(
+    inp: &mut InputRef<'a, '_, I, E>,
+) -> I::Span {
+    inp.parse(empty().map_with_span(|_, span| span))
+        .unwrap_or_else(|_| panic!("should never happen"))
 }
 
 impl<
@@ -445,19 +504,25 @@ impl<
         EndParserExtra,
     >
 where
-    I: Input<'a>,
+    // TODO: Hopefully I can simplify this at some point
+    // Especially the "EndParser" stuff is annoying. It also requires a SliceInput.
+    I: chumsky::input::SliceInput<'a, Slice = I>,
     E: ParserExtra<'a, I, Context = PrattParseContext<EndParser>>,
     EndParser: Parser<'a, I, (), EndParserExtra>,
     EndParserExtra: ParserExtra<'a, I>,
+    EndParserExtra::State: Default,
+    EndParserExtra::Context: Default,
     Atom: Parser<'a, I, O, E>,
     InfixParser: Parser<'a, I, Op, E>,
     PrefixParser: Parser<'a, I, Op, E>,
     PostfixParser: Parser<'a, I, Op, E>,
 {
     fn parse(&self, inp: &mut InputRef<'a, '_, I, E>) -> Result<O, E::Error> {
-        let min_binding_power = Strength::Weak(inp.ctx().min_binding_power); // TODO: Obviously not perfect
+        let min_binding_power = inp.ctx().min_binding_power;
         let ending_parsers = inp.ctx().ending_parsers.clone();
-        self.pratt_parse(inp, min_binding_power, &ending_parsers)
+        Ok(self
+            .pratt_parse(inp, min_binding_power, &ending_parsers)
+            .value)
     }
 }
 pub type PrattParser<'a, I, O, E, Atom, Operators, EndParser, EndParserExtra> =
@@ -492,7 +557,7 @@ pub fn pratt_parser<
     EndParserExtra,
 >
 where
-    I: Input<'a>,
+    I: chumsky::input::SliceInput<'a, Slice = I>,
 {
     Ext(PrattParser_ {
         atom,
@@ -763,7 +828,7 @@ impl PartialOrd for Strength {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-struct Precedence {
+pub struct Precedence {
     strength: u16,
     associativity: Assoc,
 }
