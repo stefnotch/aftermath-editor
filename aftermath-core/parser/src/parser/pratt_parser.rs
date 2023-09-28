@@ -98,7 +98,7 @@ impl<P> Default for PrattParseContext<P> {
 
 pub struct PrattParseErrorHandler<I, Span, O> {
     pub make_missing_atom: fn(Span) -> O,
-    pub make_missing_operator: fn(Span, (O, O)) -> O,
+    pub make_missing_operator: fn(Span, (O, O)) -> O, // fn(Span) -> Op, is superior
     pub missing_operator_precedence: Precedence,
     pub make_unknown_atom: fn(Span, I) -> O,
 }
