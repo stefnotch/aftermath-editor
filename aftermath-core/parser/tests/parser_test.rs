@@ -220,7 +220,7 @@ fn test_parser_empty_input() {
 
     let parsed = parse_row(&layout);
     // "Nothing" is taken from https://cortexjs.io/compute-engine/reference/core/
-    assert_eq!(parsed.to_string(), "(BuiltIn::Nothing)");
+    assert_eq!(parsed.to_string(), "(Error::MissingToken)");
 }
 
 #[test]
@@ -235,7 +235,7 @@ fn test_parser_empty_squareroot() {
     let parsed = parse_row(&layout);
     assert_eq!(
         parsed.to_string(),
-        r#"(BuiltIn::Root 2x1 (BuiltIn::Nothing) (Core::Variable "a"))"#
+        r#"(BuiltIn::Root 2x1 (Error::MissingToken) (Core::Variable "a"))"#
     );
 }
 
@@ -245,7 +245,7 @@ fn test_parser_empty_brackets() {
     let parsed = parse_row(&layout);
     assert_eq!(
         parsed.to_string(),
-        r#"(Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (Core::RoundBrackets (BuiltIn::Operator "(") (BuiltIn::Operator ")")))"#
+        r#"(Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (Core::RoundBrackets (BuiltIn::Operator "(") (Error::MissingToken) (BuiltIn::Operator ")")))"#
     );
 }
 

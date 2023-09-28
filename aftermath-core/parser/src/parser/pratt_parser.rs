@@ -524,6 +524,8 @@ where
     PostfixParser: Parser<'a, I, Op, E>,
 {
     fn parse(&self, inp: &mut InputRef<'a, '_, I, E>) -> Result<O, E::Error> {
+        // TODO: A single "(Error::MissingToken)" should become "(BuiltIn::Nothing)"
+
         let min_binding_power = inp.ctx().min_binding_power;
         let ending_parsers = inp.ctx().ending_parsers.clone();
         Ok(self
