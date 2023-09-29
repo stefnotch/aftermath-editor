@@ -66,7 +66,9 @@ impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op
         self.parselets.push(PrattParselet {
             parsers: vec![PrattParseletKind::Atom(PrattAtom { parser })],
             build: Arc::new(|results: Vec<PrattParseResult<Op, O>>| {
-                if let Some((PrattParseResult::Atom(v),)) = results.into_iter().collect_tuple() {
+                if let Some((PrattParseResult::Expression(v),)) =
+                    results.into_iter().collect_tuple()
+                {
                     v
                 } else {
                     panic!("add_atom_parselet failed")
@@ -92,7 +94,7 @@ impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op
                 PrattParseletKind::Expression(PrattExpression {}),
             ],
             build: Arc::new(move |results: Vec<PrattParseResult<Op, O>>| {
-                if let Some((PrattParseResult::Op(op), PrattParseResult::Atom(expr))) =
+                if let Some((PrattParseResult::Op(op), PrattParseResult::Expression(expr))) =
                     results.into_iter().collect_tuple()
                 {
                     (build)(op, expr)
@@ -120,9 +122,9 @@ impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op
             ],
             build: Arc::new(move |results: Vec<PrattParseResult<Op, O>>| {
                 if let Some((
-                    PrattParseResult::Atom(lhs),
+                    PrattParseResult::Expression(lhs),
                     PrattParseResult::Op(op),
-                    PrattParseResult::Atom(rhs),
+                    PrattParseResult::Expression(rhs),
                 )) = results.into_iter().collect_tuple()
                 {
                     (build)(lhs, op, rhs)
@@ -149,7 +151,7 @@ impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op
                 }),
             ],
             build: Arc::new(move |results: Vec<PrattParseResult<Op, O>>| {
-                if let Some((PrattParseResult::Atom(expr), PrattParseResult::Op(op))) =
+                if let Some((PrattParseResult::Expression(expr), PrattParseResult::Op(op))) =
                     results.into_iter().collect_tuple()
                 {
                     (build)(expr, op)
@@ -181,7 +183,7 @@ impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op
             build: Arc::new(move |results: Vec<PrattParseResult<Op, O>>| {
                 if let Some((
                     PrattParseResult::Op(open),
-                    PrattParseResult::Atom(expr),
+                    PrattParseResult::Expression(expr),
                     PrattParseResult::Op(close),
                 )) = results.into_iter().collect_tuple()
                 {
@@ -209,7 +211,6 @@ impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op
 pub struct PrattParselet<AtomParser, OpParser, Op, O> {
     pub parsers: Vec<PrattParseletKind<AtomParser, OpParser>>,
     pub build: Arc<dyn Fn(Vec<PrattParseResult<Op, O>>) -> O>,
-    // TODO: Actual parsing implementation lives elsewhere
 }
 
 impl<AtomParser, OpParser, Op, O> Clone for PrattParselet<AtomParser, OpParser, Op, O>
@@ -252,7 +253,7 @@ impl<AtomParser, OpParser, Op, O> PrattParselet<AtomParser, OpParser, Op, O> {
 
 #[derive(Debug)]
 pub enum PrattParseResult<Op, O> {
-    Atom(O),
+    Expression(O),
     Op(Op),
 }
 
@@ -268,6 +269,8 @@ pub struct PrattAtom<AtomParser> {
     pub parser: AtomParser,
 }
 
+// TODO: "accept_empty" is not a thing. The brackets don't need this, we will turn the bracket parser into
+// "(" expression ")" and a single token that needs both brackets "()"
 #[derive(Debug, Clone)]
 pub struct PrattExpression {}
 

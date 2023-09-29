@@ -56,15 +56,10 @@ where
     }
 }
 
-struct LeftAndMinStrength<O> {
-    left: O,
-    min_strength: (u32, Strength),
-}
-
-enum ParseletParseResult<Op, O> {
-    Some(Vec<PrattParseResult<Op, O>>),
+enum ParseletParseResult<T, Left> {
+    Some(T),
     /// Special pratt parsing case where we have a successful parse, but the binding power is too low.
-    Left,
+    Left(Left),
     None,
 }
 
@@ -79,33 +74,36 @@ where
     /// Accepts the existing left expression, if and only if the parselet needs it
     fn parse_parselet<'parse>(
         &self,
-        left: &mut Option<LeftAndMinStrength<O>>,
+        left: &mut Option<O>,
+        min_strength: (u32, Strength),
         parselet: &PrattParselet<AtomParser, OpParser, Op, O>,
         inp: &mut InputRef<'a, 'parse, I, E>,
-    ) -> ParseletParseResult<Op, O> {
+    ) -> ParseletParseResult<Vec<PrattParseResult<Op, O>>, O> {
         assert!(parselet.parsers.len() > 0);
 
         let mut results = Vec::new();
+        let mut strength_right = None;
 
         // We determine if we should continue parsing based on the first parser that actually parses any content.
         // As opposed to the Expression kind, which just says "invoke the pratt parsing algorithm again".
         let mut parser_index = 0;
-        if let PrattParseletKind::Expression(_p) = parselet.parsers[parser_index] {
-            let min_strength = left
-                .map(|v| v.min_strength)
-                .expect("left should exist when starting with an expression parse");
+        if let PrattParseletKind::Expression(_p) = &parselet.parsers[parser_index] {
+            assert!(
+                left.is_some(),
+                "left should exist when starting with an expression parse"
+            );
             parser_index += 1;
             assert!(
                 parselet.parsers.len() > parser_index,
                 "Expression parser cannot exist by itself"
             );
-            match parselet.parsers[parser_index] {
+            match &parselet.parsers[parser_index] {
                 PrattParseletKind::Atom(p) => {
                     let marker = inp.save();
-                    match inp.parse(p.parser).ok() {
+                    match inp.parse(&p.parser).ok() {
                         Some(v) => {
-                            results.push(PrattParseResult::Atom(left.take().unwrap().left));
-                            results.push(PrattParseResult::Atom(v));
+                            results.push(PrattParseResult::Expression(left.take().unwrap()));
+                            results.push(PrattParseResult::Expression(v));
                         }
                         None => {
                             inp.rewind(marker);
@@ -123,14 +121,15 @@ where
                     // 2. And then we have an operator
                     // (aka infix or postfix cases)
                     let marker = inp.save();
-                    match inp.parse(p.parser).ok() {
+                    match inp.parse(&p.parser).ok() {
                         Some(v) => {
                             if p.binding_power.strength_left() < min_strength {
                                 inp.rewind(marker);
-                                return ParseletParseResult::Left;
+                                return ParseletParseResult::Left(left.take().unwrap());
                             } else {
-                                results.push(PrattParseResult::Atom(left.take().unwrap().left));
+                                results.push(PrattParseResult::Expression(left.take().unwrap()));
                                 results.push(PrattParseResult::Op(v));
+                                strength_right = Some(p.binding_power.strength_right());
                             }
                         }
                         None => {
@@ -146,22 +145,129 @@ where
         // As soon as the first parser is successful, we definitely continue parsing until the end.
 
         for parser in parselet.parsers[parser_index..].iter() {
-            match parselet.parsers[parser_index] {
+            match parser {
                 PrattParseletKind::Atom(p) => {
-                    // TODO: infallible parse
+                    let marker = inp.save();
+                    match inp.parse(&p.parser).ok() {
+                        Some(v) => {
+                            results.push(PrattParseResult::Expression(v));
+                            strength_right = None;
+                        }
+                        None => {
+                            inp.rewind(marker);
+                            // TODO: recovery
+                        }
+                    }
                 }
                 PrattParseletKind::Expression(_p) => {
-                    // TODO: infallible parse
+                    // TODO: This, or do we pass in the "min binding power"?
+                    match self.pratt_parse(inp, strength_right.unwrap_or((0, Strength::Weak))) {
+                        Some(v) => {
+                            results.push(PrattParseResult::Expression(v));
+                        }
+                        None => {
+                            // TODO: recovery
+                        }
+                    }
+                    strength_right = None;
                 }
                 PrattParseletKind::Op(p) => {
-                    // TODO: infallible parse which ignores the whole min binding power thing
+                    let marker = inp.save();
+                    match inp.parse(&p.parser).ok() {
+                        Some(v) => {
+                            results.push(PrattParseResult::Op(v));
+                            strength_right = Some(p.binding_power.strength_right());
+                        }
+                        None => {
+                            inp.rewind(marker);
+                            // TODO: recovery
+                        }
+                    }
                 }
             }
         }
 
         ParseletParseResult::Some(results)
     }
-    // TODO: Impl
+
+    fn parse_parselets<'parse>(
+        &self,
+        left_option: &mut Option<O>,
+        min_strength: (u32, Strength),
+        parselets: &[PrattParselet<AtomParser, OpParser, Op, O>],
+        inp: &mut InputRef<'a, 'parse, I, E>,
+    ) -> ParseletParseResult<O, O> {
+        for parselet in parselets.iter() {
+            match self.parse_parselet(left_option, min_strength.clone(), parselet, inp) {
+                ParseletParseResult::Some(v) => {
+                    return ParseletParseResult::Some((parselet.build)(v));
+                }
+                ParseletParseResult::Left(left) => {
+                    return ParseletParseResult::Left(left);
+                }
+                ParseletParseResult::None => {}
+            };
+        }
+        ParseletParseResult::None
+    }
+
+    /// Pratt parsing. Will return None if there's nothing to parse, for example if the input is empty or if the first character is unknown.
+    /// Will politely rewind the input if it fails to parse.
+    fn pratt_parse<'parse>(
+        &self,
+        inp: &mut InputRef<'a, 'parse, I, E>,
+        min_strength: (u32, Strength),
+    ) -> Option<O> {
+        let mut left = match self.parse_parselets(
+            &mut None,
+            min_strength.clone(),
+            &self.parselets.parselets_starting_with_expression,
+            inp,
+        ) {
+            ParseletParseResult::Some(v) => Some(v),
+            ParseletParseResult::Left(_) => {
+                panic!("Expression parselet should never return Left");
+            }
+            ParseletParseResult::None => None,
+        };
+        if left.is_none() {
+            left = match self.parse_parselets(
+                &mut None,
+                min_strength.clone(),
+                &self.parselets.parselets_starting_with_atom,
+                inp,
+            ) {
+                ParseletParseResult::Some(v) => Some(v),
+                ParseletParseResult::Left(_) => {
+                    panic!("Expression parselet should never return Left");
+                }
+                ParseletParseResult::None => None,
+            };
+        }
+
+        // If we haven't managed to parse anything, we should return None.
+        // Alternatively we could try to do "missing token" recovery here, but that's not going to happen here for now.
+        let mut left = left?;
+
+        loop {
+            let mut left_option = Some(left);
+            left = match self.parse_parselets(
+                &mut left_option,
+                min_strength.clone(),
+                &self.parselets.parselets_starting_with_op,
+                inp,
+            ) {
+                ParseletParseResult::Some(v) => v,
+                ParseletParseResult::Left(left) => {
+                    return Some(left);
+                }
+                ParseletParseResult::None => {
+                    // No more operators to parse, so we're done.
+                    return Some(left_option.expect("Left should not have been consumed"));
+                }
+            };
+        }
+    }
 }
 
 fn get_position<'a, I: Input<'a>, E: ParserExtra<'a, I>>(
@@ -181,7 +287,18 @@ where
 {
     fn parse<'parse>(&self, inp: &mut InputRef<'a, 'parse, I, E>) -> Result<O, E::Error> {
         // TODO: A single "(Error::MissingToken)" should become "(BuiltIn::Nothing)"
-        Ok(self.pratt_parse(inp, min_binding_power).value)
+        match self.pratt_parse(inp, (0, Strength::Weak)) {
+            Some(v) => Ok(v),
+            None => {
+                let before = inp.offset();
+                // Could report slightly better errors here, but it's not really worth it.
+                Err(E::Error::expected_found(
+                    [],
+                    inp.next_maybe(),
+                    inp.span_since(before),
+                ))
+            }
+        }
     }
 }
 
