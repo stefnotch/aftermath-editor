@@ -3,6 +3,7 @@ use chumsky::{
     extra::ParserExtra,
     input::InputRef,
     prelude::*,
+    util::MaybeRef,
 };
 
 use crate::parser::pratt_parselet::PrattParseletKind;
@@ -12,16 +13,16 @@ use super::pratt_parselet::{
 };
 
 #[derive(Debug)]
-pub struct PrattParseErrorHandler<I, Span, O, Op> {
+pub struct PrattParseErrorHandler<Token, Span, O, Op> {
     pub make_missing_atom: fn(Span) -> O,
     pub make_missing_operator: fn(Span) -> Op,
     pub combine_errors: fn(Op, (O, O)) -> O,
     pub missing_operator_binding_power: BindingPower,
     // Why is this one so tricky?
-    pub make_unknown_atom: fn(Span, I) -> O,
+    pub make_unknown_atom: fn(Span, Token) -> O,
 }
 
-impl<I, Span, O, Op> Clone for PrattParseErrorHandler<I, Span, O, Op> {
+impl<Token, Span, O, Op> Clone for PrattParseErrorHandler<Token, Span, O, Op> {
     fn clone(&self) -> Self {
         Self {
             make_missing_atom: self.make_missing_atom.clone(),
@@ -38,7 +39,7 @@ where
     I: Input<'a>,
 {
     parselets: PrattParselets<AtomParser, OpParser, Op, O>,
-    error_handler: PrattParseErrorHandler<I, I::Span, O, Op>,
+    error_handler: PrattParseErrorHandler<MaybeRef<'a, I::Token>, I::Span, O, Op>,
     _phantom: std::marker::PhantomData<E>,
 }
 
@@ -67,7 +68,7 @@ enum ParseletParseResult<T, Left> {
 
 impl<'a, I, O, E, AtomParser, OpParser, Op> PrattParser_<'a, I, O, E, AtomParser, OpParser, Op>
 where
-    I: chumsky::input::SliceInput<'a, Slice = I>,
+    I: Input<'a>,
     E: ParserExtra<'a, I>,
     AtomParser: Parser<'a, I, O, E>,
     OpParser: Parser<'a, I, Op, E>,
@@ -452,7 +453,7 @@ fn get_position<'a, I: Input<'a>, E: ParserExtra<'a, I>>(
 impl<'a, I, O, E, AtomParser, OpParser, Op> ExtParser<'a, I, O, E>
     for PrattParser_<'a, I, O, E, AtomParser, OpParser, Op>
 where
-    I: chumsky::input::SliceInput<'a, Slice = I>,
+    I: Input<'a>,
     E: ParserExtra<'a, I>,
     AtomParser: Parser<'a, I, O, E>,
     OpParser: Parser<'a, I, Op, E>,
@@ -461,18 +462,37 @@ where
     /// Will do agressive error recovery to do so.
     /// For a less agressive different behaviour, use [`PrattParser_::pratt_parse`].
     fn parse<'parse>(&self, inp: &mut InputRef<'a, 'parse, I, E>) -> Result<O, E::Error> {
-        // TODO: A single "(Error::MissingToken)" should become "(BuiltIn::Nothing)"
-        match self.pratt_parse(inp, (0, Strength::Weak), &mut vec![]) {
-            Some(v) => Ok(v),
+        let mut result = None;
+
+        // Repeatedly parse while doing token skip error recovery
+        while inp.peek_maybe().is_some() {
+            let start_offset = get_position(inp);
+            let next = match self.pratt_parse(inp, (0, Strength::Weak), &mut vec![]) {
+                Some(v) => v,
+                None => {
+                    let pos = get_position(inp);
+                    let next_token = inp
+                        .next_maybe()
+                        .expect("We already checked for an empty input");
+                    (self.error_handler.make_unknown_atom)(pos, next_token)
+                }
+            };
+            result = match result {
+                Some(result) => Some((self.error_handler.combine_errors)(
+                    (self.error_handler.make_missing_operator)(start_offset),
+                    (result, next),
+                )),
+                None => Some(next),
+            };
+        }
+
+        // A single "(Error::MissingToken)" should become "(BuiltIn::Nothing)"
+        match result {
+            Some(result) => Ok(result),
             None => {
-                // TODO: Actually, let's do agressive error recovery here.
-                let before = inp.offset();
-                // Could report slightly better errors here, but it's not really worth it.
-                Err(E::Error::expected_found(
-                    [],
-                    inp.next_maybe(),
-                    inp.span_since(before),
-                ))
+                let offs = inp.offset();
+                let err_span = inp.span_since(offs);
+                Err(E::Error::expected_found(None, None, err_span))
             }
         }
     }
@@ -483,10 +503,10 @@ pub type PrattParser<'a, I, O, E, AtomParser, OpParser, Op> =
 
 pub fn pratt_parser<'a, I, O, E, AtomParser, OpParser, Op>(
     parselets: PrattParselets<AtomParser, OpParser, Op, O>,
-    error_handler: PrattParseErrorHandler<I, I::Span, O, Op>,
+    error_handler: PrattParseErrorHandler<MaybeRef<'a, I::Token>, I::Span, O, Op>,
 ) -> PrattParser<'a, I, O, E, AtomParser, OpParser, Op>
 where
-    I: chumsky::input::SliceInput<'a, Slice = I>,
+    I: Input<'a>,
 {
     Ext(PrattParser_ {
         parselets,
