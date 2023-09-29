@@ -260,8 +260,8 @@ pub enum PrattParseResult<Op, O> {
 #[derive(Debug, Clone)]
 pub enum PrattParseletKind<AtomParser, OpParser> {
     Atom(PrattAtom<AtomParser>),
-    Expression(PrattExpression),
     Op(PrattOp<OpParser>),
+    Expression(PrattExpression),
 }
 
 #[derive(Debug, Clone)]
