@@ -46,10 +46,9 @@ impl<'editor> EditorActionBuilder<'editor> {
         if edit.edits.len() > 0 {
             self.editor.input.apply_edits(&edit.edits);
             self.editor.parsed = None;
-            self.editor.caret = edit.caret_after.clone();
             self.editor.undo_stack.push(edit.clone().into());
         }
-
+        self.editor.caret = edit.caret_after.clone();
         edit
     }
 }

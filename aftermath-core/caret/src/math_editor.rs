@@ -20,6 +20,7 @@ use input_tree::{
     focus::{MinimalInputRowPosition, MinimalInputRowRange},
     node::InputNode,
 };
+use log::info;
 use parser::autocomplete::{AutocompleteMatcher, AutocompleteRule, AutocompleteRuleMatch};
 use parser::parser::MathParser;
 use parser::syntax_tree::{NodeIdentifier, SyntaxNode};

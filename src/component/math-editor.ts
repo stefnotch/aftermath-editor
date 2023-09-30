@@ -366,6 +366,7 @@ export class MathEditor extends HTMLElement {
   renderCarets() {
     if (!this.isConnected) return;
     let carets = MathEditorHelper.getCaret(this.mathEditor);
+    console.log(carets);
     this.caretsContainer.replaceChildren();
     for (const caret of carets) {
       const element = new CaretDomElement();

@@ -1,6 +1,7 @@
 pub mod math_editor;
 mod utils;
 
+use log::Level;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
@@ -22,4 +23,5 @@ extern "C" {
 #[wasm_bindgen(start)]
 fn main() {
     set_panic_hook();
+    let _ = console_log::init_with_level(Level::Debug);
 }
