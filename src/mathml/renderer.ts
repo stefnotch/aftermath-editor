@@ -46,6 +46,14 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
         assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
         return new NothingMathMLElement(syntaxTree, rowIndex);
       });
+      builtIn.add("Whitespace", (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
+        return new TextMathMLElement(syntaxTree, rowIndex, "mspace");
+      });
+      builtIn.add("Whitespaces", (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
+        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
+      });
       builtIn.add("Operator", (syntaxTree, rowIndex, options) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
         return new SymbolMathMLElement(syntaxTree, rowIndex, "mo", {
@@ -94,6 +102,10 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
       error.add("MissingToken", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
         return new NothingMathMLElement(syntaxTree, rowIndex);
+      });
+      error.add("UnknownToken", (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
+        return new TextMathMLElement(syntaxTree, rowIndex, "merror");
       });
       error.add("MissingOperator", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Children"));

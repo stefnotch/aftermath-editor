@@ -93,12 +93,13 @@ pub trait RuleCollection {
     fn get_extra_rule_names() -> Vec<NodeIdentifier> {
         vec![]
     }
-    fn get_rule_names() -> HashSet<NodeIdentifier> {
-        let mut rules_names = Self::get_rules()
-            .into_iter()
-            .map(|v| v.name)
-            .collect::<HashSet<_>>();
-        rules_names.extend(Self::get_extra_rule_names());
-        rules_names
-    }
+}
+
+pub fn get_rule_names<T: RuleCollection>(_rule_collection: T) -> HashSet<NodeIdentifier> {
+    let mut rules_names = T::get_rules()
+        .into_iter()
+        .map(|v| v.name)
+        .collect::<HashSet<_>>();
+    rules_names.extend(T::get_extra_rule_names());
+    rules_names
 }

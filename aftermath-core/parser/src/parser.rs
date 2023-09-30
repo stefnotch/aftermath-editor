@@ -25,16 +25,23 @@ use self::math_parser::CachedMathParser;
 pub struct MathParser {
     parser_cache: chumsky::cache::Cache<CachedMathParser>,
     token_rules: Arc<Vec<TokenRule>>,
+    extra_rule_names: Arc<Vec<NodeIdentifier>>,
     autocomplete_rules: Vec<AutocompleteRule>,
 }
 
 impl MathParser {
-    fn new(token_rules: Vec<TokenRule>, autocomplete_rules: Vec<AutocompleteRule>) -> Self {
+    fn new(
+        token_rules: Vec<TokenRule>,
+        extra_rule_names: Vec<NodeIdentifier>,
+        autocomplete_rules: Vec<AutocompleteRule>,
+    ) -> Self {
         let token_rules = Arc::new(token_rules);
+        let extra_rule_names = Arc::new(extra_rule_names);
         let parser_cache = chumsky::cache::Cache::new(CachedMathParser::new(token_rules.clone()));
         Self {
             parser_cache,
             token_rules,
+            extra_rule_names,
             autocomplete_rules,
         }
     }
@@ -55,12 +62,14 @@ impl MathParser {
         self.token_rules
             .iter()
             .map(|v| v.name.clone())
+            .chain(self.extra_rule_names.iter().map(|v| v.clone()))
             .collect::<HashSet<_>>()
     }
 }
 
 pub struct ParserBuilder {
     token_rules: Vec<TokenRule>,
+    extra_rule_names: Vec<NodeIdentifier>,
     autocomplete_rules: Vec<AutocompleteRule>,
 }
 
@@ -68,6 +77,7 @@ impl ParserBuilder {
     pub fn new() -> Self {
         Self {
             token_rules: Vec::new(),
+            extra_rule_names: Vec::new(),
             autocomplete_rules: Vec::new(),
         }
     }
@@ -78,11 +88,16 @@ impl ParserBuilder {
     {
         self.autocomplete_rules.extend(T::get_autocomplete_rules());
         self.token_rules.extend(T::get_rules());
+        self.extra_rule_names.extend(T::get_extra_rule_names());
         self
     }
 
     pub fn build(self) -> MathParser {
-        MathParser::new(self.token_rules, self.autocomplete_rules)
+        MathParser::new(
+            self.token_rules,
+            self.extra_rule_names,
+            self.autocomplete_rules,
+        )
     }
 
     // Hardcoded parser rules for now
