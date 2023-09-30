@@ -245,7 +245,7 @@ fn test_parser_empty_brackets() {
     let parsed = parse_row(&layout);
     assert_eq!(
         parsed.to_string(),
-        r#"(Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (Core::RoundBrackets (BuiltIn::Operator "(") (Error::MissingToken) (BuiltIn::Operator ")")))"#
+        r#"(Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (Core::RoundBrackets (BuiltIn::Operator "(") (BuiltIn::Operator ")")))"#
     );
 }
 

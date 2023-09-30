@@ -165,7 +165,7 @@ impl RuleCollection for CoreRules {
             TokenRule::new(
                 Self::rule_name("RoundBrackets"),
                 (None, None),
-                just_operator_parser(vec!["(", ")"]),
+                Self::make_empty_brackets_parser("(", ")"),
             ),
         ]
     }

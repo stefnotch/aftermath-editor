@@ -25,7 +25,7 @@ impl RuleCollection for FunctionRules {
             TokenRule::new(
                 Self::rule_name("FunctionApplication"),
                 (Some(800), None),
-                just_operator_parser(vec!["(", ")"]),
+                CoreRules::make_empty_brackets_parser("(", ")"),
             ),
         ]
     }
