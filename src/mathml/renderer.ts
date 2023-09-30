@@ -46,23 +46,15 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
         assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
         return new NothingMathMLElement(syntaxTree, rowIndex);
       });
-      builtIn.add("ErrorContainer", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
-        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
-      });
-      builtIn.add("ErrorUnknownToken", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
-        return new SymbolMathMLElement(syntaxTree, rowIndex, "merror");
-      });
-      builtIn.add("ErrorMissingToken", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
-        return new MissingMathMLElement(syntaxTree, rowIndex);
-      });
       builtIn.add("Operator", (syntaxTree, rowIndex, options) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
         return new SymbolMathMLElement(syntaxTree, rowIndex, "mo", {
           isStretchy: options.stretchyOperators ?? false,
         });
+      });
+      builtIn.add("Argument", (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
+        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });
       builtIn.add("Fraction", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "NewRows"));
@@ -95,6 +87,17 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
       builtIn.add("Table", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "NewRows"));
         return new TableMathMLElement(syntaxTree, rowIndex, this);
+      });
+    }
+    {
+      const error = this.rendererCollection("Error");
+      error.add("MissingToken", (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
+        return new NothingMathMLElement(syntaxTree, rowIndex);
+      });
+      error.add("MissingOperator", (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
+        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "merror", this);
       });
     }
     {
