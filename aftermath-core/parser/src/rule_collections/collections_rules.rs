@@ -16,7 +16,7 @@ impl CollectionsRules {
     }
 }
 impl RuleCollection for CollectionsRules {
-    fn get_rules() -> Vec<crate::rule_collection::TokenRule> {
+    fn get_rules() -> Vec<TokenRule> {
         vec![TokenRule::new(
             Self::rule_name("Tuple"),
             (Some(50), Some(51)),

@@ -20,7 +20,7 @@ impl ArithmeticRules {
 }
 
 impl RuleCollection for ArithmeticRules {
-    fn get_rules() -> Vec<crate::rule_collection::TokenRule> {
+    fn get_rules() -> Vec<TokenRule> {
         vec![
             TokenRule::new(
                 Self::rule_name("Number"),

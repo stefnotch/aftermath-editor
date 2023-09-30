@@ -1,3 +1,4 @@
+use crate::make_parser::just_symbol_parser;
 use crate::rule_collections::core_rules::CoreRules;
 
 use crate::{
@@ -15,11 +16,18 @@ impl FunctionRules {
 }
 impl RuleCollection for FunctionRules {
     fn get_rules() -> Vec<TokenRule> {
-        vec![TokenRule::new(
-            Self::rule_name("FunctionApplication"),
-            (Some(800), None),
-            CoreRules::make_brackets_parser("(", ")"),
-        )]
+        vec![
+            TokenRule::new(
+                Self::rule_name("FunctionApplication"),
+                (Some(800), None),
+                just_symbol_parser(vec!["(", ")"]),
+            ),
+            TokenRule::new(
+                Self::rule_name("FunctionApplication"),
+                (Some(800), None),
+                CoreRules::make_brackets_parser("(", ")"),
+            ),
+        ]
     }
 
     fn get_autocomplete_rules() -> Vec<AutocompleteRule> {

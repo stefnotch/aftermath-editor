@@ -17,7 +17,7 @@ impl CalculusRules {
     }
 }
 impl RuleCollection for CalculusRules {
-    fn get_rules() -> Vec<crate::rule_collection::TokenRule> {
+    fn get_rules() -> Vec<TokenRule> {
         vec![
             TokenRule::new(
                 Self::rule_name("Infinity"),

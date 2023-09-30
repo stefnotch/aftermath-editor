@@ -1,8 +1,9 @@
-use crate::parser::pratt_parser::{PrattParseContext, Strength};
+use crate::make_parser::just_symbol_parser;
+use crate::parser::pratt_parser::Strength;
 use crate::parser_extensions::just_symbol;
 
-use crate::rule_collection::{ContextualParserExtra, ParseContext};
-use crate::syntax_tree::{LeafNodeType, SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren};
+use crate::rule_collection::ParseContext;
+use crate::syntax_tree::{LeafNodeType, SyntaxNodeBuilder, SyntaxNodeChildren};
 use crate::{
     autocomplete::AutocompleteRule,
     rule_collection::{RuleCollection, TokenRule},
@@ -116,8 +117,11 @@ impl RuleCollection for CoreRules {
             ),
             // Amusingly, if someone defines the closing bracket as a postfix operator, it'll break the brackets
             // Brackets
-
-            // Can also parse unit tuples
+            TokenRule::new(
+                Self::rule_name("RoundBrackets"),
+                (None, None),
+                just_symbol_parser(vec!["(", ")"]),
+            ),
             TokenRule::new(
                 Self::rule_name("RoundBrackets"),
                 (None, None),

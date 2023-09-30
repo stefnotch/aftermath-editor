@@ -1,13 +1,11 @@
-use std::{
-    cmp::{self, Ordering},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use chumsky::{
     extension::v1::{Ext, ExtParser},
     extra::ParserExtra,
-    input::InputRef,
+    input::{InputRef, SliceInput},
     prelude::*,
+    util::MaybeRef,
 };
 
 // TODO:
@@ -96,14 +94,14 @@ impl<P> Default for PrattParseContext<P> {
     }
 }
 
-pub struct PrattParseErrorHandler<I, Span, O> {
+pub struct PrattParseErrorHandler<Token, Span, O> {
     pub make_missing_atom: fn(Span) -> O,
     pub make_missing_operator: fn(Span, (O, O)) -> O,
     pub missing_operator_binding_power: BindingPower,
-    pub make_unknown_atom: fn(Span, I) -> O,
+    pub make_unknown_atom: fn(Span, Token) -> O,
 }
 
-impl<I, Span, O> Clone for PrattParseErrorHandler<I, Span, O> {
+impl<Token, Span, O> Clone for PrattParseErrorHandler<Token, Span, O> {
     fn clone(&self) -> Self {
         Self {
             make_missing_atom: self.make_missing_atom,
@@ -115,9 +113,9 @@ impl<I, Span, O> Clone for PrattParseErrorHandler<I, Span, O> {
 }
 
 pub struct PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O> {
-    infix_ops: Vec<InfixOp<InfixParser, Op, O>>,
-    prefix_ops: Vec<PrefixOp<PrefixParser, Op, O>>,
-    postfix_ops: Vec<PostfixOp<PostfixParser, Op, O>>,
+    infix_ops: Vec<OpParser<InfixParser, InfixBuilder<Op, O>>>,
+    prefix_ops: Vec<OpParser<PrefixParser, PrefixBuilder<Op, O>>>,
+    postfix_ops: Vec<OpParser<PostfixParser, PostfixBuilder<Op, O>>>,
 }
 
 impl<InfixParser, PrefixParser, PostfixParser, Op, O> Clone
@@ -140,9 +138,9 @@ impl<InfixParser, PrefixParser, PostfixParser, Op, O>
     PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>
 {
     fn new(
-        infix_ops: Vec<InfixOp<InfixParser, Op, O>>,
-        prefix_ops: Vec<PrefixOp<PrefixParser, Op, O>>,
-        postfix_ops: Vec<PostfixOp<PostfixParser, Op, O>>,
+        infix_ops: Vec<OpParser<InfixParser, InfixBuilder<Op, O>>>,
+        prefix_ops: Vec<OpParser<PrefixParser, PrefixBuilder<Op, O>>>,
+        postfix_ops: Vec<OpParser<PostfixParser, PostfixBuilder<Op, O>>>,
     ) -> Self {
         Self {
             infix_ops,
@@ -152,22 +150,22 @@ impl<InfixParser, PrefixParser, PostfixParser, Op, O>
     }
 }
 
-pub struct PrattParser_<'a, I, O, E, Atom, Operators, EndParser, EndParserExtra>
+pub struct PrattParser_<'a, I, O, E, AtomParser, Operators, EndParser, EndParserExtra>
 where
     I: Input<'a>,
 {
     /// Atom parser, will usually be a choice parser
-    atom: Atom,
+    atom: AtomParser,
     operators: Operators,
-    error_handler: PrattParseErrorHandler<I, I::Span, O>,
+    error_handler: PrattParseErrorHandler<MaybeRef<'a, I::Token>, I::Span, O>,
     _phantom: std::marker::PhantomData<(I, O, E, EndParser, EndParserExtra)>,
 }
 
-impl<'a, I, O, E, Atom, Operators, EndParser, EndParserExtra> Clone
-    for PrattParser_<'a, I, O, E, Atom, Operators, EndParser, EndParserExtra>
+impl<'a, I, O, E, AtomParser, Operators, EndParser, EndParserExtra> Clone
+    for PrattParser_<'a, I, O, E, AtomParser, Operators, EndParser, EndParserExtra>
 where
     I: Input<'a>,
-    Atom: Clone,
+    AtomParser: Clone,
     Operators: Clone,
 {
     fn clone(&self) -> Self {
@@ -198,7 +196,7 @@ impl<
         E,
         EndParser,
         EndParserExtra,
-        Atom,
+        AtomParser,
         InfixParser,
         PrefixParser,
         PostfixParser,
@@ -209,38 +207,23 @@ impl<
         I,
         O,
         E,
-        Atom,
+        AtomParser,
         PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>,
         EndParser,
         EndParserExtra,
     >
 where
-    I: chumsky::input::SliceInput<'a, Slice = I>,
+    I: SliceInput<'a, Slice = I>,
     E: ParserExtra<'a, I, Context = PrattParseContext<EndParser>>,
     EndParser: Parser<'a, I, (), EndParserExtra>,
     EndParserExtra: ParserExtra<'a, I>,
     EndParserExtra::State: Default,
     EndParserExtra::Context: Default,
-    Atom: Parser<'a, I, O, E>,
+    AtomParser: Parser<'a, I, O, E>,
     InfixParser: Parser<'a, I, Op, E>,
     PrefixParser: Parser<'a, I, Op, E>,
     PostfixParser: Parser<'a, I, Op, E>,
 {
-    fn try_parse_prefix<'parse>(
-        &self,
-        inp: &mut InputRef<'a, 'parse, I, E>,
-    ) -> Option<(Op, &PrefixOp<PrefixParser, Op, O>)> {
-        let marker = inp.save();
-        for op in self.operators.prefix_ops.iter() {
-            // Parse the child with our current pratt parsing context
-            if let Some(v) = inp.parse(&op.parser).ok() {
-                return Some((v, op));
-            }
-            inp.rewind(marker);
-        }
-        None
-    }
-
     fn try_parse_atom<'parse>(&self, inp: &mut InputRef<'a, 'parse, I, E>) -> Option<O> {
         let marker = inp.save();
         match inp.parse(&self.atom).ok() {
@@ -252,26 +235,14 @@ where
         }
     }
 
-    fn try_parse_infix<'parse>(
-        &self,
+    fn try_parse<'parse, 'pratt, P: Parser<'a, I, Op, E>, Builder>(
+        &'pratt self,
+        parsers: &'pratt [OpParser<P, Builder>],
         inp: &mut InputRef<'a, 'parse, I, E>,
-    ) -> Option<(Op, &InfixOp<InfixParser, Op, O>)> {
+    ) -> Option<(Op, &OpParser<P, Builder>)> {
         let marker = inp.save();
-        for op in self.operators.infix_ops.iter() {
-            if let Some(v) = inp.parse(&op.parser).ok() {
-                return Some((v, op));
-            }
-            inp.rewind(marker);
-        }
-        None
-    }
-
-    fn try_parse_postfix<'parse>(
-        &self,
-        inp: &mut InputRef<'a, 'parse, I, E>,
-    ) -> Option<(Op, &PostfixOp<PostfixParser, Op, O>)> {
-        let marker = inp.save();
-        for op in self.operators.postfix_ops.iter() {
+        for op in parsers.iter() {
+            // Parse the child with our current pratt parsing context
             if let Some(v) = inp.parse(&op.parser).ok() {
                 return Some((v, op));
             }
@@ -287,7 +258,7 @@ where
     ) -> bool {
         let offset = inp.offset();
 
-        if inp.next_maybe().is_none() {
+        if inp.peek_maybe().is_none() {
             return true;
         }
 
@@ -308,28 +279,35 @@ where
     ) -> O {
         let start_offset = get_position(inp);
 
-        let offset = inp.offset();
-        let _v = inp.next_maybe();
+        let unknown_input = inp.next_maybe().unwrap(); // TODO: Don't just unwrap here
+        let mut unknown_atom = (&self.error_handler.make_unknown_atom)(start_offset, unknown_input);
         loop {
             if self.try_check_end(inp, ending_parsers) {
                 break;
             }
-            if let Some(_) = self.try_parse_prefix(inp) {
+            if let Some(_) = self.try_parse(&self.operators.prefix_ops, inp) {
                 break;
             }
             if let Some(_) = self.try_parse_atom(inp) {
                 break;
             }
-            if let Some(_) = self.try_parse_infix(inp) {
+            if let Some(_) = self.try_parse(&self.operators.infix_ops, inp) {
                 break;
             }
-            if let Some(_) = self.try_parse_postfix(inp) {
+            if let Some(_) = self.try_parse(&self.operators.postfix_ops, inp) {
                 break;
             }
-            let _v = inp.next_maybe();
+
+            let op_offset = get_position(inp);
+            let unknown_input = inp.next_maybe().unwrap(); // TODO: Don't just unwrap here
+            let atom_offset = get_position(inp);
+            let next_unknown_atom =
+                (&self.error_handler.make_unknown_atom)(atom_offset, unknown_input);
+            unknown_atom = (self.error_handler.make_missing_operator)(
+                op_offset,
+                (unknown_atom, next_unknown_atom),
+            );
         }
-        let unknown_input = inp.slice(offset..inp.offset());
-        let unknown_atom = (&self.error_handler.make_unknown_atom)(start_offset, unknown_input);
         unknown_atom
     }
 
@@ -346,12 +324,12 @@ where
     /// ### ParseExpression(strength)
     /// We're expecting an expression. So we try out the parsers in order.
     /// - Prefix: ParseExpression(strength), then ParseOperator(left, strength)
-    /// - Atom: ParseOperator(left, strength)
+    /// - AtomParser: ParseOperator(left, strength)
     /// and the fallbacks
     /// - Infix: rewind, then ParseOperator(None, strength);
     /// - Postfix: rewind, then ParseOperator(None, strength);
     /// - End: rewind, return End; (could also be moved down in this list)
-    /// - Unknown: skip until End or Prefix/Atom/Infix/Postfix, then ParseExpression(strength) or ParseOperator(left, strength)
+    /// - Unknown: skip until End or Prefix/AtomParser/Infix/Postfix, then ParseExpression(strength) or ParseOperator(left, strength)
     /// the unknown token case is also why I even need the "End" case.
     ///
     /// ### Operator Loop
@@ -359,9 +337,9 @@ where
     /// - Postfix: ParseOperator(left, strength)
     /// and the fallbacks
     /// - Prefix: rewind, missing operator with strength, ParseExpression(strength), then ParseOperator(left, strength)
-    /// - Atom: same
+    /// - AtomParser: same
     /// - End: rewind, return End;
-    /// - Unknown: skip until End or Prefix/Atom/Infix/Postfix, then ParseExpression(strength) or ParseOperator(left, strength)
+    /// - Unknown: skip until End or Prefix/AtomParser/Infix/Postfix, then ParseExpression(strength) or ParseOperator(left, strength)
     ///
     fn pratt_parse(
         &self,
@@ -371,7 +349,7 @@ where
     ) -> PrattParseResult<O> {
         let pre_op = inp.save();
         // Iterative-ish version of the above
-        let mut left = if let Some((value, op)) = self.try_parse_prefix(inp) {
+        let mut left = if let Some((value, op)) = self.try_parse(&self.operators.prefix_ops, inp) {
             let right = self.pratt_parse(inp, op.binding_power.strength_right(), ending_parsers);
             let value = (op.build)(value, right.value);
             if right.variant == PrattParseResultType::End {
@@ -385,7 +363,9 @@ where
             v
         }
         // Failure cases with graceful recovery
-        else if self.try_parse_infix(inp).is_some() || self.try_parse_postfix(inp).is_some() {
+        else if self.try_parse(&self.operators.infix_ops, inp).is_some()
+            || self.try_parse(&self.operators.postfix_ops, inp).is_some()
+        {
             inp.rewind(pre_op);
             (&self.error_handler.make_missing_atom)(get_position(inp))
         } else if self.try_check_end(inp, ending_parsers) {
@@ -402,7 +382,7 @@ where
         loop {
             let pre_op = inp.save();
 
-            if let Some((value, op)) = self.try_parse_infix(inp) {
+            if let Some((value, op)) = self.try_parse(&self.operators.infix_ops, inp) {
                 if op.binding_power.strength_left() < min_binding_power {
                     inp.rewind(pre_op);
                     // Or return Ok((left, op.binding_power.strength_left(), op, self.pratt_parse(op.binding_power.strength_right())))?
@@ -422,7 +402,7 @@ where
                     };
                 }
                 left = value;
-            } else if let Some((value, op)) = self.try_parse_postfix(inp) {
+            } else if let Some((value, op)) = self.try_parse(&self.operators.postfix_ops, inp) {
                 if op.binding_power.strength_left() < min_binding_power {
                     inp.rewind(pre_op);
                     return PrattParseResult {
@@ -433,7 +413,9 @@ where
                 left = (op.build)(value, left);
             }
             // Failure cases with graceful recovery
-            else if self.try_parse_prefix(inp).is_some() || self.try_parse_atom(inp).is_some() {
+            else if self.try_parse(&self.operators.prefix_ops, inp).is_some()
+                || self.try_parse_atom(inp).is_some()
+            {
                 inp.rewind(pre_op);
                 let start_offset = get_position(inp);
                 if self
@@ -494,7 +476,7 @@ impl<
         E,
         EndParser,
         EndParserExtra,
-        Atom,
+        AtomParser,
         InfixParser,
         PrefixParser,
         PostfixParser,
@@ -505,21 +487,20 @@ impl<
         I,
         O,
         E,
-        Atom,
+        AtomParser,
         PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>,
         EndParser,
         EndParserExtra,
     >
 where
     // TODO: Hopefully I can simplify this at some point
-    // Especially the "EndParser" stuff is annoying. It also requires a SliceInput.
-    I: chumsky::input::SliceInput<'a, Slice = I>,
+    I: SliceInput<'a, Slice = I>,
     E: ParserExtra<'a, I, Context = PrattParseContext<EndParser>>,
     EndParser: Parser<'a, I, (), EndParserExtra>,
     EndParserExtra: ParserExtra<'a, I>,
     EndParserExtra::State: Default,
     EndParserExtra::Context: Default,
-    Atom: Parser<'a, I, O, E>,
+    AtomParser: Parser<'a, I, O, E>,
     InfixParser: Parser<'a, I, Op, E>,
     PrefixParser: Parser<'a, I, Op, E>,
     PostfixParser: Parser<'a, I, Op, E>,
@@ -534,8 +515,8 @@ where
             .value)
     }
 }
-pub type PrattParser<'a, I, O, E, Atom, Operators, EndParser, EndParserExtra> =
-    Ext<PrattParser_<'a, I, O, E, Atom, Operators, EndParser, EndParserExtra>>;
+pub type PrattParser<'a, I, O, E, AtomParser, Operators, EndParser, EndParserExtra> =
+    Ext<PrattParser_<'a, I, O, E, AtomParser, Operators, EndParser, EndParserExtra>>;
 
 pub fn pratt_parser<
     'a,
@@ -544,29 +525,29 @@ pub fn pratt_parser<
     E,
     EndParser,
     EndParserExtra,
-    Atom,
+    AtomParser,
     InfixParser,
     PrefixParser,
     PostfixParser,
     Op,
 >(
-    atom: Atom,
-    infix_ops: Vec<InfixOp<InfixParser, Op, O>>,
-    prefix_ops: Vec<PrefixOp<PrefixParser, Op, O>>,
-    postfix_ops: Vec<PostfixOp<PostfixParser, Op, O>>,
-    error_handler: PrattParseErrorHandler<I, I::Span, O>,
+    atom: AtomParser,
+    infix_ops: Vec<OpParser<InfixParser, InfixBuilder<Op, O>>>,
+    prefix_ops: Vec<OpParser<PrefixParser, PrefixBuilder<Op, O>>>,
+    postfix_ops: Vec<OpParser<PostfixParser, PostfixBuilder<Op, O>>>,
+    error_handler: PrattParseErrorHandler<MaybeRef<'a, I::Token>, I::Span, O>,
 ) -> PrattParser<
     'a,
     I,
     O,
     E,
-    Atom,
+    AtomParser,
     PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>,
     EndParser,
     EndParserExtra,
 >
 where
-    I: chumsky::input::SliceInput<'a, Slice = I>,
+    I: SliceInput<'a, Slice = I>,
 {
     Ext(PrattParser_ {
         atom,
@@ -574,6 +555,22 @@ where
         error_handler,
         _phantom: std::marker::PhantomData,
     })
+}
+
+pub struct OpParser<P, Build> {
+    binding_power: BindingPower,
+    parser: P,
+    build: Build,
+}
+
+impl<P: Clone, Build: Clone> Clone for OpParser<P, Build> {
+    fn clone(&self) -> Self {
+        Self {
+            binding_power: self.binding_power,
+            parser: self.parser.clone(),
+            build: self.build.clone(),
+        }
+    }
 }
 
 /// Blatantly copied from Chumsky
@@ -601,121 +598,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-///
-/// A representation of an infix operator to be used in combination with
-/// [`Parser::pratt`](super::Parser::pratt).
-pub struct InfixOp<P, Op, O> {
-    binding_power: BindingPower,
-    parser: P,
-    build: InfixBuilder<Op, O>,
-}
 
-impl<P: Clone, Op, O> Clone for InfixOp<P, Op, O> {
-    fn clone(&self) -> Self {
-        Self {
-            binding_power: self.binding_power,
-            parser: self.parser.clone(),
-            build: self.build,
-        }
-    }
-}
-
-impl<P, Op, O> InfixOp<P, Op, O> {
-    /// Creates a left associative infix operator that is parsed with the
-    /// parser `P`, and a function which is used to `build` a value `E`.
-    /// The operator's binding_power is determined by `strength`. The higher
-    /// the value, the higher the binding_power.
-    pub fn new_left(parser: P, strength: u16, build: InfixBuilder<Op, O>) -> Self {
-        let binding_power = BindingPower::LeftInfix(strength);
-        Self {
-            binding_power,
-            parser,
-            build,
-        }
-    }
-
-    /// Creates a right associative infix operator that is parsed with the
-    /// parser `P`, and a function which is used to `build` a value `E`.
-    /// The operator's binding_power is determined by `strength`. The higher
-    /// the value, the higher the binding_power.
-    pub fn new_right(parser: P, strength: u16, build: InfixBuilder<Op, O>) -> Self {
-        let binding_power = BindingPower::RightInfix(strength);
-        Self {
-            binding_power,
-            parser,
-            build,
-        }
-    }
-}
-
-/// A representation of a prefix operator to be used in combination with
-/// [`Parser::pratt`](super::Parser::pratt).
-pub struct PrefixOp<Parser, Op, O> {
-    binding_power: BindingPower,
-    parser: Parser,
-    build: PrefixBuilder<Op, O>,
-}
-
-impl<Parser: Clone, Op, O> Clone for PrefixOp<Parser, Op, O> {
-    fn clone(&self) -> Self {
-        Self {
-            binding_power: self.binding_power,
-            parser: self.parser.clone(),
-            build: self.build,
-        }
-    }
-}
-
-impl<Parser, Op, O> PrefixOp<Parser, Op, O> {
-    /// Creates a prefix operator (a right-associative unary operator)
-    /// that is parsed with the parser `P`, and a function which is used
-    /// to `build` a value `E`. The operator's binding_power is determined
-    /// by `strength`. The higher the value, the higher the binding_power.
-    pub fn new(parser: Parser, strength: u16, build: PrefixBuilder<Op, O>) -> Self {
-        let binding_power = BindingPower::Prefix(strength);
-        Self {
-            binding_power,
-            parser,
-            build,
-        }
-    }
-}
-
-/// A representation of a postfix operator to be used in combination with
-/// [`Parser::pratt`](super::Parser::pratt).
-pub struct PostfixOp<Parser, Op, O> {
-    binding_power: BindingPower,
-    parser: Parser,
-    build: PostfixBuilder<Op, O>,
-}
-
-impl<Parser: Clone, Op, O> Clone for PostfixOp<Parser, Op, O> {
-    fn clone(&self) -> Self {
-        Self {
-            binding_power: self.binding_power,
-            parser: self.parser.clone(),
-            build: self.build,
-        }
-    }
-}
-
-impl<Parser, Op, O> PostfixOp<Parser, Op, O> {
-    /// Creates a postfix operator (a left-associative unary operator)
-    /// that is parsed with the parser `P`, and a function which is used
-    /// to `build` a value `E`. The operator's binding_power is determined
-    /// by `strength`. The higher the value, the higher the binding_power.
-    pub fn new(parser: Parser, strength: u16, build: PostfixBuilder<Op, O>) -> Self {
-        let binding_power = BindingPower::Postfix(strength);
-        Self {
-            binding_power,
-            parser,
-            build,
-        }
-    }
-}
-
-/// Shorthand for [`InfixOp::new_left`].
-///
 /// Creates a left associative infix operator that is parsed with the
 /// parser `P`, and a function which is used to `build` a value `O`.
 /// The operator's binding_power is determined by `strength`. The higher
@@ -724,12 +607,15 @@ pub fn left_infix<P, Op, O>(
     parser: P,
     strength: u16,
     build: InfixBuilder<Op, O>,
-) -> InfixOp<P, Op, O> {
-    InfixOp::new_left(parser, strength, build)
+) -> OpParser<P, InfixBuilder<Op, O>> {
+    let binding_power = BindingPower::LeftInfix(strength);
+    OpParser {
+        binding_power,
+        parser,
+        build,
+    }
 }
 
-/// Shorthand for [`InfixOp::new_right`].
-///
 /// Creates a right associative infix operator that is parsed with the
 /// parser `P`, and a function which is used to `build` a value `O`.
 /// The operator's binding_power is determined by `strength`. The higher
@@ -738,12 +624,15 @@ pub fn right_infix<P, Op, O>(
     parser: P,
     strength: u16,
     build: InfixBuilder<Op, O>,
-) -> InfixOp<P, Op, O> {
-    InfixOp::new_right(parser, strength, build)
+) -> OpParser<P, InfixBuilder<Op, O>> {
+    let binding_power = BindingPower::RightInfix(strength);
+    OpParser {
+        binding_power,
+        parser,
+        build,
+    }
 }
 
-/// Shorthand for [`PrefixOp::new`].
-///
 /// Creates a prefix operator (a right-associative unary operator)
 /// that is parsed with the parser `P`, and a function which is used
 /// to `build` a value `O`. The operator's binding_power is determined
@@ -752,12 +641,15 @@ pub fn prefix<P, Op, O>(
     parser: P,
     strength: u16,
     build: PrefixBuilder<Op, O>,
-) -> PrefixOp<P, Op, O> {
-    PrefixOp::new(parser, strength, build)
+) -> OpParser<P, PrefixBuilder<Op, O>> {
+    let binding_power = BindingPower::Prefix(strength);
+    OpParser {
+        binding_power,
+        parser,
+        build,
+    }
 }
 
-/// Shorthand for [`PostfixOp::new`].
-///
 /// Creates a postfix operator (a left-associative unary operator)
 /// that is parsed with the parser `P`, and a function which is used
 /// to `build` a value `O`. The operator's binding_power is determined
@@ -766,8 +658,13 @@ pub fn postfix<P, Op, O>(
     parser: P,
     strength: u16,
     build: PostfixBuilder<Op, O>,
-) -> PostfixOp<P, Op, O> {
-    PostfixOp::new(parser, strength, build)
+) -> OpParser<P, PostfixBuilder<Op, O>> {
+    let binding_power = BindingPower::Postfix(strength);
+    OpParser {
+        binding_power,
+        parser,
+        build,
+    }
 }
 
 type InfixBuilder<Op, O> = fn(op: Op, children: (O, O)) -> O;

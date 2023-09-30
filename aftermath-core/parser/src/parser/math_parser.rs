@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use chumsky::{cache::Cached, span::SimpleSpan, Boxed, IterParser, Parser};
+use chumsky::{cache::Cached, span::SimpleSpan, util::MaybeRef, Boxed, IterParser, Parser};
 use input_tree::node::{InputNode, InputNodeVariant};
 
 use crate::{
@@ -214,11 +214,12 @@ impl Cached for CachedMathParser {
                         child_b,
                     )
                 },
-                make_unknown_atom: |span: SimpleSpan, values: &[InputNode]| {
+                make_unknown_atom: |span: SimpleSpan, value: MaybeRef<InputNode>| {
+                    let values = [value.into_inner()];
                     BuiltInRules::error_unknown_token(
                         // Meh
-                        span.start..(span.start + values.len()),
-                        values,
+                        span.start..(span.start + 1),
+                        &values[..],
                     )
                 },
                 missing_operator_binding_power: BindingPower::LeftInfix(100),

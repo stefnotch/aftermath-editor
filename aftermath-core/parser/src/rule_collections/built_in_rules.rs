@@ -152,7 +152,7 @@ impl BuiltInRules {
 }
 
 impl RuleCollection for BuiltInRules {
-    fn get_rules() -> Vec<crate::rule_collection::TokenRule> {
+    fn get_rules() -> Vec<TokenRule> {
         vec![
             TokenRule::new(
                 Self::rule_name("Fraction"),
