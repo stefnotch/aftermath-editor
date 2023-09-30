@@ -16,19 +16,19 @@ use chumsky::{
 
 // TODO: Create helper functions for this
 pub struct PrattParseContext<P> {
-    pub min_binding_power: Strength,
+    pub min_binding_power: (u16, Strength),
     pub ending_parsers: ArcList<P>,
 }
 
 impl<P> PrattParseContext<P> {
-    pub fn new(min_binding_power: Strength, ending_parser: P) -> Self {
+    pub fn new(min_binding_power: (u16, Strength), ending_parser: P) -> Self {
         Self {
             min_binding_power,
             ending_parsers: Arc::new(ArcList_::Cons(ending_parser, Arc::new(ArcList_::Empty))),
         }
     }
 
-    pub fn with(&self, min_binding_power: Strength, ending_parser: P) -> Self {
+    pub fn with(&self, min_binding_power: (u16, Strength), ending_parser: P) -> Self {
         Self {
             min_binding_power,
             ending_parsers: Arc::new(ArcList_::Cons(ending_parser, self.ending_parsers.clone())),
@@ -90,7 +90,7 @@ impl<P> Clone for PrattParseContext<P> {
 impl<P> Default for PrattParseContext<P> {
     fn default() -> Self {
         Self {
-            min_binding_power: Strength::Weak(0),
+            min_binding_power: (0, Strength::Weak),
             ending_parsers: Default::default(),
         }
     }
@@ -99,7 +99,7 @@ impl<P> Default for PrattParseContext<P> {
 pub struct PrattParseErrorHandler<I, Span, O> {
     pub make_missing_atom: fn(Span) -> O,
     pub make_missing_operator: fn(Span, (O, O)) -> O,
-    pub missing_operator_precedence: Precedence,
+    pub missing_operator_binding_power: BindingPower,
     pub make_unknown_atom: fn(Span, I) -> O,
 }
 
@@ -109,7 +109,7 @@ impl<I, Span, O> Clone for PrattParseErrorHandler<I, Span, O> {
             make_missing_atom: self.make_missing_atom,
             make_missing_operator: self.make_missing_operator,
             make_unknown_atom: self.make_unknown_atom,
-            missing_operator_precedence: self.missing_operator_precedence,
+            missing_operator_binding_power: self.missing_operator_binding_power,
         }
     }
 }
@@ -366,13 +366,13 @@ where
     fn pratt_parse(
         &self,
         inp: &mut InputRef<'a, '_, I, E>,
-        min_binding_power: Strength,
+        min_binding_power: (u16, Strength),
         ending_parsers: &ArcList<EndParser>,
     ) -> PrattParseResult<O> {
         let pre_op = inp.save();
         // Iterative-ish version of the above
         let mut left = if let Some((value, op)) = self.try_parse_prefix(inp) {
-            let right = self.pratt_parse(inp, op.precedence.strength_right(), ending_parsers);
+            let right = self.pratt_parse(inp, op.binding_power.strength_right(), ending_parsers);
             let value = (op.build)(value, right.value);
             if right.variant == PrattParseResultType::End {
                 return PrattParseResult {
@@ -403,16 +403,17 @@ where
             let pre_op = inp.save();
 
             if let Some((value, op)) = self.try_parse_infix(inp) {
-                if op.precedence.strength_left() < min_binding_power {
+                if op.binding_power.strength_left() < min_binding_power {
                     inp.rewind(pre_op);
-                    // Or return Ok((left, op.precedence.strength_left(), op, self.pratt_parse(op.precedence.strength_right())))?
+                    // Or return Ok((left, op.binding_power.strength_left(), op, self.pratt_parse(op.binding_power.strength_right())))?
                     return PrattParseResult {
                         variant: PrattParseResultType::Expression,
                         value: left,
                     };
                 }
 
-                let right = self.pratt_parse(inp, op.precedence.strength_right(), ending_parsers);
+                let right =
+                    self.pratt_parse(inp, op.binding_power.strength_right(), ending_parsers);
                 let value = (op.build)(value, (left, right.value));
                 if right.variant == PrattParseResultType::End {
                     return PrattParseResult {
@@ -422,7 +423,7 @@ where
                 }
                 left = value;
             } else if let Some((value, op)) = self.try_parse_postfix(inp) {
-                if op.precedence.strength_left() < min_binding_power {
+                if op.binding_power.strength_left() < min_binding_power {
                     inp.rewind(pre_op);
                     return PrattParseResult {
                         variant: PrattParseResultType::Expression,
@@ -437,7 +438,7 @@ where
                 let start_offset = get_position(inp);
                 if self
                     .error_handler
-                    .missing_operator_precedence
+                    .missing_operator_binding_power
                     .strength_left()
                     < min_binding_power
                 {
@@ -449,7 +450,7 @@ where
                 let right = self.pratt_parse(
                     inp,
                     self.error_handler
-                        .missing_operator_precedence
+                        .missing_operator_binding_power
                         .strength_right(),
                     ending_parsers,
                 );
@@ -604,7 +605,7 @@ SOFTWARE.
 /// A representation of an infix operator to be used in combination with
 /// [`Parser::pratt`](super::Parser::pratt).
 pub struct InfixOp<P, Op, O> {
-    precedence: Precedence,
+    binding_power: BindingPower,
     parser: P,
     build: InfixBuilder<Op, O>,
 }
@@ -612,7 +613,7 @@ pub struct InfixOp<P, Op, O> {
 impl<P: Clone, Op, O> Clone for InfixOp<P, Op, O> {
     fn clone(&self) -> Self {
         Self {
-            precedence: self.precedence,
+            binding_power: self.binding_power,
             parser: self.parser.clone(),
             build: self.build,
         }
@@ -622,12 +623,12 @@ impl<P: Clone, Op, O> Clone for InfixOp<P, Op, O> {
 impl<P, Op, O> InfixOp<P, Op, O> {
     /// Creates a left associative infix operator that is parsed with the
     /// parser `P`, and a function which is used to `build` a value `E`.
-    /// The operator's precedence is determined by `strength`. The higher
-    /// the value, the higher the precedence.
+    /// The operator's binding_power is determined by `strength`. The higher
+    /// the value, the higher the binding_power.
     pub fn new_left(parser: P, strength: u16, build: InfixBuilder<Op, O>) -> Self {
-        let precedence = Precedence::new(strength, Assoc::Left);
+        let binding_power = BindingPower::LeftInfix(strength);
         Self {
-            precedence,
+            binding_power,
             parser,
             build,
         }
@@ -635,12 +636,12 @@ impl<P, Op, O> InfixOp<P, Op, O> {
 
     /// Creates a right associative infix operator that is parsed with the
     /// parser `P`, and a function which is used to `build` a value `E`.
-    /// The operator's precedence is determined by `strength`. The higher
-    /// the value, the higher the precedence.
+    /// The operator's binding_power is determined by `strength`. The higher
+    /// the value, the higher the binding_power.
     pub fn new_right(parser: P, strength: u16, build: InfixBuilder<Op, O>) -> Self {
-        let precedence = Precedence::new(strength, Assoc::Left);
+        let binding_power = BindingPower::RightInfix(strength);
         Self {
-            precedence,
+            binding_power,
             parser,
             build,
         }
@@ -650,7 +651,7 @@ impl<P, Op, O> InfixOp<P, Op, O> {
 /// A representation of a prefix operator to be used in combination with
 /// [`Parser::pratt`](super::Parser::pratt).
 pub struct PrefixOp<Parser, Op, O> {
-    precedence: Precedence,
+    binding_power: BindingPower,
     parser: Parser,
     build: PrefixBuilder<Op, O>,
 }
@@ -658,7 +659,7 @@ pub struct PrefixOp<Parser, Op, O> {
 impl<Parser: Clone, Op, O> Clone for PrefixOp<Parser, Op, O> {
     fn clone(&self) -> Self {
         Self {
-            precedence: self.precedence,
+            binding_power: self.binding_power,
             parser: self.parser.clone(),
             build: self.build,
         }
@@ -668,12 +669,12 @@ impl<Parser: Clone, Op, O> Clone for PrefixOp<Parser, Op, O> {
 impl<Parser, Op, O> PrefixOp<Parser, Op, O> {
     /// Creates a prefix operator (a right-associative unary operator)
     /// that is parsed with the parser `P`, and a function which is used
-    /// to `build` a value `E`. The operator's precedence is determined
-    /// by `strength`. The higher the value, the higher the precedence.
+    /// to `build` a value `E`. The operator's binding_power is determined
+    /// by `strength`. The higher the value, the higher the binding_power.
     pub fn new(parser: Parser, strength: u16, build: PrefixBuilder<Op, O>) -> Self {
-        let precedence = Precedence::new(strength, Assoc::Left);
+        let binding_power = BindingPower::Prefix(strength);
         Self {
-            precedence,
+            binding_power,
             parser,
             build,
         }
@@ -683,7 +684,7 @@ impl<Parser, Op, O> PrefixOp<Parser, Op, O> {
 /// A representation of a postfix operator to be used in combination with
 /// [`Parser::pratt`](super::Parser::pratt).
 pub struct PostfixOp<Parser, Op, O> {
-    precedence: Precedence,
+    binding_power: BindingPower,
     parser: Parser,
     build: PostfixBuilder<Op, O>,
 }
@@ -691,7 +692,7 @@ pub struct PostfixOp<Parser, Op, O> {
 impl<Parser: Clone, Op, O> Clone for PostfixOp<Parser, Op, O> {
     fn clone(&self) -> Self {
         Self {
-            precedence: self.precedence,
+            binding_power: self.binding_power,
             parser: self.parser.clone(),
             build: self.build,
         }
@@ -701,13 +702,12 @@ impl<Parser: Clone, Op, O> Clone for PostfixOp<Parser, Op, O> {
 impl<Parser, Op, O> PostfixOp<Parser, Op, O> {
     /// Creates a postfix operator (a left-associative unary operator)
     /// that is parsed with the parser `P`, and a function which is used
-    /// to `build` a value `E`. The operator's precedence is determined
-    /// by `strength`. The higher the value, the higher the precedence.
+    /// to `build` a value `E`. The operator's binding_power is determined
+    /// by `strength`. The higher the value, the higher the binding_power.
     pub fn new(parser: Parser, strength: u16, build: PostfixBuilder<Op, O>) -> Self {
-        // Is this right associativity correct?
-        let precedence = Precedence::new(strength, Assoc::Right);
+        let binding_power = BindingPower::Postfix(strength);
         Self {
-            precedence,
+            binding_power,
             parser,
             build,
         }
@@ -718,8 +718,8 @@ impl<Parser, Op, O> PostfixOp<Parser, Op, O> {
 ///
 /// Creates a left associative infix operator that is parsed with the
 /// parser `P`, and a function which is used to `build` a value `O`.
-/// The operator's precedence is determined by `strength`. The higher
-/// the value, the higher the precedence.
+/// The operator's binding_power is determined by `strength`. The higher
+/// the value, the higher the binding_power.
 pub fn left_infix<P, Op, O>(
     parser: P,
     strength: u16,
@@ -732,8 +732,8 @@ pub fn left_infix<P, Op, O>(
 ///
 /// Creates a right associative infix operator that is parsed with the
 /// parser `P`, and a function which is used to `build` a value `O`.
-/// The operator's precedence is determined by `strength`. The higher
-/// the value, the higher the precedence.
+/// The operator's binding_power is determined by `strength`. The higher
+/// the value, the higher the binding_power.
 pub fn right_infix<P, Op, O>(
     parser: P,
     strength: u16,
@@ -746,8 +746,8 @@ pub fn right_infix<P, Op, O>(
 ///
 /// Creates a prefix operator (a right-associative unary operator)
 /// that is parsed with the parser `P`, and a function which is used
-/// to `build` a value `O`. The operator's precedence is determined
-/// by `strength`. The higher the value, the higher the precedence.
+/// to `build` a value `O`. The operator's binding_power is determined
+/// by `strength`. The higher the value, the higher the binding_power.
 pub fn prefix<P, Op, O>(
     parser: P,
     strength: u16,
@@ -760,8 +760,8 @@ pub fn prefix<P, Op, O>(
 ///
 /// Creates a postfix operator (a left-associative unary operator)
 /// that is parsed with the parser `P`, and a function which is used
-/// to `build` a value `O`. The operator's precedence is determined
-/// by `strength`. The higher the value, the higher the precedence.
+/// to `build` a value `O`. The operator's binding_power is determined
+/// by `strength`. The higher the value, the higher the binding_power.
 pub fn postfix<P, Op, O>(
     parser: P,
     strength: u16,
@@ -770,105 +770,56 @@ pub fn postfix<P, Op, O>(
     PostfixOp::new(parser, strength, build)
 }
 
-/// Indicates which argument binds more strongly with a binary infix operator.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Assoc {
-    /// The operator binds more strongly with the argument to the left.
-    ///
-    /// For example `a + b + c` is parsed as `(a + b) + c`.
-    Left,
-
-    /// The operator binds more strongly with the argument to the right.
-    ///
-    /// For example `a + b + c` is parsed as `a + (b + c)`.
-    Right,
-}
-
 type InfixBuilder<Op, O> = fn(op: Op, children: (O, O)) -> O;
 
 type PrefixBuilder<Op, O> = fn(op: Op, child: O) -> O;
 
 type PostfixBuilder<Op, O> = fn(op: Op, child: O) -> O;
 
-/// Indicates the binding strength of an operator to an argument.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Ord, PartialOrd)]
 pub enum Strength {
-    /// This is the strongly associated side of the operator.
-    Strong(u16),
-
-    /// This is the weakly associated side of the operator.
-    Weak(u16),
-}
-
-impl Default for Strength {
-    fn default() -> Self {
-        Self::Weak(0)
-    }
+    Weak,
+    Strong,
 }
 
 impl Strength {
-    /// Get the binding strength, ignoring associativity.
-    pub fn strength(&self) -> &u16 {
+    fn invert(self) -> Self {
         match self {
-            Self::Strong(strength) => strength,
-            Self::Weak(strength) => strength,
+            Strength::Weak => Strength::Strong,
+            Strength::Strong => Strength::Weak,
         }
     }
+}
 
-    /// Compare two strengths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BindingPower {
+    Prefix(u16),
+    Postfix(u16),
+    /// The operator binds more strongly with the argument to the left.
     ///
-    /// `None` is considered less strong than any `Some(Strength<T>)`,
-    /// as it's used to indicate the lack of an operator
-    /// to the left of the first expression and cannot bind.
-    pub fn is_lt(&self, other: &Option<Self>) -> bool {
-        match (self, other) {
-            (x, Some(y)) => x < y,
-            (_, None) => false,
-        }
-    }
+    /// For example `a + b + c` is parsed as `(a + b) + c`.
+    LeftInfix(u16),
+    /// The operator binds more strongly with the argument to the right.
+    ///
+    /// For example `a ^ b ^ c` is parsed as `a ^ (b ^ c)`.
+    RightInfix(u16),
 }
 
-impl PartialOrd for Strength {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match self.strength().partial_cmp(other.strength()) {
-            Some(Ordering::Equal) => match (self, other) {
-                (Self::Strong(_), Self::Weak(_)) => Some(cmp::Ordering::Greater),
-                (Self::Weak(_), Self::Strong(_)) => Some(cmp::Ordering::Less),
-                _ => Some(cmp::Ordering::Equal),
-            },
-            ord => ord,
-        }
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Precedence {
-    strength: u16,
-    associativity: Assoc,
-}
-
-impl Precedence {
-    /// Create a new precedence value.
-    pub fn new(strength: u16, associativity: Assoc) -> Self {
-        Self {
-            strength,
-            associativity,
+impl BindingPower {
+    /// Note that strength is pretty much "reversed".
+    /// See https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
+    fn strength_left(&self) -> (u16, Strength) {
+        match self {
+            // TODO: Is this correct?
+            // Left associative
+            BindingPower::Prefix(v) | BindingPower::LeftInfix(v) => (*v, Strength::Weak),
+            // Right associative
+            BindingPower::Postfix(v) | BindingPower::RightInfix(v) => (*v, Strength::Strong),
         }
     }
 
-    /// Get the binding power of this operator with an argument on the left.
-    pub fn strength_left(&self) -> Strength {
-        match self.associativity {
-            Assoc::Left => Strength::Weak(self.strength),
-            Assoc::Right => Strength::Strong(self.strength),
-        }
-    }
-
-    /// Get the binding power of this operator with an argument on the right.
-    pub fn strength_right(&self) -> Strength {
-        match self.associativity {
-            Assoc::Left => Strength::Strong(self.strength),
-            Assoc::Right => Strength::Weak(self.strength),
-        }
+    fn strength_right(&self) -> (u16, Strength) {
+        let (v, strength) = self.strength_left();
+        (v, strength.invert())
     }
 }

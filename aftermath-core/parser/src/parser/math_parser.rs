@@ -5,13 +5,13 @@ use input_tree::node::{InputNode, InputNodeVariant};
 
 use crate::{
     make_parser::MakeParser,
-    rule_collection::{BindingPowerType, ContextualParserExtra, ParserInput, TokenRule},
+    rule_collection::{ContextualParserExtra, ParserInput, TokenRule},
     rule_collections::built_in_rules::BuiltInRules,
     syntax_tree::{LeafNodeType, SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren},
 };
 
 use super::pratt_parser::{
-    self, pratt_parser, Assoc, PrattParseContext, PrattParseErrorHandler, Precedence,
+    self, pratt_parser, BindingPower, PrattParseContext, PrattParseErrorHandler,
 };
 
 pub struct CachedMathParser {
@@ -145,11 +145,13 @@ impl Cached for CachedMathParser {
                     v.build(BuiltInRules::sup_rule_name(), range.into_range())
                 });
 
-            let rule_parser = match rule.binding_power_type() {
-                BindingPowerType::Atom | BindingPowerType::Postfix(_) => rule_parser.boxed(),
-                BindingPowerType::Prefix(_)
-                | BindingPowerType::LeftInfix(_)
-                | BindingPowerType::RightInfix(_) => rule_parser
+            // TODO: Accept spaces after this
+            let rule_parser = match rule.binding_power {
+                None => rule_parser.boxed(),
+                Some(BindingPower::Postfix(_)) => rule_parser.boxed(),
+                Some(BindingPower::Prefix(_))
+                | Some(BindingPower::LeftInfix(_))
+                | Some(BindingPower::RightInfix(_)) => rule_parser
                     .then(
                         chumsky::prelude::choice((sub_parser, sup_parser))
                             .repeated()
@@ -168,22 +170,20 @@ impl Cached for CachedMathParser {
             // let rule_parser: Boxed<'_, '_, _, _, chumsky::extra::Full<_, _, PrattParseContext>> =
             // rule_parser.with_ctx(()).boxed();
 
-            match rule.binding_power_type() {
-                BindingPowerType::Atom => token_parsers.push(rule_parser),
-                BindingPowerType::Prefix(strength) => prefix_parsers.push(pratt_parser::prefix(
+            match rule.binding_power {
+                None => token_parsers.push(rule_parser),
+                Some(BindingPower::Prefix(strength)) => prefix_parsers.push(pratt_parser::prefix(
                     rule_parser,
                     strength,
                     build_prefix_syntax_node,
                 )),
-                BindingPowerType::Postfix(strength) => postfix_parsers.push(pratt_parser::postfix(
-                    rule_parser,
-                    strength,
-                    build_postfix_syntax_node,
-                )),
-                BindingPowerType::LeftInfix(strength) => infix_parsers.push(
+                Some(BindingPower::Postfix(strength)) => postfix_parsers.push(
+                    pratt_parser::postfix(rule_parser, strength, build_postfix_syntax_node),
+                ),
+                Some(BindingPower::LeftInfix(strength)) => infix_parsers.push(
                     pratt_parser::left_infix(rule_parser, strength, build_infix_syntax_node),
                 ),
-                BindingPowerType::RightInfix(strength) => infix_parsers.push(
+                Some(BindingPower::RightInfix(strength)) => infix_parsers.push(
                     pratt_parser::right_infix(rule_parser, strength, build_infix_syntax_node),
                 ),
             };
@@ -221,7 +221,7 @@ impl Cached for CachedMathParser {
                         values,
                     )
                 },
-                missing_operator_precedence: Precedence::new(100, Assoc::Left),
+                missing_operator_binding_power: BindingPower::LeftInfix(100),
             },
         ));
 

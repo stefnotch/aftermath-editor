@@ -5,7 +5,7 @@ use input_tree::node::InputNode;
 use crate::{
     autocomplete::AutocompleteRule,
     make_parser::MakeParser,
-    parser::pratt_parser::PrattParseContext,
+    parser::pratt_parser::{BindingPower, PrattParseContext},
     parser_debug_error::ParserDebugError,
     syntax_tree::{NodeIdentifier, SyntaxNode, SyntaxNodeBuilder},
 };
@@ -39,11 +39,7 @@ pub type BoxedNodeParser<'a, 'b> =
 
 pub struct TokenRule {
     pub name: NodeIdentifier,
-    /// (None, None) is a constant\
-    /// (None, Some) is a prefix operator\
-    /// (Some, None) is a postfix operator\
-    /// (Some, Some) is an infix operator
-    pub binding_power: (Option<u16>, Option<u16>),
+    pub binding_power: Option<BindingPower>,
 
     /// Parser for the token. Is greedy, as in the longest one that matches will win.
     /// This is needed for ">=" instead of ">" and "=".
@@ -64,39 +60,28 @@ pub struct TokenRule {
     // "do parser priority".
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BindingPowerType {
-    Atom,
-    Prefix(u16),
-    Postfix(u16),
-    LeftInfix(u16),
-    RightInfix(u16),
-}
-
 impl TokenRule {
     pub fn new(
         name: NodeIdentifier,
         binding_power: (Option<u16>, Option<u16>),
         make_parser: impl MakeParser + 'static,
     ) -> Self {
+        let binding_power = match binding_power {
+            (None, None) => None,
+            (None, Some(a)) => Some(BindingPower::Prefix(a)),
+            (Some(a), None) => Some(BindingPower::Postfix(a)),
+            (Some(a), Some(b)) => {
+                if a <= b {
+                    Some(BindingPower::LeftInfix(a))
+                } else {
+                    Some(BindingPower::RightInfix(b))
+                }
+            }
+        };
         Self {
             name,
             binding_power,
             make_parser: Box::new(make_parser),
-        }
-    }
-    pub fn binding_power_type(&self) -> BindingPowerType {
-        match self.binding_power {
-            (None, None) => BindingPowerType::Atom,
-            (None, Some(a)) => BindingPowerType::Prefix(a),
-            (Some(a), None) => BindingPowerType::Postfix(a),
-            (Some(a), Some(b)) => {
-                if a <= b {
-                    BindingPowerType::LeftInfix(a)
-                } else {
-                    BindingPowerType::RightInfix(b)
-                }
-            }
         }
     }
 }

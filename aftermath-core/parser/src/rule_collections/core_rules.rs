@@ -1,4 +1,4 @@
-use crate::parser::pratt_parser::PrattParseContext;
+use crate::parser::pratt_parser::{PrattParseContext, Strength};
 use crate::parser_extensions::just_symbol;
 
 use crate::rule_collection::{ContextualParserExtra, ParseContext};
@@ -38,7 +38,7 @@ impl CoreRules {
                     map_ctx(
                         move |ctx: &ParseContext<'_>| {
                             ctx.with(
-                                Default::default(),
+                                (0, Strength::Weak),
                                 just_symbol(ending_bracket_1.clone()).map(|_| ()).boxed(),
                             )
                         },
