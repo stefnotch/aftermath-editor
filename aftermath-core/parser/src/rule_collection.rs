@@ -1,57 +1,46 @@
 use std::collections::HashSet;
 
+use chumsky::{span::SimpleSpan, IterParser, Parser};
 use input_tree::node::InputNode;
 
 use crate::{
     autocomplete::AutocompleteRule,
-    make_parser::MakeParser,
-    parser::pratt_parser_old::PrattParseContext,
+    parser::pratt_parselet::PrattParselet,
     parser_debug_error::ParserDebugError,
-    syntax_tree::{NodeIdentifier, SyntaxNode, SyntaxNodeBuilder},
+    rule_collections::built_in_rules::BuiltInRules,
+    syntax_tree::{LeafNodeType, NodeIdentifier, SyntaxNode, SyntaxNodeBuilder},
 };
 
 pub type ParserInput<'a> = &'a [InputNode];
 
-pub type ParseContext<'a> =
-    PrattParseContext<chumsky::Boxed<'a, 'a, ParserInput<'a>, (), BasicParserExtra>>;
-
 // chumsky::prelude::Cheap
-type BasicParserExtra = chumsky::extra::Full<ParserDebugError<InputNode>, (), ()>;
-pub type ContextualParserExtra<'a> =
-    chumsky::extra::Full<ParserDebugError<InputNode>, (), ParseContext<'a>>;
+pub type BasicParserExtra = chumsky::extra::Full<ParserDebugError<InputNode>, (), ()>;
 
 // Oh look, it's a trait alias
 pub trait TokenParser<'a>:
-    chumsky::Parser<'a, ParserInput<'a>, SyntaxNodeBuilder, ContextualParserExtra<'a>>
+    chumsky::Parser<'a, ParserInput<'a>, SyntaxNodeBuilder, BasicParserExtra>
 {
 }
 impl<'a, T> TokenParser<'a> for T where
-    T: chumsky::Parser<'a, ParserInput<'a>, SyntaxNodeBuilder, ContextualParserExtra<'a>>
+    T: chumsky::Parser<'a, ParserInput<'a>, SyntaxNodeBuilder, BasicParserExtra>
 {
 }
 
 pub type BoxedTokenParser<'a, 'b> =
-    chumsky::Boxed<'a, 'b, ParserInput<'a>, SyntaxNodeBuilder, ContextualParserExtra<'a>>;
+    chumsky::Boxed<'a, 'b, ParserInput<'a>, SyntaxNodeBuilder, BasicParserExtra>;
 
 // TODO: This should not be able to return any errors.
 pub type BoxedNodeParser<'a, 'b> =
-    chumsky::Boxed<'a, 'b, ParserInput<'a>, SyntaxNode, ContextualParserExtra<'a>>;
+    chumsky::Boxed<'a, 'b, ParserInput<'a>, SyntaxNode, BasicParserExtra>;
 
-pub struct TokenRule {
-    pub name: NodeIdentifier,
-    /// (None, None) is a constant\
-    /// (None, Some) is a prefix operator\
-    /// (Some, None) is a postfix operator\
-    /// (Some, Some) is an infix operator
-    pub binding_power: (Option<u16>, Option<u16>),
-
-    /// Parser for the token. Is greedy, as in the longest one that matches will win.
-    /// This is needed for ">=" instead of ">" and "=".
+pub struct TokenRule<'a, 'b> {
     /// If the match isn't what the user intended, the user can use spaces to separate the tokens.
     /// Tokens can also be escaped using a backslash \.
     /// \x basically means "this has a very specific meaning", such as \| always being a | symbol, and \sum always being a sum symbol.
     /// The parser is a recursive parser, which can be used to parse nested expressions.
-    pub make_parser: Box<dyn MakeParser>,
+    ///
+    pub parselet:
+        PrattParselet<BoxedTokenParser<'a, 'b>, SyntaxNodeBuilder, SyntaxNode, NodeIdentifier>,
     // Maybe introduce a concept of "priority"
     // When two things match, the one with the highest priority wins
     // e.g. "lim" and "variable parser" both match "lim"
@@ -73,36 +62,43 @@ pub enum BindingPowerType {
     RightInfix(u16),
 }
 
-impl TokenRule {
+impl<'a, 'b> TokenRule<'a, 'b> {
     pub fn new(
-        name: NodeIdentifier,
-        binding_power: (Option<u16>, Option<u16>),
-        make_parser: impl MakeParser + 'static,
+        parselet: PrattParselet<
+            BoxedTokenParser<'a, 'b>,
+            SyntaxNodeBuilder,
+            SyntaxNode,
+            NodeIdentifier,
+        >,
     ) -> Self {
-        Self {
-            name,
-            binding_power,
-            make_parser: Box::new(make_parser),
-        }
+        Self { parselet }
     }
-    pub fn binding_power_type(&self) -> BindingPowerType {
-        match self.binding_power {
-            (None, None) => BindingPowerType::Atom,
-            (None, Some(a)) => BindingPowerType::Prefix(a),
-            (Some(a), None) => BindingPowerType::Postfix(a),
-            (Some(a), Some(b)) => {
-                if a <= b {
-                    BindingPowerType::LeftInfix(a)
-                } else {
-                    BindingPowerType::RightInfix(b)
-                }
-            }
-        }
+
+    pub fn new_atom(name: NodeIdentifier, parser: BoxedTokenParser<'a, 'b>) -> TokenRule<'a, 'b> {
+        Self::new(PrattParselet::new_atom(parser, |v, extra| {}, name))
     }
 }
 
-pub trait RuleCollection {
-    fn get_rules() -> Vec<TokenRule>;
+fn make_space_parser() -> impl Parser<'static, ParserInput<'static>, Option<SyntaxNode>> {
+    chumsky::select_ref! {
+      input_tree::node::InputNode::Symbol(v) if v == " " => v.clone(),
+    }
+    .repeated()
+    .collect::<Vec<_>>()
+    .map_with_span(|v, range: SimpleSpan| {
+        if v.len() > 0 {
+            Some(
+                SyntaxNodeBuilder::new_leaf_node(v, LeafNodeType::Operator)
+                    .build(BuiltInRules::whitespace_rule_name(), range.into_range()),
+            )
+        } else {
+            None
+        }
+    })
+}
+
+pub trait RuleCollection<'a, 'b> {
+    fn get_rules() -> Vec<TokenRule<'static, 'static>>;
     fn get_autocomplete_rules() -> Vec<AutocompleteRule>;
     fn get_extra_rule_names() -> Vec<NodeIdentifier> {
         vec![]
@@ -110,7 +106,7 @@ pub trait RuleCollection {
     fn get_rule_names() -> HashSet<NodeIdentifier> {
         let mut rules_names = Self::get_rules()
             .into_iter()
-            .map(|v| v.name)
+            .map(|v| v.parselet.extra)
             .collect::<HashSet<_>>();
         rules_names.extend(Self::get_extra_rule_names());
         rules_names

@@ -16,8 +16,8 @@ impl CalculusRules {
         NodeIdentifier::new(vec!["Calculus".into(), name.into()])
     }
 }
-impl RuleCollection for CalculusRules {
-    fn get_rules() -> Vec<crate::rule_collection::TokenRule> {
+impl RuleCollection<'static, 'static> for CalculusRules {
+    fn get_rules() -> Vec<TokenRule<'static, 'static>> {
         vec![
             TokenRule::new(
                 Self::rule_name("Infinity"),

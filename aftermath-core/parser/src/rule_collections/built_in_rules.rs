@@ -151,8 +151,8 @@ impl BuiltInRules {
     }
 }
 
-impl RuleCollection for BuiltInRules {
-    fn get_rules() -> Vec<crate::rule_collection::TokenRule> {
+impl RuleCollection<'static, 'static> for BuiltInRules {
+    fn get_rules() -> Vec<TokenRule<'static, 'static>> {
         vec![
             TokenRule::new(
                 Self::rule_name("Fraction"),

@@ -5,20 +5,16 @@ use input_tree::node::{InputNode, InputNodeVariant};
 
 use crate::{
     make_parser::MakeParser,
-    rule_collection::{BindingPowerType, ContextualParserExtra, ParserInput, TokenRule},
+    rule_collection::{BasicParserExtra, BindingPowerType, ParserInput, TokenRule},
     rule_collections::built_in_rules::BuiltInRules,
     syntax_tree::{LeafNodeType, SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren},
 };
 
-use super::pratt_parser_old::{
-    self, pratt_parser, Assoc, PrattParseContext, PrattParseErrorHandler, Precedence,
-};
-
 pub struct CachedMathParser {
-    token_rules: Arc<Vec<TokenRule>>,
+    token_rules: Arc<Vec<TokenRule<'static, 'static>>>,
 }
 impl CachedMathParser {
-    pub fn new(token_rules: Arc<Vec<TokenRule>>) -> Self {
+    pub fn new(token_rules: Arc<Vec<TokenRule<'static, 'static>>>) -> Self {
         Self { token_rules }
     }
 }
@@ -65,8 +61,7 @@ fn build_infix_syntax_node(op: SyntaxNode, children: (SyntaxNode, SyntaxNode)) -
 
 /// See https://github.com/zesterer/chumsky/blob/f10e56b7eac878cbad98f71fd5485a21d44db226/src/lib.rs#L3456
 impl Cached for CachedMathParser {
-    type Parser<'src> =
-        Boxed<'src, 'src, ParserInput<'src>, SyntaxNode, ContextualParserExtra<'src>>;
+    type Parser<'src> = Boxed<'src, 'src, ParserInput<'src>, SyntaxNode, BasicParserExtra>;
 
     fn make_parser<'src>(self) -> Self::Parser<'src> {
         // For whitespace handling, we'll extend every parser to accept whitespaces around it.
@@ -78,6 +73,7 @@ impl Cached for CachedMathParser {
         let mut postfix_parsers = vec![];
         let mut infix_parsers = vec![];
 
+        // TODO: Replace spaces by adjusting every single parser to accept spaces around it. (basically adjust first non-expression rule and last non-expression rule. And generate the syntax tree accordingly, see below.)
         let space_parser = chumsky::select_ref! {
           input_tree::node::InputNode::Symbol(v) if v == " " => v.clone(),
         }
@@ -104,6 +100,7 @@ impl Cached for CachedMathParser {
 
             // This parses the basic tokens with spaces around them
             // And the pratt parser joins them together
+            // TODO: map_with_span gets replaced by the individual rules already generating usable tokens with spans. And the rule_name gets replaced with the Extra.
             let rule_parser = space_parser
                 .then(rule.make_parser.build(chain.clone().boxed()).map_with_span(
                     move |v, range: SimpleSpan| v.build(rule_name.clone(), range.into_range()),
@@ -134,6 +131,7 @@ impl Cached for CachedMathParser {
             // e.g. sum_{n=0}^{10} n^2 is a prefix-operator called "sum" with a sub and sup.
             // e.g. \circ_0 is an infix-operator called "+" with a sub. That can appear when writing down formal grammars.
 
+            // TODO: Those two get replaced with smarter "new..." builders.
             let sub_parser = BuiltInRules::make_container_parser(InputNodeVariant::Sub)
                 .build(chain.clone().boxed())
                 .map_with_span(|v, range: SimpleSpan| {

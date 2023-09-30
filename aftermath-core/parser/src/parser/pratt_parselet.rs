@@ -3,16 +3,16 @@ use std::{fmt, sync::Arc};
 use itertools::Itertools;
 
 #[derive(Debug)]
-pub struct PrattParselets<AtomParser, OpParser, Op, O> {
-    pub(crate) parselets_starting_with_atom: Vec<PrattParselet<AtomParser, OpParser, Op, O>>,
-    pub(crate) parselets_starting_with_expression: Vec<PrattParselet<AtomParser, OpParser, Op, O>>,
-    pub(crate) parselets_starting_with_op: Vec<PrattParselet<AtomParser, OpParser, Op, O>>,
+pub struct PrattParselets<OpParser, Op, O, Extra> {
+    pub(crate) parselets_starting_with_atom: Vec<PrattParselet<OpParser, Op, O, Extra>>,
+    pub(crate) parselets_starting_with_expression: Vec<PrattParselet<OpParser, Op, O, Extra>>,
+    pub(crate) parselets_starting_with_op: Vec<PrattParselet<OpParser, Op, O, Extra>>,
 }
 
-impl<AtomParser, OpParser, Op, O> Clone for PrattParselets<AtomParser, OpParser, Op, O>
+impl<OpParser, Op, O, Extra> Clone for PrattParselets<OpParser, Op, O, Extra>
 where
-    AtomParser: Clone,
     OpParser: Clone,
+    Extra: Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -23,8 +23,8 @@ where
     }
 }
 
-impl<AtomParser, OpParser, Op, O> PrattParselets<AtomParser, OpParser, Op, O> {
-    pub fn new(parselets: Vec<PrattParselet<AtomParser, OpParser, Op, O>>) -> Self {
+impl<OpParser, Op, O, Extra> PrattParselets<OpParser, Op, O, Extra> {
+    pub fn new(parselets: Vec<PrattParselet<OpParser, Op, O, Extra>>) -> Self {
         let mut parselets_starting_with_atom = vec![];
         let mut parselets_starting_with_expression = vec![];
         let mut parselets_starting_with_op = vec![];
@@ -51,40 +51,102 @@ impl<AtomParser, OpParser, Op, O> PrattParselets<AtomParser, OpParser, Op, O> {
     }
 }
 
-pub struct PrattParseletsBuilder<AtomParser, OpParser, Op, O> {
-    parselets: Vec<PrattParselet<AtomParser, OpParser, Op, O>>,
+pub struct PrattParseletsBuilder<OpParser, Op, O, Extra> {
+    parselets: Vec<PrattParselet<OpParser, Op, O, Extra>>,
 }
 
-impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op, O> {
+impl<OpParser, Op, O, Extra> PrattParseletsBuilder<OpParser, Op, O, Extra> {
     pub fn new() -> Self {
         Self {
             parselets: Vec::new(),
         }
     }
 
-    pub fn add_atom_parselet(mut self, parser: AtomParser) -> Self {
-        self.parselets.push(PrattParselet {
-            parsers: vec![PrattParseletKind::Atom(PrattAtom { parser })],
-            build: Arc::new(|results: Vec<PrattParseResult<Op, O>>| {
-                if let Some((PrattParseResult::Expression(v),)) =
-                    results.into_iter().collect_tuple()
-                {
-                    v
-                } else {
-                    panic!("add_atom_parselet failed")
-                }
-            }),
-        });
+    pub fn add_parselet(mut self, parselet: PrattParselet<OpParser, Op, O, Extra>) -> Self {
+        self.parselets.push(parselet);
         self
     }
 
-    pub fn add_prefix_parselet(
-        mut self,
+    pub fn build(self) -> PrattParselets<OpParser, Op, O, Extra> {
+        PrattParselets::new(self.parselets)
+    }
+}
+
+/// A Pratt parselet is a parser for a single operator.
+/// Could be made fully type safe, but that would require a lot of hard work.
+/// Also note that every parselet is *finite*. No infinite comma separated lists or anything like that.
+pub struct PrattParselet<OpParser, Op, O, Extra> {
+    pub parsers: Vec<PrattParseletKind<OpParser>>,
+    pub build: Arc<dyn Fn(Vec<PrattParseResult<Op, O>>, &Extra) -> O>,
+    pub extra: Extra,
+}
+
+impl<OpParser, Op, O, Extra> Clone for PrattParselet<OpParser, Op, O, Extra>
+where
+    OpParser: Clone,
+    Extra: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            parsers: self.parsers.clone(),
+            build: self.build.clone(),
+            extra: self.extra.clone(),
+        }
+    }
+}
+
+impl<OpParser, Op, O, Extra> fmt::Debug for PrattParselet<OpParser, Op, O, Extra>
+where
+    OpParser: fmt::Debug,
+    Extra: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("PrattParselet")
+            .field("parsers", &self.parsers)
+            .field("build", &"...")
+            .field("extra", &self.extra)
+            .finish()
+    }
+}
+
+impl<OpParser, Op, O, Extra> PrattParselet<OpParser, Op, O, Extra> {
+    pub fn new(
+        parsers: Vec<PrattParseletKind<OpParser>>,
+        build: impl Fn(Vec<PrattParseResult<Op, O>>, &Extra) -> O + 'static,
+        extra: Extra,
+    ) -> Self {
+        Self {
+            parsers,
+            build: Arc::new(build),
+            extra,
+        }
+    }
+
+    pub fn new_atom(
+        parser: OpParser,
+        extra: Extra,
+        build: impl Fn(Op, &Extra) -> O + 'static,
+    ) -> Self {
+        PrattParselet {
+            parsers: vec![PrattParseletKind::Atom(PrattAtom { parser })],
+            build: Arc::new(|results: Vec<PrattParseResult<Op, O>>, extra| {
+                if let Some((PrattParseResult::Op(v),)) = results.into_iter().collect_tuple() {
+                    (build)(v, extra)
+                } else {
+                    panic!("new_atom failed")
+                }
+            }),
+            extra,
+        }
+    }
+
+    pub fn new_prefix(
         binding_power: u32,
         parser: OpParser,
-        build: impl Fn(Op, O) -> O + 'static,
-    ) {
-        self.parselets.push(PrattParselet {
+        build: impl Fn(Op, O, &Extra) -> O + 'static,
+        extra: Extra,
+    ) -> Self {
+        PrattParselet {
             parsers: vec![
                 PrattParseletKind::Op(PrattOp {
                     parser: parser,
@@ -93,25 +155,26 @@ impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op
                 }),
                 PrattParseletKind::Expression(PrattExpression {}),
             ],
-            build: Arc::new(move |results: Vec<PrattParseResult<Op, O>>| {
+            build: Arc::new(move |results: Vec<PrattParseResult<Op, O>>, extra| {
                 if let Some((PrattParseResult::Op(op), PrattParseResult::Expression(expr))) =
                     results.into_iter().collect_tuple()
                 {
-                    (build)(op, expr)
+                    (build)(op, expr, extra)
                 } else {
-                    panic!("add_prefix_parselet failed")
+                    panic!("new_prefix failed")
                 }
             }),
-        });
+            extra,
+        }
     }
 
-    pub fn add_infix_parselet(
-        mut self,
+    pub fn new_infix(
         binding_power: BindingPower,
         parser: OpParser,
-        build: impl Fn(O, Op, O) -> O + 'static,
-    ) {
-        self.parselets.push(PrattParselet {
+        build: impl Fn(O, Op, O, &Extra) -> O + 'static,
+        extra: Extra,
+    ) -> Self {
+        PrattParselet {
             parsers: vec![
                 PrattParseletKind::Expression(PrattExpression {}),
                 PrattParseletKind::Op(PrattOp {
@@ -120,28 +183,29 @@ impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op
                 }),
                 PrattParseletKind::Expression(PrattExpression {}),
             ],
-            build: Arc::new(move |results: Vec<PrattParseResult<Op, O>>| {
+            build: Arc::new(move |results: Vec<PrattParseResult<Op, O>>, extra| {
                 if let Some((
                     PrattParseResult::Expression(lhs),
                     PrattParseResult::Op(op),
                     PrattParseResult::Expression(rhs),
                 )) = results.into_iter().collect_tuple()
                 {
-                    (build)(lhs, op, rhs)
+                    (build)(lhs, op, rhs, extra)
                 } else {
-                    panic!("add_infix_parselet failed")
+                    panic!("new_infix failed")
                 }
             }),
-        });
+            extra,
+        }
     }
 
-    pub fn add_postfix_parselet(
-        mut self,
+    pub fn new_postfix(
         binding_power: u32,
         parser: OpParser,
-        build: impl Fn(O, Op) -> O + 'static,
-    ) {
-        self.parselets.push(PrattParselet {
+        build: impl Fn(O, Op, &Extra) -> O + 'static,
+        extra: Extra,
+    ) -> Self {
+        PrattParselet {
             parsers: vec![
                 PrattParseletKind::Expression(PrattExpression {}),
                 PrattParseletKind::Op(PrattOp {
@@ -150,25 +214,26 @@ impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op
                     binding_power: BindingPower::new_right(binding_power),
                 }),
             ],
-            build: Arc::new(move |results: Vec<PrattParseResult<Op, O>>| {
+            build: Arc::new(move |results: Vec<PrattParseResult<Op, O>>, extra| {
                 if let Some((PrattParseResult::Expression(expr), PrattParseResult::Op(op))) =
                     results.into_iter().collect_tuple()
                 {
-                    (build)(expr, op)
+                    (build)(expr, op, extra)
                 } else {
-                    panic!("add_postfix_parselet failed")
+                    panic!("new_postfix failed")
                 }
             }),
-        });
+            extra,
+        }
     }
 
-    pub fn add_brackets_parselet(
-        mut self,
+    pub fn new_brackets(
         open: OpParser,
         close: OpParser,
-        build: impl Fn(Op, O, Op) -> O + 'static,
-    ) {
-        self.parselets.push(PrattParselet {
+        build: impl Fn(Op, O, Op, &Extra) -> O + 'static,
+        extra: Extra,
+    ) -> Self {
+        PrattParselet {
             parsers: vec![
                 PrattParseletKind::Op(PrattOp {
                     parser: open,
@@ -180,73 +245,19 @@ impl<AtomParser, OpParser, Op, O> PrattParseletsBuilder<AtomParser, OpParser, Op
                     binding_power: BindingPower::new_right(0),
                 }),
             ],
-            build: Arc::new(move |results: Vec<PrattParseResult<Op, O>>| {
+            build: Arc::new(move |results: Vec<PrattParseResult<Op, O>>, extra| {
                 if let Some((
                     PrattParseResult::Op(open),
                     PrattParseResult::Expression(expr),
                     PrattParseResult::Op(close),
                 )) = results.into_iter().collect_tuple()
                 {
-                    (build)(open, expr, close)
+                    (build)(open, expr, close, extra)
                 } else {
-                    panic!("add_brackets_parselet failed")
+                    panic!("new_brackets failed")
                 }
             }),
-        });
-    }
-
-    pub fn add_parselet(mut self, parselet: PrattParselet<AtomParser, OpParser, Op, O>) -> Self {
-        self.parselets.push(parselet);
-        self
-    }
-
-    pub fn build(self) -> PrattParselets<AtomParser, OpParser, Op, O> {
-        PrattParselets::new(self.parselets)
-    }
-}
-
-/// A Pratt parselet is a parser for a single operator.
-/// Could be made fully type safe, but that would require a lot of hard work.
-/// Also note that every parselet is *finite*. No infinite comma separated lists or anything like that.
-pub struct PrattParselet<AtomParser, OpParser, Op, O> {
-    pub parsers: Vec<PrattParseletKind<AtomParser, OpParser>>,
-    pub build: Arc<dyn Fn(Vec<PrattParseResult<Op, O>>) -> O>,
-}
-
-impl<AtomParser, OpParser, Op, O> Clone for PrattParselet<AtomParser, OpParser, Op, O>
-where
-    AtomParser: Clone,
-    OpParser: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            parsers: self.parsers.clone(),
-            build: self.build.clone(),
-        }
-    }
-}
-
-impl<AtomParser, OpParser, Op, O> fmt::Debug for PrattParselet<AtomParser, OpParser, Op, O>
-where
-    AtomParser: fmt::Debug,
-    OpParser: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("PrattParselet")
-            .field("parsers", &self.parsers)
-            .field("build", &"...")
-            .finish()
-    }
-}
-
-impl<AtomParser, OpParser, Op, O> PrattParselet<AtomParser, OpParser, Op, O> {
-    pub fn new(
-        parsers: Vec<PrattParseletKind<AtomParser, OpParser>>,
-        build: impl Fn(Vec<PrattParseResult<Op, O>>) -> O + 'static,
-    ) -> Self {
-        Self {
-            parsers,
-            build: Arc::new(build),
+            extra,
         }
     }
 }
@@ -258,15 +269,15 @@ pub enum PrattParseResult<Op, O> {
 }
 
 #[derive(Debug, Clone)]
-pub enum PrattParseletKind<AtomParser, OpParser> {
-    Atom(PrattAtom<AtomParser>),
+pub enum PrattParseletKind<OpParser> {
+    Atom(PrattAtom<OpParser>),
     Op(PrattOp<OpParser>),
     Expression(PrattExpression),
 }
 
 #[derive(Debug, Clone)]
-pub struct PrattAtom<AtomParser> {
-    pub parser: AtomParser,
+pub struct PrattAtom<OpParser> {
+    pub parser: OpParser,
 }
 
 // TODO: "accept_empty" is not a thing. The brackets don't need this, we will turn the bracket parser into

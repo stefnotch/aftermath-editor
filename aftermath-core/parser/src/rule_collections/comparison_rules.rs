@@ -17,8 +17,8 @@ impl ComparisonRules {
         NodeIdentifier::new(vec!["Comparison".into(), name.into()])
     }
 }
-impl RuleCollection for ComparisonRules {
-    fn get_rules() -> Vec<TokenRule> {
+impl RuleCollection<'static, 'static> for ComparisonRules {
+    fn get_rules() -> Vec<TokenRule<'static, 'static>> {
         vec![
             TokenRule::new(
                 Self::rule_name("Equals"),

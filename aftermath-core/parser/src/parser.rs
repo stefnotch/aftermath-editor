@@ -2,7 +2,6 @@ mod greedy_choice;
 mod math_parser;
 pub mod pratt_parselet;
 pub mod pratt_parser;
-pub mod pratt_parser_old;
 
 use std::{collections::HashSet, sync::Arc};
 
@@ -25,12 +24,15 @@ use self::math_parser::CachedMathParser;
 
 pub struct MathParser {
     parser_cache: chumsky::cache::Cache<CachedMathParser>,
-    token_rules: Arc<Vec<TokenRule>>,
+    token_rules: Arc<Vec<TokenRule<'static, 'static>>>,
     autocomplete_rules: Vec<AutocompleteRule>,
 }
 
 impl MathParser {
-    fn new(token_rules: Vec<TokenRule>, autocomplete_rules: Vec<AutocompleteRule>) -> Self {
+    fn new(
+        token_rules: Vec<TokenRule<'static, 'static>>,
+        autocomplete_rules: Vec<AutocompleteRule>,
+    ) -> Self {
         let token_rules = Arc::new(token_rules);
         let parser_cache = chumsky::cache::Cache::new(CachedMathParser::new(token_rules.clone()));
         Self {
@@ -61,7 +63,7 @@ impl MathParser {
 }
 
 pub struct ParserBuilder {
-    token_rules: Vec<TokenRule>,
+    token_rules: Vec<TokenRule<'static, 'static>>,
     autocomplete_rules: Vec<AutocompleteRule>,
 }
 

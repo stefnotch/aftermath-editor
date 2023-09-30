@@ -17,8 +17,8 @@ impl StringRules {
         NodeIdentifier::new(vec!["String".into(), name.into()])
     }
 }
-impl RuleCollection for StringRules {
-    fn get_rules() -> Vec<TokenRule> {
+impl RuleCollection<'static, 'static> for StringRules {
+    fn get_rules() -> Vec<TokenRule<'static, 'static>> {
         vec![TokenRule::new(
             Self::rule_name("String"),
             (None, None),

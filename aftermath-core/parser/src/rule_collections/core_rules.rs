@@ -89,8 +89,8 @@ fn is_identifier_continue(value: &str) -> bool {
     value.chars().all(|c| is_xid_continue(c))
 }
 
-impl RuleCollection for CoreRules {
-    fn get_rules() -> Vec<TokenRule> {
+impl RuleCollection<'static, 'static> for CoreRules {
+    fn get_rules() -> Vec<TokenRule<'static, 'static>> {
         vec![
             TokenRule::new(
                 Self::rule_name("Variable"),

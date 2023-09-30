@@ -14,41 +14,42 @@ use super::pratt_parselet::{
 
 #[derive(Debug)]
 pub struct PrattParseErrorHandler<Token, Span, O, Op> {
-    pub make_missing_atom: fn(Span) -> O,
+    pub make_missing_atom: fn(Span) -> Op,
+    make_missing_expression: fn(Span) -> O,
     pub make_missing_operator: fn(Span) -> Op,
     pub combine_errors: fn(Op, (O, O)) -> O,
     pub missing_operator_binding_power: BindingPower,
     // Why is this one so tricky?
-    pub make_unknown_atom: fn(Span, Token) -> O,
+    pub make_unknown_expression: fn(Span, Token) -> O,
 }
 
 impl<Token, Span, O, Op> Clone for PrattParseErrorHandler<Token, Span, O, Op> {
     fn clone(&self) -> Self {
         Self {
             make_missing_atom: self.make_missing_atom.clone(),
+            make_missing_expression: self.make_missing_expression.clone(),
             make_missing_operator: self.make_missing_operator.clone(),
             combine_errors: self.combine_errors.clone(),
             missing_operator_binding_power: self.missing_operator_binding_power.clone(),
-            make_unknown_atom: self.make_unknown_atom.clone(),
+            make_unknown_expression: self.make_unknown_expression.clone(),
         }
     }
 }
 
-pub struct PrattParser_<'a, I, O, E, AtomParser, OpParser, Op>
+pub struct PrattParser_<'a, I, O, E, OpParser, Op, Extra>
 where
     I: Input<'a>,
 {
-    parselets: PrattParselets<AtomParser, OpParser, Op, O>,
+    parselets: PrattParselets<OpParser, Op, O, Extra>,
     error_handler: PrattParseErrorHandler<MaybeRef<'a, I::Token>, I::Span, O, Op>,
     _phantom: std::marker::PhantomData<E>,
 }
 
-impl<'a, I, O, E, AtomParser, OpParser, Op> Clone
-    for PrattParser_<'a, I, O, E, AtomParser, OpParser, Op>
+impl<'a, I, O, E, OpParser, Op, Extra> Clone for PrattParser_<'a, I, O, E, OpParser, Op, Extra>
 where
     I: Input<'a>,
-    AtomParser: Clone,
     OpParser: Clone,
+    Extra: Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -66,11 +67,10 @@ enum ParseletParseResult<T, Left> {
     None,
 }
 
-impl<'a, I, O, E, AtomParser, OpParser, Op> PrattParser_<'a, I, O, E, AtomParser, OpParser, Op>
+impl<'a, I, O, E, OpParser, Op, Extra> PrattParser_<'a, I, O, E, OpParser, Op, Extra>
 where
     I: Input<'a>,
     E: ParserExtra<'a, I>,
-    AtomParser: Parser<'a, I, O, E>,
     OpParser: Parser<'a, I, Op, E>,
 {
     /// Tries to run a single parselet
@@ -80,8 +80,8 @@ where
         inp: &mut InputRef<'a, 'parse, I, E>,
         left: &mut Option<O>,
         min_strength: (u32, Strength),
-        parselet: &'pratt PrattParselet<AtomParser, OpParser, Op, O>,
-        error_next_parsers: &mut Vec<&'pratt PrattParseletKind<AtomParser, OpParser>>,
+        parselet: &'pratt PrattParselet<OpParser, Op, O, Extra>,
+        error_next_parsers: &mut Vec<&'pratt PrattParseletKind<OpParser>>,
     ) -> ParseletParseResult<Vec<PrattParseResult<Op, O>>, O> {
         assert!(parselet.parsers.len() > 0);
 
@@ -107,7 +107,7 @@ where
                     match inp.parse(&p.parser).ok() {
                         Some(v) => {
                             results.push(PrattParseResult::Expression(left.take().unwrap()));
-                            results.push(PrattParseResult::Expression(v));
+                            results.push(PrattParseResult::Op(v));
                         }
                         None => {
                             inp.rewind(marker);
@@ -153,7 +153,7 @@ where
                     strength_right = None;
                     let marker = inp.save();
                     match inp.parse(&p.parser).ok() {
-                        Some(v) => Some(PrattParseResult::Expression(v)),
+                        Some(v) => Some(PrattParseResult::Op(v)),
                         None => {
                             inp.rewind(marker);
                             None
@@ -242,8 +242,8 @@ where
         inp: &mut InputRef<'a, 'parse, I, E>,
         left_option: &mut Option<O>,
         min_strength: (u32, Strength),
-        parselets: &'pratt [PrattParselet<AtomParser, OpParser, Op, O>],
-        error_next_parsers: &mut Vec<&'pratt PrattParseletKind<AtomParser, OpParser>>,
+        parselets: &'pratt [PrattParselet<OpParser, Op, O, Extra>],
+        error_next_parsers: &mut Vec<&'pratt PrattParseletKind<OpParser>>,
     ) -> ParseletParseResult<O, O> {
         for parselet in parselets.iter() {
             match self.parse_parselet(
@@ -254,7 +254,7 @@ where
                 error_next_parsers,
             ) {
                 ParseletParseResult::Some(v) => {
-                    return ParseletParseResult::Some((parselet.build)(v));
+                    return ParseletParseResult::Some((parselet.build)(v, &parselet.extra));
                 }
                 ParseletParseResult::Left(left) => {
                     return ParseletParseResult::Left(left);
@@ -268,7 +268,7 @@ where
     fn could_parse(
         &self,
         inp: &mut InputRef<'a, '_, I, E>,
-        parselet: &PrattParseletKind<AtomParser, OpParser>,
+        parselet: &PrattParseletKind<OpParser>,
     ) -> bool {
         let marker = inp.save();
 
@@ -306,18 +306,18 @@ where
     fn make_missing(
         &self,
         inp: &mut InputRef<'a, '_, I, E>,
-        parselet: &PrattParseletKind<AtomParser, OpParser>,
+        parselet: &PrattParseletKind<OpParser>,
     ) -> PrattParseResult<Op, O> {
         let position = get_position(inp);
         match parselet {
             PrattParseletKind::Atom(_) => {
-                PrattParseResult::Expression((self.error_handler.make_missing_atom)(position))
+                PrattParseResult::Op((self.error_handler.make_missing_atom)(position))
             }
             PrattParseletKind::Op(_) => {
                 PrattParseResult::Op((self.error_handler.make_missing_operator)(position))
             }
             PrattParseletKind::Expression(_) => {
-                PrattParseResult::Expression((self.error_handler.make_missing_atom)(position))
+                PrattParseResult::Expression((self.error_handler.make_missing_expression)(position))
             }
         }
     }
@@ -331,7 +331,7 @@ where
         &'pratt self,
         inp: &mut InputRef<'a, 'parse, I, E>,
         min_strength: (u32, Strength),
-        error_next_parsers: &mut Vec<&'pratt PrattParseletKind<AtomParser, OpParser>>,
+        error_next_parsers: &mut Vec<&'pratt PrattParseletKind<OpParser>>,
     ) -> Option<O> {
         let mut left = match self.parse_parselets(
             inp,
@@ -367,8 +367,9 @@ where
         let mut left = match left {
             Some(v) => v,
             None => {
-                let mut left_option =
-                    Some((self.error_handler.make_missing_atom)(get_position(inp)));
+                let mut left_option = Some((self.error_handler.make_missing_expression)(
+                    get_position(inp),
+                ));
                 match self.parse_parselets(
                     inp,
                     &mut left_option,
@@ -450,12 +451,11 @@ fn get_position<'a, I: Input<'a>, E: ParserExtra<'a, I>>(
         .unwrap_or_else(|_| panic!("should never happen"))
 }
 
-impl<'a, I, O, E, AtomParser, OpParser, Op> ExtParser<'a, I, O, E>
-    for PrattParser_<'a, I, O, E, AtomParser, OpParser, Op>
+impl<'a, I, O, E, OpParser, Op, Extra> ExtParser<'a, I, O, E>
+    for PrattParser_<'a, I, O, E, OpParser, Op, Extra>
 where
     I: Input<'a>,
     E: ParserExtra<'a, I>,
-    AtomParser: Parser<'a, I, O, E>,
     OpParser: Parser<'a, I, Op, E>,
 {
     /// Applies a pratt parser *until the end of the input*.
@@ -474,7 +474,7 @@ where
                     let next_token = inp
                         .next_maybe()
                         .expect("We already checked for an empty input");
-                    (self.error_handler.make_unknown_atom)(pos, next_token)
+                    (self.error_handler.make_unknown_expression)(pos, next_token)
                 }
             };
             result = match result {
@@ -498,13 +498,13 @@ where
     }
 }
 
-pub type PrattParser<'a, I, O, E, AtomParser, OpParser, Op> =
-    Ext<PrattParser_<'a, I, O, E, AtomParser, OpParser, Op>>;
+pub type PrattParser<'a, I, O, E, OpParser, Op, Extra> =
+    Ext<PrattParser_<'a, I, O, E, OpParser, Op, Extra>>;
 
-pub fn pratt_parser<'a, I, O, E, AtomParser, OpParser, Op>(
-    parselets: PrattParselets<AtomParser, OpParser, Op, O>,
+pub fn pratt_parser<'a, I, O, E, OpParser, Op, Extra>(
+    parselets: PrattParselets<OpParser, Op, O, Extra>,
     error_handler: PrattParseErrorHandler<MaybeRef<'a, I::Token>, I::Span, O, Op>,
-) -> PrattParser<'a, I, O, E, AtomParser, OpParser, Op>
+) -> PrattParser<'a, I, O, E, OpParser, Op, Extra>
 where
     I: Input<'a>,
 {

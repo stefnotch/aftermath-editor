@@ -19,8 +19,8 @@ impl ArithmeticRules {
     }
 }
 
-impl RuleCollection for ArithmeticRules {
-    fn get_rules() -> Vec<crate::rule_collection::TokenRule> {
+impl RuleCollection<'static, 'static> for ArithmeticRules {
+    fn get_rules() -> Vec<TokenRule<'static, 'static>> {
         vec![
             TokenRule::new(
                 Self::rule_name("Number"),

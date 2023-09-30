@@ -13,8 +13,8 @@ impl FunctionRules {
         NodeIdentifier::new(vec!["Function".into(), name.into()])
     }
 }
-impl RuleCollection for FunctionRules {
-    fn get_rules() -> Vec<TokenRule> {
+impl RuleCollection<'static, 'static> for FunctionRules {
+    fn get_rules() -> Vec<TokenRule<'static, 'static>> {
         vec![TokenRule::new(
             Self::rule_name("FunctionApplication"),
             (Some(800), None),

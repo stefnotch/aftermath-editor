@@ -14,8 +14,8 @@ impl LogicRules {
         NodeIdentifier::new(vec!["Logic".into(), name.into()])
     }
 }
-impl RuleCollection for LogicRules {
-    fn get_rules() -> Vec<TokenRule> {
+impl RuleCollection<'static, 'static> for LogicRules {
+    fn get_rules() -> Vec<TokenRule<'static, 'static>> {
         vec![
             TokenRule::new(
                 Self::rule_name("True"),
