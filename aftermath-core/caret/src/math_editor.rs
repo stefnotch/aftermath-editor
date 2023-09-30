@@ -12,7 +12,7 @@ use crate::{
 };
 use input_tree::editing::editable::Editable;
 use input_tree::editing::BasicEdit;
-use input_tree::focus::{InputRowPosition, InputRowRange};
+use input_tree::focus::InputRowRange;
 use input_tree::input_tree::InputTree;
 use input_tree::row::{InputRow, Offset};
 use input_tree::{
@@ -80,7 +80,7 @@ impl MathEditor {
     }
     pub fn select_with_caret(&mut self, direction: Direction, mode: MoveMode) -> Option<()> {
         let autocorrect = self.start_autocorrect();
-        let mut builder = EditorActionBuilder::new(self);
+        let builder = EditorActionBuilder::new(self);
         let selection = Caret::from_minimal(&builder.input, &builder.caret).into_selection();
         let caret = match selection {
             CaretSelection::Row(range) => {
@@ -342,10 +342,9 @@ impl MathEditor {
         let matches = self
             .parser
             .matches(&position.row_focus.row().values, position.offset.0, 2);
-        Some(
-            self.autocomplete_state
-                .get_autocomplete(matches, position.to_minimal()),
-        )
+
+        self.autocomplete_state
+            .get_autocomplete(matches, position.to_minimal())
     }
     pub fn get_caret(&self) -> Vec<MinimalCaretSelection> {
         let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
@@ -410,7 +409,11 @@ impl AutocompleteState {
         &'a mut self,
         mut matches: Vec<AutocompleteRuleMatch<'a>>,
         caret_position: MinimalInputRowPosition,
-    ) -> AutocompleteResults<'a> {
+    ) -> Option<AutocompleteResults<'a>> {
+        if matches.len() == 0 {
+            self.current_autocomplete = None;
+            return None;
+        }
         matches.sort();
 
         let selected_index = self
@@ -420,7 +423,11 @@ impl AutocompleteState {
             .unwrap_or(0);
 
         self.current_autocomplete = matches.get(selected_index).map(|v| v.rule.clone());
-        AutocompleteResults::new(selected_index, matches, caret_position)
+        Some(AutocompleteResults::new(
+            selected_index,
+            matches,
+            caret_position,
+        ))
     }
 
     pub fn set_current_autocomplete(&mut self, rule: Option<AutocompleteRule>) {

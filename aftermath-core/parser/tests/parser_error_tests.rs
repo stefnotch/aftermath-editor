@@ -1,4 +1,4 @@
-use input_tree::{input_row, node::InputNode, row::InputRow};
+use input_tree::{input_row, row::InputRow};
 use parser::{
     parser::ParserBuilder,
     rule_collections::{
