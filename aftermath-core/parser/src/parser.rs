@@ -1,3 +1,4 @@
+mod arc_list;
 mod greedy_choice;
 mod math_parser;
 pub mod pratt_parser;

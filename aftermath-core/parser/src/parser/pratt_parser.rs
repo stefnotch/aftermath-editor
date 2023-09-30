@@ -8,11 +8,12 @@ use chumsky::{
     util::MaybeRef,
 };
 
+use super::arc_list::{ArcList, ArcList_};
+
 // TODO:
 // - The pratt parser can be created from parsers. However, those parsers are forced to accept the same type of context as the pratt parser. This is not ideal.
 // - We're abusing the context to get better error recovery (ending parsers)
 
-// TODO: Create helper functions for this
 pub struct PrattParseContext<P> {
     pub min_binding_power: (u16, Strength),
     pub ending_parsers: ArcList<P>,
@@ -34,44 +35,11 @@ impl<P> PrattParseContext<P> {
     }
 }
 
-pub type ArcList<T> = Arc<ArcList_<T>>;
-
-pub enum ArcList_<T> {
-    Empty,
-    Cons(T, ArcList<T>),
-}
-
-impl<T> Default for ArcList_<T> {
+impl<P> Default for PrattParseContext<P> {
     fn default() -> Self {
-        Self::Empty
-    }
-}
-
-impl<T> ArcList_<T> {
-    pub fn iter(&self) -> ArcListIter<T> {
-        ArcListIter {
-            list: self,
-            index: 0,
-        }
-    }
-}
-
-pub struct ArcListIter<'a, T> {
-    list: &'a ArcList_<T>,
-    index: usize,
-}
-
-impl<'a, T> Iterator for ArcListIter<'a, T> {
-    type Item = &'a T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.list {
-            ArcList_::Empty => None,
-            ArcList_::Cons(v, next) => {
-                self.list = next;
-                self.index += 1;
-                Some(v)
-            }
+        Self {
+            min_binding_power: (0, Strength::Weak),
+            ending_parsers: Default::default(),
         }
     }
 }
@@ -85,23 +53,14 @@ impl<P> Clone for PrattParseContext<P> {
     }
 }
 
-impl<P> Default for PrattParseContext<P> {
-    fn default() -> Self {
-        Self {
-            min_binding_power: (0, Strength::Weak),
-            ending_parsers: Default::default(),
-        }
-    }
-}
-
-pub struct PrattParseErrorHandler<Token, Span, O> {
-    pub make_missing_atom: fn(Span) -> O,
-    pub make_missing_operator: fn(Span, (O, O)) -> O,
+pub struct PrattParseErrorHandler<Token, Offset, O> {
+    pub make_missing_atom: fn(Offset) -> O,
+    pub make_missing_operator: fn(Offset, (O, O)) -> O,
     pub missing_operator_binding_power: BindingPower,
-    pub make_unknown_atom: fn(Span, Token) -> O,
+    pub make_unknown_atom: fn(Offset, Token) -> O,
 }
 
-impl<Token, Span, O> Clone for PrattParseErrorHandler<Token, Span, O> {
+impl<Token, Offset, O> Clone for PrattParseErrorHandler<Token, Offset, O> {
     fn clone(&self) -> Self {
         Self {
             make_missing_atom: self.make_missing_atom,
@@ -112,21 +71,25 @@ impl<Token, Span, O> Clone for PrattParseErrorHandler<Token, Span, O> {
     }
 }
 
-pub struct PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O> {
+pub struct PrattSymbolParsers<AtomParser, InfixParser, PrefixParser, PostfixParser, Op, O> {
+    /// Atom parser, will usually be a choice parser
+    atom: AtomParser,
     infix_ops: Vec<OpParser<InfixParser, InfixBuilder<Op, O>>>,
     prefix_ops: Vec<OpParser<PrefixParser, PrefixBuilder<Op, O>>>,
     postfix_ops: Vec<OpParser<PostfixParser, PostfixBuilder<Op, O>>>,
 }
 
-impl<InfixParser, PrefixParser, PostfixParser, Op, O> Clone
-    for PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>
+impl<AtomParser, InfixParser, PrefixParser, PostfixParser, Op, O> Clone
+    for PrattSymbolParsers<AtomParser, InfixParser, PrefixParser, PostfixParser, Op, O>
 where
+    AtomParser: Clone,
     InfixParser: Clone,
     PrefixParser: Clone,
     PostfixParser: Clone,
 {
     fn clone(&self) -> Self {
         Self {
+            atom: self.atom.clone(),
             infix_ops: self.infix_ops.clone(),
             prefix_ops: self.prefix_ops.clone(),
             postfix_ops: self.postfix_ops.clone(),
@@ -134,15 +97,17 @@ where
     }
 }
 
-impl<InfixParser, PrefixParser, PostfixParser, Op, O>
-    PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>
+impl<AtomParser, InfixParser, PrefixParser, PostfixParser, Op, O>
+    PrattSymbolParsers<AtomParser, InfixParser, PrefixParser, PostfixParser, Op, O>
 {
     fn new(
+        atom: AtomParser,
         infix_ops: Vec<OpParser<InfixParser, InfixBuilder<Op, O>>>,
         prefix_ops: Vec<OpParser<PrefixParser, PrefixBuilder<Op, O>>>,
         postfix_ops: Vec<OpParser<PostfixParser, PostfixBuilder<Op, O>>>,
     ) -> Self {
         Self {
+            atom,
             infix_ops,
             prefix_ops,
             postfix_ops,
@@ -150,43 +115,42 @@ impl<InfixParser, PrefixParser, PostfixParser, Op, O>
     }
 }
 
-pub struct PrattParser_<'a, I, O, E, AtomParser, Operators, EndParser, EndParserExtra>
+pub struct PrattParser_<'a, I, O, E, Symbols, EndParser, EndParserExtra>
 where
     I: Input<'a>,
 {
-    /// Atom parser, will usually be a choice parser
-    atom: AtomParser,
-    operators: Operators,
+    symbols: Symbols,
     error_handler: PrattParseErrorHandler<MaybeRef<'a, I::Token>, I::Span, O>,
     _phantom: std::marker::PhantomData<(I, O, E, EndParser, EndParserExtra)>,
 }
 
-impl<'a, I, O, E, AtomParser, Operators, EndParser, EndParserExtra> Clone
-    for PrattParser_<'a, I, O, E, AtomParser, Operators, EndParser, EndParserExtra>
+impl<'a, I, O, E, Symbols, EndParser, EndParserExtra> Clone
+    for PrattParser_<'a, I, O, E, Symbols, EndParser, EndParserExtra>
 where
     I: Input<'a>,
-    AtomParser: Clone,
-    Operators: Clone,
+    Symbols: Clone,
 {
     fn clone(&self) -> Self {
         Self {
-            atom: self.atom.clone(),
-            operators: self.operators.clone(),
+            symbols: self.symbols.clone(),
             error_handler: self.error_handler.clone(),
             _phantom: std::marker::PhantomData,
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PrattParseResultType {
-    Expression,
-    End,
+enum PrattParseResult<T> {
+    Expression(T),
+    End(T),
 }
 
-struct PrattParseResult<T> {
-    variant: PrattParseResultType,
-    value: T,
+impl<T> PrattParseResult<T> {
+    fn map<U>(self, f: impl FnOnce(T) -> U) -> PrattParseResult<U> {
+        match self {
+            PrattParseResult::Expression(v) => PrattParseResult::Expression(f(v)),
+            PrattParseResult::End(v) => PrattParseResult::End(f(v)),
+        }
+    }
 }
 
 impl<
@@ -207,8 +171,7 @@ impl<
         I,
         O,
         E,
-        AtomParser,
-        PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>,
+        PrattSymbolParsers<AtomParser, InfixParser, PrefixParser, PostfixParser, Op, O>,
         EndParser,
         EndParserExtra,
     >
@@ -224,44 +187,15 @@ where
     PrefixParser: Parser<'a, I, Op, E>,
     PostfixParser: Parser<'a, I, Op, E>,
 {
-    fn try_parse_atom<'parse>(&self, inp: &mut InputRef<'a, 'parse, I, E>) -> Option<O> {
-        let marker = inp.save();
-        match inp.parse(&self.atom).ok() {
-            Some(v) => Some(v),
-            None => {
-                inp.rewind(marker);
-                None
-            }
-        }
-    }
-
-    fn try_parse<'parse, 'pratt, P: Parser<'a, I, Op, E>, Builder>(
-        &'pratt self,
-        parsers: &'pratt [OpParser<P, Builder>],
-        inp: &mut InputRef<'a, 'parse, I, E>,
-    ) -> Option<(Op, &OpParser<P, Builder>)> {
-        let marker = inp.save();
-        for op in parsers.iter() {
-            // Parse the child with our current pratt parsing context
-            if let Some(v) = inp.parse(&op.parser).ok() {
-                return Some((v, op));
-            }
-            inp.rewind(marker);
-        }
-        None
-    }
-
-    fn try_check_end<'parse>(
+    fn is_at_end<'parse>(
         &self,
         inp: &mut InputRef<'a, 'parse, I, E>,
         ending_parsers: &ArcList<EndParser>,
     ) -> bool {
-        let offset = inp.offset();
-
-        if inp.peek_maybe().is_none() {
+        if inp.is_at_end() {
             return true;
         }
-
+        let offset = inp.offset();
         for parser in ending_parsers.iter() {
             let input = inp.slice_from(offset..);
             let parse_result = parser.check(input);
@@ -277,30 +211,23 @@ where
         inp: &mut InputRef<'a, 'parse, I, E>,
         ending_parsers: &ArcList<EndParser>,
     ) -> O {
-        let start_offset = get_position(inp);
+        let start_offset = inp.input_position();
 
         let unknown_input = inp.next_maybe().unwrap(); // TODO: Don't just unwrap here
         let mut unknown_atom = (&self.error_handler.make_unknown_atom)(start_offset, unknown_input);
         loop {
-            if self.try_check_end(inp, ending_parsers) {
-                break;
-            }
-            if let Some(_) = self.try_parse(&self.operators.prefix_ops, inp) {
-                break;
-            }
-            if let Some(_) = self.try_parse_atom(inp) {
-                break;
-            }
-            if let Some(_) = self.try_parse(&self.operators.infix_ops, inp) {
-                break;
-            }
-            if let Some(_) = self.try_parse(&self.operators.postfix_ops, inp) {
+            if self.is_at_end(inp, ending_parsers)
+                || inp.can_parse_iter(&self.symbols.prefix_ops)
+                || inp.can_parse(&self.symbols.atom)
+                || inp.can_parse_iter(&self.symbols.infix_ops)
+                || inp.can_parse_iter(&self.symbols.postfix_ops)
+            {
                 break;
             }
 
-            let op_offset = get_position(inp);
+            let op_offset = inp.input_position();
             let unknown_input = inp.next_maybe().unwrap(); // TODO: Don't just unwrap here
-            let atom_offset = get_position(inp);
+            let atom_offset = inp.input_position();
             let next_unknown_atom =
                 (&self.error_handler.make_unknown_atom)(atom_offset, unknown_input);
             unknown_atom = (self.error_handler.make_missing_operator)(
@@ -347,34 +274,34 @@ where
         min_binding_power: (u16, Strength),
         ending_parsers: &ArcList<EndParser>,
     ) -> PrattParseResult<O> {
-        let pre_op = inp.save();
         // Iterative-ish version of the above
-        let mut left = if let Some((value, op)) = self.try_parse(&self.operators.prefix_ops, inp) {
-            let right = self.pratt_parse(inp, op.binding_power.strength_right(), ending_parsers);
-            let value = (op.build)(value, right.value);
-            if right.variant == PrattParseResultType::End {
-                return PrattParseResult {
-                    variant: PrattParseResultType::End,
-                    value,
-                };
+        let mut left = if inp.is_at_end() {
+            return PrattParseResult::End((&self.error_handler.make_missing_atom)(
+                inp.input_position(),
+            ));
+        } else if let Some((value, op)) = inp.parse_iter(&self.symbols.prefix_ops) {
+            let right = self
+                .pratt_parse(inp, op.binding_power.strength_right(), ending_parsers)
+                .map(|right| (op.build)(value, right));
+            match right {
+                PrattParseResult::Expression(value) => value,
+                PrattParseResult::End(value) => {
+                    return PrattParseResult::End(value);
+                }
             }
-            value
-        } else if let Some(v) = self.try_parse_atom(inp) {
+        } else if let Ok(v) = inp.parse_safe(&self.symbols.atom) {
             v
         }
         // Failure cases with graceful recovery
-        else if self.try_parse(&self.operators.infix_ops, inp).is_some()
-            || self.try_parse(&self.operators.postfix_ops, inp).is_some()
+        else if inp.can_parse_iter(&self.symbols.infix_ops)
+            || inp.can_parse_iter(&self.symbols.postfix_ops)
         {
-            inp.rewind(pre_op);
-            (&self.error_handler.make_missing_atom)(get_position(inp))
-        } else if self.try_check_end(inp, ending_parsers) {
+            (self.error_handler.make_missing_atom)(inp.input_position())
+        } else if self.is_at_end(inp, ending_parsers) {
             // Don't try to parse more if we're at the end
-            inp.rewind(pre_op);
-            return PrattParseResult {
-                variant: PrattParseResultType::End,
-                value: (&self.error_handler.make_missing_atom)(get_position(inp)),
-            };
+            return PrattParseResult::End((&self.error_handler.make_missing_atom)(
+                inp.input_position(),
+            ));
         } else {
             self.parse_unknown(inp, ending_parsers)
         };
@@ -382,91 +309,70 @@ where
         loop {
             let pre_op = inp.save();
 
-            if let Some((value, op)) = self.try_parse(&self.operators.infix_ops, inp) {
+            if inp.is_at_end() {
+                return PrattParseResult::End(left);
+            } else if let Some((value, op)) = inp.parse_iter(&self.symbols.infix_ops) {
                 if op.binding_power.strength_left() < min_binding_power {
                     inp.rewind(pre_op);
-                    // Or return Ok((left, op.binding_power.strength_left(), op, self.pratt_parse(op.binding_power.strength_right())))?
-                    return PrattParseResult {
-                        variant: PrattParseResultType::Expression,
-                        value: left,
-                    };
+                    return PrattParseResult::Expression(left);
                 }
-
-                let right =
-                    self.pratt_parse(inp, op.binding_power.strength_right(), ending_parsers);
-                let value = (op.build)(value, (left, right.value));
-                if right.variant == PrattParseResultType::End {
-                    return PrattParseResult {
-                        variant: PrattParseResultType::End,
-                        value,
-                    };
-                }
-                left = value;
-            } else if let Some((value, op)) = self.try_parse(&self.operators.postfix_ops, inp) {
+                let right = self
+                    .pratt_parse(inp, op.binding_power.strength_right(), ending_parsers)
+                    .map(|right| (op.build)(value, (left, right)));
+                match right {
+                    PrattParseResult::Expression(value) => left = value,
+                    PrattParseResult::End(value) => {
+                        return PrattParseResult::End(value);
+                    }
+                };
+            } else if let Some((value, op)) = inp.parse_iter(&self.symbols.postfix_ops) {
                 if op.binding_power.strength_left() < min_binding_power {
                     inp.rewind(pre_op);
-                    return PrattParseResult {
-                        variant: PrattParseResultType::Expression,
-                        value: left,
-                    };
+                    return PrattParseResult::Expression(left);
                 }
                 left = (op.build)(value, left);
             }
             // Failure cases with graceful recovery
-            else if self.try_parse(&self.operators.prefix_ops, inp).is_some()
-                || self.try_parse_atom(inp).is_some()
+            else if inp.can_parse_iter(&self.symbols.prefix_ops)
+                || inp.can_parse(&self.symbols.atom)
             {
-                inp.rewind(pre_op);
-                let start_offset = get_position(inp);
+                let start_offset = inp.input_position();
                 if self
                     .error_handler
                     .missing_operator_binding_power
                     .strength_left()
                     < min_binding_power
                 {
-                    return PrattParseResult {
-                        variant: PrattParseResultType::Expression,
-                        value: left,
-                    };
+                    return PrattParseResult::Expression(left);
                 }
-                let right = self.pratt_parse(
-                    inp,
-                    self.error_handler
-                        .missing_operator_binding_power
-                        .strength_right(),
-                    ending_parsers,
-                );
-                let value =
-                    (self.error_handler.make_missing_operator)(start_offset, (left, right.value));
-                if right.variant == PrattParseResultType::End {
-                    return PrattParseResult {
-                        variant: PrattParseResultType::End,
-                        value,
-                    };
-                }
-                left = value;
-            } else if self.try_check_end(inp, ending_parsers) {
-                // Don't try to parse more if we're at the end
-                inp.rewind(pre_op);
-                return PrattParseResult {
-                    variant: PrattParseResultType::End,
-                    value: left,
+                let right = self
+                    .pratt_parse(
+                        inp,
+                        self.error_handler
+                            .missing_operator_binding_power
+                            .strength_right(),
+                        ending_parsers,
+                    )
+                    .map(|right| {
+                        (self.error_handler.make_missing_operator)(start_offset, (left, right))
+                    });
+                match right {
+                    PrattParseResult::Expression(value) => left = value,
+                    PrattParseResult::End(value) => {
+                        return PrattParseResult::End(value);
+                    }
                 };
+            } else if self.is_at_end(inp, ending_parsers) {
+                // Don't try to parse more if we're at the end
+                return PrattParseResult::End(left);
             } else {
                 // Unknown
-                let start_offset = get_position(inp);
+                let start_offset = inp.input_position();
                 let right = self.parse_unknown(inp, ending_parsers);
                 left = (self.error_handler.make_missing_operator)(start_offset, (left, right));
             }
         }
     }
-}
-
-fn get_position<'a, I: Input<'a>, E: ParserExtra<'a, I>>(
-    inp: &mut InputRef<'a, '_, I, E>,
-) -> I::Span {
-    inp.parse(empty().map_with_span(|_, span| span))
-        .unwrap_or_else(|_| panic!("should never happen"))
 }
 
 impl<
@@ -487,8 +393,7 @@ impl<
         I,
         O,
         E,
-        AtomParser,
-        PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>,
+        PrattSymbolParsers<AtomParser, InfixParser, PrefixParser, PostfixParser, Op, O>,
         EndParser,
         EndParserExtra,
     >
@@ -510,13 +415,15 @@ where
 
         let min_binding_power = inp.ctx().min_binding_power;
         let ending_parsers = inp.ctx().ending_parsers.clone();
-        Ok(self
-            .pratt_parse(inp, min_binding_power, &ending_parsers)
-            .value)
+        let result = self.pratt_parse(inp, min_binding_power, &ending_parsers);
+        match result {
+            PrattParseResult::Expression(v) => Ok(v),
+            PrattParseResult::End(v) => Ok(v),
+        }
     }
 }
-pub type PrattParser<'a, I, O, E, AtomParser, Operators, EndParser, EndParserExtra> =
-    Ext<PrattParser_<'a, I, O, E, AtomParser, Operators, EndParser, EndParserExtra>>;
+pub type PrattParser<'a, I, O, E, Symbols, EndParser, EndParserExtra> =
+    Ext<PrattParser_<'a, I, O, E, Symbols, EndParser, EndParserExtra>>;
 
 pub fn pratt_parser<
     'a,
@@ -541,8 +448,7 @@ pub fn pratt_parser<
     I,
     O,
     E,
-    AtomParser,
-    PrattParseOperators<InfixParser, PrefixParser, PostfixParser, Op, O>,
+    PrattSymbolParsers<AtomParser, InfixParser, PrefixParser, PostfixParser, Op, O>,
     EndParser,
     EndParserExtra,
 >
@@ -550,8 +456,7 @@ where
     I: SliceInput<'a, Slice = I>,
 {
     Ext(PrattParser_ {
-        atom,
-        operators: PrattParseOperators::new(infix_ops, prefix_ops, postfix_ops),
+        symbols: PrattSymbolParsers::new(atom, infix_ops, prefix_ops, postfix_ops),
         error_handler,
         _phantom: std::marker::PhantomData,
     })
@@ -570,6 +475,144 @@ impl<P: Clone, Build: Clone> Clone for OpParser<P, Build> {
             parser: self.parser.clone(),
             build: self.build.clone(),
         }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Ord, PartialOrd)]
+pub enum Strength {
+    Weak,
+    Strong,
+}
+
+impl Strength {
+    fn invert(self) -> Self {
+        match self {
+            Strength::Weak => Strength::Strong,
+            Strength::Strong => Strength::Weak,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BindingPower {
+    Prefix(u16),
+    Postfix(u16),
+    /// The operator binds more strongly with the argument to the left.
+    ///
+    /// For example `a + b + c` is parsed as `(a + b) + c`.
+    LeftInfix(u16),
+    /// The operator binds more strongly with the argument to the right.
+    ///
+    /// For example `a ^ b ^ c` is parsed as `a ^ (b ^ c)`.
+    RightInfix(u16),
+}
+
+impl BindingPower {
+    /// Note that strength is pretty much "reversed".
+    /// See https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
+    fn strength_left(&self) -> (u16, Strength) {
+        match self {
+            // TODO: Is this correct?
+            // Left associative
+            BindingPower::Prefix(v) | BindingPower::LeftInfix(v) => (*v, Strength::Weak),
+            // Right associative
+            BindingPower::Postfix(v) | BindingPower::RightInfix(v) => (*v, Strength::Strong),
+        }
+    }
+
+    fn strength_right(&self) -> (u16, Strength) {
+        let (v, strength) = self.strength_left();
+        (v, strength.invert())
+    }
+}
+
+trait InputRefExt<'a, 'parse, I, E>
+where
+    I: SliceInput<'a, Slice = I>,
+    E: ParserExtra<'a, I>,
+{
+    fn input_position(&self) -> I::Span;
+
+    fn is_at_end(&self) -> bool;
+    /// Parse with the given parser, but rewind the input if it fails.
+    fn parse_safe<O, P: Parser<'a, I, O, E>>(&mut self, parser: &P) -> Result<O, E::Error>;
+    /// Applies all the parsers and returns the first successful result.
+    fn parse_iter<'has_p, O, P: Parser<'a, I, O, E>, HasP: HasParser<P>>(
+        &mut self,
+        parsers: impl IntoIterator<Item = &'has_p HasP>,
+    ) -> Option<(O, &'has_p HasP)>;
+
+    /// Check if the given parser could parse the input.
+    fn can_parse<O, P: Parser<'a, I, O, E>>(&mut self, parser: &P) -> bool;
+    fn can_parse_iter<'has_p, O, P: Parser<'a, I, O, E>, HasP: HasParser<P> + 'has_p>(
+        &mut self,
+        parsers: impl IntoIterator<Item = &'has_p HasP>,
+    ) -> bool;
+}
+
+impl<'a, 'parse, I, E> InputRefExt<'a, 'parse, I, E> for InputRef<'a, 'parse, I, E>
+where
+    I: SliceInput<'a, Slice = I>,
+    E: ParserExtra<'a, I>,
+{
+    fn input_position(&self) -> I::Span {
+        self.span_since(self.offset())
+    }
+    fn is_at_end(&self) -> bool {
+        self.peek_maybe().is_none()
+    }
+
+    fn parse_safe<O, P: Parser<'a, I, O, E>>(&mut self, parser: &P) -> Result<O, E::Error> {
+        let marker = self.save();
+        let result = self.parse(parser);
+        match result {
+            Err(e) => {
+                self.rewind(marker);
+                Err(e)
+            }
+            v => v,
+        }
+    }
+
+    fn parse_iter<'has_p, O, P: Parser<'a, I, O, E>, HasP: HasParser<P>>(
+        &mut self,
+        parsers: impl IntoIterator<Item = &'has_p HasP>,
+    ) -> Option<(O, &'has_p HasP)> {
+        for p in parsers.into_iter() {
+            if let Some(result) = self.parse_safe(p.parser()).ok() {
+                return Some((result, &p));
+            }
+        }
+        None
+    }
+
+    fn can_parse<O, P: Parser<'a, I, O, E>>(&mut self, parser: &P) -> bool {
+        let marker = self.save();
+        let result = self.check(parser);
+        self.rewind(marker);
+        result.is_ok()
+    }
+
+    fn can_parse_iter<'has_p, O, P: Parser<'a, I, O, E>, HasP: HasParser<P> + 'has_p>(
+        &mut self,
+        parsers: impl IntoIterator<Item = &'has_p HasP>,
+    ) -> bool {
+        for p in parsers.into_iter() {
+            if self.can_parse(p.parser()) {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+trait HasParser<P> {
+    fn parser(&self) -> &P;
+}
+
+impl<P, Builder> HasParser<P> for OpParser<P, Builder> {
+    fn parser(&self) -> &P {
+        &self.parser
     }
 }
 
@@ -672,51 +715,3 @@ type InfixBuilder<Op, O> = fn(op: Op, children: (O, O)) -> O;
 type PrefixBuilder<Op, O> = fn(op: Op, child: O) -> O;
 
 type PostfixBuilder<Op, O> = fn(op: Op, child: O) -> O;
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Ord, PartialOrd)]
-pub enum Strength {
-    Weak,
-    Strong,
-}
-
-impl Strength {
-    fn invert(self) -> Self {
-        match self {
-            Strength::Weak => Strength::Strong,
-            Strength::Strong => Strength::Weak,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BindingPower {
-    Prefix(u16),
-    Postfix(u16),
-    /// The operator binds more strongly with the argument to the left.
-    ///
-    /// For example `a + b + c` is parsed as `(a + b) + c`.
-    LeftInfix(u16),
-    /// The operator binds more strongly with the argument to the right.
-    ///
-    /// For example `a ^ b ^ c` is parsed as `a ^ (b ^ c)`.
-    RightInfix(u16),
-}
-
-impl BindingPower {
-    /// Note that strength is pretty much "reversed".
-    /// See https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
-    fn strength_left(&self) -> (u16, Strength) {
-        match self {
-            // TODO: Is this correct?
-            // Left associative
-            BindingPower::Prefix(v) | BindingPower::LeftInfix(v) => (*v, Strength::Weak),
-            // Right associative
-            BindingPower::Postfix(v) | BindingPower::RightInfix(v) => (*v, Strength::Strong),
-        }
-    }
-
-    fn strength_right(&self) -> (u16, Strength) {
-        let (v, strength) = self.strength_left();
-        (v, strength.invert())
-    }
-}
