@@ -1,4 +1,4 @@
-use crate::make_parser::just_symbol_parser;
+use crate::make_parser::{just_operator_parser, just_symbol_parser};
 use crate::rule_collections::core_rules::CoreRules;
 
 use crate::{
@@ -20,12 +20,12 @@ impl RuleCollection for FunctionRules {
             TokenRule::new(
                 Self::rule_name("FunctionApplication"),
                 (Some(800), None),
-                just_symbol_parser(vec!["(", ")"]),
+                CoreRules::make_brackets_parser("(", ")"),
             ),
             TokenRule::new(
                 Self::rule_name("FunctionApplication"),
                 (Some(800), None),
-                CoreRules::make_brackets_parser("(", ")"),
+                just_operator_parser(vec!["(", ")"]),
             ),
         ]
     }

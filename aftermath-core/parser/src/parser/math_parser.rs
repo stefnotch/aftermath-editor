@@ -206,8 +206,6 @@ impl Cached for CachedMathParser {
             PrattParseErrorHandler {
                 make_missing_atom: |span: SimpleSpan| BuiltInRules::error_missing_token(span.end),
                 make_missing_operator: |_span: SimpleSpan, (child_a, child_b)| {
-                    panic!("Unknown token: {:?} {:?}", child_a, child_b);
-
                     BuiltInRules::error_missing_operator(
                         combine_ranges(child_a.range(), child_b.range()),
                         child_a,

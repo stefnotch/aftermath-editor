@@ -27,6 +27,7 @@ impl<P> PrattParseContext<P> {
         }
     }
 
+    /// Remember to make the ending parsers *lazy*.
     pub fn with(&self, min_binding_power: (u16, Strength), ending_parser: P) -> Self {
         Self {
             min_binding_power,
@@ -225,11 +226,12 @@ where
                 break;
             }
 
-            let op_offset = inp.input_position();
-            let unknown_input = inp.next_maybe().unwrap(); // TODO: Don't just unwrap here
             let atom_offset = inp.input_position();
+            let op_offset = inp.input_position(); // It's a missing operator, so the offset is the same as the atom
+            let unknown_input = inp.next_maybe().unwrap(); // TODO: Don't just unwrap here
             let next_unknown_atom =
                 (&self.error_handler.make_unknown_atom)(atom_offset, unknown_input);
+
             unknown_atom = (self.error_handler.make_missing_operator)(
                 op_offset,
                 (unknown_atom, next_unknown_atom),

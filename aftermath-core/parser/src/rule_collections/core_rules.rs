@@ -1,4 +1,4 @@
-use crate::make_parser::just_symbol_parser;
+use crate::make_parser::{just_operator_parser, just_symbol_parser};
 use crate::parser::pratt_parser::Strength;
 use crate::parser_extensions::just_symbol;
 
@@ -40,7 +40,10 @@ impl CoreRules {
                         move |ctx: &ParseContext<'_>| {
                             ctx.with(
                                 (0, Strength::Weak),
-                                just_symbol(ending_bracket_1.clone()).map(|_| ()).boxed(),
+                                just_symbol(ending_bracket_1.clone())
+                                    .lazy()
+                                    .map(|_| ())
+                                    .boxed(),
                             )
                         },
                         parser,
@@ -65,6 +68,43 @@ impl CoreRules {
                             .build(BuiltInRules::operator_rule_name(), left_bracket_span),
                         );
                         children.push(child);
+                        children.push(
+                            SyntaxNodeBuilder::new_leaf_node(
+                                vec![right_bracket],
+                                LeafNodeType::Operator,
+                            )
+                            .build(BuiltInRules::operator_rule_name(), right_bracket_span),
+                        );
+                        SyntaxNodeBuilder::new(SyntaxNodeChildren::Children(children))
+                    },
+                )
+                .boxed()
+        })
+    }
+
+    pub fn make_empty_brackets_parser(
+        starting_bracket: impl Into<String>,
+        ending_bracket: impl Into<String>,
+    ) -> impl crate::make_parser::MakeParser {
+        let starting_bracket: String = starting_bracket.into();
+        let ending_bracket: String = ending_bracket.into();
+        crate::make_parser::MakeParserFn(move |_| {
+            just_symbol(starting_bracket.clone())
+                .map_with_span(|v, span| (v, span.into_range()))
+                .then(
+                    just_symbol(ending_bracket.clone())
+                        .map_with_span(|v, span| (v, span.into_range())),
+                )
+                .map(
+                    |((left_bracket, left_bracket_span), (right_bracket, right_bracket_span))| {
+                        let mut children = vec![];
+                        children.push(
+                            SyntaxNodeBuilder::new_leaf_node(
+                                vec![left_bracket],
+                                LeafNodeType::Operator,
+                            )
+                            .build(BuiltInRules::operator_rule_name(), left_bracket_span),
+                        );
                         children.push(
                             SyntaxNodeBuilder::new_leaf_node(
                                 vec![right_bracket],
@@ -120,12 +160,12 @@ impl RuleCollection for CoreRules {
             TokenRule::new(
                 Self::rule_name("RoundBrackets"),
                 (None, None),
-                just_symbol_parser(vec!["(", ")"]),
+                Self::make_brackets_parser("(", ")"),
             ),
             TokenRule::new(
                 Self::rule_name("RoundBrackets"),
                 (None, None),
-                Self::make_brackets_parser("(", ")"),
+                just_operator_parser(vec!["(", ")"]),
             ),
         ]
     }

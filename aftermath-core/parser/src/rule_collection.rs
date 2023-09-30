@@ -87,6 +87,7 @@ impl TokenRule {
 }
 
 pub trait RuleCollection {
+    /// Later rules take priority.
     fn get_rules() -> Vec<TokenRule>;
     fn get_autocomplete_rules() -> Vec<AutocompleteRule>;
     fn get_extra_rule_names() -> Vec<NodeIdentifier> {
