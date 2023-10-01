@@ -5,13 +5,13 @@ use input_tree::node::{InputNode, InputNodeVariant};
 
 use crate::{
     make_parser::MakeParser,
+    parser::pratt_parser::{
+        self, pratt_parse_recursive, BindingPower, PrattParseErrorHandler, PrattParser,
+    },
+    parser_extensions::just_symbol,
     rule_collection::{BasicParserExtra, ParserInput, TokenRule},
     rule_collections::built_in_rules::BuiltInRules,
     syntax_tree::{LeafNodeType, SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren},
-};
-
-use super::pratt_parser::{
-    self, pratt_parse_recursive, BindingPower, PrattParseErrorHandler, PrattParser,
 };
 
 pub struct CachedMathParser {
@@ -196,16 +196,22 @@ impl Cached for CachedMathParser {
             // I'm not using greedy_choice for now.
             let atom = chumsky::primitive::choice(token_parsers);
 
+            // TODO: Don't hardcode this
+            let ending_parser = just_symbol(")")
+                .map(|_| ())
+                .or(chumsky::primitive::end())
+                .boxed();
+
             // I'll accept two limitations for now
             // - A sequence of commas will end up being nested
             // - |abs| works, because it acts like an atom. So we start parsing a | and invoke the main parser which parses the abs atom.
             //   Then the main parser encounters a | atom, and bails out. At this point, the |abs| parser can finish parsing the |.
-            let foo: crate::rule_collection::PrattParserType<'_, '_> = PrattParser::new(
+            let parser: crate::rule_collection::PrattParserType<'_, '_> = PrattParser::new(
                 atom,
                 infix_parsers,
                 prefix_parsers,
                 postfix_parsers,
-                chumsky::primitive::end().boxed(),
+                ending_parser,
                 PrattParseErrorHandler {
                     make_missing_atom: |span: SimpleSpan| {
                         BuiltInRules::error_missing_token(span.end)
@@ -226,7 +232,7 @@ impl Cached for CachedMathParser {
                 },
             );
 
-            foo
+            parser
         })
         .boxed()
     }

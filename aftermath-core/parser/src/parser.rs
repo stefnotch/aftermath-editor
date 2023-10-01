@@ -1,5 +1,4 @@
 mod greedy_choice;
-mod math_parser;
 pub mod pratt_parser;
 
 use std::{collections::HashSet, rc::Rc, sync::Arc};
@@ -9,6 +8,7 @@ use input_tree::node::InputNode;
 
 use crate::{
     autocomplete::{AutocompleteMatcher, AutocompleteRule},
+    math_parser::CachedMathParser,
     rule_collection::{RuleCollection, TokenRule},
     rule_collections::{
         arithmetic_rules::ArithmeticRules, built_in_rules::BuiltInRules,
@@ -18,8 +18,6 @@ use crate::{
     },
     syntax_tree::{NodeIdentifier, SyntaxNode},
 };
-
-use self::math_parser::CachedMathParser;
 
 pub struct MathParser {
     parser_cache: chumsky::cache::Cache<CachedMathParser>,
