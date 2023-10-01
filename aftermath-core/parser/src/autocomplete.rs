@@ -21,6 +21,8 @@ pub trait AutocompleteMatcher {
     /// TODO:
     /// When we have text like "sin|(3)", with | being the caret, then we probably should avoid suggesting "into" as an autocomplete.
     /// So after `matches` happens, we should probably remove all autocompletes that start in the middle of an existing parsed token.
+    /// See https://github.com/stefnotch/aftermath-editor/blob/82a09aa3fead16baeca44f60b044275d3ef3a304/src/editing/editing-autocomplete.ts#L16 for
+    /// some relevant code.
     fn matches<'input, 'b>(
         &'b self,
         input: &'input [InputNode],
