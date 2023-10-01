@@ -101,7 +101,7 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
       const error = this.rendererCollection("Error");
       error.add("MissingToken", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
-        return new NothingMathMLElement(syntaxTree, rowIndex);
+        return new MissingMathMLElement(syntaxTree, rowIndex);
       });
       error.add("UnknownToken", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
@@ -109,7 +109,8 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
       });
       error.add("MissingOperator", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
-        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "merror", this);
+        // has a "missing token" child which renders the error
+        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });
     }
     {

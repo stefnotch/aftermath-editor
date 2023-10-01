@@ -85,15 +85,10 @@ export function joinNodeIdentifier(nodeIdentifier: NodeIdentifier): NodeIdentifi
   return nodeIdentifier.join("::");
 }
 
-export function getGridRow(node: SyntaxNode, indices: RowIndices, indexOfContainer: number, gridOffset: Offset2D): RowIndices {
-  node = getNodeWithRowIndices(node, indices);
-  const gridNode = getChildWithNewRows(node, indexOfContainer);
-
-  const indexInGrid = gridOffset.x + gridOffset.y * gridNode.children.NewRows.width;
-  return [...indices, [indexOfContainer, indexInGrid]];
-}
-
-function getNodeWithRowIndices(node: SyntaxNode, indices: RowIndices) {
+/**
+ * Walks down the syntax tree to find the node with the given row indices.
+ */
+export function getNodeWithRowIndices(node: SyntaxNode, indices: RowIndices) {
   for (let rowIndex of indices) {
     let [indexOfContainer, indexOfRow] = rowIndex;
     assert(node.range.start <= indexOfContainer && indexOfContainer < node.range.end);
@@ -112,6 +107,10 @@ function getNodeWithRowIndices(node: SyntaxNode, indices: RowIndices) {
   return node;
 }
 
+/**
+ * In a syntax tree, we care about the "NewRows" children, which are the rows of a grid.
+ * (e.g. Fraction, Table, etc.)
+ */
 function getChildWithNewRows(node: SyntaxNode, indexOfContainer: number): SyntaxNodeWith<"NewRows"> {
   // Only walk down if we're still on the same row
   if (hasSyntaxNodeChildren(node, "Children")) {

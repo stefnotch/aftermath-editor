@@ -10,7 +10,6 @@ import { RowIndices } from "../input-tree/row-indices";
 import { MathMLRenderer } from "../mathml/renderer";
 import type { RenderResult, RenderedElement } from "../rendering/render-result";
 import {
-  getGridRow,
   joinNodeIdentifier,
   MathEditorBindings,
   MathEditorHelper,
@@ -366,7 +365,6 @@ export class MathEditor extends HTMLElement {
   renderCarets() {
     if (!this.isConnected) return;
     let carets = MathEditorHelper.getCaret(this.mathEditor);
-    console.log(carets);
     this.caretsContainer.replaceChildren();
     for (const caret of carets) {
       const element = new CaretDomElement();
@@ -397,22 +395,14 @@ export class MathEditor extends HTMLElement {
         }
       } else if (keyIn("Grid", caret)) {
         const range = caret.Grid;
-        const topLeftOffset = {
-          x: Math.min(range.start.x, range.end.x),
-          y: Math.min(range.start.y, range.end.y),
-        };
-        const bottomRightOffset = {
-          x: Math.max(range.start.x, range.end.x),
-          y: Math.max(range.start.y, range.end.y),
-        };
-        const startIndices = new RowIndices(getGridRow(this.syntaxTree, range.row_indices, range.index, topLeftOffset));
+        // Assumes a lot of internal details about the grid range
+        // (Start index, exclusive end index)
+        const startIndices = new RowIndices([...range.row_indices, [range.index, range.range.start]]);
         const renderedStart = this.renderResult.getViewportRowBounds(startIndices);
-        const endIndices = new RowIndices(
-          getGridRow(this.syntaxTree, range.row_indices, range.index, {
-            x: Math.max(0, bottomRightOffset.x - 1),
-            y: Math.max(0, bottomRightOffset.y - 1),
-          })
-        );
+        const endIndices = new RowIndices([
+          ...range.row_indices,
+          [range.index, Math.max(range.range.end - 1, range.range.start)],
+        ]);
         const renderedEnd = this.renderResult.getViewportRowBounds(endIndices);
         element.clearSelections();
         element.addSelection(

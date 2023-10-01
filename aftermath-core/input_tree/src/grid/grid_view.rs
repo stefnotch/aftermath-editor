@@ -34,6 +34,12 @@ impl<'a, T> GridView<'a, T> {
 
 /// A rectangular range in a grid.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+// TODO: Implement a custom https://serde.rs/impl-serialize.html
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub struct GridRectangle {
     /// Invariant: range.start <= range.end
     /// The start and end fields are conceptually turned into 2D positions, and then a rectangle is constructed.
