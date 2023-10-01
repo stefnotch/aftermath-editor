@@ -1,7 +1,6 @@
-use crate::parser::pratt_parser::Strength;
+use crate::parser::pratt_parser::{call_pratt_parser, Strength};
 use crate::parser_extensions::just_symbol;
 
-use crate::rule_collection::ParseContext;
 use crate::syntax_tree::{LeafNodeType, SyntaxNodeBuilder, SyntaxNodeChildren};
 use crate::{
     autocomplete::AutocompleteRule,
@@ -30,25 +29,9 @@ impl CoreRules {
         let starting_bracket: String = starting_bracket.into();
         let ending_bracket: String = ending_bracket.into();
         crate::make_parser::MakeParserFn(move |parser| {
-            let ending_bracket_1: String = ending_bracket.clone();
-
             just_symbol(starting_bracket.clone())
                 .map_with_span(|v, span| (v, span.into_range()))
-                .then(
-                    map_ctx(
-                        move |ctx: &ParseContext<'_>| {
-                            ctx.with(
-                                (0, Strength::Weak),
-                                just_symbol(ending_bracket_1.clone())
-                                    .lazy()
-                                    .map(|_| ())
-                                    .boxed(),
-                            )
-                        },
-                        parser,
-                    )
-                    .boxed(),
-                )
+                .then(call_pratt_parser(parser, (0, Strength::Weak), None))
                 .then(
                     just_symbol(ending_bracket.clone())
                         .map_with_span(|v, span| (v, span.into_range())),
