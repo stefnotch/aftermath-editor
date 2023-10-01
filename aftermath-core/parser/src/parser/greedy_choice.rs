@@ -55,7 +55,7 @@ pub type GreedyChoice<T> = Ext<GreedyChoice_<T>>;
 
 pub fn greedy_choice<T>(parsers: Vec<T>) -> GreedyChoice<T> {
     assert!(
-        parsers.len() > 0,
+        !parsers.is_empty(),
         "Need at least one parser for greedy choice"
     );
     Ext(GreedyChoice_ { parsers })

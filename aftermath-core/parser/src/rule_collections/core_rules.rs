@@ -121,12 +121,12 @@ impl CoreRules {
 
 fn is_identifier_start(value: &str) -> bool {
     let mut chars = value.chars();
-    let matches = chars.next().map(|c| is_xid_start(c)).unwrap_or(false);
-    matches && chars.all(|c| is_xid_continue(c))
+    let matches = chars.next().map(is_xid_start).unwrap_or(false);
+    matches && chars.all(is_xid_continue)
 }
 
 fn is_identifier_continue(value: &str) -> bool {
-    value.chars().all(|c| is_xid_continue(c))
+    value.chars().all(is_xid_continue)
 }
 
 impl RuleCollection for CoreRules {

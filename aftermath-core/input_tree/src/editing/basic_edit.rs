@@ -73,7 +73,7 @@ impl BasicEdit {
         range: &InputRowRange<'_>,
         values: Vec<InputNode>,
     ) -> (Vec<BasicEdit>, MinimalInputRowRange) {
-        let (mut edits, _) = BasicEdit::remove_range(&range);
+        let (mut edits, _) = BasicEdit::remove_range(range);
         let (mut insert_edits, position) =
             BasicEdit::insert_at_position(&range.left_position(), values);
         edits.append(&mut insert_edits);
@@ -88,7 +88,7 @@ impl BasicEdit {
         )
     }
 
-    pub fn get_row_indices_edit<'a>(&'a self) -> RowIndicesEdit<'a> {
+    pub fn get_row_indices_edit(&self) -> RowIndicesEdit<'_> {
         match self {
             BasicEdit::Row(edit) => edit.get_row_indices_edit(),
             BasicEdit::Grid(edit) => edit.get_row_indices_edit(),
@@ -116,8 +116,8 @@ pub struct RowEdit {
 }
 
 impl RowEdit {
-    pub fn get_row_indices_edit<'a>(&'a self) -> RowIndicesEdit<'a> {
-        let mut old_offset = self.position.offset.clone();
+    pub fn get_row_indices_edit(&self) -> RowIndicesEdit<'_> {
+        let mut old_offset = self.position.offset;
         let mut new_offset = Offset(self.position.offset.0 + self.values.len());
         if self.edit_type == EditType::Delete {
             std::mem::swap(&mut old_offset, &mut new_offset);
@@ -130,9 +130,9 @@ impl RowEdit {
     }
 }
 
-impl Into<BasicEdit> for RowEdit {
-    fn into(self) -> BasicEdit {
-        BasicEdit::Row(self)
+impl From<RowEdit> for BasicEdit {
+    fn from(val: RowEdit) -> Self {
+        BasicEdit::Row(val)
     }
 }
 
@@ -158,8 +158,8 @@ pub struct GridEdit {
 }
 
 impl GridEdit {
-    pub fn get_row_indices_edit<'a>(&'a self) -> RowIndicesEdit<'a> {
-        let mut old_offset = self.row_or_column.clone();
+    pub fn get_row_indices_edit(&self) -> RowIndicesEdit<'_> {
+        let mut old_offset = self.row_or_column;
         let mut new_offset = if self.direction == GridDirection::Column {
             Offset(self.row_or_column.0 + self.values.width())
         } else {
@@ -170,7 +170,7 @@ impl GridEdit {
         }
         RowIndicesEdit::GridIndexEdit {
             element_indices: &self.element_indices,
-            direction: self.direction.clone(),
+            direction: self.direction,
             old_offset,
             new_offset,
         }
@@ -194,9 +194,9 @@ impl GridEdit {
     }
 }
 
-impl Into<BasicEdit> for GridEdit {
-    fn into(self) -> BasicEdit {
-        BasicEdit::Grid(self)
+impl From<GridEdit> for BasicEdit {
+    fn from(val: GridEdit) -> Self {
+        BasicEdit::Grid(val)
     }
 }
 

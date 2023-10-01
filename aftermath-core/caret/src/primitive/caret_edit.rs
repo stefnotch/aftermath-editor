@@ -42,8 +42,8 @@ impl Invertible for CaretEdit {
     }
 }
 
-impl Into<UndoAction> for CaretEdit {
-    fn into(self) -> UndoAction {
-        UndoAction::CaretEdit(self)
+impl From<CaretEdit> for UndoAction {
+    fn from(val: CaretEdit) -> Self {
+        UndoAction::CaretEdit(val)
     }
 }

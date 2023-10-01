@@ -18,6 +18,12 @@ where
     // - Remove clone constraint
 }
 
+impl<T: Invertible + Clone> Default for UndoRedoManager<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Invertible + Clone> UndoRedoManager<T> {
     pub fn new() -> Self {
         Self {

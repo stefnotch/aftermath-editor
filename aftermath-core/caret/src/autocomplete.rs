@@ -6,15 +6,12 @@ use input_tree::{
 };
 use parser::autocomplete::{AutocompleteRule, AutocompleteRuleMatch};
 
+#[derive(Default)]
 pub struct AutocorrectActionBuilder {
     autocorrect: Option<AutocorrectAction>,
 }
 
-impl Default for AutocorrectActionBuilder {
-    fn default() -> Self {
-        Self { autocorrect: None }
-    }
-}
+
 
 impl AutocorrectActionBuilder {
     pub fn finish(self, edits: &[BasicEdit]) -> Option<AutocorrectAction> {

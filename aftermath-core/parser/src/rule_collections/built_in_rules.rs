@@ -126,7 +126,6 @@ impl BuiltInRules {
             .map(move |v| {
                 let new_grid = GridVec::from_one_dimensional(
                     v.values()
-                        .into_iter()
                         .map(|row| {
                             let p: BoxedNodeParser = parser
                                 .clone()
@@ -136,7 +135,7 @@ impl BuiltInRules {
                             let (output, errors) = parsed.into_output_errors();
                             let output = output.unwrap_or_else(|| Self::nothing_node(0));
                             // TODO: This should never happen
-                            if errors.len() > 0 {
+                            if !errors.is_empty() {
                                 panic!("Errors: {:?}", errors);
                             }
                             output

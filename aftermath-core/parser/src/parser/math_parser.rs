@@ -84,7 +84,7 @@ impl Cached for CachedMathParser {
         .repeated()
         .collect::<Vec<_>>()
         .map_with_span(|v, range: SimpleSpan| {
-            if v.len() > 0 {
+            if !v.is_empty() {
                 Some(
                     SyntaxNodeBuilder::new_leaf_node(v, LeafNodeType::Operator)
                         .build(BuiltInRules::whitespace_rule_name(), range.into_range()),

@@ -129,7 +129,7 @@ fn remove_at_caret_position(
     }
 
     // Move into next/previous node
-    if let Some(_) = adjacent_node {
+    if adjacent_node.is_some() {
         return move_caret(caret_mover, caret, direction);
     }
 
@@ -168,7 +168,7 @@ fn remove_at_caret_position(
     };
     if at_edge && grid.values().all(|v| v.values.is_empty()) {
         // Delete the entire node if we are at the start/end *and* the grid is empty
-        return flatten_node(parent, Offset(0));
+        flatten_node(parent, Offset(0))
     } else {
         // Move into next/previous node if we aren't at the start/end
         move_caret(caret_mover, caret, direction)

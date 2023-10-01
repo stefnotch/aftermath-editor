@@ -30,6 +30,12 @@ pub struct NavigationSettings {
     pub get_caret_viewport_position: Option<Box<fn(MinimalInputRowPosition) -> (f64, f64)>>,
 }
 
+impl Default for NavigationSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NavigationSettings {
     pub fn new() -> Self {
         NavigationSettings {
@@ -37,7 +43,7 @@ impl NavigationSettings {
         }
     }
 
-    pub fn move_caret<'a>(&self, caret: &mut Caret<'a>, direction: Direction, mode: MoveMode) {
+    pub fn move_caret(&self, caret: &mut Caret<'_>, direction: Direction, mode: MoveMode) {
         let selection = caret.selection();
         match selection {
             CaretSelection::Row(row) => {
@@ -93,16 +99,16 @@ impl NavigationSettings {
     ) -> Option<InputRowPosition<'a>> {
         match direction {
             Direction::Left => self
-                .move_horizontal_into(&caret, HorizontalDirection::Left)
-                .or_else(|| self.move_horizontal_beyond_edge(&caret, HorizontalDirection::Left)),
+                .move_horizontal_into(caret, HorizontalDirection::Left)
+                .or_else(|| self.move_horizontal_beyond_edge(caret, HorizontalDirection::Left)),
             Direction::Right => self
-                .move_horizontal_into(&caret, HorizontalDirection::Right)
-                .or_else(|| self.move_horizontal_beyond_edge(&caret, HorizontalDirection::Right)),
+                .move_horizontal_into(caret, HorizontalDirection::Right)
+                .or_else(|| self.move_horizontal_beyond_edge(caret, HorizontalDirection::Right)),
             Direction::Up => {
-                self.move_vertical(&caret, VerticalDirection::Up, caret_viewport_position)
+                self.move_vertical(caret, VerticalDirection::Up, caret_viewport_position)
             }
             Direction::Down => {
-                self.move_vertical(&caret, VerticalDirection::Down, caret_viewport_position)
+                self.move_vertical(caret, VerticalDirection::Down, caret_viewport_position)
             }
         }
     }

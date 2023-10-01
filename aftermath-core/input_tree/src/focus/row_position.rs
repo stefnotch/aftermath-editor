@@ -36,7 +36,7 @@ impl<'a> InputRowPosition<'a> {
     }
 
     pub fn row_indices(&self) -> &RowIndices {
-        &self.row_focus.row_indices()
+        self.row_focus.row_indices()
     }
 
     pub fn to_minimal(&self) -> MinimalInputRowPosition {
@@ -55,12 +55,12 @@ impl<'a> InputRowPosition<'a> {
     }
 }
 
-impl<'a> Into<InputRowRange<'a>> for &InputRowPosition<'a> {
-    fn into(self) -> InputRowRange<'a> {
+impl<'a> From<&InputRowPosition<'a>> for InputRowRange<'a> {
+    fn from(val: &InputRowPosition<'a>) -> Self {
         InputRowRange {
-            row_focus: self.row_focus.clone(),
-            start: self.offset,
-            end: self.offset,
+            row_focus: val.row_focus.clone(),
+            start: val.offset,
+            end: val.offset,
         }
     }
 }

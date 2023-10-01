@@ -35,18 +35,18 @@ pub enum VerticalDirection {
     Down,
 }
 
-impl Into<Direction> for HorizontalDirection {
-    fn into(self) -> Direction {
-        match self {
+impl From<HorizontalDirection> for Direction {
+    fn from(val: HorizontalDirection) -> Self {
+        match val {
             HorizontalDirection::Left => Direction::Left,
             HorizontalDirection::Right => Direction::Right,
         }
     }
 }
 
-impl Into<Direction> for VerticalDirection {
-    fn into(self) -> Direction {
-        match self {
+impl From<VerticalDirection> for Direction {
+    fn from(val: VerticalDirection) -> Self {
+        match val {
             VerticalDirection::Up => Direction::Up,
             VerticalDirection::Down => Direction::Down,
         }

@@ -20,7 +20,7 @@ use input_tree::{
     focus::{MinimalInputRowPosition, MinimalInputRowRange},
     node::InputNode,
 };
-use log::info;
+
 use parser::autocomplete::{AutocompleteMatcher, AutocompleteRule, AutocompleteRuleMatch};
 use parser::parser::MathParser;
 use parser::syntax_tree::{NodeIdentifier, SyntaxNode};
@@ -107,7 +107,7 @@ impl MathEditor {
     pub fn remove_at_caret(
         &mut self,
         remove_mode: CaretRemoveMode,
-        move_mode: MoveMode,
+        _move_mode: MoveMode,
     ) -> Option<()> {
         let autocorrect = self.start_autocorrect();
         let mut builder = EditorActionBuilder::new(self);
@@ -122,7 +122,7 @@ impl MathEditor {
                     end_position: new_position,
                 }
             }
-            CaretSelection::Grid(range) => {
+            CaretSelection::Grid(_range) => {
                 // Grid deleting needs to be implemented
                 todo!();
             }
@@ -155,7 +155,7 @@ impl MathEditor {
                     end_position: new_position,
                 }
             }
-            CaretSelection::Grid(range) => {
+            CaretSelection::Grid(_range) => {
                 // Grid inserting needs to be implemented
                 todo!();
             }
@@ -213,7 +213,7 @@ impl MathEditor {
         self.apply_autocorrect(autocorrect.finish(&action.edits));
     }
     pub fn extend_selection(&mut self, position: MinimalInputRowPosition) {
-        let mode = self.selection_mode.unwrap_or(MoveMode::Char);
+        let _mode = self.selection_mode.unwrap_or(MoveMode::Char);
 
         let autocorrect = self.start_autocorrect();
         let builder = EditorActionBuilder::new(self);
@@ -239,7 +239,7 @@ impl MathEditor {
         let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
         let selected_nodes = match &selection {
             CaretSelection::Row(range) => range.values(),
-            CaretSelection::Grid(range) => {
+            CaretSelection::Grid(_range) => {
                 // Grid copying needs to be implemented
                 // For example, we could construct a new, smaller grid and copy that node
                 todo!()
@@ -330,10 +330,10 @@ impl MathEditor {
             autocomplete_range.to_minimal(),
             autocorrect.rule.result.to_vec(),
         );
-        return Some(());
+        Some(())
     }
 
-    pub fn get_autocomplete<'a>(&'a mut self) -> Option<AutocompleteResults<'a>> {
+    pub fn get_autocomplete(&mut self) -> Option<AutocompleteResults<'_>> {
         let selection = Caret::from_minimal(&self.input, &self.caret).into_selection();
         let position = match selection {
             CaretSelection::Row(range) if range.is_collapsed() => range.start_position(),
@@ -398,6 +398,12 @@ pub struct AutocompleteState {
     current_autocomplete: Option<AutocompleteRule>,
 }
 
+impl Default for AutocompleteState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AutocompleteState {
     pub fn new() -> Self {
         Self {
@@ -411,7 +417,7 @@ impl AutocompleteState {
         mut matches: Vec<AutocompleteRuleMatch<'a>>,
         caret_position: MinimalInputRowPosition,
     ) -> Option<AutocompleteResults<'a>> {
-        if matches.len() == 0 {
+        if matches.is_empty() {
             self.current_autocomplete = None;
             return None;
         }

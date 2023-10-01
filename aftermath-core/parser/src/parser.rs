@@ -51,7 +51,7 @@ impl MathParser {
         let (result, errors) = parser.parse(input).into_output_errors();
 
         // Panic here, because this place is too late for error recovery.
-        if errors.len() > 0 {
+        if !errors.is_empty() {
             panic!("Errors: {:?}", errors);
         }
 
@@ -62,7 +62,7 @@ impl MathParser {
         self.token_rules
             .iter()
             .map(|v| v.name.clone())
-            .chain(self.extra_rule_names.iter().map(|v| v.clone()))
+            .chain(self.extra_rule_names.iter().cloned())
             .collect::<HashSet<_>>()
     }
 }
@@ -71,6 +71,12 @@ pub struct ParserBuilder {
     token_rules: Vec<TokenRule>,
     extra_rule_names: Vec<NodeIdentifier>,
     autocomplete_rules: Vec<AutocompleteRule>,
+}
+
+impl Default for ParserBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ParserBuilder {
@@ -117,9 +123,9 @@ impl ParserBuilder {
 }
 
 impl AutocompleteMatcher for MathParser {
-    fn matches<'input, 'b>(
+    fn matches<'b>(
         &'b self,
-        input: &'input [input_tree::node::InputNode],
+        input: &[input_tree::node::InputNode],
         caret_position: usize,
         min_rule_match_length: usize,
     ) -> Vec<crate::autocomplete::AutocompleteRuleMatch<'b>> {

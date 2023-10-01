@@ -34,7 +34,7 @@ impl NodeIdentifier {
 
 fn is_identifier(value: &str) -> bool {
     let mut chars = value.chars();
-    chars.next().filter(|c| is_xid_start(*c)).is_some() && chars.all(|c| is_xid_continue(c))
+    chars.next().filter(|c| is_xid_start(*c)).is_some() && chars.all(is_xid_continue)
 }
 
 impl fmt::Display for NodeIdentifier {

@@ -48,7 +48,7 @@ impl<P> Default for PrattParseContext<P> {
 impl<P> Clone for PrattParseContext<P> {
     fn clone(&self) -> Self {
         Self {
-            min_binding_power: self.min_binding_power.clone(),
+            min_binding_power: self.min_binding_power,
             ending_parsers: self.ending_parsers.clone(),
         }
     }
@@ -204,7 +204,7 @@ where
                 return true;
             }
         }
-        return false;
+        false
     }
 
     fn parse_unknown<'parse>(
@@ -215,7 +215,7 @@ where
         let start_offset = inp.input_position();
 
         let unknown_input = inp.next_maybe().unwrap(); // TODO: Don't just unwrap here
-        let mut unknown_atom = (&self.error_handler.make_unknown_atom)(start_offset, unknown_input);
+        let mut unknown_atom = (self.error_handler.make_unknown_atom)(start_offset, unknown_input);
         loop {
             if self.is_at_end(inp, ending_parsers)
                 || inp.can_parse_iter(&self.symbols.prefix_ops)
@@ -230,7 +230,7 @@ where
             let op_offset = inp.input_position(); // It's a missing operator, so the offset is the same as the atom
             let unknown_input = inp.next_maybe().unwrap(); // TODO: Don't just unwrap here
             let next_unknown_atom =
-                (&self.error_handler.make_unknown_atom)(atom_offset, unknown_input);
+                (self.error_handler.make_unknown_atom)(atom_offset, unknown_input);
 
             unknown_atom = (self.error_handler.make_missing_operator)(
                 op_offset,
@@ -278,7 +278,7 @@ where
     ) -> PrattParseResult<O> {
         // Iterative-ish version of the above
         let mut left = if inp.is_at_end() {
-            return PrattParseResult::End((&self.error_handler.make_missing_atom)(
+            return PrattParseResult::End((self.error_handler.make_missing_atom)(
                 inp.input_position(),
             ));
         } else if let Some((value, op)) = inp.parse_iter(&self.symbols.prefix_ops) {
@@ -301,7 +301,7 @@ where
             (self.error_handler.make_missing_atom)(inp.input_position())
         } else if self.is_at_end(inp, ending_parsers) {
             // Don't try to parse more if we're at the end
-            return PrattParseResult::End((&self.error_handler.make_missing_atom)(
+            return PrattParseResult::End((self.error_handler.make_missing_atom)(
                 inp.input_position(),
             ));
         } else {
@@ -581,7 +581,7 @@ where
         parsers: impl IntoIterator<Item = &'has_p HasP>,
     ) -> Option<(O, &'has_p HasP)> {
         for p in parsers.into_iter() {
-            if let Some(result) = self.parse_safe(p.parser()).ok() {
+            if let Ok(result) = self.parse_safe(p.parser()) {
                 return Some((result, &p));
             }
         }

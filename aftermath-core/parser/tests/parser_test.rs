@@ -20,8 +20,8 @@ fn create_parser() -> parser::parser::MathParser {
         .add_rule_collection::<FunctionRules>()
         .add_rule_collection::<LogicRules>()
         .add_rule_collection::<StringRules>();
-    let parser = builder.build();
-    parser
+    
+    builder.build()
 }
 
 fn parse_row(row: &InputRow) -> parser::syntax_tree::SyntaxNode {

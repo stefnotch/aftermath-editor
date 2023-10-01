@@ -43,7 +43,7 @@ impl<'editor> EditorActionBuilder<'editor> {
             edits: self.edits,
         };
 
-        if edit.edits.len() > 0 {
+        if !edit.edits.is_empty() {
             self.editor.input.apply_edits(&edit.edits);
             self.editor.parsed = None;
             self.editor.undo_stack.push(edit.clone().into());
@@ -57,6 +57,6 @@ impl<'editor> Deref for EditorActionBuilder<'editor> {
     type Target = MathEditor;
 
     fn deref(&self) -> &Self::Target {
-        &self.editor
+        self.editor
     }
 }

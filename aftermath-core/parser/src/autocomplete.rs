@@ -23,9 +23,9 @@ pub trait AutocompleteMatcher {
     /// So after `matches` happens, we should probably remove all autocompletes that start in the middle of an existing parsed token.
     /// See https://github.com/stefnotch/aftermath-editor/blob/82a09aa3fead16baeca44f60b044275d3ef3a304/src/editing/editing-autocomplete.ts#L16 for
     /// some relevant code.
-    fn matches<'input, 'b>(
+    fn matches<'b>(
         &'b self,
-        input: &'input [InputNode],
+        input: &[InputNode],
         caret_position: usize,
         min_rule_match_length: usize,
     ) -> Vec<AutocompleteRuleMatch<'b>>;
@@ -81,13 +81,13 @@ fn indices_of(needle: &str, haystack: &str) -> Vec<usize> {
 }
 
 impl AutocompleteMatcher for AutocompleteRule {
-    fn matches<'input, 'b>(
+    fn matches<'b>(
         &'b self,
-        input: &'input [InputNode],
+        input: &[InputNode],
         caret_position: usize,
         min_rule_match_length: usize,
     ) -> Vec<AutocompleteRuleMatch<'b>> {
-        assert!(self.parser.len() > 0);
+        assert!(!self.parser.is_empty());
         let input = &input[0..caret_position];
         // Contains the *exclusive* end indices in the parser
         // e.g.
@@ -138,9 +138,9 @@ impl AutocompleteMatcher for AutocompleteRule {
 
 pub struct AutocompleteRules(pub Vec<AutocompleteRule>);
 impl AutocompleteMatcher for AutocompleteRules {
-    fn matches<'input, 'b>(
+    fn matches<'b>(
         &'b self,
-        input: &'input [InputNode],
+        input: &[InputNode],
         caret_position: usize,
         min_rule_match_length: usize,
     ) -> Vec<AutocompleteRuleMatch<'b>> {
