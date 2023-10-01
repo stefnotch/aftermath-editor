@@ -141,9 +141,13 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
     }
     {
       const calculus = this.rendererCollection("Calculus");
-      calculus.add(["Infinity", "Lim", "LimSup", "LimInf", "Integral", "Sum"], (syntaxTree, rowIndex) => {
+      calculus.add(["Infinity"], (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
         return new TextMathMLElement(syntaxTree, rowIndex, "mi");
+      });
+      calculus.add(["Lim", "LimSup", "LimInf", "Integral", "Sum"], (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
+        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });
     }
     {
