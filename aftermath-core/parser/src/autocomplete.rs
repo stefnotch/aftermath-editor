@@ -118,7 +118,7 @@ impl AutocompleteMatcher for AutocompleteRule {
                 }
             }
 
-            if parser_current_index <= 0 {
+            if parser_current_index == 0 {
                 if symbol_count < min_rule_match_length {
                     continue;
                 }

@@ -76,7 +76,7 @@ impl InputNode {
     pub fn sub(value: InputRow) -> Self {
         Self::container_with_type(
             InputNodeVariant::Sub,
-            GridVec::from_one_dimensional(vec![value.into()], 1),
+            GridVec::from_one_dimensional(vec![value], 1),
         )
     }
 

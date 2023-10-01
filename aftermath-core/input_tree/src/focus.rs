@@ -90,6 +90,10 @@ impl<'a> InputFocusRow<'a> {
         self.row.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.row.is_empty()
+    }
+
     pub fn row_indices(&self) -> &RowIndices {
         &self.row_indices
     }

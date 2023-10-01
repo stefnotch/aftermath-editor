@@ -69,16 +69,21 @@ impl<T> GridVec<T> {
         self.values.iter()
     }
 
-    pub fn into_iter(self) -> impl Iterator<Item = T> {
-        self.values.into_iter()
-    }
-
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
     }
 
     pub fn get_view(&self, range: GridRectangle) -> GridView<'_, T> {
         GridView::new(self, range)
+    }
+}
+
+impl<T> IntoIterator for GridVec<T> {
+    type Item = T;
+    type IntoIter = std::vec::IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.values.into_iter()
     }
 }
 

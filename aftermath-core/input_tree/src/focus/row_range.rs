@@ -59,6 +59,10 @@ impl<'a> InputRowRange<'a> {
         self.right_offset().0 - self.left_offset().0
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn is_collapsed(&self) -> bool {
         self.start == self.end
     }
@@ -102,7 +106,7 @@ impl<'a> InputRowRange<'a> {
     }
 
     pub fn row_indices(&self) -> &RowIndices {
-        &self.row_focus.row_indices()
+        self.row_focus.row_indices()
     }
 
     pub fn contains(&self, position: &InputRowPosition<'a>) -> bool {

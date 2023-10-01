@@ -34,10 +34,14 @@ impl InputRow {
         self.values.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
     pub fn offset_to_index(&self, offset: Offset, direction: HorizontalDirection) -> Option<usize> {
         match direction {
             HorizontalDirection::Left => {
-                if offset.0 <= 0 {
+                if offset.0 == 0 {
                     None
                 } else {
                     Some(offset.0 - 1)
@@ -86,9 +90,9 @@ pub struct RowIndices(Vec<RowIndex>);
 )]
 pub struct RowIndex(pub usize, pub usize);
 
-impl Into<RowIndex> for (usize, usize) {
-    fn into(self) -> RowIndex {
-        RowIndex(self.0, self.1)
+impl From<(usize, usize)> for RowIndex {
+    fn from(value: (usize, usize)) -> Self {
+        RowIndex(value.0, value.1)
     }
 }
 
@@ -143,6 +147,10 @@ impl RowIndices {
         self.0.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = &RowIndex> {
         self.0.iter()
     }
@@ -180,7 +188,7 @@ impl RowIndices {
             other_offset.0 * 2
         };
 
-        return self_offset_or_index.cmp(&other_offset_or_index);
+        self_offset_or_index.cmp(&other_offset_or_index)
     }
 }
 
@@ -200,9 +208,9 @@ impl Default for RowIndices {
 )]
 pub struct Offset(pub usize);
 
-impl Into<Offset> for usize {
-    fn into(self) -> Offset {
-        Offset(self)
+impl From<usize> for Offset {
+    fn from(value: usize) -> Self {
+        Offset(value)
     }
 }
 
