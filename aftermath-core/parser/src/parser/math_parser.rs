@@ -214,11 +214,8 @@ impl Cached for CachedMathParser {
                 },
                 make_unknown_atom: |span: SimpleSpan, value: MaybeRef<InputNode>| {
                     let values = [value.into_inner()];
-                    BuiltInRules::error_unknown_token(
-                        // Meh
-                        span.start..(span.start + 1),
-                        &values[..],
-                    )
+                    // TODO: This one should do special handling like "frac/sub/table/... always gets parsed".
+                    BuiltInRules::error_unknown_token(span.start..(span.start + 1), &values[..])
                 },
                 missing_operator_binding_power: BindingPower::LeftInfix(100),
             },
