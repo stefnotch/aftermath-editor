@@ -1,4 +1,4 @@
-import { type SyntaxNode, offsetInRange } from "../../core";
+import { type SyntaxNodeWith, offsetInRange } from "../../core";
 import type { Offset } from "../../input-tree/input-offset";
 import type { RowIndex } from "../../input-tree/row-indices";
 import type { RenderedElement } from "../../rendering/render-result";
@@ -16,14 +16,14 @@ export class SymbolMathMLElement implements RenderedElement<MathMLElement> {
   private textElement: LeafMathMLElement;
 
   constructor(
-    public syntaxTree: SyntaxNode<"Leaf">,
+    public syntaxTree: SyntaxNodeWith<"Leaf">,
     public rowIndex: RowIndex | null,
     elementName: MathMLTags,
     options: Partial<{
       isStretchy: boolean;
     }> = {}
   ) {
-    this.textElement = new LeafMathMLElement(syntaxTree.children.Leaf);
+    this.textElement = new LeafMathMLElement(syntaxTree.children.Leaf, syntaxTree.range);
     let children: Text[] = this.textElement.getElements();
     const mathElement = createMathElement(elementName, children);
     mathElement.style.whiteSpace = "nowrap";

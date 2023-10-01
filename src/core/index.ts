@@ -1,250 +1,99 @@
-import init, { MathParser } from "../../aftermath-core/pkg";
-import { type InputNode, InputNodeContainer, InputNodeSymbol } from "../input-tree/input-node";
-import type { Offset } from "../input-tree/input-offset";
-import { RowIndices } from "../input-tree/row-indices";
-import { Grid, InputRow } from "../input-tree/row";
+import init, {
+  MathEditorBindings,
+  type InputNode,
+  type MinimalCaretSelection,
+  type MinimalInputRowRange,
+  type NodeIdentifier,
+  type SyntaxNode,
+  type SyntaxNodeChildren,
+  type InputRow,
+  type Offset,
+  type RowIndices,
+  type SerializedDataType,
+  type AutocompleteResultsBindings,
+} from "../../aftermath-core/pkg";
 import { assert } from "../utils/assert";
-import { InputRowRange } from "../input-position/input-row-range";
-import type { InputRowPosition } from "../input-position/input-row-position";
-import { version } from "../../package.json";
 
 // Yay, top level await is neat https://v8.dev/features/top-level-await
 await init();
 
-const parser = MathParser.new();
-
-export type JsonSerializedInput = {
-  version: string;
-  value: string;
+export const MathEditorHelper = {
+  insertAtCaret(mathEditor: MathEditorBindings, values: string[]) {
+    return mathEditor.insert_at_caret(values);
+  },
+  paste(mathEditor: MathEditorBindings, data: string, data_type?: SerializedDataType) {
+    return mathEditor.paste(data, data_type);
+  },
+  getCaret(mathEditor: MathEditorBindings): MinimalCaretSelection[] {
+    return mathEditor.get_caret();
+  },
+  getAutocomplete(mathEditor: MathEditorBindings): AutocompleteResultsBindings | undefined {
+    return mathEditor.get_autocomplete();
+  },
+  getInputTree(mathEditor: MathEditorBindings): InputRow {
+    return mathEditor.get_input_tree();
+  },
+  getSyntaxTree(mathEditor: MathEditorBindings): SyntaxNode {
+    return mathEditor.get_syntax_tree();
+  },
+  spliceAtRange(mathEditor: MathEditorBindings, range: MinimalInputRowRange, values: InputNode[]) {
+    return mathEditor.splice_at_range(range, values);
+  },
+  getRuleNames(mathEditor: MathEditorBindings): NodeIdentifier[] {
+    return mathEditor.get_rule_names();
+  },
 };
 
-export function serializeInput(row: InputRow): JsonSerializedInput {
-  let result = parser.serialize(toCore(row));
-
-  return {
-    version,
-    value: result,
-  };
-}
-
-export function deserializeInput(serialized: JsonSerializedInput): InputRow {
-  assert(serialized.version === version);
-  let result: InputRow = fromCore(parser.deserialize(serialized.value));
-  return result;
-}
-
-export function parse(row: InputRow): ParseResult {
-  let result: ParseResult = parser.parse(toCore(row));
-
-  return result;
-}
-
-export type Autocomplete = {
-  input: InputRowRange;
-  result: AutocompleteResult;
-};
-
-export type AutocompleteResult = {
-  potentialRules: AutocompleteRuleMatch[];
-};
-
-export type AutocompleteRuleMatch = {
-  value: string;
-  result: InputNode[];
-  matchLength: number;
-};
-
-export function autocomplete(tokenStarts: InputRowPosition[], endPosition: Offset): Autocomplete[] {
-  return tokenStarts.flatMap((token) => {
-    let inputNodes = token.zipper.value.values.slice(token.offset, endPosition);
-    let result: CoreAutocompleteResult | null = parser.autocomplete(inputNodes.map((n) => toCoreNode(n))) ?? null;
-    if (result !== null) {
-      let autocomplete: Autocomplete = {
-        input: new InputRowRange(token.zipper, token.offset, endPosition),
-        result: fromCoreAutocompleteResult(result),
-      };
-      return [autocomplete];
-    } else {
-      return [];
-    }
-  });
-}
-
-export function beginningAutocomplete(token: InputRowPosition, endPosition: Offset): Autocomplete | null {
-  let inputNodes = token.zipper.value.values.slice(token.offset, endPosition);
-  let result: CoreAutocompleteResult | null = parser.beginning_autocomplete(inputNodes.map((n) => toCoreNode(n))) ?? null;
-  if (result !== null) {
-    let autocomplete: Autocomplete = {
-      input: new InputRowRange(token.zipper, token.offset, endPosition),
-      result: fromCoreAutocompleteResult(result),
-    };
-    return autocomplete;
-  } else {
-    return null;
+export function isInputRow(value: InputRow | InputNode | (InputRow | InputNode)[]): value is InputRow {
+  if (!Array.isArray(value) && "values" in value) {
+    // Silly hacks to force Typescript to do its job of checking if the condition above is actually good enough
+    const _v = value satisfies InputRow;
+    assert(true || _v);
+    return true;
   }
+  return false;
 }
 
-function fromCoreAutocompleteResult(result: CoreAutocompleteResult): AutocompleteResult {
-  return {
-    potentialRules: result.potential_rules.map((r) => {
-      return {
-        value: r.rule.value,
-        result: r.rule.result.map((e) => fromCoreNode(e)),
-        matchLength: r.match_length,
-      };
-    }),
-  };
-}
+type SyntaxNodesKeys = "NewRows" | "Children" | "Leaf";
 
-export function getNodeIdentifiers(): Array<NodeIdentifier> {
-  return parser.get_token_names();
-}
-
-// TODO: I want tuples and records for this https://github.com/tc39/proposal-record-tuple
-export type NodeIdentifier = string[];
-export type NodeIdentifierJoined = string;
-export function joinNodeIdentifier(nodeIdentifier: NodeIdentifier): NodeIdentifierJoined {
-  return nodeIdentifier.join("::");
-}
-
-function toCore(row: InputRow): CoreRow {
-  const values = row.values.map((v) => toCoreNode(v));
-  return { values, offset_count: row.offsetCount };
-}
-
-function toCoreNode(node: InputNode): CoreElement {
-  if (node instanceof InputNodeContainer) {
-    return {
-      Container: {
-        container_type: node.containerType,
-        rows: { values: node.rows.values.map((row) => toCore(row)), width: node.rows.width },
-        offset_count: node.offsetCount,
-      },
-    };
-  } else {
-    const value = node.symbol.normalize("NFD");
-    return { Symbol: value };
-  }
-  // Uh oh, now I'm also maintaining invariants in two places.
-}
-
-function fromCore(row: CoreRow): InputRow {
-  const values = row.values.map((v) => fromCoreNode(v));
-  return new InputRow(values);
-}
-
-function fromCoreNode(node: CoreElement): InputNode {
-  if ("Container" in node) {
-    const container = node.Container;
-    const rows = container.rows.values.map((row) => fromCore(row));
-    return new InputNodeContainer(container.container_type, Grid.fromOneDimensional(rows, container.rows.width));
-  } else {
-    return new InputNodeSymbol(node.Symbol);
-  }
-}
-
-// TODO:
-// We're maintaining the types by hand for now, since we tried out mostly everything else.
-// Directly using WASM-bindgen's Typescript stuff doesn't work, because they don't support enums. https://github.com/rustwasm/wasm-bindgen/issues/2407
-// https://github.com/cloudflare/serde-wasm-bindgen/issues/19 doesn't generate Typescript types.
-// tsify hasn't been updated in a while https://github.com/madonoharu/tsify/issues/17
-// typeshare is only for JSON https://github.com/1Password/typeshare/issues/100 and is annoying to use (needs a CLI and such).
-//
-// Maybe in the future we can move to WebAssembly Interface Types, e.g. https://github.com/tauri-apps/tauri-bindgen
-
-type CoreRow = { values: CoreElement[]; offset_count: number };
-type CoreElement =
-  | {
-      Container: {
-        container_type: CoreContainer;
-        rows: CoreGrid<CoreRow>;
-        offset_count: number;
-      };
-    }
-  | { Symbol: string };
-
-type CoreContainer = "Fraction" | "Root" | "Under" | "Over" | "Sup" | "Sub" | "Table";
-
-type CoreGrid<T> = { values: T[]; width: number };
-
-export type ParseResult = {
-  value: SyntaxNode;
-  errors: ParseError[];
+export type SyntaxNodeWith<Extra extends SyntaxNodesKeys> = SyntaxNode & {
+  children: Extract<SyntaxNodeChildren, { [key in Extra]: any }>;
 };
 
-export type SyntaxNodes =
-  | {
-      Containers: SyntaxNode[];
-    }
-  | {
-      NewRows: CoreGrid<SyntaxNode>;
-    }
-  | {
-      Leaf: SyntaxLeafNode;
-    };
-
-type SyntaxNodesKeys = "Containers" | "NewRows" | "Leaf";
-type SyntaxNodesMatcher<T extends SyntaxNodesKeys> = {
-  [X in T]: Extract<SyntaxNodes, { [P in X]: any }>;
-}[T];
-
-export type Range<T> = {
-  start: T;
-  end: T;
-};
-
-export type SyntaxNode<T extends SyntaxNodesKeys = SyntaxNodesKeys> = {
-  name: NodeIdentifier;
-  children: SyntaxNodesMatcher<T>;
-  value: any; // TODO:
-  range: Range<number>;
-};
-
-export type SyntaxLeafNode = {
-  node_type: "Operator" | "Leaf";
-  range: Range<number>;
-  symbols: string[];
-};
-
-// TODO:
-export type ParseError = {
-  error: any;
-  range: any;
-};
-
-type CoreAutocompleteResult = {
-  range_in_input: Range<number>;
-  potential_rules: CoreAutocompleteRuleMatch[];
-};
-
-type CoreAutocompleteRuleMatch = {
-  rule: CoreAutocompleteRule;
-  match_length: number;
-};
-
-type CoreAutocompleteRule = {
-  result: CoreElement[];
-  value: string;
-};
-
-export function hasSyntaxNodeChildren<T extends SyntaxNodesKeys>(node: SyntaxNode, childType: T): node is SyntaxNode<T> {
+export function hasSyntaxNodeChildren<T extends SyntaxNodesKeys>(node: SyntaxNode, childType: T): node is SyntaxNodeWith<T> {
   return childType in node.children;
 }
 
 /**
  * Be careful when using this function, you don't want an off-by-one error.
  */
-export function offsetInRange(offset: Offset, range: Range<number>): boolean {
+export function offsetInRange(
+  offset: Offset,
+  range: {
+    start: Offset;
+    end: Offset;
+  }
+): boolean {
   return range.start <= offset && offset <= range.end;
 }
 
-export function getRowNode(node: SyntaxNode, indices: RowIndices) {
-  // Note that similar code exists in render-result.ts
+export * from "../../aftermath-core/pkg";
+
+// TODO: I want tuples and records for this https://github.com/tc39/proposal-record-tuple
+export type NodeIdentifierJoined = string;
+export function joinNodeIdentifier(nodeIdentifier: NodeIdentifier): NodeIdentifierJoined {
+  return nodeIdentifier.join("::");
+}
+
+/**
+ * Walks down the syntax tree to find the node with the given row indices.
+ */
+export function getNodeWithRowIndices(node: SyntaxNode, indices: RowIndices) {
   for (let rowIndex of indices) {
     let [indexOfContainer, indexOfRow] = rowIndex;
     assert(node.range.start <= indexOfContainer && indexOfContainer < node.range.end);
 
-    const childNode = getChildWithContainerIndex(node, indexOfContainer);
+    const childNode = getChildWithNewRows(node, indexOfContainer);
     let rowChildElement: SyntaxNode | undefined;
     if (hasSyntaxNodeChildren(childNode, "NewRows")) {
       rowChildElement = childNode.children.NewRows.values[indexOfRow];
@@ -255,20 +104,24 @@ export function getRowNode(node: SyntaxNode, indices: RowIndices) {
     node = rowChildElement;
   }
 
-  function getChildWithContainerIndex(node: SyntaxNode, indexOfContainer: number): SyntaxNode<"NewRows"> {
-    // Only walk down if we're still on the same row
-    if (hasSyntaxNodeChildren(node, "Containers")) {
-      for (let childElement of node.children.Containers) {
-        // If we find a better matching child, we go deeper. Notice how the end bound, aka length, is exclusive.
-        if (childElement.range.start <= indexOfContainer && indexOfContainer < childElement.range.end) {
-          return getChildWithContainerIndex(childElement, indexOfContainer);
-        }
+  return node;
+}
+
+/**
+ * In a syntax tree, we care about the "NewRows" children, which are the rows of a grid.
+ * (e.g. Fraction, Table, etc.)
+ */
+function getChildWithNewRows(node: SyntaxNode, indexOfContainer: number): SyntaxNodeWith<"NewRows"> {
+  // Only walk down if we're still on the same row
+  if (hasSyntaxNodeChildren(node, "Children")) {
+    for (let childElement of node.children.Children) {
+      // If we find a better matching child, we go deeper. Notice how the end bound, aka length, is exclusive.
+      if (childElement.range.start <= indexOfContainer && indexOfContainer < childElement.range.end) {
+        return getChildWithNewRows(childElement, indexOfContainer);
       }
     }
-
-    assert(hasSyntaxNodeChildren(node, "NewRows"));
-    return node;
   }
 
+  assert(hasSyntaxNodeChildren(node, "NewRows"));
   return node;
 }

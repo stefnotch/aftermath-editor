@@ -2,7 +2,9 @@
 resolver = "2"
 
 members = [
-    "web",
-    "parser",
     "input_tree",
+    "parser",
+    "serialization",
+    "caret",
+    "web",
 ]

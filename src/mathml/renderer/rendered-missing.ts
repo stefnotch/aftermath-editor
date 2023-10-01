@@ -1,4 +1,4 @@
-import type { SyntaxNode } from "../../core";
+import type { SyntaxNodeWith } from "../../core";
 import type { Offset } from "../../input-tree/input-offset";
 import type { RowIndex } from "../../input-tree/row-indices";
 import type { RenderedElement } from "../../rendering/render-result";
@@ -9,8 +9,8 @@ import { RenderedMathML, createMathElement } from "./rendered-element";
 export class MissingMathMLElement implements RenderedElement<MathMLElement> {
   element: RenderedMathML;
 
-  constructor(public syntaxTree: SyntaxNode<"Containers">, public rowIndex: RowIndex | null) {
-    assert(syntaxTree.children.Containers.length === 0);
+  constructor(public syntaxTree: SyntaxNodeWith<"Children">, public rowIndex: RowIndex | null) {
+    assert(syntaxTree.children.Children.length === 0);
     assert(syntaxTree.range.start === syntaxTree.range.end);
 
     // TODO: maybe wrap in an merror

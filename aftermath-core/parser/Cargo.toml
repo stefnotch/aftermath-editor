@@ -6,8 +6,13 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-unicode-segmentation = "1.10.1"
-unicode-normalization = "0.1.22"
 serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tsify =  { version = "0.4", optional = true, default-features = false, features = ["js"] }
 input_tree = { path = "../input_tree" }
-unicode-ident = "1.0.8"
+unicode-ident = "1.0"
+chumsky = { git = "https://github.com/zesterer/chumsky.git", default-features = false, features = ["extension", "unstable"] }
+wasm-bindgen = { version = "0.2", optional = true }
+
+[features]
+wasm = ["dep:wasm-bindgen", "dep:tsify", "input_tree/wasm"]

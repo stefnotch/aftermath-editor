@@ -1,0 +1,18 @@
+[package]
+name = "caret"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tsify =  { version = "0.4", optional = true, default-features = false, features = ["js"] }
+input_tree = { path = "../input_tree" }
+parser = { path = "../parser" }
+serialization = { path = "../serialization" }
+wasm-bindgen = { version = "0.2", optional = true }
+
+[features]
+wasm = ["dep:wasm-bindgen", "dep:tsify", "input_tree/wasm", "parser/wasm", "serialization/wasm"]

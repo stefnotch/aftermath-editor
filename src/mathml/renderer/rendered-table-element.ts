@@ -1,4 +1,4 @@
-import type { SyntaxNode } from "../../core";
+import type { SyntaxNodeWith } from "../../core";
 import type { RowIndex } from "../../input-tree/row-indices";
 import type { RenderedElement, Renderer } from "../../rendering/render-result";
 import type { ViewportCoordinate } from "../../rendering/viewport-coordinate";
@@ -10,7 +10,11 @@ export class TableMathMLElement implements RenderedElement<MathMLElement> {
   startBaselineReader: MathMLElement;
   endBaselineReader: MathMLElement;
 
-  constructor(public syntaxTree: SyntaxNode<"NewRows">, public rowIndex: RowIndex | null, renderer: Renderer<MathMLElement>) {
+  constructor(
+    public syntaxTree: SyntaxNodeWith<"NewRows">,
+    public rowIndex: RowIndex | null,
+    renderer: Renderer<MathMLElement>
+  ) {
     assert(syntaxTree.children.NewRows.values.length > 0, "Needs at least one child");
     this.element = new RenderedMathML(createMathElement("mtable", []));
     this.startBaselineReader = createMathElement("mphantom", []);
