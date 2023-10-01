@@ -190,7 +190,7 @@ where
 {
     fn is_at_end<'parse>(
         &self,
-        inp: &mut InputRef<'a, 'parse, I, E>,
+        inp: &InputRef<'a, 'parse, I, E>,
         ending_parsers: &ArcList<EndParser>,
     ) -> bool {
         if inp.is_at_end() {

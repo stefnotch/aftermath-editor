@@ -6,6 +6,7 @@ use chumsky::{
     prelude::Input,
     Parser,
 };
+
 /// Will apply all parsers, and then pick the one with the longest match.
 /// Be careful about exponential blowup when nesting this.
 /// Implementation similar to Chumsky's choice.
@@ -51,8 +52,9 @@ where
     }
 }
 
+#[allow(dead_code)]
 pub type GreedyChoice<T> = Ext<GreedyChoice_<T>>;
-
+#[allow(dead_code)]
 pub fn greedy_choice<T>(parsers: Vec<T>) -> GreedyChoice<T> {
     assert!(
         !parsers.is_empty(),

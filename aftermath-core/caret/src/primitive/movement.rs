@@ -117,7 +117,7 @@ impl NavigationSettings {
         &self,
         caret: &InputRowPosition<'a>,
         direction: VerticalDirection,
-        caret_viewport_position: Option<(f64, f64)>,
+        _caret_viewport_position: Option<(f64, f64)>,
     ) -> Option<InputRowPosition<'a>> {
         let parent = caret.row_focus.clone().parent()?;
 
@@ -169,7 +169,7 @@ impl NavigationSettings {
                 self.move_vertical(
                     &InputRowPosition::new(grandparent, Offset(0)),
                     direction,
-                    caret_viewport_position,
+                    _caret_viewport_position,
                 )
             }
         }

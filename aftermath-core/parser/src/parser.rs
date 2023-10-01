@@ -3,7 +3,7 @@ mod greedy_choice;
 mod math_parser;
 pub mod pratt_parser;
 
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, rc::Rc, sync::Arc};
 
 use chumsky::Parser;
 use input_tree::node::InputNode;
@@ -24,7 +24,7 @@ use self::math_parser::CachedMathParser;
 
 pub struct MathParser {
     parser_cache: chumsky::cache::Cache<CachedMathParser>,
-    token_rules: Arc<Vec<TokenRule>>,
+    token_rules: Rc<Vec<TokenRule>>,
     extra_rule_names: Arc<Vec<NodeIdentifier>>,
     autocomplete_rules: Vec<AutocompleteRule>,
 }
@@ -35,7 +35,7 @@ impl MathParser {
         extra_rule_names: Vec<NodeIdentifier>,
         autocomplete_rules: Vec<AutocompleteRule>,
     ) -> Self {
-        let token_rules = Arc::new(token_rules);
+        let token_rules = Rc::new(token_rules);
         let extra_rule_names = Arc::new(extra_rule_names);
         let parser_cache = chumsky::cache::Cache::new(CachedMathParser::new(token_rules.clone()));
         Self {

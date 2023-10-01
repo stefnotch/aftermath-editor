@@ -163,7 +163,7 @@ fn remove_at_caret_position(
     // General grid movement
     let grid = parent.node().grid()?;
     let at_edge = match direction {
-        HorizontalDirection::Left => index_in_parent <= 0,
+        HorizontalDirection::Left => index_in_parent == 0,
         HorizontalDirection::Right => index_in_parent >= grid.width() * grid.height() - 1,
     };
     if at_edge && grid.values().all(|v| v.values.is_empty()) {

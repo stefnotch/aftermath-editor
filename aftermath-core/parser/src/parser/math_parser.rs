@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::rc::Rc;
 
 use chumsky::{cache::Cached, span::SimpleSpan, util::MaybeRef, Boxed, IterParser, Parser};
 use input_tree::node::{InputNode, InputNodeVariant};
@@ -15,10 +15,10 @@ use super::pratt_parser::{
 };
 
 pub struct CachedMathParser {
-    token_rules: Arc<Vec<TokenRule>>,
+    token_rules: Rc<Vec<TokenRule>>,
 }
 impl CachedMathParser {
-    pub fn new(token_rules: Arc<Vec<TokenRule>>) -> Self {
+    pub fn new(token_rules: Rc<Vec<TokenRule>>) -> Self {
         Self { token_rules }
     }
 }

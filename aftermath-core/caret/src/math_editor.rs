@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::rc::Rc;
 
 use crate::autocomplete::{AutocompleteResults, AutocorrectAction, AutocorrectActionBuilder};
 use crate::caret::{CaretSelection, MinimalCaretSelection};
@@ -32,7 +32,7 @@ pub use serialization::SerializedDataType;
 pub struct MathEditor {
     /// User input
     pub(crate) input: InputTree,
-    pub(crate) parser: Arc<MathParser>,
+    pub(crate) parser: Rc<MathParser>,
     /// Parsed content, can be cleared
     pub(crate) parsed: Option<SyntaxNode>,
     /// Main caret
@@ -47,7 +47,7 @@ pub struct MathEditor {
 }
 
 impl MathEditor {
-    pub fn new(parser: Arc<MathParser>) -> Self {
+    pub fn new(parser: Rc<MathParser>) -> Self {
         let input: InputTree = Default::default();
         Self {
             input,

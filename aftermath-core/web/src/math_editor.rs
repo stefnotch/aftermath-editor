@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::rc::Rc;
 
 use caret::{
     autocomplete::AutocompleteResults,
@@ -26,7 +26,7 @@ impl MathEditorBindings {
     pub fn new() -> Self {
         Self {
             // Hardcoded parser rules for now
-            editor: MathEditor::new(Arc::new(ParserBuilder::new().add_default_rules().build())),
+            editor: MathEditor::new(Rc::new(ParserBuilder::new().add_default_rules().build())),
             // Do note that large numbers won't be serialized correctly, because JS doesn't have 64 bit integers.
             serializer: serde_wasm_bindgen::Serializer::new(),
         }
@@ -150,7 +150,7 @@ impl<'a> From<AutocompleteResults<'a>> for AutocompleteResultsBindings {
         AutocompleteResultsBindings {
             selected_index,
             matches: matches
-                .into_iter()
+                .iter()
                 .map(|rule_match| AutocompleteRuleMatchBindings {
                     rule: rule_match.rule.clone(),
                     rule_match_length: rule_match.rule_match_length,

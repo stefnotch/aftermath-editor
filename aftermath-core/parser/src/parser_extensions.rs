@@ -11,7 +11,7 @@ pub fn just_symbol<'a, E: ParserExtra<'a, &'a [InputNode]>>(
 }
 
 pub fn just_symbols<'a, E: ParserExtra<'a, &'a [InputNode]>>(
-    symbols: &Vec<String>,
+    symbols: &[String],
 ) -> impl chumsky::Parser<'a, &'a [InputNode], String, E> {
     let symbol_nodes = symbols
         .iter()

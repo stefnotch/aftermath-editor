@@ -58,22 +58,19 @@ impl CoreRules {
                         ((left_bracket, left_bracket_span), child),
                         (right_bracket, right_bracket_span),
                     )| {
-                        let mut children = vec![];
-                        children.push(
+                        let children = vec![
                             SyntaxNodeBuilder::new_leaf_node(
                                 vec![left_bracket],
                                 LeafNodeType::Operator,
                             )
                             .build(BuiltInRules::operator_rule_name(), left_bracket_span),
-                        );
-                        children.push(child);
-                        children.push(
+                            child,
                             SyntaxNodeBuilder::new_leaf_node(
                                 vec![right_bracket],
                                 LeafNodeType::Operator,
                             )
                             .build(BuiltInRules::operator_rule_name(), right_bracket_span),
-                        );
+                        ];
                         SyntaxNodeBuilder::new(SyntaxNodeChildren::Children(children))
                     },
                 )
@@ -96,21 +93,18 @@ impl CoreRules {
                 )
                 .map(
                     |((left_bracket, left_bracket_span), (right_bracket, right_bracket_span))| {
-                        let mut children = vec![];
-                        children.push(
+                        let children = vec![
                             SyntaxNodeBuilder::new_leaf_node(
                                 vec![left_bracket],
                                 LeafNodeType::Operator,
                             )
                             .build(BuiltInRules::operator_rule_name(), left_bracket_span),
-                        );
-                        children.push(
                             SyntaxNodeBuilder::new_leaf_node(
                                 vec![right_bracket],
                                 LeafNodeType::Operator,
                             )
                             .build(BuiltInRules::operator_rule_name(), right_bracket_span),
-                        );
+                        ];
                         SyntaxNodeBuilder::new(SyntaxNodeChildren::Children(children))
                     },
                 )
