@@ -40,6 +40,18 @@ pub struct SyntaxNode {
     derive(tsify::Tsify),
     tsify(into_wasm_abi, from_wasm_abi)
 )]
+pub enum SyntaxNodeChildrenType {
+    NewRows,
+    Children,
+    Leaf,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(tsify::Tsify),
+    tsify(into_wasm_abi, from_wasm_abi)
+)]
 pub enum SyntaxNodeChildren {
     /// When this syntax node actually starts a new row in the input tree.
     /// TODO: Maybe verify that this has a range of 1?
