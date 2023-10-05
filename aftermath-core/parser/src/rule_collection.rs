@@ -7,7 +7,7 @@ use crate::{
     make_parser::MakeParser,
     parser::pratt_parser::{BindingPower, PrattParser, PrattSymbolParsers, RcOrWeak},
     parser_debug_error::ParserDebugError,
-    syntax_tree::{NodeIdentifier, SyntaxNode, SyntaxNodeBuilder},
+    syntax_tree::{PathIdentifier, SyntaxNode, SyntaxNodeBuilder},
 };
 
 pub type ParserInput<'a> = &'a [InputNode];
@@ -54,7 +54,7 @@ pub type PrattParserType<'a, 'b> = PrattParser<
 pub type RcPrattParserType<'a, 'b> = RcOrWeak<PrattParserType<'a, 'b>>;
 
 pub struct TokenRule {
-    pub name: NodeIdentifier,
+    pub name: PathIdentifier,
     pub binding_power: Option<BindingPower>,
 
     /// Parser for the token. Is greedy, as in the longest one that matches will win.
@@ -78,7 +78,7 @@ pub struct TokenRule {
 
 impl TokenRule {
     pub fn new(
-        name: NodeIdentifier,
+        name: PathIdentifier,
         binding_power: (Option<u16>, Option<u16>),
         make_parser: impl MakeParser + 'static,
     ) -> Self {
@@ -106,12 +106,12 @@ pub trait RuleCollection {
     /// Later rules take priority.
     fn get_rules() -> Vec<TokenRule>;
     fn get_autocomplete_rules() -> Vec<AutocompleteRule>;
-    fn get_extra_rule_names() -> Vec<NodeIdentifier> {
+    fn get_extra_rule_names() -> Vec<PathIdentifier> {
         vec![]
     }
 }
 
-pub fn get_rule_names<T: RuleCollection>(_rule_collection: T) -> HashSet<NodeIdentifier> {
+pub fn get_rule_names<T: RuleCollection>(_rule_collection: T) -> HashSet<PathIdentifier> {
     let mut rules_names = T::get_rules()
         .into_iter()
         .map(|v| v.name)

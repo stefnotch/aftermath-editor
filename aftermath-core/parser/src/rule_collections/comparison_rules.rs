@@ -3,7 +3,7 @@ use crate::make_parser::just_operator_parser;
 use crate::{
     autocomplete::AutocompleteRule,
     rule_collection::{RuleCollection, TokenRule},
-    syntax_tree::NodeIdentifier,
+    syntax_tree::PathIdentifier,
 };
 
 use input_tree::input_nodes;
@@ -13,8 +13,8 @@ use input_tree::input_nodes;
 pub struct ComparisonRules {}
 
 impl ComparisonRules {
-    fn rule_name(name: &str) -> NodeIdentifier {
-        NodeIdentifier::new(vec!["Comparison".into(), name.into()])
+    fn rule_name(name: &str) -> PathIdentifier {
+        PathIdentifier::new(vec!["Comparison".into(), name.into()])
     }
 }
 impl RuleCollection for ComparisonRules {

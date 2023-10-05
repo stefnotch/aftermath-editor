@@ -12,9 +12,9 @@ use unicode_ident::{is_xid_continue, is_xid_start};
     derive(tsify::Tsify),
     tsify(into_wasm_abi, from_wasm_abi)
 )]
-pub struct NodeIdentifier(Vec<String>);
+pub struct PathIdentifier(Vec<String>);
 
-impl NodeIdentifier {
+impl PathIdentifier {
     pub fn new(name: Vec<String>) -> Self {
         assert!(
             name.len() > 1,
@@ -37,7 +37,7 @@ fn is_identifier(value: &str) -> bool {
     chars.next().filter(|c| is_xid_start(*c)).is_some() && chars.all(is_xid_continue)
 }
 
-impl fmt::Display for NodeIdentifier {
+impl fmt::Display for PathIdentifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write_with_separator(&self.0, "::", f)
     }

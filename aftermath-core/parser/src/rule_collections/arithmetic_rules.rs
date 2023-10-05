@@ -4,7 +4,7 @@ use crate::syntax_tree::{LeafNodeType, SyntaxNodeBuilder};
 use crate::{
     autocomplete::AutocompleteRule,
     rule_collection::{RuleCollection, TokenRule},
-    syntax_tree::NodeIdentifier,
+    syntax_tree::PathIdentifier,
 };
 use chumsky::{prelude::*, Parser};
 use input_tree::input_nodes;
@@ -14,8 +14,8 @@ use input_tree::node::InputNode;
 pub struct ArithmeticRules;
 
 impl ArithmeticRules {
-    fn rule_name(name: &str) -> NodeIdentifier {
-        NodeIdentifier::new(vec!["Arithmetic".into(), name.into()])
+    fn rule_name(name: &str) -> PathIdentifier {
+        PathIdentifier::new(vec!["Arithmetic".into(), name.into()])
     }
 }
 

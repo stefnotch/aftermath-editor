@@ -1,6 +1,8 @@
 pub mod autocomplete;
 pub mod make_parser;
 pub mod math_parser;
+pub mod parse_module;
+pub mod parse_modules;
 pub mod parser;
 pub mod parser_debug_error;
 pub mod parser_extensions;

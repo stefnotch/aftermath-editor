@@ -3,15 +3,15 @@ use crate::make_parser::{just_operator_parser, just_symbol_parser};
 use crate::{
     autocomplete::AutocompleteRule,
     rule_collection::{RuleCollection, TokenRule},
-    syntax_tree::NodeIdentifier,
+    syntax_tree::PathIdentifier,
 };
 
 /// Rules for basic arithmetic.
 pub struct LogicRules {}
 
 impl LogicRules {
-    fn rule_name(name: &str) -> NodeIdentifier {
-        NodeIdentifier::new(vec!["Logic".into(), name.into()])
+    fn rule_name(name: &str) -> PathIdentifier {
+        PathIdentifier::new(vec!["Logic".into(), name.into()])
     }
 }
 impl RuleCollection for LogicRules {

@@ -5,7 +5,7 @@ use crate::syntax_tree::{LeafNodeType, SyntaxNodeBuilder, SyntaxNodeChildren};
 use crate::{
     autocomplete::AutocompleteRule,
     rule_collection::{RuleCollection, TokenRule},
-    syntax_tree::NodeIdentifier,
+    syntax_tree::PathIdentifier,
 };
 use chumsky::{prelude::*, Parser};
 
@@ -18,8 +18,8 @@ use super::built_in_rules::BuiltInRules;
 pub struct CoreRules {}
 
 impl CoreRules {
-    fn rule_name(name: &str) -> NodeIdentifier {
-        NodeIdentifier::new(vec!["Core".into(), name.into()])
+    fn rule_name(name: &str) -> PathIdentifier {
+        PathIdentifier::new(vec!["Core".into(), name.into()])
     }
 
     pub fn make_brackets_parser(

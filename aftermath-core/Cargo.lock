@@ -1043,6 +1043,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "parse_rules"
+version = "0.1.0"
+dependencies = [
+ "chumsky",
+ "input_tree",
+ "log",
+ "parser",
+ "serde",
+ "unicode-ident",
+]
+
+[[package]]
 name = "parser"
 version = "0.1.0"
 dependencies = [

@@ -6,7 +6,7 @@ use crate::syntax_tree::{SyntaxLeafNode, SyntaxNode, SyntaxNodeBuilder, SyntaxNo
 use crate::{
     autocomplete::AutocompleteRule,
     rule_collection::{RuleCollection, TokenRule},
-    syntax_tree::NodeIdentifier,
+    syntax_tree::PathIdentifier,
 };
 use chumsky::{prelude::*, Parser};
 use input_tree::grid::{Grid, GridVec};
@@ -16,43 +16,43 @@ use input_tree::node::{InputNode, InputNodeVariant};
 pub struct BuiltInRules;
 
 impl BuiltInRules {
-    fn rule_name(name: &str) -> NodeIdentifier {
-        NodeIdentifier::new(vec!["BuiltIn".into(), name.into()])
+    fn rule_name(name: &str) -> PathIdentifier {
+        PathIdentifier::new(vec!["BuiltIn".into(), name.into()])
     }
     /// Whenever a syntax tree has an operator, this can be used to wrap the operator leaf.
-    pub fn operator_rule_name() -> NodeIdentifier {
+    pub fn operator_rule_name() -> PathIdentifier {
         BuiltInRules::rule_name("Operator")
     }
     /// Whenever a syntax tree has an new row, this will be used.
-    pub fn new_row_rule_name() -> NodeIdentifier {
+    pub fn new_row_rule_name() -> PathIdentifier {
         BuiltInRules::rule_name("Row")
     }
     /// Whenever an operator has one or more arguments, this can be used.
     /// For example, a function call uses this.
-    pub fn argument_rule_name() -> NodeIdentifier {
+    pub fn argument_rule_name() -> PathIdentifier {
         BuiltInRules::rule_name("Argument")
     }
     /// Can have Whitespace nodes at the start and/or end.
-    pub fn whitespaces_rule_name() -> NodeIdentifier {
+    pub fn whitespaces_rule_name() -> PathIdentifier {
         BuiltInRules::rule_name("Whitespaces")
     }
     /// Whenever we encounter a space between tokens, this will be used.
-    pub fn whitespace_rule_name() -> NodeIdentifier {
+    pub fn whitespace_rule_name() -> PathIdentifier {
         BuiltInRules::rule_name("Whitespace")
     }
     /// Whenever we encounter a subscript after an operator, this will be used.
-    pub fn sub_rule_name() -> NodeIdentifier {
+    pub fn sub_rule_name() -> PathIdentifier {
         BuiltInRules::rule_name("Sub")
     }
     /// Whenever we encounter a superscript after an operator, this will be used.
-    pub fn sup_rule_name() -> NodeIdentifier {
+    pub fn sup_rule_name() -> PathIdentifier {
         BuiltInRules::rule_name("Sup")
     }
-    fn error_rule_name(name: &str) -> NodeIdentifier {
-        NodeIdentifier::new(vec!["Error".into(), name.into()])
+    fn error_rule_name(name: &str) -> PathIdentifier {
+        PathIdentifier::new(vec!["Error".into(), name.into()])
     }
 
-    fn error_missing_token_name() -> NodeIdentifier {
+    fn error_missing_token_name() -> PathIdentifier {
         BuiltInRules::error_rule_name("MissingToken")
     }
 
@@ -65,7 +65,7 @@ impl BuiltInRules {
         )
     }
 
-    fn error_missing_operator_name() -> NodeIdentifier {
+    fn error_missing_operator_name() -> PathIdentifier {
         BuiltInRules::error_rule_name("MissingOperator")
     }
 
@@ -82,7 +82,7 @@ impl BuiltInRules {
         )
     }
 
-    fn error_unknown_token_name() -> NodeIdentifier {
+    fn error_unknown_token_name() -> PathIdentifier {
         BuiltInRules::error_rule_name("UnknownToken")
     }
 
@@ -104,7 +104,7 @@ impl BuiltInRules {
     }
 
     /// An empty node, this happens when a row is empty.
-    fn nothing_name() -> NodeIdentifier {
+    fn nothing_name() -> PathIdentifier {
         BuiltInRules::rule_name("Nothing")
     }
 
@@ -182,7 +182,7 @@ impl RuleCollection for BuiltInRules {
         ]
     }
 
-    fn get_extra_rule_names() -> Vec<NodeIdentifier> {
+    fn get_extra_rule_names() -> Vec<PathIdentifier> {
         vec![
             Self::operator_rule_name(),
             Self::new_row_rule_name(),

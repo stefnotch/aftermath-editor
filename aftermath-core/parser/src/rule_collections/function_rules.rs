@@ -3,14 +3,14 @@ use crate::rule_collections::core_rules::CoreRules;
 use crate::{
     autocomplete::AutocompleteRule,
     rule_collection::{RuleCollection, TokenRule},
-    syntax_tree::NodeIdentifier,
+    syntax_tree::PathIdentifier,
 };
 
 pub struct FunctionRules {}
 
 impl FunctionRules {
-    fn rule_name(name: &str) -> NodeIdentifier {
-        NodeIdentifier::new(vec!["Function".into(), name.into()])
+    fn rule_name(name: &str) -> PathIdentifier {
+        PathIdentifier::new(vec!["Function".into(), name.into()])
     }
 }
 impl RuleCollection for FunctionRules {

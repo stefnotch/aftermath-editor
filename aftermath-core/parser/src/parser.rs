@@ -9,6 +9,8 @@ use input_tree::node::InputNode;
 use crate::{
     autocomplete::{AutocompleteMatcher, AutocompleteRule},
     math_parser::CachedMathParser,
+    parse_module::ParseModule,
+    parse_modules::ParseModules,
     rule_collection::{RuleCollection, TokenRule},
     rule_collections::{
         arithmetic_rules::ArithmeticRules, built_in_rules::BuiltInRules,
@@ -16,20 +18,21 @@ use crate::{
         comparison_rules::ComparisonRules, core_rules::CoreRules, function_rules::FunctionRules,
         logic_rules::LogicRules, string_rules::StringRules,
     },
-    syntax_tree::{NodeIdentifier, SyntaxNode},
+    syntax_tree::{PathIdentifier, SyntaxNode},
 };
 
 pub struct MathParser {
     parser_cache: chumsky::cache::Cache<CachedMathParser>,
     token_rules: Rc<Vec<TokenRule>>,
-    extra_rule_names: Arc<Vec<NodeIdentifier>>,
+    extra_rule_names: Arc<Vec<PathIdentifier>>,
     autocomplete_rules: Vec<AutocompleteRule>,
 }
 
 impl MathParser {
     fn new(
+        //parse_modules: Vec<&dyn ParseModule>,
         token_rules: Vec<TokenRule>,
-        extra_rule_names: Vec<NodeIdentifier>,
+        extra_rule_names: Vec<PathIdentifier>,
         autocomplete_rules: Vec<AutocompleteRule>,
     ) -> Self {
         let token_rules = Rc::new(token_rules);
@@ -55,7 +58,7 @@ impl MathParser {
         result.unwrap_or_else(|| BuiltInRules::nothing_node(0))
     }
 
-    pub fn get_rule_names(&self) -> HashSet<NodeIdentifier> {
+    pub fn get_rule_names(&self) -> HashSet<PathIdentifier> {
         self.token_rules
             .iter()
             .map(|v| v.name.clone())
@@ -66,7 +69,7 @@ impl MathParser {
 
 pub struct ParserBuilder {
     token_rules: Vec<TokenRule>,
-    extra_rule_names: Vec<NodeIdentifier>,
+    extra_rule_names: Vec<PathIdentifier>,
     autocomplete_rules: Vec<AutocompleteRule>,
 }
 

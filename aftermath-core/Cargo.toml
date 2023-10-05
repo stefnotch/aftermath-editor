@@ -4,6 +4,7 @@ resolver = "2"
 members = [
     "input_tree",
     "parser",
+    "parse_rules",
     "serialization",
     "caret",
     "web",
