@@ -23,7 +23,7 @@ use input_tree::{
 
 use parser::autocomplete::{AutocompleteMatcher, AutocompleteRule, AutocompleteRuleMatch};
 use parser::parser::MathParser;
-use parser::syntax_tree::{PathIdentifier, SyntaxNode};
+use parser::syntax_tree::SyntaxNode;
 use serialization::{deserialize_input_nodes, serialize_input_nodes};
 
 pub use serialization::SerializedDataType;
@@ -383,13 +383,6 @@ impl MathEditor {
         builder.add_edits(basic_edit);
         builder.finish(caret);
         self.caret = caret_before;
-    }
-
-    /// Get all the known rule names
-    pub fn get_rule_names(&self) -> Vec<PathIdentifier> {
-        let mut names: Vec<_> = self.parser.get_rule_names().into_iter().collect();
-        names.sort();
-        names
     }
 }
 

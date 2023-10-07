@@ -9,21 +9,10 @@ use chumsky::{
 };
 
 pub struct PrattParseErrorHandler<Token, Offset, O> {
-    pub make_missing_atom: fn(Offset) -> O,
-    pub make_missing_operator: fn(Offset, (O, O)) -> O,
+    pub make_missing_atom: Rc<dyn Fn(Offset) -> O>,
+    pub make_missing_operator: Rc<dyn Fn(Offset, (O, O)) -> O>,
     pub missing_operator_binding_power: BindingPower,
-    pub make_unknown_atom: fn(Offset, Token) -> O,
-}
-
-impl<Token, Offset, O> Clone for PrattParseErrorHandler<Token, Offset, O> {
-    fn clone(&self) -> Self {
-        Self {
-            make_missing_atom: self.make_missing_atom,
-            make_missing_operator: self.make_missing_operator,
-            make_unknown_atom: self.make_unknown_atom,
-            missing_operator_binding_power: self.missing_operator_binding_power,
-        }
-    }
+    pub make_unknown_atom: Rc<dyn Fn(Offset, Token) -> O>,
 }
 
 pub struct PrattSymbolParsers<
@@ -42,34 +31,6 @@ pub struct PrattSymbolParsers<
     postfix_ops: Vec<OpParser<PostfixParser, PostfixBuilder<Op, O>>>,
     /// Used for error recovery, to check if we're at the end of the input
     ending_parser: EndingParser,
-}
-
-impl<AtomParser, InfixParser, PrefixParser, PostfixParser, EndingParser, Op, O> Clone
-    for PrattSymbolParsers<
-        AtomParser,
-        InfixParser,
-        PrefixParser,
-        PostfixParser,
-        EndingParser,
-        Op,
-        O,
-    >
-where
-    AtomParser: Clone,
-    InfixParser: Clone,
-    PrefixParser: Clone,
-    PostfixParser: Clone,
-    EndingParser: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            atom: self.atom.clone(),
-            infix_ops: self.infix_ops.clone(),
-            prefix_ops: self.prefix_ops.clone(),
-            postfix_ops: self.postfix_ops.clone(),
-            ending_parser: self.ending_parser.clone(),
-        }
-    }
 }
 
 impl<AtomParser, InfixParser, PrefixParser, PostfixParser, EndingParser, Op, O>
@@ -488,16 +449,6 @@ pub struct OpParser<P, Build> {
     build: Build,
 }
 
-impl<P: Clone, Build: Clone> Clone for OpParser<P, Build> {
-    fn clone(&self) -> Self {
-        Self {
-            binding_power: self.binding_power,
-            parser: self.parser.clone(),
-            build: self.build.clone(),
-        }
-    }
-}
-
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Ord, PartialOrd)]
 pub enum Strength {
     Weak,
@@ -730,8 +681,8 @@ pub fn postfix<P, Op, O>(
     }
 }
 
-type InfixBuilder<Op, O> = fn(op: Op, children: (O, O)) -> O;
+type InfixBuilder<Op, O> = Rc<dyn Fn(Op, (O, O)) -> O>;
 
-type PrefixBuilder<Op, O> = fn(op: Op, child: O) -> O;
+type PrefixBuilder<Op, O> = Rc<dyn Fn(Op, O) -> O>;
 
-type PostfixBuilder<Op, O> = fn(op: Op, child: O) -> O;
+type PostfixBuilder<Op, O> = Rc<dyn Fn(Op, O) -> O>;

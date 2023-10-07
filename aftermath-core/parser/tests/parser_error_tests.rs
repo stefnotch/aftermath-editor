@@ -1,6 +1,8 @@
+use std::rc::Rc;
+
 use input_tree::{input_row, row::InputRow};
 use parser::{
-    parser::ParserBuilder,
+    parse_modules::{ParseModuleCollection, ParseModules},
     rule_collections::{
         arithmetic_rules::ArithmeticRules, built_in_rules::BuiltInRules,
         calculus_rules::CalculusRules, collections_rules::CollectionsRules,
@@ -10,18 +12,32 @@ use parser::{
 };
 
 fn create_parser() -> parser::parser::MathParser {
-    let builder = ParserBuilder::new()
-        .add_rule_collection::<BuiltInRules>()
-        .add_rule_collection::<CoreRules>()
-        .add_rule_collection::<ArithmeticRules>()
-        .add_rule_collection::<CalculusRules>()
-        .add_rule_collection::<CollectionsRules>()
-        .add_rule_collection::<ComparisonRules>()
-        .add_rule_collection::<FunctionRules>()
-        .add_rule_collection::<LogicRules>()
-        .add_rule_collection::<StringRules>();
-    
-    builder.build()
+    let mut modules = ParseModules::new();
+    let built_in = Rc::new(BuiltInRules::new(&mut modules));
+    let core = Rc::new(CoreRules::new(&mut modules, &built_in));
+    let arithmetic = Rc::new(ArithmeticRules::new(&mut modules));
+    let calculus = Rc::new(CalculusRules::new(&mut modules));
+    let collections = Rc::new(CollectionsRules::new(&mut modules));
+    let comparison = Rc::new(ComparisonRules::new(&mut modules));
+    let function = Rc::new(FunctionRules::new(&mut modules, &built_in));
+    let logic = Rc::new(LogicRules::new(&mut modules));
+    let string = Rc::new(StringRules::new(&mut modules));
+
+    let module_collection = ParseModuleCollection::new(
+        built_in.clone(),
+        vec![
+            built_in,
+            core,
+            arithmetic,
+            calculus,
+            collections,
+            comparison,
+            function,
+            logic,
+            string,
+        ],
+    );
+    parser::parser::MathParser::new(module_collection)
 }
 
 fn parse_row(row: &InputRow) -> parser::syntax_tree::SyntaxNode {

@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use super::{LeafNodeType, PathIdentifier, SyntaxLeafNode, SyntaxNode, SyntaxNodeChildren};
+use super::{LeafNodeType, SyntaxLeafNode, SyntaxNode, SyntaxNodeChildren, SyntaxNodeNameId};
 
 pub struct SyntaxNodeBuilder {
     /// children of the node, including the operator token(s)
@@ -29,7 +29,7 @@ impl SyntaxNodeBuilder {
         )))
     }
 
-    pub fn build(self, name: PathIdentifier, range: Range<usize>) -> SyntaxNode {
+    pub fn build(self, name: SyntaxNodeNameId, range: Range<usize>) -> SyntaxNode {
         let mut node = SyntaxNode::new(name, range, self.children);
         node.value = self.value;
         node

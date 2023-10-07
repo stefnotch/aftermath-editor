@@ -3,7 +3,7 @@ use std::ops::Range;
 use input_tree::grid::GridVec;
 use serde::{Deserialize, Serialize};
 
-use super::PathIdentifier;
+use super::SyntaxNodeNameId;
 
 /// A node in a concrete syntax tree that contains other nodes.
 /// Has a few invariants:
@@ -23,8 +23,9 @@ use super::PathIdentifier;
     tsify(into_wasm_abi, from_wasm_abi)
 )]
 pub struct SyntaxNode {
-    /// name of the function or constant
-    pub name: PathIdentifier,
+    /// ID of name of the function or constant.
+    /// The parser has a map from name to ID.
+    pub name: SyntaxNodeNameId,
     /// children of the node, including the operator token(s)
     pub children: SyntaxNodeChildren,
     /// value, especially for constants
@@ -106,7 +107,7 @@ pub enum LeafNodeType {
 }
 
 impl SyntaxNode {
-    pub fn new(name: PathIdentifier, range: Range<usize>, children: SyntaxNodeChildren) -> Self {
+    pub fn new(name: SyntaxNodeNameId, range: Range<usize>, children: SyntaxNodeChildren) -> Self {
         if let Some(child_range) = SyntaxNode::get_combined_range(&children) {
             assert!(range.start <= child_range.start && child_range.end <= range.end);
         }

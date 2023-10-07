@@ -1,9 +1,10 @@
 use chumsky::Parser;
 
 use crate::{
-    parser_extensions::just_symbols,
+    parser::pratt_parser::{call_pratt_parser, Strength},
+    parser_extensions::{just_symbol, just_symbols},
     rule_collection::{BoxedTokenParser, RcPrattParserType},
-    syntax_tree::{LeafNodeType, SyntaxNodeBuilder},
+    syntax_tree::{LeafNodeType, SyntaxNodeBuilder, SyntaxNodeChildren, SyntaxNodeNameId},
 };
 
 pub trait MakeParser: 'static {
@@ -87,4 +88,77 @@ pub fn just_operator_parser(operator: impl VecOrString) -> impl MakeParser {
         symbols: operator.into_vec(),
         node_type: LeafNodeType::Operator,
     }
+}
+
+pub fn make_brackets_parser(
+    operator_rule_name: SyntaxNodeNameId,
+    starting_bracket: impl Into<String>,
+    ending_bracket: impl Into<String>,
+) -> impl crate::make_parser::MakeParser {
+    let starting_bracket: String = starting_bracket.into();
+    let ending_bracket: String = ending_bracket.into();
+    crate::make_parser::MakeParserFn(move |parser| {
+        just_symbol(starting_bracket.clone())
+            .map_with_span(|v, span| (v, span.into_range()))
+            .then(call_pratt_parser(parser, (0, Strength::Weak), None))
+            .then(
+                just_symbol(ending_bracket.clone()).map_with_span(|v, span| (v, span.into_range())),
+            )
+            .map(
+                move |(
+                    ((left_bracket, left_bracket_span), child),
+                    (right_bracket, right_bracket_span),
+                )| {
+                    let children = vec![
+                        SyntaxNodeBuilder::new_leaf_node(
+                            vec![left_bracket],
+                            LeafNodeType::Operator,
+                        )
+                        .build(operator_rule_name, left_bracket_span),
+                        child,
+                        SyntaxNodeBuilder::new_leaf_node(
+                            vec![right_bracket],
+                            LeafNodeType::Operator,
+                        )
+                        .build(operator_rule_name, right_bracket_span),
+                    ];
+                    SyntaxNodeBuilder::new(SyntaxNodeChildren::Children(children))
+                },
+            )
+            .boxed()
+    })
+}
+
+pub fn make_empty_brackets_parser(
+    operator_rule_name: SyntaxNodeNameId,
+    starting_bracket: impl Into<String>,
+    ending_bracket: impl Into<String>,
+) -> impl crate::make_parser::MakeParser {
+    let starting_bracket: String = starting_bracket.into();
+    let ending_bracket: String = ending_bracket.into();
+    crate::make_parser::MakeParserFn(move |_| {
+        just_symbol(starting_bracket.clone())
+            .map_with_span(|v, span| (v, span.into_range()))
+            .then(
+                just_symbol(ending_bracket.clone()).map_with_span(|v, span| (v, span.into_range())),
+            )
+            .map(
+                move |((left_bracket, left_bracket_span), (right_bracket, right_bracket_span))| {
+                    let children = vec![
+                        SyntaxNodeBuilder::new_leaf_node(
+                            vec![left_bracket],
+                            LeafNodeType::Operator,
+                        )
+                        .build(operator_rule_name, left_bracket_span),
+                        SyntaxNodeBuilder::new_leaf_node(
+                            vec![right_bracket],
+                            LeafNodeType::Operator,
+                        )
+                        .build(operator_rule_name, right_bracket_span),
+                    ];
+                    SyntaxNodeBuilder::new(SyntaxNodeChildren::Children(children))
+                },
+            )
+            .boxed()
+    })
 }

@@ -1,12 +1,9 @@
-use crate::parser::pratt_parser::{call_pratt_parser, Strength};
-use crate::parser_extensions::just_symbol;
+use crate::make_parser::{just_symbol_parser, make_brackets_parser, make_empty_brackets_parser};
+use crate::parse_module::*;
+use crate::parse_modules::ParseModules;
 
-use crate::syntax_tree::{LeafNodeType, SyntaxNodeBuilder, SyntaxNodeChildren};
-use crate::{
-    autocomplete::AutocompleteRule,
-    rule_collection::{RuleCollection, TokenRule},
-    syntax_tree::PathIdentifier,
-};
+use crate::syntax_tree::{LeafNodeType, SyntaxNodeBuilder};
+use crate::{autocomplete::AutocompleteRule, syntax_tree::PathIdentifier};
 use chumsky::{prelude::*, Parser};
 
 use input_tree::node::InputNode;
@@ -15,84 +12,37 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 use super::built_in_rules::BuiltInRules;
 
 /// Core rules that one basically always wants.
-pub struct CoreRules {}
+pub struct CoreRules {
+    module_name: String,
+    rules: Vec<ParseRule>,
+    autocomplete_rules: Vec<AutocompleteRule>,
+}
 
 impl CoreRules {
+    pub fn new(modules: &mut ParseModules, built_in_rules: &BuiltInRules) -> Self {
+        let rules = Self::get_rules(modules, built_in_rules);
+        let autocomplete_rules = Self::get_autocomplete_rules();
+        Self {
+            module_name: "Core".into(),
+            rules,
+            autocomplete_rules,
+        }
+    }
     fn rule_name(name: &str) -> PathIdentifier {
         PathIdentifier::new(vec!["Core".into(), name.into()])
     }
-
-    pub fn make_brackets_parser(
-        starting_bracket: impl Into<String>,
-        ending_bracket: impl Into<String>,
-    ) -> impl crate::make_parser::MakeParser {
-        let starting_bracket: String = starting_bracket.into();
-        let ending_bracket: String = ending_bracket.into();
-        crate::make_parser::MakeParserFn(move |parser| {
-            just_symbol(starting_bracket.clone())
-                .map_with_span(|v, span| (v, span.into_range()))
-                .then(call_pratt_parser(parser, (0, Strength::Weak), None))
-                .then(
-                    just_symbol(ending_bracket.clone())
-                        .map_with_span(|v, span| (v, span.into_range())),
-                )
-                .map(
-                    |(
-                        ((left_bracket, left_bracket_span), child),
-                        (right_bracket, right_bracket_span),
-                    )| {
-                        let children = vec![
-                            SyntaxNodeBuilder::new_leaf_node(
-                                vec![left_bracket],
-                                LeafNodeType::Operator,
-                            )
-                            .build(BuiltInRules::operator_rule_name(), left_bracket_span),
-                            child,
-                            SyntaxNodeBuilder::new_leaf_node(
-                                vec![right_bracket],
-                                LeafNodeType::Operator,
-                            )
-                            .build(BuiltInRules::operator_rule_name(), right_bracket_span),
-                        ];
-                        SyntaxNodeBuilder::new(SyntaxNodeChildren::Children(children))
-                    },
-                )
-                .boxed()
-        })
+}
+impl ParseModule for CoreRules {
+    fn get_module_name(&self) -> &str {
+        &self.module_name
     }
 
-    pub fn make_empty_brackets_parser(
-        starting_bracket: impl Into<String>,
-        ending_bracket: impl Into<String>,
-    ) -> impl crate::make_parser::MakeParser {
-        let starting_bracket: String = starting_bracket.into();
-        let ending_bracket: String = ending_bracket.into();
-        crate::make_parser::MakeParserFn(move |_| {
-            just_symbol(starting_bracket.clone())
-                .map_with_span(|v, span| (v, span.into_range()))
-                .then(
-                    just_symbol(ending_bracket.clone())
-                        .map_with_span(|v, span| (v, span.into_range())),
-                )
-                .map(
-                    |((left_bracket, left_bracket_span), (right_bracket, right_bracket_span))| {
-                        let children = vec![
-                            SyntaxNodeBuilder::new_leaf_node(
-                                vec![left_bracket],
-                                LeafNodeType::Operator,
-                            )
-                            .build(BuiltInRules::operator_rule_name(), left_bracket_span),
-                            SyntaxNodeBuilder::new_leaf_node(
-                                vec![right_bracket],
-                                LeafNodeType::Operator,
-                            )
-                            .build(BuiltInRules::operator_rule_name(), right_bracket_span),
-                        ];
-                        SyntaxNodeBuilder::new(SyntaxNodeChildren::Children(children))
-                    },
-                )
-                .boxed()
-        })
+    fn get_rules(&self) -> &[ParseRule] {
+        &self.rules
+    }
+
+    fn get_autocomplete_rules(&self) -> &[AutocompleteRule] {
+        &self.autocomplete_rules
     }
 }
 
@@ -106,12 +56,11 @@ fn is_identifier_continue(value: &str) -> bool {
     value.chars().all(is_xid_continue)
 }
 
-impl RuleCollection for CoreRules {
-    fn get_rules() -> Vec<TokenRule> {
+impl CoreRules {
+    fn get_rules(modules: &mut ParseModules, built_in_rules: &BuiltInRules) -> Vec<ParseRule> {
         vec![
-            TokenRule::new(
-                Self::rule_name("Variable"),
-                (None, None),
+            atom_rule(
+                modules.with_rule_name(Self::rule_name("Variable")),
                 crate::make_parser::MakeParserFn(|_| {
                     select! {
                       InputNode::Symbol(a) if is_identifier_start(&a) => a,
@@ -133,16 +82,15 @@ impl RuleCollection for CoreRules {
             ),
             // Amusingly, if someone defines the closing bracket as a postfix operator, it'll break the brackets
             // Brackets
-            TokenRule::new(
-                Self::rule_name("RoundBrackets"),
-                (None, None),
-                Self::make_brackets_parser("(", ")"),
+            atom_rule(
+                modules.with_rule_name(Self::rule_name("RoundBrackets")),
+                make_brackets_parser(built_in_rules.operator_rule_name, "(", ")"),
             ),
-            TokenRule::new(
-                Self::rule_name("RoundBrackets"),
-                (None, None),
-                Self::make_empty_brackets_parser("(", ")"),
+            atom_rule(
+                modules.with_rule_name(Self::rule_name("RoundBrackets")),
+                make_empty_brackets_parser(built_in_rules.operator_rule_name, "(", ")"),
             ),
+            recovery_ending_rule(just_symbol_parser(")")),
         ]
     }
 

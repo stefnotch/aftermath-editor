@@ -28,4 +28,9 @@ Also includes editing logic, such as inserting and deleting characters.
 
 Exported bindings for the web.
 
+A website will create a few shared parse modules, then create parsers from the parse modules, and finally use the parsers for math editors.
+e.g.
+A website can have 5 math editors, 3 of them are using the default parser.
+One is using a parser with an advanced calculus module, and another is using a parser with a logic module.
+
 The `npm run build` command recreates the bindings. It's a tad complex, due to issues [like this one](https://github.com/rustwasm/wasm-pack/issues/642).

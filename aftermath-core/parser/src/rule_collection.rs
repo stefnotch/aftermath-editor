@@ -1,13 +1,9 @@
-use std::collections::HashSet;
-
 use input_tree::node::InputNode;
 
 use crate::{
-    autocomplete::AutocompleteRule,
-    make_parser::MakeParser,
-    parser::pratt_parser::{BindingPower, PrattParser, PrattSymbolParsers, RcOrWeak},
+    parser::pratt_parser::{PrattParser, PrattSymbolParsers, RcOrWeak},
     parser_debug_error::ParserDebugError,
-    syntax_tree::{PathIdentifier, SyntaxNode, SyntaxNodeBuilder},
+    syntax_tree::{SyntaxNode, SyntaxNodeBuilder},
 };
 
 pub type ParserInput<'a> = &'a [InputNode];
@@ -52,70 +48,3 @@ pub type PrattParserType<'a, 'b> = PrattParser<
 >;
 
 pub type RcPrattParserType<'a, 'b> = RcOrWeak<PrattParserType<'a, 'b>>;
-
-pub struct TokenRule {
-    pub name: PathIdentifier,
-    pub binding_power: Option<BindingPower>,
-
-    /// Parser for the token. Is greedy, as in the longest one that matches will win.
-    /// This is needed for ">=" instead of ">" and "=".
-    /// If the match isn't what the user intended, the user can use spaces to separate the tokens.
-    /// Tokens can also be escaped using a backslash \.
-    /// \x basically means "this has a very specific meaning", such as \| always being a | symbol, and \sum always being a sum symbol.
-    /// The parser is a recursive parser, which can be used to parse nested expressions.
-    pub make_parser: Box<dyn MakeParser>,
-    // Maybe introduce a concept of "priority"
-    // When two things match, the one with the highest priority wins
-    // e.g. "lim" and "variable parser" both match "lim"
-    //
-    // We roughly model this by:
-    // 1. Insert parse collections in order.
-    // 2. Do a choice backwards. Later parse collections take priority.
-    // This is somewhat different from what we used to have. The
-    // previous logic did "apply all parsers, do greedy" followed by
-    // "do parser priority".
-}
-
-impl TokenRule {
-    pub fn new(
-        name: PathIdentifier,
-        binding_power: (Option<u16>, Option<u16>),
-        make_parser: impl MakeParser + 'static,
-    ) -> Self {
-        let binding_power = match binding_power {
-            (None, None) => None,
-            (None, Some(a)) => Some(BindingPower::Prefix(a)),
-            (Some(a), None) => Some(BindingPower::Postfix(a)),
-            (Some(a), Some(b)) => {
-                if a <= b {
-                    Some(BindingPower::LeftInfix(a))
-                } else {
-                    Some(BindingPower::RightInfix(b))
-                }
-            }
-        };
-        Self {
-            name,
-            binding_power,
-            make_parser: Box::new(make_parser),
-        }
-    }
-}
-
-pub trait RuleCollection {
-    /// Later rules take priority.
-    fn get_rules() -> Vec<TokenRule>;
-    fn get_autocomplete_rules() -> Vec<AutocompleteRule>;
-    fn get_extra_rule_names() -> Vec<PathIdentifier> {
-        vec![]
-    }
-}
-
-pub fn get_rule_names<T: RuleCollection>(_rule_collection: T) -> HashSet<PathIdentifier> {
-    let mut rules_names = T::get_rules()
-        .into_iter()
-        .map(|v| v.name)
-        .collect::<HashSet<_>>();
-    rules_names.extend(T::get_extra_rule_names());
-    rules_names
-}

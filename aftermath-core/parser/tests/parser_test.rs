@@ -1,40 +1,59 @@
+use std::rc::Rc;
+
 use input_tree::{input_row, node::InputNode, row::InputRow};
 use parser::{
-    parser::ParserBuilder,
+    parse_modules::{ParseModuleCollection, ParseModules},
     rule_collections::{
         arithmetic_rules::ArithmeticRules, built_in_rules::BuiltInRules,
         calculus_rules::CalculusRules, collections_rules::CollectionsRules,
         comparison_rules::ComparisonRules, core_rules::CoreRules, function_rules::FunctionRules,
         logic_rules::LogicRules, string_rules::StringRules,
     },
+    syntax_tree::SyntaxNode,
 };
 
-fn create_parser() -> parser::parser::MathParser {
-    let builder = ParserBuilder::new()
-        .add_rule_collection::<BuiltInRules>()
-        .add_rule_collection::<CoreRules>()
-        .add_rule_collection::<ArithmeticRules>()
-        .add_rule_collection::<CalculusRules>()
-        .add_rule_collection::<CollectionsRules>()
-        .add_rule_collection::<ComparisonRules>()
-        .add_rule_collection::<FunctionRules>()
-        .add_rule_collection::<LogicRules>()
-        .add_rule_collection::<StringRules>();
-    
-    builder.build()
+fn create_parser() -> (parser::parser::MathParser, ParseModules) {
+    let mut modules = ParseModules::new();
+    let built_in = Rc::new(BuiltInRules::new(&mut modules));
+    let core = Rc::new(CoreRules::new(&mut modules, &built_in));
+    let arithmetic = Rc::new(ArithmeticRules::new(&mut modules));
+    let calculus = Rc::new(CalculusRules::new(&mut modules));
+    let collections = Rc::new(CollectionsRules::new(&mut modules));
+    let comparison = Rc::new(ComparisonRules::new(&mut modules));
+    let function = Rc::new(FunctionRules::new(&mut modules, &built_in));
+    let logic = Rc::new(LogicRules::new(&mut modules));
+    let string = Rc::new(StringRules::new(&mut modules));
+
+    let module_collection = ParseModuleCollection::new(
+        built_in.clone(),
+        vec![
+            built_in,
+            core,
+            arithmetic,
+            calculus,
+            collections,
+            comparison,
+            function,
+            logic,
+            string,
+        ],
+    );
+    (parser::parser::MathParser::new(module_collection), modules)
 }
 
-fn parse_row(row: &InputRow) -> parser::syntax_tree::SyntaxNode {
-    create_parser().parse(&row.values)
+fn parse_row(row: &InputRow) -> (SyntaxNode, ParseModules) {
+    let (parser, modules) = create_parser();
+    let parsed = parser.parse(&row.values);
+    (parsed, modules)
 }
 
 #[test]
 fn test_parser() {
     let layout = input_row! {(row "-", "b", "*", "C")};
-    let parsed = parse_row(&layout);
+    let (parsed, modules) = parse_row(&layout);
 
     assert_eq!(
-        parsed.to_string(),
+        parsed.with_display(modules.get_rule_name_map()).to_string(),
         r#"(Arithmetic::Multiply (Arithmetic::Subtract (BuiltIn::Operator "-") (Core::Variable "b")) (BuiltIn::Operator "*") (Core::Variable "C"))"#
     );
 }
@@ -47,9 +66,9 @@ fn test_postfix() {
         InputNode::symbol("a"),
         InputNode::symbol("!"),
     ]);
-    let parsed = parse_row(&layout);
+    let (parsed, modules) = parse_row(&layout);
     assert_eq!(
-        parsed.to_string(),
+        parsed.with_display(modules.get_rule_name_map()).to_string(),
         r#"(Arithmetic::Add (Core::Variable "c") (BuiltIn::Operator "+") (Arithmetic::Factorial (Core::Variable "a") (BuiltIn::Operator "!")))"#
     );
 }
@@ -61,9 +80,9 @@ fn test_sub() {
         InputNode::sub(InputRow::new(vec![InputNode::symbol("1")])),
     ]);
 
-    let parsed = parse_row(&layout);
+    let (parsed, modules) = parse_row(&layout);
     assert_eq!(
-        parsed.to_string(),
+        parsed.with_display(modules.get_rule_name_map()).to_string(),
         r#"(BuiltIn::Sub (Core::Variable "a") (BuiltIn::Row 1x1 (Arithmetic::Number "1")))"#
     );
 }
@@ -76,9 +95,9 @@ fn test_sup_sub() {
         InputNode::sub(InputRow::new(vec![InputNode::symbol("2")])),
     ]);
 
-    let parsed = parse_row(&layout);
+    let (parsed, modules) = parse_row(&layout);
     assert_eq!(
-        parsed.to_string(),
+        parsed.with_display(modules.get_rule_name_map()).to_string(),
         format!(
             "{}{}{}",
             r#"(BuiltIn::Sub "#,
@@ -101,9 +120,9 @@ fn test_parser_nested_brackets_and_postfix() {
         InputNode::symbol(")"),
     ]);
 
-    let parsed = parse_row(&layout);
+    let (parsed, modules) = parse_row(&layout);
     assert_eq!(
-        parsed.to_string(),
+        parsed.with_display(modules.get_rule_name_map()).to_string(),
         format!(
             "{}{}{}",
             r#"(Core::RoundBrackets (BuiltIn::Operator "(") (Core::RoundBrackets (BuiltIn::Operator "(") (Core::RoundBrackets (BuiltIn::Operator "(") "#,
@@ -121,9 +140,9 @@ fn test_parser_tuple() {
         InputNode::symbol("b"),
     ]);
 
-    let parsed = parse_row(&layout);
+    let (parsed, modules) = parse_row(&layout);
     assert_eq!(
-        parsed.to_string(),
+        parsed.with_display(modules.get_rule_name_map()).to_string(),
         r#"(Collection::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b"))"#
     );
 }
@@ -140,9 +159,9 @@ fn test_parser_tuple_advanced() {
         InputNode::symbol(")"),
     ]);
 
-    let parsed = parse_row(&layout);
+    let (parsed, modules) = parse_row(&layout);
     assert_eq!(
-        parsed.to_string(),
+        parsed.with_display(modules.get_rule_name_map()).to_string(),
         format!(
             "{}{}{}",
             r#"(Core::RoundBrackets (BuiltIn::Operator "(") "#,
@@ -163,9 +182,9 @@ fn test_parser_function_call() {
         InputNode::symbol(")"),
     ]);
 
-    let parsed = parse_row(&layout);
+    let (parsed, modules) = parse_row(&layout);
     assert_eq!(
-        parsed.to_string(),
+        parsed.with_display(modules.get_rule_name_map()).to_string(),
         format!(
             "{}{}{}",
             r#"(Function::FunctionApplication (Core::Variable "f") (BuiltIn::Argument (BuiltIn::Operator "(") ("#,
@@ -185,10 +204,10 @@ fn test_parser_brackets_with_addition() {
         InputNode::symbol(")"),
     ]);
 
-    let parsed = parse_row(&layout);
+    let (parsed, modules) = parse_row(&layout);
 
     assert_eq!(
-        parsed.to_string(),
+        parsed.with_display(modules.get_rule_name_map()).to_string(),
         r#"(Core::RoundBrackets (BuiltIn::Operator "(") (Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (Core::Variable "b")) (BuiltIn::Operator ")"))"#
     );
 }
@@ -206,10 +225,10 @@ fn test_parser_fraction() {
         InputNode::symbol(")"),
     ]);
 
-    let parsed = parse_row(&layout);
+    let (parsed, modules) = parse_row(&layout);
 
     assert_eq!(
-        parsed.to_string(),
+        parsed.with_display(modules.get_rule_name_map()).to_string(),
         r#"(Core::RoundBrackets (BuiltIn::Operator "(") (Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (BuiltIn::Fraction 1x2 (Core::Variable "b") (Core::Variable "c"))) (BuiltIn::Operator ")"))"#
     );
 }
@@ -218,9 +237,12 @@ fn test_parser_fraction() {
 fn test_parser_empty_input() {
     let layout = InputRow::new(vec![]);
 
-    let parsed = parse_row(&layout);
+    let (parsed, modules) = parse_row(&layout);
     // "Nothing" is taken from https://cortexjs.io/compute-engine/reference/core/
-    assert_eq!(parsed.to_string(), "(Error::MissingToken)");
+    assert_eq!(
+        parsed.with_display(modules.get_rule_name_map()).to_string(),
+        "(Error::MissingToken)"
+    );
 }
 
 #[test]
@@ -232,9 +254,9 @@ fn test_parser_empty_squareroot() {
         InputRow::new(vec![InputNode::symbol("a")]),
     ])]);
 
-    let parsed = parse_row(&layout);
+    let (parsed, modules) = parse_row(&layout);
     assert_eq!(
-        parsed.to_string(),
+        parsed.with_display(modules.get_rule_name_map()).to_string(),
         r#"(BuiltIn::Root 2x1 (Error::MissingToken) (Core::Variable "a"))"#
     );
 }
@@ -242,9 +264,9 @@ fn test_parser_empty_squareroot() {
 #[test]
 fn test_parser_empty_brackets() {
     let layout = input_row! {(row "a", "+", "(", ")")};
-    let parsed = parse_row(&layout);
+    let (parsed, modules) = parse_row(&layout);
     assert_eq!(
-        parsed.to_string(),
+        parsed.with_display(modules.get_rule_name_map()).to_string(),
         r#"(Arithmetic::Add (Core::Variable "a") (BuiltIn::Operator "+") (Core::RoundBrackets (BuiltIn::Operator "(") (BuiltIn::Operator ")")))"#
     );
 }

@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use caret::{
     autocomplete::AutocompleteResults,
     math_editor::{MathEditor, SerializedDataType},
@@ -10,9 +8,11 @@ use input_tree::{
     focus::{MinimalInputRowPosition, MinimalInputRowRange},
     node::InputNode,
 };
-use parser::{autocomplete::AutocompleteRule, parser::ParserBuilder};
+use parser::autocomplete::AutocompleteRule;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
+
+use crate::math_parser::MathParserBindings;
 
 #[wasm_bindgen]
 pub struct MathEditorBindings {
@@ -23,10 +23,10 @@ pub struct MathEditorBindings {
 #[wasm_bindgen]
 impl MathEditorBindings {
     #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
+    pub fn new(parser: &MathParserBindings) -> Self {
         Self {
             // Hardcoded parser rules for now
-            editor: MathEditor::new(Rc::new(ParserBuilder::new().add_default_rules().build())),
+            editor: MathEditor::new(parser.get_parser()),
             // Do note that large numbers won't be serialized correctly, because JS doesn't have 64 bit integers.
             serializer: serde_wasm_bindgen::Serializer::new(),
         }
@@ -136,11 +136,6 @@ impl MathEditorBindings {
         let values: Vec<InputNode> = serde_wasm_bindgen::from_value(values)?;
         self.editor.splice_at_range(range, values);
         Ok(())
-    }
-
-    pub fn get_rule_names(&self) -> Result<JsValue, JsValue> {
-        let result = self.editor.get_rule_names().serialize(&self.serializer)?;
-        Ok(result)
     }
 }
 
