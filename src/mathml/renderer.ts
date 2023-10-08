@@ -1,10 +1,4 @@
-import {
-  type NodeIdentifier,
-  type NodeIdentifierJoined,
-  type SyntaxNode,
-  hasSyntaxNodeChildren,
-  joinNodeIdentifier,
-} from "../core";
+import { type PathIdentifier, type SyntaxNode, hasSyntaxNodeChildren, type SyntaxNodeNameId } from "../core";
 import type { RowIndex } from "../input-tree/row-indices";
 import type {
   RenderedElement,
@@ -24,9 +18,16 @@ import { SymbolMathMLElement } from "./renderer/rendered-symbol-element";
 import { TableMathMLElement } from "./renderer/rendered-table-element";
 import { TextMathMLElement } from "./renderer/rendered-text-element";
 
+export type PathIdentifierJoined = string;
+export function joinPathIdentifier(path: PathIdentifier): PathIdentifierJoined {
+  return path.join("::");
+}
+
+export type NameMap = ReadonlyMap<PathIdentifierJoined, SyntaxNodeNameId>;
+
 export class MathMLRenderer implements Renderer<MathMLElement> {
   private readonly renderers: Map<
-    NodeIdentifierJoined,
+    SyntaxNodeNameId,
     (
       syntaxTree: SyntaxNode,
       rowIndex: RowIndex | null,
@@ -34,7 +35,10 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
     ) => RenderedElement<MathMLElement>
   > = new Map();
 
-  constructor() {
+  private readonly nameMap: NameMap;
+
+  constructor(nameMap: NameMap) {
+    this.nameMap = nameMap;
     // TODO:
     // If it's a square root, make the 2 a bit lighter?
     // sub, sup without a base element - create a placeholder
@@ -145,9 +149,13 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
         return new TextMathMLElement(syntaxTree, rowIndex, "mi");
       });
-      calculus.add(["Lim", "LimSup", "LimInf", "Integral", "Sum"], (syntaxTree, rowIndex) => {
+      calculus.add(["Lim", "LimSup", "LimInf"], (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
         return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
+      });
+      calculus.add(["Integral", "Sum"], (syntaxTree, rowIndex) => {
+        assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
+        return new TextMathMLElement(syntaxTree, rowIndex, "mn");
       });
     }
     {
@@ -161,7 +169,7 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
       );
     }
     {
-      const collection = this.rendererCollection("Collection");
+      const collection = this.rendererCollection("Collections");
       collection.add("Tuple", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
         return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
@@ -192,6 +200,10 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
         return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });
     }
+
+    this.nameMap.forEach((name, path) => {
+      assert(this.renderers.get(name), `Renderer for ${path} (ID ${name}) is missing`);
+    });
   }
 
   /**
@@ -201,21 +213,30 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
     const self = this;
 
     function addRenderer(
-      nameFull: NodeIdentifier,
+      nameFull: PathIdentifier,
       renderer: (
         syntaxTree: SyntaxNode,
         rowIndex: RowIndex | null,
         options: Partial<ImmediateRenderingOptions>
       ) => RenderedElement<MathMLElement>
     ): void {
-      let name = joinNodeIdentifier(nameFull);
+      let name = self.nameMap.get(joinPathIdentifier(nameFull));
+      if (name === undefined) {
+        console.warn(
+          `${joinPathIdentifier(
+            nameFull
+          )} is missing a name ID, this usually happens when a renderer is defined, but the parser cannot generate it.`
+        );
+        return;
+      }
+
       assert(!self.renderers.has(name), `Renderer for ${name} already exists`);
 
       if (import.meta.env.DEV) {
         self.renderers.set(name, (syntaxTree, rowIndex, options) => {
           const rendered = renderer(syntaxTree, rowIndex, options);
           rendered.getElements().forEach((v) => {
-            v.setAttribute("data-renderer-name", name);
+            v.setAttribute("data-renderer-name", joinPathIdentifier(nameFull));
           });
           return rendered;
         });
@@ -250,10 +271,6 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
     return renderCollectionInternal([namePart]);
   }
 
-  canRender(nodeIdentifier: NodeIdentifier): boolean {
-    return this.renderers.has(joinNodeIdentifier(nodeIdentifier));
-  }
-
   // TODO: Rendering errors is like rendering non-semantic annotations
   renderAll(parsed: ParseResult): RenderResult<MathMLElement> {
     const element = this.render(parsed.value, null);
@@ -265,8 +282,8 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
     rowIndex: RowIndex | null,
     options: Partial<ImmediateRenderingOptions> = {}
   ): RenderedElement<MathMLElement> {
-    const renderer = this.renderers.get(joinNodeIdentifier(syntaxTree.name));
-    assert(renderer, `No renderer for "${joinNodeIdentifier(syntaxTree.name)}"`);
+    const renderer = this.renderers.get(syntaxTree.name);
+    assert(renderer, `No renderer for "${syntaxTree.name}"`);
 
     const element = renderer(syntaxTree, rowIndex, options);
     return element;

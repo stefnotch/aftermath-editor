@@ -7,12 +7,13 @@ import inputHandlerStyles from "./input/input-handler-style.css?inline";
 import autocompleteStyles from "./autocomplete/autocomplete-styles.css?inline";
 import { InputHandlerElement } from "./input/input-handler-element";
 import { RowIndices } from "../input-tree/row-indices";
-import { MathMLRenderer } from "../mathml/renderer";
+import { MathMLRenderer, joinPathIdentifier } from "../mathml/renderer";
 import type { RenderResult, RenderedElement } from "../rendering/render-result";
 import {
-  joinNodeIdentifier,
+  DefaultParser,
   MathEditorBindings,
   MathEditorHelper,
+  ModulesCreator,
   type MinimalInputRowPosition,
   type SyntaxNode,
 } from "./../core";
@@ -69,7 +70,7 @@ export class MathEditor extends HTMLElement {
       },
       tabIndex: 0,
     });
-    this.mathEditor = new MathEditorBindings();
+    this.mathEditor = new MathEditorBindings(DefaultParser);
 
     this.caretsContainer = createNode("div", {
       style: {
@@ -122,10 +123,9 @@ export class MathEditor extends HTMLElement {
     inputContainer.appendChild(this.autocomplete.element);
 
     // Rendering
-    this.renderer = new MathMLRenderer();
-    MathEditorHelper.getRuleNames(this.mathEditor).forEach((name) => {
-      assert(this.renderer.canRender(name), "Cannot render " + joinNodeIdentifier(name) + ".");
-    });
+    this.renderer = new MathMLRenderer(
+      new Map(Array.from(ModulesCreator.get_syntax_node_name_map().values, ([k, v]) => [joinPathIdentifier(k), v]))
+    );
 
     this.syntaxTree = MathEditorHelper.getSyntaxTree(this.mathEditor);
     this.renderResult = this.renderer.renderAll({

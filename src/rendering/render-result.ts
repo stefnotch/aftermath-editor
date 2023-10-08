@@ -1,4 +1,4 @@
-import type { NodeIdentifier, SyntaxNode } from "../core";
+import type { SyntaxNode } from "../core";
 import type { Offset } from "../input-tree/input-offset";
 import { type RowIndex, RowIndices } from "../input-tree/row-indices";
 import { RenderedSelection } from "./rendered-selection";
@@ -12,8 +12,6 @@ export interface ImmediateRenderingOptions {
 }
 
 export interface Renderer<T> {
-  canRender(syntaxTreeNames: NodeIdentifier): boolean;
-
   renderAll(parsed: ParseResult): RenderResult<T>;
 
   render(syntaxTree: SyntaxNode, rowIndex: RowIndex | null, options?: Partial<ImmediateRenderingOptions>): RenderedElement<T>;

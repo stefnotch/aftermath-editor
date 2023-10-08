@@ -3,7 +3,6 @@ import init, {
   type InputNode,
   type MinimalCaretSelection,
   type MinimalInputRowRange,
-  type NodeIdentifier,
   type SyntaxNode,
   type SyntaxNodeChildren,
   type InputRow,
@@ -11,11 +10,38 @@ import init, {
   type RowIndices,
   type SerializedDataType,
   type AutocompleteResultsBindings,
+  ParseModulesBindings,
+  BoxedParseModule,
+  ParseModuleCollectionBindings,
+  MathParserBindings,
+  ParseModulesCreator,
 } from "../../aftermath-core/pkg";
 import { assert } from "../utils/assert";
 
 // Yay, top level await is neat https://v8.dev/features/top-level-await
 await init();
+
+export const ModulesCreator = new ParseModulesBindings();
+
+// create all the modules
+export const MathModules = {
+  BuiltIn: ModulesCreator.get_built_in(),
+  Arithmetic: ParseModulesCreator.make_arithmetic(ModulesCreator),
+  Calculus: ParseModulesCreator.make_calculus(ModulesCreator),
+  Collections: ParseModulesCreator.make_collections(ModulesCreator),
+  Comparison: ParseModulesCreator.make_comparison(ModulesCreator),
+  Function: ParseModulesCreator.make_function(ModulesCreator),
+  Logic: ParseModulesCreator.make_logic(ModulesCreator),
+  String: ParseModulesCreator.make_string(ModulesCreator),
+};
+
+export function makeMathParserWith(modules: BoxedParseModule[]) {
+  const collection = new ParseModuleCollectionBindings(ModulesCreator);
+  for (let module of modules) {
+    collection.add_module(module);
+  }
+  return new MathParserBindings(collection);
+}
 
 export const MathEditorHelper = {
   insertAtCaret(mathEditor: MathEditorBindings, values: string[]) {
@@ -39,10 +65,19 @@ export const MathEditorHelper = {
   spliceAtRange(mathEditor: MathEditorBindings, range: MinimalInputRowRange, values: InputNode[]) {
     return mathEditor.splice_at_range(range, values);
   },
-  getRuleNames(mathEditor: MathEditorBindings): NodeIdentifier[] {
-    return mathEditor.get_rule_names();
-  },
 };
+
+// TODO: Make this configurable
+export const DefaultParser = makeMathParserWith([
+  // MathModules.BuiltIn is already included
+  MathModules.Arithmetic,
+  MathModules.Calculus,
+  MathModules.Collections,
+  MathModules.Comparison,
+  MathModules.Function,
+  MathModules.Logic,
+  MathModules.String,
+]);
 
 export function isInputRow(value: InputRow | InputNode | (InputRow | InputNode)[]): value is InputRow {
   if (!Array.isArray(value) && "values" in value) {
@@ -79,12 +114,6 @@ export function offsetInRange(
 
 export * from "../../aftermath-core/pkg";
 
-// TODO: I want tuples and records for this https://github.com/tc39/proposal-record-tuple
-export type NodeIdentifierJoined = string;
-export function joinNodeIdentifier(nodeIdentifier: NodeIdentifier): NodeIdentifierJoined {
-  return nodeIdentifier.join("::");
-}
-
 /**
  * Walks down the syntax tree to find the node with the given row indices.
  */
@@ -100,7 +129,7 @@ export function getNodeWithRowIndices(node: SyntaxNode, indices: RowIndices) {
     } else {
       assert(false, "Expected to find NewRows");
     }
-    assert(rowChildElement, `Couldn't find row ${indexOfRow} in ${joinNodeIdentifier(node.name)}`);
+    assert(rowChildElement, `Couldn't find row ${indexOfRow} in ${node.name}`);
     node = rowChildElement;
   }
 

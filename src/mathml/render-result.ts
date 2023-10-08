@@ -1,4 +1,4 @@
-import { hasSyntaxNodeChildren, joinNodeIdentifier } from "../core";
+import { hasSyntaxNodeChildren } from "../core";
 import type { Offset } from "../input-tree/input-offset";
 import { RowIndices } from "../input-tree/row-indices";
 import type { RenderResult, RenderedElement, RowIndicesAndOffset, RowIndicesAndRange } from "../rendering/render-result";
@@ -95,7 +95,7 @@ export class MathMLRenderResult implements RenderResult<MathMLElement> {
 
       const childElement = getChildWithContainerIndex(element, indexOfContainer);
       const rowChildElement = childElement.getChildren().find((c) => c.rowIndex?.[1] === indexOfRow);
-      assert(rowChildElement, `Couldn't find row ${indexOfRow} in ${joinNodeIdentifier(childElement.syntaxTree.name)}`);
+      assert(rowChildElement, `Couldn't find row ${indexOfRow} in ${childElement.syntaxTree.name}`);
       element = rowChildElement;
     }
     return element;
