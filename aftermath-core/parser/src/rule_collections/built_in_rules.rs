@@ -19,12 +19,8 @@ pub struct BuiltInRules {
     rules: Vec<ParseRule>,
     autocomplete_rules: Vec<AutocompleteRule>,
     /// Whenever a syntax tree has an operator, this can be used to wrap the operator leaf.
+    /// Do note that some operators are relevant for the AST, such as a "function call" being an operator with arguments.
     pub operator_rule_name: SyntaxNodeNameId,
-    /// Whenever a syntax tree has an new row, this will be used.
-    pub new_row_rule_name: SyntaxNodeNameId,
-    /// Whenever an operator has one or more arguments, this can be used.
-    /// For example, a function call uses this.
-    pub argument_rule_name: SyntaxNodeNameId,
     /// Can have Whitespace nodes at the start and/or end.
     whitespaces_rule_name: SyntaxNodeNameId,
     /// Whenever we encounter a space between tokens, this will be used.
@@ -43,8 +39,6 @@ pub struct BuiltInRules {
 impl BuiltInRules {
     pub fn new(modules: &mut ParseModules) -> Self {
         let operator_rule_name = modules.with_rule_name(BuiltInRules::rule_name("Operator"));
-        let new_row_rule_name = modules.with_rule_name(BuiltInRules::rule_name("Row"));
-        let argument_rule_name = modules.with_rule_name(BuiltInRules::rule_name("Argument"));
         let whitespaces_rule_name = modules.with_rule_name(BuiltInRules::rule_name("Whitespaces"));
         let whitespace_rule_name = modules.with_rule_name(BuiltInRules::rule_name("Whitespace"));
         let sub_rule_name = modules.with_rule_name(BuiltInRules::rule_name("Sub"));
@@ -64,8 +58,6 @@ impl BuiltInRules {
             rules,
             autocomplete_rules,
             operator_rule_name,
-            new_row_rule_name,
-            argument_rule_name,
             whitespaces_rule_name,
             whitespace_rule_name,
             sub_rule_name,
@@ -226,8 +218,6 @@ impl BuiltInRules {
     fn make_rules(&self, modules: &mut ParseModules) -> Vec<ParseRule> {
         vec![
             name_only_rule(self.operator_rule_name),
-            name_only_rule(self.new_row_rule_name),
-            name_only_rule(self.argument_rule_name),
             name_only_rule(self.whitespaces_rule_name),
             name_only_rule(self.whitespace_rule_name),
             name_only_rule(self.error_missing_operator_name),

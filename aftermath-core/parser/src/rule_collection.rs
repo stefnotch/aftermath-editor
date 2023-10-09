@@ -1,9 +1,11 @@
 use input_tree::node::InputNode;
 
 use crate::{
-    parser::pratt_parser::{PrattParser, PrattSymbolParsers, RcOrWeak},
+    parser::pratt_parser::{
+        InfixBuilder, PostfixBuilder, PrattParser, PrattSymbolParsers, PrefixBuilder, RcOrWeak,
+    },
     parser_debug_error::ParserDebugError,
-    syntax_tree::{SyntaxNode, SyntaxNodeBuilder},
+    syntax_tree::{SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren, SyntaxNodeNameId},
 };
 
 pub type ParserInput<'a> = &'a [InputNode];
@@ -42,9 +44,60 @@ pub type PrattParserType<'a, 'b> = PrattParser<
         BoxedNodeParser<'a, 'b>,
         BoxedNodeParser<'a, 'b>,
         BoxedNothingParser<'a, 'b>,
-        SyntaxNode,
+        InfixBuilderImpl,
+        PrefixBuilderImpl,
+        PostfixBuilderImpl,
         SyntaxNode,
     >,
 >;
 
 pub type RcPrattParserType<'a, 'b> = RcOrWeak<PrattParserType<'a, 'b>>;
+
+pub struct InfixBuilderImpl {
+    pub name: SyntaxNodeNameId,
+}
+
+impl InfixBuilder<SyntaxNode, SyntaxNode> for InfixBuilderImpl {
+    fn build(&self, op: SyntaxNode, children: (SyntaxNode, SyntaxNode)) -> SyntaxNode {
+        let (left, right) = children;
+        SyntaxNode::new(
+            self.name,
+            combine_ranges(left.range(), combine_ranges(op.range(), right.range())),
+            SyntaxNodeChildren::Children(vec![left, op, right]),
+        )
+    }
+}
+
+pub struct PrefixBuilderImpl {
+    pub name: SyntaxNodeNameId,
+}
+
+impl PrefixBuilder<SyntaxNode, SyntaxNode> for PrefixBuilderImpl {
+    fn build(&self, op: SyntaxNode, right: SyntaxNode) -> SyntaxNode {
+        SyntaxNode::new(
+            self.name,
+            combine_ranges(op.range(), right.range()),
+            SyntaxNodeChildren::Children(vec![op, right]),
+        )
+    }
+}
+
+pub struct PostfixBuilderImpl {
+    pub name: SyntaxNodeNameId,
+}
+
+impl PostfixBuilder<SyntaxNode, SyntaxNode> for PostfixBuilderImpl {
+    fn build(&self, op: SyntaxNode, left: SyntaxNode) -> SyntaxNode {
+        SyntaxNode::new(
+            self.name,
+            combine_ranges(left.range(), op.range()),
+            SyntaxNodeChildren::Children(vec![left, op]),
+        )
+    }
+}
+
+fn combine_ranges(a: std::ops::Range<usize>, b: std::ops::Range<usize>) -> std::ops::Range<usize> {
+    let start = a.start.min(b.start);
+    let end = a.end.max(b.end);
+    start..end
+}

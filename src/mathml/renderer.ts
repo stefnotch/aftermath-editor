@@ -154,6 +154,7 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
         return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });
       calculus.add(["Integral", "Sum"], (syntaxTree, rowIndex) => {
+        console.error(syntaxTree);
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
         return new TextMathMLElement(syntaxTree, rowIndex, "mn");
       });

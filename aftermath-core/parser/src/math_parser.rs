@@ -8,10 +8,13 @@ use crate::{
     parse_module::ParseRule,
     parse_modules::ParseModuleCollection,
     parser::pratt_parser::{
-        self, pratt_parse_recursive, BindingPower, PrattParseErrorHandler, PrattParser,
+        self, pratt_parse_recursive, BindingPower, PostfixBuilder, PrattParseErrorHandler,
+        PrattParser,
     },
-    rule_collection::{BasicParserExtra, ParserInput},
-    syntax_tree::{SyntaxNode, SyntaxNodeBuilder, SyntaxNodeChildren},
+    rule_collection::{
+        BasicParserExtra, InfixBuilderImpl, ParserInput, PostfixBuilderImpl, PrefixBuilderImpl,
+    },
+    syntax_tree::{SyntaxNode, SyntaxNodeBuilder},
 };
 
 pub struct CachedMathParser {
@@ -36,54 +39,7 @@ impl Cached for CachedMathParser {
     fn make_parser<'src>(self) -> Self::Parser<'src> {
         pratt_parse_recursive(move |pratt| {
             let built_in_rules = self.parse_modules.get_built_in().clone();
-            let with_operator_name = {
-                let new_row_rule_name = built_in_rules.new_row_rule_name.clone();
-                let argument_rule_name = built_in_rules.argument_rule_name.clone();
-                let operator_rule_name = built_in_rules.operator_rule_name.clone();
-                Rc::new(move |mut op: SyntaxNode| {
-                    match &op.children {
-                        SyntaxNodeChildren::NewRows(_) => op.name = new_row_rule_name,
-                        SyntaxNodeChildren::Children(_) => op.name = argument_rule_name,
-                        SyntaxNodeChildren::Leaf(_) => op.name = operator_rule_name,
-                    }
-                    op
-                })
-            };
-            let build_prefix_syntax_node = {
-                let with_operator_name = with_operator_name.clone();
-                Rc::new(move |op: SyntaxNode, rhs: SyntaxNode| {
-                    SyntaxNode::new(
-                        op.name.clone(),
-                        combine_ranges(op.range(), rhs.range()),
-                        SyntaxNodeChildren::Children(vec![(with_operator_name.clone())(op), rhs]),
-                    )
-                })
-            };
-            let build_postfix_syntax_node = {
-                let with_operator_name = with_operator_name.clone();
-                Rc::new(move |op: SyntaxNode, lhs: SyntaxNode| {
-                    SyntaxNode::new(
-                        op.name.clone(),
-                        combine_ranges(lhs.range(), op.range()),
-                        SyntaxNodeChildren::Children(vec![lhs, (with_operator_name.clone())(op)]),
-                    )
-                })
-            };
-            let build_infix_syntax_node = {
-                let with_operator_name = with_operator_name.clone();
-                Rc::new(move |op: SyntaxNode, children: (SyntaxNode, SyntaxNode)| {
-                    let (lhs, rhs) = children;
-                    SyntaxNode::new(
-                        op.name.clone(),
-                        combine_ranges(lhs.range(), combine_ranges(op.range(), rhs.range())),
-                        SyntaxNodeChildren::Children(vec![
-                            lhs,
-                            (with_operator_name.clone())(op),
-                            rhs,
-                        ]),
-                    )
-                })
-            };
+            let operator_rule_name = built_in_rules.operator_rule_name;
 
             // For whitespace handling, we'll extend every parser to accept whitespaces around it.
             // And then input that info into the syntax tree.
@@ -128,34 +84,37 @@ impl Cached for CachedMathParser {
                 // Okay, so to move something into the closure
                 // I first had to create a copy here
                 // And then had to create a copy inside the closure
-                let rule_name = match rule {
-                    ParseRule::Atom(name, _)
-                    | ParseRule::Prefix(name, _, _)
-                    | ParseRule::LeftInfix(name, _, _)
-                    | ParseRule::RightInfix(name, _, _)
-                    | ParseRule::Postfix(name, _, _) => name,
-                    ParseRule::NameOnly(_) => unreachable!(),
-                    ParseRule::RecoveryEnding(_) => unreachable!(),
-                }
-                .clone();
 
-                let make_parser = match rule {
-                    ParseRule::Atom(_, make_parser)
-                    | ParseRule::Prefix(_, _, make_parser)
-                    | ParseRule::LeftInfix(_, _, make_parser)
-                    | ParseRule::RightInfix(_, _, make_parser)
-                    | ParseRule::Postfix(_, _, make_parser) => make_parser,
-                    ParseRule::NameOnly(_) => unreachable!(),
-                    ParseRule::RecoveryEnding(_) => unreachable!(),
-                };
+                let basic_parser =
+                    {
+                        let make_parser = match rule {
+                            ParseRule::Atom(_, make_parser)
+                            | ParseRule::Prefix(_, _, make_parser)
+                            | ParseRule::LeftInfix(_, _, make_parser)
+                            | ParseRule::RightInfix(_, _, make_parser)
+                            | ParseRule::Postfix(_, _, make_parser) => make_parser,
+                            ParseRule::NameOnly(_) => unreachable!(),
+                            ParseRule::RecoveryEnding(_) => unreachable!(),
+                        };
+                        let rule_name = match rule {
+                            ParseRule::Atom(rule_name, _) => *rule_name,
+                            ParseRule::Prefix(_, _, _)
+                            | ParseRule::LeftInfix(_, _, _)
+                            | ParseRule::RightInfix(_, _, _)
+                            | ParseRule::Postfix(_, _, _) => operator_rule_name,
+                            ParseRule::NameOnly(_) => unreachable!(),
+                            ParseRule::RecoveryEnding(_) => unreachable!(),
+                        };
+                        make_parser.build(pratt.clone()).map_with_span(
+                            move |v, range: SimpleSpan| v.build(rule_name, range.into_range()),
+                        )
+                    };
 
                 // This parses the basic tokens with spaces around them
                 // And the pratt parser joins them together
                 let rule_parser = space_parser
                     .clone()
-                    .then(make_parser.build(pratt.clone()).map_with_span(
-                        move |v, range: SimpleSpan| v.build(rule_name.clone(), range.into_range()),
-                    ))
+                    .then(basic_parser)
                     .then(space_parser.clone())
                     .map_with_span({
                         let built_in_rules = built_in_rules.clone();
@@ -173,27 +132,55 @@ impl Cached for CachedMathParser {
                 // e.g. sum_{n=0}^{10} n^2 is a prefix-operator called "sum" with a sub and sup.
                 // e.g. \circ_0 is an infix-operator called "+" with a sub. That can appear when writing down formal grammars.
 
+                let sub_rule_name = built_in_rules.sub_rule_name;
                 let sub_parser = built_in_rules
                     .make_container_parser(InputNodeVariant::Sub)
                     .build(pratt.clone())
+                    .map_with_span(move |v, range: SimpleSpan| {
+                        v.build(operator_rule_name.clone(), range.into_range())
+                    })
+                    .then(space_parser.clone())
                     .map_with_span({
                         let built_in_rules = built_in_rules.clone();
-                        move |v, range: SimpleSpan| {
-                            v.build(built_in_rules.sub_rule_name, range.into_range())
+                        move |(sub, spaces_after), range: SimpleSpan| {
+                            (
+                                built_in_rules.whitespaces_node(
+                                    None,
+                                    sub,
+                                    spaces_after,
+                                    range.into_range(),
+                                ),
+                                PostfixBuilderImpl {
+                                    name: sub_rule_name,
+                                },
+                            )
                         }
                     });
+                let sup_rule_name = built_in_rules.sup_rule_name;
                 let sup_parser = built_in_rules
                     .make_container_parser(InputNodeVariant::Sup)
                     .build(pratt.clone())
+                    .map_with_span(move |v: SyntaxNodeBuilder, range: SimpleSpan| {
+                        v.build(operator_rule_name.clone(), range.into_range())
+                    })
+                    .then(space_parser.clone())
                     .map_with_span({
                         let built_in_rules = built_in_rules.clone();
-                        move |v: SyntaxNodeBuilder, range: SimpleSpan| {
-                            v.build(built_in_rules.sup_rule_name, range.into_range())
+                        move |(sup, spaces_after), range: SimpleSpan| {
+                            (
+                                built_in_rules.whitespaces_node(
+                                    None,
+                                    sup,
+                                    spaces_after,
+                                    range.into_range(),
+                                ),
+                                PostfixBuilderImpl {
+                                    name: sup_rule_name,
+                                },
+                            )
                         }
                     });
 
-                let build_postfix_syntax_node_copy = build_postfix_syntax_node.clone();
-                // TODO: Accept spaces after this
                 let rule_parser = match rule {
                     ParseRule::Atom(_, _) => rule_parser.boxed(),
                     ParseRule::Postfix(_, _, _) => rule_parser.boxed(),
@@ -206,8 +193,8 @@ impl Cached for CachedMathParser {
                                 .collect::<Vec<_>>(),
                         )
                         .map(move |(mut node, sub_sups)| {
-                            for postfix_op in sub_sups {
-                                node = (build_postfix_syntax_node_copy.clone())(postfix_op, node);
+                            for (postfix_op, builder) in sub_sups {
+                                node = builder.build(postfix_op, node);
                             }
                             node
                         })
@@ -216,36 +203,34 @@ impl Cached for CachedMathParser {
                     ParseRule::RecoveryEnding(_) => unreachable!(),
                 };
 
-                // with_ctx(...) is such a weird function. It fully specifies a parser context, and then lets you use it as a parser with a different context.
-                // let rule_parser: Boxed<'_, '_, _, _, chumsky::extra::Full<_, _, PrattParseContext>> =
-                // rule_parser.with_ctx(()).boxed();
-
                 match rule {
                     ParseRule::Atom(_, _) => atom_parsers.push(rule_parser),
-                    ParseRule::Prefix(_, strength, _) => prefix_parsers.push(pratt_parser::prefix(
-                        rule_parser,
-                        *strength,
-                        build_prefix_syntax_node.clone(),
-                    )),
-                    ParseRule::LeftInfix(_, strength, _) => {
+                    ParseRule::Prefix(rule_name, strength, _) => {
+                        prefix_parsers.push(pratt_parser::prefix(
+                            rule_parser,
+                            *strength,
+                            PrefixBuilderImpl { name: *rule_name },
+                        ))
+                    }
+                    ParseRule::LeftInfix(rule_name, strength, _) => {
                         infix_parsers.push(pratt_parser::left_infix(
                             rule_parser,
                             *strength,
-                            build_infix_syntax_node.clone(),
+                            InfixBuilderImpl { name: *rule_name },
                         ))
                     }
-                    ParseRule::RightInfix(_, strength, _) => {
+                    ParseRule::RightInfix(rule_name, strength, _) => {
                         infix_parsers.push(pratt_parser::right_infix(
                             rule_parser,
                             *strength,
-                            build_infix_syntax_node.clone(),
+                            InfixBuilderImpl { name: *rule_name },
                         ))
                     }
-                    ParseRule::Postfix(_, strength, _) => {
+                    ParseRule::Postfix(rule_name, strength, _) => {
                         postfix_parsers.push(pratt_parser::postfix(
                             rule_parser,
                             *strength,
-                            build_postfix_syntax_node.clone(),
+                            PostfixBuilderImpl { name: *rule_name },
                         ))
                     }
                     ParseRule::NameOnly(_) => unreachable!(),
