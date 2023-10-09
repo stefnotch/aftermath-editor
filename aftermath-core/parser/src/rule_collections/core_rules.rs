@@ -1,4 +1,4 @@
-use crate::make_parser::{just_symbol_parser, make_brackets_parser, make_empty_brackets_parser};
+use crate::make_parser::{make_brackets_parser, make_empty_brackets_parser};
 use crate::parse_module::*;
 use crate::parse_modules::ParseModules;
 
@@ -90,7 +90,6 @@ impl CoreRules {
                 modules.with_rule_name(Self::rule_name("RoundBrackets")),
                 make_empty_brackets_parser(built_in_rules.operator_rule_name, "(", ")"),
             ),
-            recovery_ending_rule(just_symbol_parser(")")),
         ]
     }
 

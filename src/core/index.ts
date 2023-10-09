@@ -26,6 +26,7 @@ export const ModulesCreator = new ParseModulesBindings();
 // create all the modules
 export const MathModules = {
   BuiltIn: ModulesCreator.get_built_in(),
+  Core: ParseModulesCreator.make_core(ModulesCreator),
   Arithmetic: ParseModulesCreator.make_arithmetic(ModulesCreator),
   Calculus: ParseModulesCreator.make_calculus(ModulesCreator),
   Collections: ParseModulesCreator.make_collections(ModulesCreator),
@@ -70,6 +71,7 @@ export const MathEditorHelper = {
 // TODO: Make this configurable
 export const DefaultParser = makeMathParserWith([
   // MathModules.BuiltIn is already included
+  MathModules.Core,
   MathModules.Arithmetic,
   MathModules.Calculus,
   MathModules.Collections,

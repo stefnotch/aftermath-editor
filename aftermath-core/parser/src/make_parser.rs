@@ -1,4 +1,4 @@
-use chumsky::Parser;
+use chumsky::{primitive::end, Parser};
 
 use crate::{
     parser::pratt_parser::{call_pratt_parser, Strength},
@@ -100,7 +100,11 @@ pub fn make_brackets_parser(
     crate::make_parser::MakeParserFn(move |parser| {
         just_symbol(starting_bracket.clone())
             .map_with_span(|v, span| (v, span.into_range()))
-            .then(call_pratt_parser(parser, (0, Strength::Weak), None))
+            .then(call_pratt_parser(
+                parser,
+                (0, Strength::Weak),
+                just_symbol(ending_bracket.clone()).map(|_| ()).boxed(),
+            ))
             .then(
                 just_symbol(ending_bracket.clone()).map_with_span(|v, span| (v, span.into_range())),
             )

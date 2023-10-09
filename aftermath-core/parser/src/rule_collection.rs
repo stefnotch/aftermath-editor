@@ -43,12 +43,12 @@ pub type PrattParserType<'a, 'b> = PrattParser<
         BoxedNodeParser<'a, 'b>,
         BoxedNodeParser<'a, 'b>,
         BoxedNodeParser<'a, 'b>,
-        BoxedNothingParser<'a, 'b>,
         InfixBuilderImpl,
         PrefixBuilderImpl,
         PostfixBuilderImpl,
         SyntaxNode,
     >,
+    BoxedNothingParser<'a, 'b>,
 >;
 
 pub type RcPrattParserType<'a, 'b> = RcOrWeak<PrattParserType<'a, 'b>>;

@@ -83,7 +83,7 @@ fn test_sub() {
     let (parsed, modules) = parse_row(&layout);
     assert_eq!(
         parsed.with_display(modules.get_rule_name_map()).to_string(),
-        r#"(BuiltIn::Sub (Core::Variable "a") (BuiltIn::Row 1x1 (Arithmetic::Number "1")))"#
+        r#"(BuiltIn::Sub (Core::Variable "a") (BuiltIn::Operator 1x1 (Arithmetic::Number "1")))"#
     );
 }
 
@@ -101,8 +101,8 @@ fn test_sup_sub() {
         format!(
             "{}{}{}",
             r#"(BuiltIn::Sub "#,
-            r#"(BuiltIn::Sup (Core::Variable "a") (BuiltIn::Row 1x1 (Arithmetic::Number "1")))"#,
-            r#" (BuiltIn::Row 1x1 (Arithmetic::Number "2")))"#
+            r#"(BuiltIn::Sup (Core::Variable "a") (BuiltIn::Operator 1x1 (Arithmetic::Number "1")))"#,
+            r#" (BuiltIn::Operator 1x1 (Arithmetic::Number "2")))"#
         )
     );
 }
@@ -143,7 +143,7 @@ fn test_parser_tuple() {
     let (parsed, modules) = parse_row(&layout);
     assert_eq!(
         parsed.with_display(modules.get_rule_name_map()).to_string(),
-        r#"(Collection::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b"))"#
+        r#"(Collections::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b"))"#
     );
 }
 
@@ -165,7 +165,7 @@ fn test_parser_tuple_advanced() {
         format!(
             "{}{}{}",
             r#"(Core::RoundBrackets (BuiltIn::Operator "(") "#,
-            r#"(Collection::Tuple (Collection::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b")) (BuiltIn::Operator ",") (Core::Variable "c")) "#,
+            r#"(Collections::Tuple (Collections::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b")) (BuiltIn::Operator ",") (Core::Variable "c")) "#,
             r#"(BuiltIn::Operator ")"))"#
         )
     );
@@ -187,8 +187,8 @@ fn test_parser_function_call() {
         parsed.with_display(modules.get_rule_name_map()).to_string(),
         format!(
             "{}{}{}",
-            r#"(Function::FunctionApplication (Core::Variable "f") (BuiltIn::Argument (BuiltIn::Operator "(") ("#,
-            r#"Collection::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b")"#,
+            r#"(Function::FunctionApplication (Core::Variable "f") (BuiltIn::Operator (BuiltIn::Operator "(") ("#,
+            r#"Collections::Tuple (Core::Variable "a") (BuiltIn::Operator ",") (Core::Variable "b")"#,
             r#") (BuiltIn::Operator ")")))"#
         )
     );

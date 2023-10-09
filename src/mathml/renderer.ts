@@ -59,38 +59,35 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
         return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });
       builtIn.add("Operator", (syntaxTree, rowIndex, options) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
-        return new SymbolMathMLElement(syntaxTree, rowIndex, "mo", {
-          isStretchy: options.stretchyOperators ?? false,
-        });
-      });
-      builtIn.add("Argument", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
-        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
+        // There are also operators that actually have children, like sub and superscripts
+        if (hasSyntaxNodeChildren(syntaxTree, "Leaf")) {
+          return new SymbolMathMLElement(syntaxTree, rowIndex, "mo", {
+            isStretchy: options.stretchyOperators ?? false,
+          });
+        } else if (hasSyntaxNodeChildren(syntaxTree, "Children")) {
+          return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
+        } else {
+          assert(
+            false,
+            "Operator has neither children nor leaf. This means that it's a NewRows operator, like a superscript. Those need to be handled one level further up."
+          );
+        }
       });
       builtIn.add("Fraction", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "NewRows"));
         return new RowsContainerMathMLElement(syntaxTree, rowIndex, "mfrac", this);
       });
-      builtIn.add("Under", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "NewRows"));
-        return new RowsContainerMathMLElement(syntaxTree, rowIndex, "munder", this);
-      });
-      builtIn.add("Over", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "NewRows"));
-        return new RowsContainerMathMLElement(syntaxTree, rowIndex, "mover", this);
-      });
       builtIn.add("Sup", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
-        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "msup", this);
+        assert(hasSyntaxNodeChildren(syntaxTree.children.Children[1], "NewRows"));
+        // TODO: Properly render sub and sup
+        //return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "msup", this);
       });
       builtIn.add("Sub", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
-        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "msub", this);
-      });
-      builtIn.add("Row", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "NewRows"));
-        return new RowsContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
+        assert(hasSyntaxNodeChildren(syntaxTree.children.Children[1], "NewRows"));
+        // TODO: Properly render sub and sup
+        //return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "msub", this);
       });
       builtIn.add("Root", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "NewRows"));
@@ -127,10 +124,6 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
         assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
         return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this, { stretchyOperators: true });
       });
-      core.add("Subscript", (syntaxTree, rowIndex) => {
-        assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
-        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
-      });
     }
     {
       const arithmetic = this.rendererCollection("Arithmetic");
@@ -154,9 +147,8 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
         return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });
       calculus.add(["Integral", "Sum"], (syntaxTree, rowIndex) => {
-        console.error(syntaxTree);
-        assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
-        return new TextMathMLElement(syntaxTree, rowIndex, "mn");
+        assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
+        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
       });
     }
     {

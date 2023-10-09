@@ -193,9 +193,12 @@ impl BuiltInRules {
                 let new_grid = GridVec::from_one_dimensional(
                     v.values()
                         .map(|row| {
-                            let p: BoxedNodeParser =
-                                call_pratt_parser(parser.clone(), (0, Strength::Weak), None)
-                                    .boxed();
+                            let p: BoxedNodeParser = call_pratt_parser(
+                                parser.clone(),
+                                (0, Strength::Weak),
+                                end().boxed(),
+                            )
+                            .boxed();
                             let parsed = p.parse(&row.values);
                             let (output, errors) = parsed.into_output_errors();
                             let output = output.unwrap_or_else(|| {

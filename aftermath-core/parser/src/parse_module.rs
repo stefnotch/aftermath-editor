@@ -28,8 +28,6 @@ pub enum ParseRule {
     LeftInfix(SyntaxNodeNameId, u16, Box<dyn MakeParser>),
     RightInfix(SyntaxNodeNameId, u16, Box<dyn MakeParser>),
     Postfix(SyntaxNodeNameId, u16, Box<dyn MakeParser>),
-    /// A rule for error recovery. Will never result in a syntax node.
-    RecoveryEnding(Box<dyn MakeParser>),
 }
 impl ParseRule {
     pub fn rule_name(&self) -> Option<&SyntaxNodeNameId> {
@@ -40,7 +38,6 @@ impl ParseRule {
             ParseRule::LeftInfix(name, _, _) => Some(name),
             ParseRule::RightInfix(name, _, _) => Some(name),
             ParseRule::Postfix(name, _, _) => Some(name),
-            ParseRule::RecoveryEnding(_) => None,
         }
     }
 }
@@ -83,10 +80,6 @@ pub fn postfix_rule(
     parser: impl MakeParser + 'static,
 ) -> ParseRule {
     ParseRule::Postfix(name, priority, Box::new(parser))
-}
-
-pub fn recovery_ending_rule(parser: impl MakeParser + 'static) -> ParseRule {
-    ParseRule::RecoveryEnding(Box::new(parser))
 }
 
 // Old notes:

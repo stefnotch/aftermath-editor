@@ -20,7 +20,6 @@ pub struct PrattSymbolParsers<
     InfixParser,
     PrefixParser,
     PostfixParser,
-    EndingParser,
     InfixBuilder,
     PrefixBuilder,
     PostfixBuilder,
@@ -31,8 +30,6 @@ pub struct PrattSymbolParsers<
     infix_ops: Vec<OpParser<InfixParser, InfixBuilder>>,
     prefix_ops: Vec<OpParser<PrefixParser, PrefixBuilder>>,
     postfix_ops: Vec<OpParser<PostfixParser, PostfixBuilder>>,
-    /// Used for error recovery, to check if we're at the end of the input
-    ending_parser: EndingParser,
     phantom: std::marker::PhantomData<Op>,
 }
 
@@ -41,7 +38,6 @@ impl<
         InfixParser,
         PrefixParser,
         PostfixParser,
-        EndingParser,
         InfixBuilder,
         PrefixBuilder,
         PostfixBuilder,
@@ -52,7 +48,6 @@ impl<
         InfixParser,
         PrefixParser,
         PostfixParser,
-        EndingParser,
         InfixBuilder,
         PrefixBuilder,
         PostfixBuilder,
@@ -64,26 +59,24 @@ impl<
         infix_ops: Vec<OpParser<InfixParser, InfixBuilder>>,
         prefix_ops: Vec<OpParser<PrefixParser, PrefixBuilder>>,
         postfix_ops: Vec<OpParser<PostfixParser, PostfixBuilder>>,
-        ending_parser: EndingParser,
     ) -> Self {
         Self {
             atom,
             infix_ops,
             prefix_ops,
             postfix_ops,
-            ending_parser,
             phantom: std::marker::PhantomData,
         }
     }
 }
 
-pub struct PrattParser<'a, I, O, E, Symbols>
+pub struct PrattParser<'a, I, O, E, Symbols, EndingParser>
 where
     I: Input<'a>,
 {
     symbols: Symbols,
     error_handler: PrattParseErrorHandler<MaybeRef<'a, I::Token>, I::Span, O>,
-    _phantom: std::marker::PhantomData<(I, O, E)>,
+    _phantom: std::marker::PhantomData<(I, O, E, EndingParser)>,
 }
 
 pub enum RcOrWeak<T> {
@@ -115,11 +108,10 @@ pub struct PrattParserCaller_<'a, I, O, E, Symbols, EndingParser>
 where
     I: Input<'a>,
 {
-    internal: RcOrWeak<PrattParser<'a, I, O, E, Symbols>>,
+    internal: RcOrWeak<PrattParser<'a, I, O, E, Symbols, EndingParser>>,
     min_binding_power: (u16, Strength),
-    /// Used for recovery, to check if we're at the end of the pratt parse.
-    /// If the current token has a really weird ending parser that should only be used in this specific situation, then this can be used.
-    bonus_ending_parser: Option<EndingParser>,
+    /// To check if we're at the end of the pratt parse.
+    ending_parser: EndingParser,
 }
 
 impl<'a, I, O, E, Symbols, EndingParser> Clone
@@ -132,7 +124,7 @@ where
         Self {
             internal: self.internal.clone(),
             min_binding_power: self.min_binding_power,
-            bonus_ending_parser: self.bonus_ending_parser.clone(),
+            ending_parser: self.ending_parser.clone(),
         }
     }
 }
@@ -176,12 +168,12 @@ impl<
             InfixParser,
             PrefixParser,
             PostfixParser,
-            EndingParser,
             InfixBuilder,
             PrefixBuilder,
             PostfixBuilder,
             Op,
         >,
+        EndingParser,
     >
 where
     I: Input<'a>,
@@ -200,17 +192,10 @@ where
         infix_ops: Vec<OpParser<InfixParser, InfixBuilder>>,
         prefix_ops: Vec<OpParser<PrefixParser, PrefixBuilder>>,
         postfix_ops: Vec<OpParser<PostfixParser, PostfixBuilder>>,
-        ending_parser: EndingParser,
         error_handler: PrattParseErrorHandler<MaybeRef<'a, I::Token>, I::Span, O>,
     ) -> Self {
         Self {
-            symbols: PrattSymbolParsers::new(
-                atom,
-                infix_ops,
-                prefix_ops,
-                postfix_ops,
-                ending_parser,
-            ),
+            symbols: PrattSymbolParsers::new(atom, infix_ops, prefix_ops, postfix_ops),
             error_handler,
             _phantom: std::marker::PhantomData,
         }
@@ -219,29 +204,25 @@ where
     fn is_at_end<'parse>(
         &self,
         inp: &mut InputRef<'a, 'parse, I, E>,
-        bonus_ending_parser: &Option<EndingParser>,
+        ending_parser: &EndingParser,
     ) -> bool {
         if inp.is_at_end() {
             return true;
         }
-        inp.can_parse(&self.symbols.ending_parser)
-            || match bonus_ending_parser {
-                Some(parser) => inp.can_parse(parser),
-                None => false,
-            }
+        inp.can_parse(ending_parser)
     }
 
     fn parse_unknown<'parse>(
         &self,
         inp: &mut InputRef<'a, 'parse, I, E>,
-        bonus_ending_parser: &Option<EndingParser>,
+        ending_parser: &EndingParser,
     ) -> O {
         let start_offset = inp.input_position();
 
         let unknown_input = inp.next_maybe().unwrap(); // TODO: Don't just unwrap here
         let mut unknown_atom = (self.error_handler.make_unknown_atom)(start_offset, unknown_input);
         loop {
-            if self.is_at_end(inp, bonus_ending_parser)
+            if self.is_at_end(inp, ending_parser)
                 || inp.can_parse_iter(&self.symbols.prefix_ops)
                 || inp.can_parse(&self.symbols.atom)
                 || inp.can_parse_iter(&self.symbols.infix_ops)
@@ -298,7 +279,7 @@ where
         &self,
         inp: &mut InputRef<'a, '_, I, E>,
         min_binding_power: (u16, Strength),
-        bonus_ending_parser: &Option<EndingParser>,
+        ending_parser: &EndingParser,
     ) -> PrattParseResult<O> {
         // Iterative-ish version of the above
         let mut left = if inp.is_at_end() {
@@ -307,7 +288,7 @@ where
             ));
         } else if let Some((value, op)) = inp.parse_iter(&self.symbols.prefix_ops) {
             let right = self
-                .pratt_parse(inp, op.binding_power.strength_right(), bonus_ending_parser)
+                .pratt_parse(inp, op.binding_power.strength_right(), ending_parser)
                 .map(|right| op.build.build(value, right));
             match right {
                 PrattParseResult::Expression(value) => value,
@@ -323,13 +304,13 @@ where
             || inp.can_parse_iter(&self.symbols.postfix_ops)
         {
             (self.error_handler.make_missing_atom)(inp.input_position())
-        } else if self.is_at_end(inp, bonus_ending_parser) {
+        } else if self.is_at_end(inp, ending_parser) {
             // Don't try to parse more if we're at the end
             return PrattParseResult::End((self.error_handler.make_missing_atom)(
                 inp.input_position(),
             ));
         } else {
-            self.parse_unknown(inp, bonus_ending_parser)
+            self.parse_unknown(inp, ending_parser)
         };
 
         loop {
@@ -343,7 +324,7 @@ where
                     return PrattParseResult::Expression(left);
                 }
                 let right = self
-                    .pratt_parse(inp, op.binding_power.strength_right(), bonus_ending_parser)
+                    .pratt_parse(inp, op.binding_power.strength_right(), ending_parser)
                     .map(|right| op.build.build(value, (left, right)));
                 match right {
                     PrattParseResult::Expression(value) => left = value,
@@ -377,7 +358,7 @@ where
                         self.error_handler
                             .missing_operator_binding_power
                             .strength_right(),
-                        bonus_ending_parser,
+                        ending_parser,
                     )
                     .map(|right| {
                         (self.error_handler.make_missing_operator)(start_offset, (left, right))
@@ -388,13 +369,13 @@ where
                         return PrattParseResult::End(value);
                     }
                 };
-            } else if self.is_at_end(inp, bonus_ending_parser) {
+            } else if self.is_at_end(inp, ending_parser) {
                 // Don't try to parse more if we're at the end
                 return PrattParseResult::End(left);
             } else {
                 // Unknown
                 let start_offset = inp.input_position();
-                let right = self.parse_unknown(inp, bonus_ending_parser);
+                let right = self.parse_unknown(inp, ending_parser);
                 left = (self.error_handler.make_missing_operator)(start_offset, (left, right));
             }
         }
@@ -426,7 +407,6 @@ impl<
             InfixParser,
             PrefixParser,
             PostfixParser,
-            EndingParser,
             InfixBuilder,
             PrefixBuilder,
             PostfixBuilder,
@@ -450,11 +430,10 @@ where
     fn parse(&self, inp: &mut InputRef<'a, '_, I, E>) -> Result<O, E::Error> {
         // TODO: A single "(Error::MissingToken)" should become "(BuiltIn::Nothing)"
 
-        let result = self.internal.inner().pratt_parse(
-            inp,
-            self.min_binding_power,
-            &self.bonus_ending_parser,
-        );
+        let result =
+            self.internal
+                .inner()
+                .pratt_parse(inp, self.min_binding_power, &self.ending_parser);
         match result {
             PrattParseResult::Expression(v) => Ok(v),
             PrattParseResult::End(v) => Ok(v),
@@ -465,9 +444,9 @@ pub type PrattParserCaller<'a, I, O, E, Symbols, EndingParser> =
     Ext<PrattParserCaller_<'a, I, O, E, Symbols, EndingParser>>;
 
 pub fn call_pratt_parser<'a, I, O, E, Symbols, EndingParser>(
-    parser_internal: RcOrWeak<PrattParser<'a, I, O, E, Symbols>>,
+    parser_internal: RcOrWeak<PrattParser<'a, I, O, E, Symbols, EndingParser>>,
     min_binding_power: (u16, Strength),
-    bonus_ending_parser: Option<EndingParser>,
+    ending_parser: EndingParser,
 ) -> PrattParserCaller<'a, I, O, E, Symbols, EndingParser>
 where
     I: Input<'a>,
@@ -477,15 +456,18 @@ where
     Ext(PrattParserCaller_ {
         internal: parser_internal,
         min_binding_power,
-        bonus_ending_parser,
+        ending_parser,
     })
 }
 
 pub fn pratt_parse_recursive<'a, I, O, E, Symbols, EndingParser, F>(
+    ending_parser: EndingParser,
     f: F,
 ) -> PrattParserCaller<'a, I, O, E, Symbols, EndingParser>
 where
-    F: FnOnce(RcOrWeak<PrattParser<'a, I, O, E, Symbols>>) -> PrattParser<'a, I, O, E, Symbols>,
+    F: FnOnce(
+        RcOrWeak<PrattParser<'a, I, O, E, Symbols, EndingParser>>,
+    ) -> PrattParser<'a, I, O, E, Symbols, EndingParser>,
     I: Input<'a>,
     EndingParser: Parser<'a, I, (), E>,
     E: ParserExtra<'a, I>,
@@ -498,7 +480,7 @@ where
     Ext(PrattParserCaller_ {
         internal: RcOrWeak::Owned(strong_ref),
         min_binding_power: (0, Strength::Weak),
-        bonus_ending_parser: None,
+        ending_parser,
     })
 }
 

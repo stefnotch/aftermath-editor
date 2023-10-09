@@ -37,7 +37,7 @@ impl Cached for CachedMathParser {
     type Parser<'src> = Boxed<'src, 'src, ParserInput<'src>, SyntaxNode, BasicParserExtra>;
 
     fn make_parser<'src>(self) -> Self::Parser<'src> {
-        pratt_parse_recursive(move |pratt| {
+        pratt_parse_recursive(chumsky::primitive::end().boxed(), move |pratt| {
             let built_in_rules = self.parse_modules.get_built_in().clone();
             let operator_rule_name = built_in_rules.operator_rule_name;
 
@@ -47,7 +47,6 @@ impl Cached for CachedMathParser {
             let mut prefix_parsers = vec![];
             let mut postfix_parsers = vec![];
             let mut infix_parsers = vec![];
-            let mut ending_parsers = vec![];
 
             let space_parser = chumsky::select_ref! {
               input_tree::node::InputNode::Symbol(v) if v == " " => v.clone(),
@@ -76,10 +75,6 @@ impl Cached for CachedMathParser {
                 if let ParseRule::NameOnly(_) = rule {
                     continue;
                 }
-                if let ParseRule::RecoveryEnding(recovery_parser) = rule {
-                    ending_parsers.push(recovery_parser.build(pratt.clone()).map(|_| ()).boxed());
-                    continue;
-                }
 
                 // Okay, so to move something into the closure
                 // I first had to create a copy here
@@ -94,7 +89,6 @@ impl Cached for CachedMathParser {
                             | ParseRule::RightInfix(_, _, make_parser)
                             | ParseRule::Postfix(_, _, make_parser) => make_parser,
                             ParseRule::NameOnly(_) => unreachable!(),
-                            ParseRule::RecoveryEnding(_) => unreachable!(),
                         };
                         let rule_name = match rule {
                             ParseRule::Atom(rule_name, _) => *rule_name,
@@ -103,7 +97,6 @@ impl Cached for CachedMathParser {
                             | ParseRule::RightInfix(_, _, _)
                             | ParseRule::Postfix(_, _, _) => operator_rule_name,
                             ParseRule::NameOnly(_) => unreachable!(),
-                            ParseRule::RecoveryEnding(_) => unreachable!(),
                         };
                         make_parser.build(pratt.clone()).map_with_span(
                             move |v, range: SimpleSpan| v.build(rule_name, range.into_range()),
@@ -200,7 +193,6 @@ impl Cached for CachedMathParser {
                         })
                         .boxed(),
                     ParseRule::NameOnly(_) => unreachable!(),
-                    ParseRule::RecoveryEnding(_) => unreachable!(),
                 };
 
                 match rule {
@@ -234,13 +226,11 @@ impl Cached for CachedMathParser {
                         ))
                     }
                     ParseRule::NameOnly(_) => unreachable!(),
-                    ParseRule::RecoveryEnding(_) => unreachable!(),
                 };
             }
 
             // I'm not using greedy_choice for now.
             let atom = chumsky::primitive::choice(atom_parsers);
-            let ending_parser = chumsky::primitive::choice(ending_parsers).boxed();
 
             // I'll accept two limitations for now
             // - A sequence of commas will end up being nested
@@ -251,7 +241,6 @@ impl Cached for CachedMathParser {
                 infix_parsers,
                 prefix_parsers,
                 postfix_parsers,
-                ending_parser,
                 PrattParseErrorHandler {
                     make_missing_atom: Rc::new({
                         let built_in_rules = built_in_rules.clone();
