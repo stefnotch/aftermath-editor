@@ -1,7 +1,8 @@
-# next
+# v0.2.3
 
 - Copy-pasting
 - Selections with double click and drag. Also with triple click.
+- Parser error recovery
 
 # v0.2.3
 
