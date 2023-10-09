@@ -1,6 +1,6 @@
 import type { SyntaxNodeWith } from "../../core";
 import type { RowIndex } from "../../input-tree/row-indices";
-import type { RenderedElement, Renderer } from "../../rendering/render-result";
+import type { ImmediateRenderingOptions, RenderedElement, Renderer } from "../../rendering/render-result";
 import type { ViewportCoordinate } from "../../rendering/viewport-coordinate";
 import { assert } from "../../utils/assert";
 import type { MathMLTags } from "../mathml-spec";
@@ -17,20 +17,12 @@ export class SimpleContainerMathMLElement implements RenderedElement<MathMLEleme
     public rowIndex: RowIndex | null,
     elementName: MathMLTags,
     renderer: Renderer<MathMLElement>,
-    options: Partial<{
-      stretchyOperators: boolean;
-    }> = {}
+    options: Partial<ImmediateRenderingOptions<MathMLElement>> = {}
   ) {
     assert(syntaxTree.children.Children.length > 0, "Needs at least one child");
     this.element = new RenderedMathML(createMathElement(elementName, []));
 
-    this.element.setChildren(
-      syntaxTree.children.Children.map((c) =>
-        renderer.render(c, null, {
-          stretchyOperators: options.stretchyOperators,
-        })
-      )
-    );
+    this.element.setChildren(syntaxTree.children.Children.map((c) => renderer.render(c, null, options)));
     assert(this.element.getChildren().length === this.syntaxTree.children.Children.length, "Invalid number of children");
     assert(this.element.getChildren().length > 0, "Needs at least one rendered child");
   }

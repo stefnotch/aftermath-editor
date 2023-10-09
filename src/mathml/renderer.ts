@@ -31,7 +31,7 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
     (
       syntaxTree: SyntaxNode,
       rowIndex: RowIndex | null,
-      options: Partial<ImmediateRenderingOptions>
+      options: Partial<ImmediateRenderingOptions<MathMLElement>>
     ) => RenderedElement<MathMLElement>
   > = new Map();
 
@@ -54,9 +54,11 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
         assert(hasSyntaxNodeChildren(syntaxTree, "Leaf"));
         return new TextMathMLElement(syntaxTree, rowIndex, "mspace");
       });
-      builtIn.add("Whitespaces", (syntaxTree, rowIndex) => {
+      builtIn.add("Whitespaces", (syntaxTree, rowIndex, options) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
-        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
+        // Pass the rendering options straight through a whitespaces node
+        // This is needed so that the options can actually affect the rendering of stretchy/NewRows/... operators, instead of being blocked by the whitespace node
+        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this, options);
       });
       builtIn.add("Operator", (syntaxTree, rowIndex, options) => {
         // There are also operators that actually have children, like sub and superscripts
@@ -67,10 +69,12 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
         } else if (hasSyntaxNodeChildren(syntaxTree, "Children")) {
           return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "mrow", this);
         } else {
+          assert(hasSyntaxNodeChildren(syntaxTree, "NewRows"));
           assert(
-            false,
-            "Operator has neither children nor leaf. This means that it's a NewRows operator, like a superscript. Those need to be handled one level further up."
+            options.newRowsOperatorOverride,
+            "Operator has neither children nor leaf. This means that it's a NewRows operator, like a superscript. Those need have a newRowsOperatorOverride"
           );
+          return options.newRowsOperatorOverride(syntaxTree, rowIndex);
         }
       });
       builtIn.add("Fraction", (syntaxTree, rowIndex) => {
@@ -80,14 +84,22 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
       builtIn.add("Sup", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
         assert(hasSyntaxNodeChildren(syntaxTree.children.Children[1], "NewRows"));
-        // TODO: Properly render sub and sup
-        //return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "msup", this);
+        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "msup", this, {
+          newRowsOperatorOverride: (node) => {
+            assert(hasSyntaxNodeChildren(node, "NewRows"));
+            return new RowsContainerMathMLElement(node, rowIndex, "mrow", this);
+          },
+        });
       });
       builtIn.add("Sub", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "Children"));
         assert(hasSyntaxNodeChildren(syntaxTree.children.Children[1], "NewRows"));
-        // TODO: Properly render sub and sup
-        //return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "msub", this);
+        return new SimpleContainerMathMLElement(syntaxTree, rowIndex, "msub", this, {
+          newRowsOperatorOverride: (node) => {
+            assert(hasSyntaxNodeChildren(node, "NewRows"));
+            return new RowsContainerMathMLElement(node, rowIndex, "mrow", this);
+          },
+        });
       });
       builtIn.add("Root", (syntaxTree, rowIndex) => {
         assert(hasSyntaxNodeChildren(syntaxTree, "NewRows"));
@@ -210,7 +222,7 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
       renderer: (
         syntaxTree: SyntaxNode,
         rowIndex: RowIndex | null,
-        options: Partial<ImmediateRenderingOptions>
+        options: Partial<ImmediateRenderingOptions<MathMLElement>>
       ) => RenderedElement<MathMLElement>
     ): void {
       let name = self.nameMap.get(joinPathIdentifier(nameFull));
@@ -245,7 +257,7 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
           renderer: (
             syntaxTree: SyntaxNode,
             rowIndex: RowIndex | null,
-            options: Partial<ImmediateRenderingOptions>
+            options: Partial<ImmediateRenderingOptions<MathMLElement>>
           ) => RenderedElement<MathMLElement>
         ) => {
           if (typeof names === "string") {
@@ -273,7 +285,7 @@ export class MathMLRenderer implements Renderer<MathMLElement> {
   render(
     syntaxTree: SyntaxNode,
     rowIndex: RowIndex | null,
-    options: Partial<ImmediateRenderingOptions> = {}
+    options: Partial<ImmediateRenderingOptions<MathMLElement>> = {}
   ): RenderedElement<MathMLElement> {
     const renderer = this.renderers.get(syntaxTree.name);
     assert(renderer, `No renderer for "${syntaxTree.name}"`);

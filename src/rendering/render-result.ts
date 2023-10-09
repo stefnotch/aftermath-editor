@@ -7,14 +7,19 @@ import type { ViewportCoordinate, ViewportRect, ViewportValue } from "./viewport
 /**
  * Rendering options that only apply to the direct children.
  */
-export interface ImmediateRenderingOptions {
+export interface ImmediateRenderingOptions<T> {
   stretchyOperators: boolean;
+  newRowsOperatorOverride: (node: SyntaxNode, rowIndex: RowIndex | null) => RenderedElement<T>;
 }
 
 export interface Renderer<T> {
   renderAll(parsed: ParseResult): RenderResult<T>;
 
-  render(syntaxTree: SyntaxNode, rowIndex: RowIndex | null, options?: Partial<ImmediateRenderingOptions>): RenderedElement<T>;
+  render(
+    syntaxTree: SyntaxNode,
+    rowIndex: RowIndex | null,
+    options?: Partial<ImmediateRenderingOptions<T>>
+  ): RenderedElement<T>;
 }
 
 export type RowIndicesAndOffset = { indices: RowIndices; offset: Offset };
